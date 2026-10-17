@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 public final class ShaderPackScreen extends Screen {
-    private String status = "F6 opens this screen. Only a single final.fsh pass is applied.";
+    private String status = "Post passes support colortex0. Depth, gbuffers, and shadow maps are not connected yet.";
 
     public ShaderPackScreen() {
         super(Component.literal("Veyra Shader Packs"));
@@ -31,15 +31,15 @@ public final class ShaderPackScreen extends Screen {
         for (int i = 0; i < shown; i++) {
             ShaderPack pack = packs.get(i);
             String prefix = VeyraRenderer.selectedPack().filter(pack::equals).isPresent() ? "[Active] " : "";
-            String suffix = pack.supportsFinalPass() ? "" : " (unsupported)";
+            String suffix = pack.supportsPostProcessing() ? "" : " (unsupported)";
             Button button = Button.builder(Component.literal(prefix + pack.name() + suffix), ignored -> {
-                if (!pack.supportsFinalPass()) {
+                if (!pack.supportsPostProcessing()) {
                     status = pack.issue();
                     return;
                 }
                 status = VeyraRenderer.select(pack);
             }).bounds(center - 160, top + 28 + i * 26, 320, 22).build();
-            button.active = pack.supportsFinalPass();
+            button.active = pack.supportsPostProcessing();
             addRenderableWidget(button);
         }
 

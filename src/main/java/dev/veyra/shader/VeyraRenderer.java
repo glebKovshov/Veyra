@@ -11,6 +11,9 @@ import com.mojang.blaze3d.shaders.ShaderSource;
 import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
+import dev.veyra.VeyraClient;
+import dev.veyra.mixin.accessor.MinecraftAccessor;
+import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.PostChain;
@@ -18,23 +21,26 @@ import net.minecraft.client.renderer.PostPass;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.Identifier;
-import dev.veyra.VeyraClient;
-import dev.veyra.mixin.accessor.MinecraftAccessor;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class VeyraRenderer {
-    private static final Identifier FINAL_SHADER_ID = Identifier.fromNamespaceAndPath("veyra", "shaderpack/final");
-    private static final Identifier COPY_SHADER_ID = Identifier.fromNamespaceAndPath("veyra", "shaderpack/copy");
-    private static final Identifier FINAL_PIPELINE_ID = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack_final");
-    private static final Identifier COPY_PIPELINE_ID = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack_copy");
-    private static final Identifier SWAP_TARGET_ID = Identifier.fromNamespaceAndPath("veyra", "swap");
+    private static final Identifier SWAP_TARGET_A_ID = Identifier.fromNamespaceAndPath("veyra", "swap_a");
+    private static final Identifier SWAP_TARGET_B_ID = Identifier.fromNamespaceAndPath("veyra", "swap_b");
     private static final Identifier BLIT_VERTEX_ID = Identifier.withDefaultNamespace("core/screenquad");
     private static final String COPY_FRAGMENT_SHADER = """
             #version 450
@@ -51,13 +57,16 @@ public final class VeyraRenderer {
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
     private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final RenderPipeline FINAL_PIPELINE = createPipeline(FINAL_PIPELINE_ID, FINAL_SHADER_ID);
-    private static final RenderPipeline COPY_PIPELINE = createPipeline(COPY_PIPELINE_ID, COPY_SHADER_ID);
+    private static final Pattern OTHER_COLOR_SAMPLER = Pattern.compile("\\bcolortex([1-9][0-9]*)\\b");
+    private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex[0-9]*|DepthSampler)\\b");
+    private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
+    private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private static ShaderPackRepository repository;
-    private static RenderTarget swapTarget;
+    private static RenderTarget swapTargetA;
+    private static RenderTarget swapTargetB;
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
-    private static String compiledShader;
+    private static PipelineSet pipelineSet;
     private static boolean pipelinesDirty = true;
     private static boolean renderingEnabled;
     private static String lastError = "";
@@ -83,19 +92,22 @@ public final class VeyraRenderer {
     }
 
     public static String select(ShaderPack pack) {
+        PipelineSet prepared = null;
         try {
-            String shader = pack.readFinalShader();
-            String adapted = adaptShader(shader);
-            compilePipelines(adapted);
+            prepared = compilePipelines(pack);
             repository.select(pack);
-            compiledShader = adapted;
+            replacePipelineSet(prepared);
+            prepared = null;
             pipelinesDirty = false;
             renderingEnabled = true;
             lastError = "";
-            VeyraClient.LOGGER.info("Enabled final pass from shader pack '{}'.", pack.name());
-            return "Enabled " + pack.name() + ".";
+            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es) from shader pack '{}'.",
+                    pipelineSet.shaderPasses().size(), pack.name());
+            return "Enabled " + pack.name() + " (" + pipelineSet.shaderPasses().size() + " passes).";
         } catch (Exception exception) {
-            renderingEnabled = false;
+            if (prepared != null) {
+                prepared.close();
+            }
             lastError = shortError(exception);
             VeyraClient.LOGGER.error("Could not enable shader pack '{}'.", pack.name(), exception);
             return "Shader compile failed: " + lastError;
@@ -106,6 +118,8 @@ public final class VeyraRenderer {
         try {
             repository.select(null);
             renderingEnabled = false;
+            pipelinesDirty = false;
+            replacePipelineSet(null);
             lastError = "";
             return "Shader pack disabled.";
         } catch (IOException exception) {
@@ -116,6 +130,10 @@ public final class VeyraRenderer {
 
     public static void invalidatePipelines() {
         pipelinesDirty = true;
+        projectionBuffer = null;
+        PIPELINE_CACHE.clear();
+        COMPILED_PIPELINES.clear();
+        replacePipelineSet(null);
     }
 
     public static void render(Minecraft minecraft) {
@@ -132,25 +150,20 @@ public final class VeyraRenderer {
 
             FrameGraphBuilder graph = new FrameGraphBuilder();
             ResourceHandle<RenderTarget> main = graph.importExternal("main", mainTarget);
-            ensureSwapTarget(mainTarget.width, mainTarget.height);
-            ResourceHandle<RenderTarget> swap = graph.importExternal("veyra:shaderpack-swap", swapTarget);
+            ensureSwapTargets(mainTarget.width, mainTarget.height);
+            ResourceHandle<RenderTarget> swapA = graph.importExternal("veyra:shaderpack-swap-a", swapTargetA);
+            ResourceHandle<RenderTarget> swapB = graph.importExternal("veyra:shaderpack-swap-b", swapTargetB);
             Map<Identifier, ResourceHandle<RenderTarget>> targets = new HashMap<>();
             targets.put(PostChain.MAIN_TARGET_ID, main);
-            targets.put(SWAP_TARGET_ID, swap);
+            targets.put(SWAP_TARGET_A_ID, swapA);
+            targets.put(SWAP_TARGET_B_ID, swapB);
 
-            PostPass shaderPass = new PostPass(FINAL_PIPELINE, SWAP_TARGET_ID, Map.of(),
-                    List.of(new PostPass.TargetInput("In", PostChain.MAIN_TARGET_ID, false, true)));
-            PostPass copyPass = new PostPass(COPY_PIPELINE, PostChain.MAIN_TARGET_ID, Map.of(),
-                    List.of(new PostPass.TargetInput("In", SWAP_TARGET_ID, false, true)));
-
-            try {
-                shaderPass.addToFrame(graph, targets, projectionBuffer().getBuffer(mainTarget.width, mainTarget.height));
-                copyPass.addToFrame(graph, targets, projectionBuffer().getBuffer(mainTarget.width, mainTarget.height));
-                graph.execute(GraphicsResourceAllocator.UNPOOLED);
-            } finally {
-                shaderPass.close();
-                copyPass.close();
+            var samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
+            for (PostPass pass : pipelineSet.shaderPasses()) {
+                pass.addToFrame(graph, targets, samplerInfo);
             }
+            pipelineSet.copyPass().addToFrame(graph, targets, samplerInfo);
+            graph.execute(GraphicsResourceAllocator.UNPOOLED);
         } catch (Exception exception) {
             renderingEnabled = false;
             lastError = shortError(exception);
@@ -158,58 +171,85 @@ public final class VeyraRenderer {
         }
     }
 
-    private static CachedOrthoProjectionMatrixBuffer projectionBuffer() {
-        if (projectionBuffer == null) {
-            ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
-            projectionBuffer = ((dev.veyra.mixin.accessor.ShaderManagerAccessor) shaderManager)
-                    .veyra$getPostChainProjectionMatrixBuffer();
-        }
-        return projectionBuffer;
-    }
-
-    private static void ensureSwapTarget(int width, int height) {
-        if (swapTarget == null) {
-            swapTarget = new TextureTarget("Veyra shader pack swap", width, height, false);
-        } else if (swapTarget.width != width || swapTarget.height != height) {
-            swapTarget.resize(width, height);
-        }
-    }
-
     private static void ensurePipelines() throws IOException {
+        if (!pipelinesDirty && pipelineSet != null) {
+            return;
+        }
         ShaderPack pack = repository.getSelected().orElse(null);
         if (pack == null) {
             renderingEnabled = false;
+            replacePipelineSet(null);
             return;
         }
-        if (!pipelinesDirty && compiledShader != null) {
-            return;
-        }
-
-        String adapted = adaptShader(pack.readFinalShader());
-        compilePipelines(adapted);
-        compiledShader = adapted;
+        PipelineSet prepared = compilePipelines(pack);
+        replacePipelineSet(prepared);
         pipelinesDirty = false;
         lastError = "";
+        VeyraClient.LOGGER.info("Loaded {} post-processing pass(es) from shader pack '{}'.",
+                pipelineSet.shaderPasses().size(), pack.name());
     }
 
-    private static void compilePipelines(String finalShader) {
-        Minecraft minecraft = Minecraft.getInstance();
-        ShaderManager shaderManager = ((MinecraftAccessor) minecraft).veyra$getShaderManager();
-        ShaderSource source = (identifier, type) -> {
-            if (identifier.equals(FINAL_SHADER_ID) && type == ShaderType.FRAGMENT) {
-                return finalShader;
+    private static PipelineSet compilePipelines(ShaderPack pack) throws IOException {
+        List<ShaderPack.Program> sources = pack.readPrograms();
+        List<PipelineProgram> programs = new ArrayList<>(sources.size());
+        for (ShaderPack.Program source : sources) {
+            AdaptedShader adapted = adaptShader(source.source());
+            PipelineProgram program = pipelineProgram(source.name(), adapted);
+            compilePipeline(program);
+            programs.add(program);
+        }
+
+        PipelineProgram copyProgram = pipelineProgram("copy", new AdaptedShader(COPY_FRAGMENT_SHADER));
+        compilePipeline(copyProgram);
+
+        List<PostPass> passes = new ArrayList<>(programs.size());
+        try {
+            Identifier inputTarget = PostChain.MAIN_TARGET_ID;
+            for (int index = 0; index < programs.size(); index++) {
+                PipelineProgram program = programs.get(index);
+                Identifier outputTarget = index % 2 == 0 ? SWAP_TARGET_A_ID : SWAP_TARGET_B_ID;
+                List<PostPass.Input> inputs = new ArrayList<>();
+                inputs.add(new PostPass.TargetInput("In", inputTarget, false, true));
+                passes.add(new PostPass(program.pipeline(), outputTarget, Map.of(), inputs));
+                inputTarget = outputTarget;
             }
-            if (identifier.equals(COPY_SHADER_ID) && type == ShaderType.FRAGMENT) {
-                return COPY_FRAGMENT_SHADER;
+        } catch (RuntimeException exception) {
+            passes.forEach(PostPass::close);
+            throw exception;
+        }
+        PostPass copyPass = new PostPass(copyProgram.pipeline(), PostChain.MAIN_TARGET_ID, Map.of(),
+                List.of(new PostPass.TargetInput("In", programs.size() % 2 == 1 ? SWAP_TARGET_A_ID : SWAP_TARGET_B_ID, false, true)));
+        return new PipelineSet(List.copyOf(passes), copyPass);
+    }
+
+    private static PipelineProgram pipelineProgram(String name, AdaptedShader shader) {
+        String hash = sha256(name + '\n' + shader.source());
+        String cacheKey = name + ':' + hash;
+        return PIPELINE_CACHE.computeIfAbsent(cacheKey, ignored -> {
+            String suffix = name + '_' + hash;
+            Identifier shaderId = Identifier.fromNamespaceAndPath("veyra", "shaderpack/" + suffix);
+            Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
+            return new PipelineProgram(shaderId, shader.source(), createPipeline(pipelineId, shaderId));
+        });
+    }
+
+    private static void compilePipeline(PipelineProgram program) {
+        if (COMPILED_PIPELINES.contains(program)) {
+            return;
+        }
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+        ShaderSource source = (identifier, type) -> {
+            if (identifier.equals(program.shaderId()) && type == ShaderType.FRAGMENT) {
+                return program.fragmentSource();
             }
             return shaderManager.getShader(identifier, type);
         };
 
-        CompiledRenderPipeline finalPipeline = RenderSystem.getDevice().precompilePipeline(FINAL_PIPELINE, source);
-        CompiledRenderPipeline copyPipeline = RenderSystem.getDevice().precompilePipeline(COPY_PIPELINE, source);
-        if (!finalPipeline.isValid() || !copyPipeline.isValid()) {
-            throw new IllegalStateException("VulkanMod could not compile one of the post-processing pipelines.");
+        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(program.pipeline(), source);
+        if (!compiled.isValid()) {
+            throw new IllegalStateException("VulkanMod could not compile pipeline " + program.pipeline().getLocation() + ".");
         }
+        COMPILED_PIPELINES.add(program);
     }
 
     private static RenderPipeline createPipeline(Identifier pipeline, Identifier fragmentShader) {
@@ -222,15 +262,23 @@ public final class VeyraRenderer {
                 .build();
     }
 
-    private static String adaptShader(String source) throws IOException {
+    private static AdaptedShader adaptShader(String source) throws IOException {
         if (source == null || source.isBlank()) {
-            throw new IOException("final.fsh is empty.");
+            throw new IOException("Fragment shader is empty.");
         }
         if (source.length() > 1024 * 1024) {
-            throw new IOException("final.fsh exceeds the 1 MiB size limit.");
+            throw new IOException("Fragment shader exceeds the 1 MiB size limit.");
         }
         if (source.contains("gl_FragData")) {
-            throw new IOException("Multiple fragment outputs (gl_FragData) are not supported by the single-target final pass.");
+            throw new IOException("Multiple fragment outputs (gl_FragData) are not supported by the single-target passes.");
+        }
+        Matcher otherSampler = OTHER_COLOR_SAMPLER.matcher(source);
+        if (otherSampler.find()) {
+            throw new IOException("Only colortex0 is currently available to post-processing passes.");
+        }
+        Matcher depthSampler = DEPTH_SAMPLER.matcher(source);
+        if (depthSampler.find()) {
+            throw new IOException("Veyra does not currently support depth texture sampling on VulkanMod.");
         }
 
         String body = source.replace("\uFEFF", "");
@@ -260,15 +308,69 @@ public final class VeyraRenderer {
         }
         adapted.append("uniform sampler2D InSampler;\n")
                 .append("#define colortex0 InSampler\n")
+                .append("#define Sampler0 InSampler\n")
                 .append("#define texcoord texCoord\n")
                 .append("#define gl_FragColor ").append(outputName).append('\n')
-                .append("#define texture2D texture\n")
-                .append(body);
-        return adapted.toString();
+                .append("#define texture2D texture\n");
+        adapted.append(body);
+        return new AdaptedShader(adapted.toString());
+    }
+
+    private static String sha256(String source) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable.", exception);
+        }
+    }
+
+    private static CachedOrthoProjectionMatrixBuffer projectionBuffer() {
+        if (projectionBuffer == null) {
+            ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+            projectionBuffer = ((ShaderManagerAccessor) shaderManager).veyra$getPostChainProjectionMatrixBuffer();
+        }
+        return projectionBuffer;
+    }
+
+    private static void ensureSwapTargets(int width, int height) {
+        if (swapTargetA == null) {
+            swapTargetA = new TextureTarget("Veyra shader pack swap A", width, height, false);
+        } else if (swapTargetA.width != width || swapTargetA.height != height) {
+            swapTargetA.resize(width, height);
+        }
+        if (swapTargetB == null) {
+            swapTargetB = new TextureTarget("Veyra shader pack swap B", width, height, false);
+        } else if (swapTargetB.width != width || swapTargetB.height != height) {
+            swapTargetB.resize(width, height);
+        }
+    }
+
+    private static void replacePipelineSet(PipelineSet next) {
+        PipelineSet old = pipelineSet;
+        pipelineSet = next;
+        if (old != null && old != next) {
+            old.close();
+        }
     }
 
     private static String shortError(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
+
+    private record AdaptedShader(String source) {
+    }
+
+    private record PipelineProgram(Identifier shaderId, String fragmentSource, RenderPipeline pipeline) {
+    }
+
+    private record PipelineSet(List<PostPass> shaderPasses, PostPass copyPass) implements AutoCloseable {
+        @Override
+        public void close() {
+            shaderPasses.forEach(PostPass::close);
+            copyPass.close();
+        }
+    }
+
 }
