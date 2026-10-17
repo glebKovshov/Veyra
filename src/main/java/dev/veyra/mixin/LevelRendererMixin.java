@@ -2,6 +2,7 @@ package dev.veyra.mixin;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
+import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.shader.VeyraShadowRenderer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
@@ -22,5 +23,6 @@ public abstract class LevelRendererMixin {
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
         VeyraShadowRenderer.render(camera, modelView, projection);
+        VeyraRenderer.captureFrameMatrices(modelView, projection);
     }
 }

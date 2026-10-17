@@ -32,6 +32,8 @@ public final class VeyraShadowRenderer {
     private static final float SHADOW_HALF_PLANE = 128.0F;
     private static final MappedBuffer SHADOW_MODEL_VIEW_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final MappedBuffer SHADOW_PROJECTION_BUFFER = new MappedBuffer(16 * Float.BYTES);
+    private static final Matrix4f shadowModelView = new Matrix4f();
+    private static final Matrix4f shadowProjection = new Matrix4f();
 
     private static TextureTarget target;
     private static Framebuffer framebuffer;
@@ -57,9 +59,21 @@ public final class VeyraShadowRenderer {
         return rendering;
     }
 
+    public static Matrix4f shadowModelView() {
+        return new Matrix4f(shadowModelView);
+    }
+
+    public static Matrix4f shadowProjection() {
+        return new Matrix4f(shadowProjection);
+    }
+
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.hasShadowPass()) {
+            shadowModelView.identity();
+            shadowProjection.identity();
+            writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
+            writeMatrix(shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
             return;
         }
 
@@ -80,8 +94,10 @@ public final class VeyraShadowRenderer {
             Matrix4f shadowModelView = shadowView.modelView();
             Matrix4f shadowProjection = new Matrix4f().setOrthoSymmetric(
                     SHADOW_HALF_PLANE * 2.0F, SHADOW_HALF_PLANE * 2.0F, 0.1F, SHADOW_HALF_PLANE * 2.0F, true);
-            writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
-            writeMatrix(shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
+            VeyraShadowRenderer.shadowModelView.set(shadowModelView);
+            VeyraShadowRenderer.shadowProjection.set(shadowProjection);
+            writeMatrix(VeyraShadowRenderer.shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
+            writeMatrix(VeyraShadowRenderer.shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
 
             Frustum shadowFrustum = new Frustum(shadowModelView, shadowProjection);
             shadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
@@ -141,6 +157,10 @@ public final class VeyraShadowRenderer {
             target.destroyBuffers();
             target = null;
         }
+        shadowModelView.identity();
+        shadowProjection.identity();
+        writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
+        writeMatrix(shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
     }
 
     public static void clearBinding() {
