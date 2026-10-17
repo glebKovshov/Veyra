@@ -130,6 +130,7 @@ public final class VeyraRenderer {
     private static final Map<EntityPipelineKey, RenderPipeline> ENTITY_PIPELINE_CACHE = new HashMap<>();
     private static final Map<ParticlePipelineKey, RenderPipeline> PARTICLE_PIPELINE_CACHE = new HashMap<>();
     private static final Map<WeatherPipelineKey, RenderPipeline> WEATHER_PIPELINE_CACHE = new HashMap<>();
+    private static final Map<LightningPipelineKey, RenderPipeline> LIGHTNING_PIPELINE_CACHE = new HashMap<>();
     private static final Map<BeaconBeamPipelineKey, RenderPipeline> BEACON_BEAM_PIPELINE_CACHE = new HashMap<>();
 
     private static ShaderPackRepository repository;
@@ -145,6 +146,7 @@ public final class VeyraRenderer {
     private static EntityPipelineSet entityPipelineSet;
     private static ParticlePipelineSet particlePipelineSet;
     private static WeatherPipelineSet weatherPipelineSet;
+    private static LightningPipelineSet lightningPipelineSet;
     private static BeaconBeamPipelineSet beaconBeamPipelineSet;
     private static GraphicsPipeline cloudPipeline;
     private static GpuTexture sampledDepthTexture;
@@ -154,6 +156,7 @@ public final class VeyraRenderer {
     private static boolean entityPipelineDirty = true;
     private static boolean particlePipelineDirty = true;
     private static boolean weatherPipelineDirty = true;
+    private static boolean lightningPipelineDirty = true;
     private static boolean beaconBeamPipelineDirty = true;
     private static boolean cloudPipelineDirty = true;
     private static Boolean previousUniqueOpaqueLayer;
@@ -186,6 +189,9 @@ public final class VeyraRenderer {
                 .orElse(false);
         weatherPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasWeatherFragment)
+                .orElse(false);
+        lightningPipelineDirty = packRepository.getSelected()
+                .map(ShaderPack::hasLightningFragment)
                 .orElse(false);
         beaconBeamPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasBeaconBeamFragment)
@@ -336,6 +342,27 @@ public final class VeyraRenderer {
         return weatherPipelineSet == null ? null : weatherPipelineSet.pipelines().get(original);
     }
 
+    public static RenderPipeline getLightningPipeline(RenderPipeline original) {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.hasLightningFragment() || !isLightningPipeline(original)) {
+            return null;
+        }
+        if (lightningPipelineDirty) {
+            lightningPipelineDirty = false;
+            try {
+                replaceLightningPipelines(compileLightningPipelines(pack));
+                lastError = "";
+                VeyraClient.LOGGER.info("Loaded {} lightning render pipelines from shader pack '{}'.",
+                        lightningPipelineSet.pipelines().size(), pack.name());
+            } catch (Exception exception) {
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not load gbuffers_lightning from shader pack '{}'.", pack.name(), exception);
+                return null;
+            }
+        }
+        return lightningPipelineSet == null ? null : lightningPipelineSet.pipelines().get(original);
+    }
+
     public static String getLastError() {
         return lastError;
     }
@@ -345,6 +372,7 @@ public final class VeyraRenderer {
         replaceEntityPipelines(null);
         replaceParticlePipelines(null);
         replaceWeatherPipelines(null);
+        replaceLightningPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
     }
@@ -355,6 +383,7 @@ public final class VeyraRenderer {
         EntityPipelineSet preparedEntities = null;
         ParticlePipelineSet preparedParticles = null;
         WeatherPipelineSet preparedWeather = null;
+        LightningPipelineSet preparedLightning = null;
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
         try {
@@ -371,6 +400,9 @@ public final class VeyraRenderer {
             }
             if (pack.hasWeatherFragment()) {
                 preparedWeather = compileWeatherPipelines(pack);
+            }
+            if (pack.hasLightningFragment()) {
+                preparedLightning = compileLightningPipelines(pack);
             }
             if (pack.hasBeaconBeamFragment()) {
                 preparedBeaconBeams = compileBeaconBeamPipelines(pack);
@@ -390,6 +422,8 @@ public final class VeyraRenderer {
             preparedParticles = null;
             replaceWeatherPipelines(preparedWeather);
             preparedWeather = null;
+            replaceLightningPipelines(preparedLightning);
+            preparedLightning = null;
             replaceBeaconBeamPipelines(preparedBeaconBeams);
             preparedBeaconBeams = null;
             replaceCloudPipeline(preparedClouds);
@@ -399,6 +433,7 @@ public final class VeyraRenderer {
             entityPipelineDirty = false;
             particlePipelineDirty = false;
             weatherPipelineDirty = false;
+            lightningPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             cloudPipelineDirty = false;
             renderingEnabled = pipelineSet.passCount() > 0;
@@ -408,10 +443,11 @@ public final class VeyraRenderer {
             int entityPipelineCount = entityPipelineSet == null ? 0 : entityPipelineSet.pipelines().size();
             int particlePipelineCount = particlePipelineSet == null ? 0 : particlePipelineSet.pipelines().size();
             int weatherPipelineCount = weatherPipelineSet == null ? 0 : weatherPipelineSet.pipelines().size();
+            int lightningPipelineCount = lightningPipelineSet == null ? 0 : lightningPipelineSet.pipelines().size();
             int beaconBeamPipelineCount = beaconBeamPipelineSet == null ? 0 : beaconBeamPipelineSet.pipelines().size();
-            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), {} entity pipeline(s), {} particle pipeline(s), {} weather pipeline(s), {} beacon beam pipeline(s), clouds={} from shader pack '{}'.",
+            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), {} entity pipeline(s), {} particle pipeline(s), {} weather pipeline(s), {} lightning pipeline(s), {} beacon beam pipeline(s), clouds={} from shader pack '{}'.",
                     pipelineSet.passCount(), terrainProgramCount, entityPipelineCount, particlePipelineCount,
-                    weatherPipelineCount, beaconBeamPipelineCount, cloudPipeline != null, pack.name());
+                    weatherPipelineCount, lightningPipelineCount, beaconBeamPipelineCount, cloudPipeline != null, pack.name());
             List<String> features = new ArrayList<>();
             if (pipelineSet.passCount() > 0) {
                 features.add(pipelineSet.passCount() + " post passes");
@@ -431,6 +467,9 @@ public final class VeyraRenderer {
             if (weatherPipelineCount > 0) {
                 features.add(weatherPipelineCount + " weather pipelines");
             }
+            if (lightningPipelineCount > 0) {
+                features.add(lightningPipelineCount + " lightning pipelines");
+            }
             if (beaconBeamPipelineCount > 0) {
                 features.add(beaconBeamPipelineCount + " beacon beam pipelines");
             }
@@ -445,6 +484,7 @@ public final class VeyraRenderer {
             preparedEntities = null;
             preparedParticles = null;
             preparedWeather = null;
+            preparedLightning = null;
             preparedBeaconBeams = null;
             if (preparedClouds != null) {
                 preparedClouds.scheduleCleanUp();
@@ -465,12 +505,14 @@ public final class VeyraRenderer {
             entityPipelineDirty = false;
             particlePipelineDirty = false;
             weatherPipelineDirty = false;
+            lightningPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             replacePipelineSet(null);
             replaceTerrainPipelines(null);
             replaceEntityPipelines(null);
             replaceParticlePipelines(null);
             replaceWeatherPipelines(null);
+            replaceLightningPipelines(null);
             replaceBeaconBeamPipelines(null);
             replaceCloudPipeline(null);
             lastError = "";
@@ -491,12 +533,14 @@ public final class VeyraRenderer {
         replaceEntityPipelines(null);
         replaceParticlePipelines(null);
         replaceWeatherPipelines(null);
+        replaceLightningPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
         terrainPipelineDirty = selectedPack().map(ShaderPack::hasTerrainFragment).orElse(false);
         entityPipelineDirty = selectedPack().map(ShaderPack::hasEntityFragment).orElse(false);
         particlePipelineDirty = selectedPack().map(ShaderPack::hasParticleFragment).orElse(false);
         weatherPipelineDirty = selectedPack().map(ShaderPack::hasWeatherFragment).orElse(false);
+        lightningPipelineDirty = selectedPack().map(ShaderPack::hasLightningFragment).orElse(false);
         beaconBeamPipelineDirty = selectedPack().map(ShaderPack::hasBeaconBeamFragment).orElse(false);
         cloudPipelineDirty = selectedPack().map(ShaderPack::hasCloudFragment).orElse(false);
     }
@@ -924,6 +968,59 @@ public final class VeyraRenderer {
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected weather shader.");
+        }
+        return pipeline;
+    }
+
+    private static LightningPipelineSet compileLightningPipelines(ShaderPack pack) throws IOException {
+        List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
+                .filter(VeyraRenderer::isLightningPipeline)
+                .toList();
+        String fragmentSource = pack.readLightningFragment()
+                .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_lightning.fsh."));
+        fragmentSource = LightningShaderAdapter.adaptFragment(fragmentSource);
+        String sourceHash = sha256("gbuffers_lightning\n" + fragmentSource);
+        Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        for (RenderPipeline original : candidates) {
+            LightningPipelineKey cacheKey = new LightningPipelineKey(original, sourceHash);
+            RenderPipeline lightningPipeline = LIGHTNING_PIPELINE_CACHE.get(cacheKey);
+            if (lightningPipeline == null) {
+                lightningPipeline = compileLightningPipeline(original, fragmentSource, sourceHash);
+                LIGHTNING_PIPELINE_CACHE.put(cacheKey, lightningPipeline);
+            }
+            pipelines.put(original, lightningPipeline);
+        }
+        if (pipelines.isEmpty()) {
+            throw new IOException("VulkanMod's Minecraft lightning render pipelines were not found.");
+        }
+        return new LightningPipelineSet(pipelines);
+    }
+
+    private static boolean isLightningPipeline(RenderPipeline pipeline) {
+        if (pipeline == null
+                || !pipeline.getFragmentShader().equals(Identifier.withDefaultNamespace("core/rendertype_lightning"))) {
+            return false;
+        }
+        String location = pipeline.getLocation().getPath();
+        return location.equals("pipeline/lightning") || location.equals("pipeline/dragon_rays");
+    }
+
+    private static RenderPipeline compileLightningPipeline(
+            RenderPipeline original, String fragmentSource, String sourceHash) throws IOException {
+        Identifier fragmentShader = Identifier.fromNamespaceAndPath(
+                "veyra", "shaderpack/lightning/" + sourceHash);
+        RenderPipeline pipeline = copyPipelineWithFragment(original, fragmentShader);
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+        ShaderSource source = (identifier, type) -> {
+            if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
+                return fragmentSource;
+            }
+            return shaderManager.getShader(identifier, type);
+        };
+        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        if (!compiled.isValid()) {
+            throw new IOException("VulkanMod could not compile " + original.getLocation()
+                    + " with the selected lightning shader.");
         }
         return pipeline;
     }
@@ -1701,6 +1798,10 @@ public final class VeyraRenderer {
         weatherPipelineSet = next;
     }
 
+    private static void replaceLightningPipelines(LightningPipelineSet next) {
+        lightningPipelineSet = next;
+    }
+
     private static void replaceBeaconBeamPipelines(BeaconBeamPipelineSet next) {
         beaconBeamPipelineSet = next;
     }
@@ -1729,6 +1830,9 @@ public final class VeyraRenderer {
     }
 
     private record WeatherPipelineKey(RenderPipeline original, String sourceHash) {
+    }
+
+    private record LightningPipelineKey(RenderPipeline original, String sourceHash) {
     }
 
     private record BeaconBeamPipelineKey(RenderPipeline original, String sourceHash) {
@@ -1798,6 +1902,9 @@ public final class VeyraRenderer {
     }
 
     private record WeatherPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
+    }
+
+    private record LightningPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
     }
 
     private record BeaconBeamPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {

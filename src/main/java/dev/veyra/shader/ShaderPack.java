@@ -22,7 +22,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasPostProcessing, Set<String> terrainPrograms,
                          boolean hasCloudFragment, Set<String> entityPrograms, Set<String> particlePrograms,
                          Set<String> weatherPrograms,
-                         boolean hasBeaconBeamFragment, String issue) {
+                         boolean hasBeaconBeamFragment, boolean hasLightningFragment, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
     private static final int MAX_INCLUDE_DEPTH = 32;
@@ -36,6 +36,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "gbuffers_particles", "gbuffers_particles_translucent");
     private static final List<String> WEATHER_PROGRAMS = List.of("gbuffers_weather");
     private static final String BEACON_BEAM_PROGRAM = "gbuffers_beaconbeam";
+    private static final String LIGHTNING_PROGRAM = "gbuffers_lightning";
     private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
             "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
 
@@ -45,7 +46,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private record Inspection(String shaderDirectory, boolean hasPostProcessing,
                               Set<String> terrainPrograms, boolean hasCloudFragment,
                               Set<String> entityPrograms, Set<String> particlePrograms, Set<String> weatherPrograms,
-                              boolean hasBeaconBeamFragment) {
+                              boolean hasBeaconBeamFragment, boolean hasLightningFragment) {
     }
 
     public static ShaderPack inspect(Path path) {
@@ -61,11 +62,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection == null ? Set.of() : inspection.particlePrograms(),
                     inspection == null ? Set.of() : inspection.weatherPrograms(),
                     inspection != null && inspection.hasBeaconBeamFragment(),
+                    inspection != null && inspection.hasLightningFragment(),
                     inspection == null
-                            ? "No supported terrain, clouds, entities, particles, weather, beacon beam, prepare, deferred, composite, or final fragment programs were found."
-                            : "Supported terrain, clouds, entities, particles, weather, beacon beam, and/or post-processing fragment programs are available.");
+                            ? "No supported terrain, clouds, entities, particles, weather, beacon beam, lightning, prepare, deferred, composite, or final fragment programs were found."
+                            : "Supported terrain, clouds, entities, particles, weather, beacon beam, lightning, and/or post-processing fragment programs are available.");
         } catch (IOException | RuntimeException exception) {
-            return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false,
+            return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false, false,
                     "Could not read pack: " + exception.getMessage());
         }
     }
@@ -196,6 +198,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             return Optional.empty();
         }
         String fileName = BEACON_BEAM_PROGRAM + ".fsh";
+        Optional<String> source = readShader(fileName);
+        if (source.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+    }
+
+    public Optional<String> readLightningFragment() throws IOException {
+        if (!supportsShaderPrograms() || !hasLightningFragment) {
+            return Optional.empty();
+        }
+        String fileName = LIGHTNING_PROGRAM + ".fsh";
         Optional<String> source = readShader(fileName);
         if (source.isEmpty()) {
             return Optional.empty();
@@ -360,6 +374,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
             boolean hasCloudFragment = files.contains("gbuffers_clouds.fsh");
             boolean hasBeaconBeamFragment = files.contains(BEACON_BEAM_PROGRAM + ".fsh");
+            boolean hasLightningFragment = files.contains(LIGHTNING_PROGRAM + ".fsh");
             Set<String> entityPrograms = files.stream()
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
@@ -374,8 +389,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
             return hasPostProcessing || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
                     || !particlePrograms.isEmpty() || !weatherPrograms.isEmpty() || hasBeaconBeamFragment
+                    || hasLightningFragment
                     ? new Inspection("shaders", hasPostProcessing, terrainPrograms, hasCloudFragment,
-                            entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment) : null;
+                            entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment, hasLightningFragment) : null;
         }
     }
 
@@ -415,6 +431,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
             boolean hasCloudFragment = files.contains("gbuffers_clouds.fsh");
             boolean hasBeaconBeamFragment = files.contains(BEACON_BEAM_PROGRAM + ".fsh");
+            boolean hasLightningFragment = files.contains(LIGHTNING_PROGRAM + ".fsh");
             Set<String> entityPrograms = files.stream()
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
@@ -428,7 +445,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
             return new Inspection(shaderDirectory, hasPostProcessing, terrainPrograms, hasCloudFragment,
-                    entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment);
+                    entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment, hasLightningFragment);
         }
     }
 
@@ -443,6 +460,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static boolean isSupportedProgramFile(String fileName) {
         return fileName.equals("gbuffers_clouds.fsh")
                 || fileName.equals(BEACON_BEAM_PROGRAM + ".fsh")
+                || fileName.equals(LIGHTNING_PROGRAM + ".fsh")
                 || isSupportedTerrainProgramFile(fileName)
                 || isSupportedEntityProgramFile(fileName)
                 || isSupportedParticleProgramFile(fileName)

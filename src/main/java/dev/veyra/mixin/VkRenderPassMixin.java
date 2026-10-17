@@ -21,6 +21,9 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getWeatherPipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getLightningPipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }
