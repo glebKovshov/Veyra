@@ -33,6 +33,12 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getGlintPipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getSkyBasicPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getSkyTexturedPipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }

@@ -36,19 +36,19 @@ public final class ColorDistanceShaderAdapter {
             Map.entry("vertexColor", "vec4"),
             Map.entry("sphericalVertexDistance", "float"),
             Map.entry("cylindricalVertexDistance", "float"));
-    private static final Map<String, String> INPUT_LOCATIONS = Map.ofEntries(
-            Map.entry("sphericalVertexDistance", "0"),
-            Map.entry("cylindricalVertexDistance", "1"),
-            Map.entry("color", "2"),
-            Map.entry("glcolor", "2"),
-            Map.entry("glColor", "2"),
-            Map.entry("gl_Color", "2"),
-            Map.entry("vertexColor", "2"));
+    private static final Map<String, String> DISTANCE_INPUT_LOCATIONS = Map.of(
+            "sphericalVertexDistance", "0",
+            "cylindricalVertexDistance", "1");
 
     private ColorDistanceShaderAdapter() {
     }
 
     public static String adaptFragment(String source, String programName, boolean flatVertexColor) throws IOException {
+        return adaptFragment(source, programName, flatVertexColor, true, true);
+    }
+
+    public static String adaptFragment(String source, String programName, boolean flatVertexColor,
+                                       boolean hasVertexColor, boolean hasVertexDistances) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -76,11 +76,21 @@ public final class ColorDistanceShaderAdapter {
             if (expectedType == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's color-distance bridge yet.");
             }
+            boolean distanceInput = DISTANCE_INPUT_LOCATIONS.containsKey(name);
+            if (distanceInput && !hasVertexDistances) {
+                throw new IOException(programName + " does not receive vertex distances from Minecraft's vertex shader.");
+            }
+            if (!distanceInput && !hasVertexColor) {
+                throw new IOException(programName + " does not receive vertex color from Minecraft's vertex shader.");
+            }
             if (!expectedType.equals(type)) {
                 throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
             }
             String location = varyingMatcher.group(1);
-            if (location != null && !location.equals(INPUT_LOCATIONS.get(name))) {
+            String expectedLocation = distanceInput
+                    ? DISTANCE_INPUT_LOCATIONS.get(name)
+                    : hasVertexDistances ? "2" : "0";
+            if (location != null && !location.equals(expectedLocation)) {
                 throw new IOException(programName + " input '" + name + "' uses an unsupported location.");
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
@@ -130,12 +140,17 @@ public final class ColorDistanceShaderAdapter {
                 .replaceAll("\\bgl_FragColor\\b", outputName)
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
 
+        String distanceInputs = hasVertexDistances ? """
+                in float sphericalVertexDistance;
+                in float cylindricalVertexDistance;
+                """ : "";
+        String colorInput = hasVertexColor
+                ? (flatVertexColor ? "flat " : "") + "in vec4 vertexColor;\n"
+                : "";
         String bridge = """
-                layout(location = 0) in float sphericalVertexDistance;
-                layout(location = 1) in float cylindricalVertexDistance;
-                layout(location = 2) %sin vec4 vertexColor;
-                layout(location = 0) out vec4 %s;
-                """.formatted(flatVertexColor ? "flat " : "", outputName);
+                %s%s
+                out vec4 %s;
+                """.formatted(distanceInputs, colorInput, outputName);
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');

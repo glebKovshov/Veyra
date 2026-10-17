@@ -56,6 +56,11 @@ public final class TextureColorDistanceShaderAdapter {
     }
 
     public static String adaptFragment(String source, String programName, boolean hasVertexColor) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, true);
+    }
+
+    public static String adaptFragment(String source, String programName,
+                                       boolean hasVertexColor, boolean hasVertexDistances) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -100,6 +105,10 @@ public final class TextureColorDistanceShaderAdapter {
             }
             if (!hasVertexColor && COLOR_INPUTS.contains(name)) {
                 throw new IOException(programName + " does not receive vertex color from Minecraft's vertex shader.");
+            }
+            if (!hasVertexDistances
+                    && (name.equals("sphericalVertexDistance") || name.equals("cylindricalVertexDistance"))) {
+                throw new IOException(programName + " does not receive vertex distances from Minecraft's vertex shader.");
             }
             if (!expectedType.equals(type)) {
                 throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
@@ -158,10 +167,13 @@ public final class TextureColorDistanceShaderAdapter {
                 .replaceAll("\\btexcoord\\b|\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
 
-        String bridge = """
+        String distanceInputs = hasVertexDistances ? """
                 in float sphericalVertexDistance;
                 in float cylindricalVertexDistance;
-                %s
+                """ : "";
+        String colorInput = hasVertexColor ? "in vec4 vertexColor;\n" : "";
+        String bridge = """
+                %s%s
                 in vec2 texCoord0;
                 out vec4 %s;
                 uniform sampler2D Sampler0;
@@ -176,7 +188,7 @@ public final class TextureColorDistanceShaderAdapter {
                 }
                 #define texture Sampler0
                 #define gtexture Sampler0
-                """.formatted(hasVertexColor ? "in vec4 vertexColor;" : "", outputName);
+                """.formatted(distanceInputs, colorInput, outputName);
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
