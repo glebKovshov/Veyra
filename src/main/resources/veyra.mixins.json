@@ -5,13 +5,17 @@
   "client": [
     "MinecraftMixin",
     "GameRendererMixin",
+    "BlockEntityRenderDispatcherMixin",
+    "SubmitNodeCollectionMixin",
     "GuiRendererMixin",
     "ShaderManagerMixin",
     "PipelineManagerMixin",
     "VkRenderPassMixin",
     "accessor.MinecraftAccessor",
     "accessor.ShaderManagerAccessor",
-    "accessor.PostPassAccessor"
+    "accessor.PostPassAccessor",
+    "accessor.RenderSetupAccessor",
+    "accessor.RenderTypeAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

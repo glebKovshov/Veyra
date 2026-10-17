@@ -21,6 +21,8 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
+import dev.veyra.mixin.accessor.RenderSetupAccessor;
+import dev.veyra.mixin.accessor.RenderTypeAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
 import net.vulkanmod.Initializer;
@@ -33,6 +35,8 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.client.renderer.UniformValue;
+import net.minecraft.client.renderer.rendertype.RenderSetup;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.vulkanmod.gl.VkGlTexture;
@@ -151,6 +155,7 @@ public final class VeyraRenderer {
     private static PipelineSet pipelineSet;
     private static TerrainPipelineSet terrainPipelineSet;
     private static EntityPipelineSet entityPipelineSet;
+    private static EntityPipelineSet blockEntityPipelineSet;
     private static EntityPipelineSet handPipelineSet;
     private static ParticlePipelineSet particlePipelineSet;
     private static WeatherPipelineSet weatherPipelineSet;
@@ -169,6 +174,7 @@ public final class VeyraRenderer {
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
     private static boolean entityPipelineDirty = true;
+    private static boolean blockEntityPipelineDirty = true;
     private static boolean handPipelineDirty = true;
     private static boolean particlePipelineDirty = true;
     private static boolean weatherPipelineDirty = true;
@@ -185,7 +191,9 @@ public final class VeyraRenderer {
     private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
     private static final ThreadLocal<Integer> HAND_RENDER_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final ThreadLocal<Integer> BLOCK_ENTITY_SUBMISSION_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static boolean handPipelineRoutingLogged;
+    private static boolean blockEntityPipelineRoutingLogged;
     private static boolean damagedBlockRoutingLogged;
     private static String lastError = "";
     private static long previousFrameNanos;
@@ -209,6 +217,9 @@ public final class VeyraRenderer {
                 .orElse(false);
         entityPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasEntityFragment)
+                .orElse(false);
+        blockEntityPipelineDirty = packRepository.getSelected()
+                .map(ShaderPack::supportsBlockEntityPipeline)
                 .orElse(false);
         handPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::supportsHandPipeline)
@@ -271,6 +282,61 @@ public final class VeyraRenderer {
         } else {
             HAND_RENDER_DEPTH.set(depth - 1);
         }
+    }
+
+    public static void beginBlockEntitySubmission() {
+        BLOCK_ENTITY_SUBMISSION_DEPTH.set(BLOCK_ENTITY_SUBMISSION_DEPTH.get() + 1);
+    }
+
+    public static void endBlockEntitySubmission() {
+        int depth = BLOCK_ENTITY_SUBMISSION_DEPTH.get();
+        if (depth <= 1) {
+            BLOCK_ENTITY_SUBMISSION_DEPTH.remove();
+        } else {
+            BLOCK_ENTITY_SUBMISSION_DEPTH.set(depth - 1);
+        }
+    }
+
+    public static RenderType routeBlockEntityRenderType(RenderType originalType) {
+        if (originalType == null || BLOCK_ENTITY_SUBMISSION_DEPTH.get() == 0) {
+            return originalType;
+        }
+        RenderPipeline original = originalType.pipeline();
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.supportsBlockEntityPipeline() || !isEntityRenderPipeline(original)) {
+            return originalType;
+        }
+        if (blockEntityPipelineDirty) {
+            blockEntityPipelineDirty = false;
+            try {
+                replaceBlockEntityPipelines(compileBlockEntityPipelines(pack));
+                lastError = "";
+                VeyraClient.LOGGER.info("Loaded {} block entity render pipelines from shader pack '{}'.",
+                        blockEntityPipelineSet.pipelines().size(), pack.name());
+            } catch (Exception exception) {
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not load block entity shader programs from shader pack '{}'.", pack.name(), exception);
+                return originalType;
+            }
+        }
+        RenderPipeline replacement = blockEntityPipelineSet == null
+                ? null : blockEntityPipelineSet.pipelines().get(original);
+        if (replacement == null) {
+            return originalType;
+        }
+        if (!blockEntityPipelineRoutingLogged) {
+            VeyraClient.LOGGER.info("Routing block entity pipeline {} through {} from shader pack '{}'.",
+                    original.getLocation(), resolveBlockEntityProgram(pack, original), pack.name());
+            blockEntityPipelineRoutingLogged = true;
+        }
+        RenderSetup originalSetup = ((RenderTypeAccessor) (Object) originalType).veyra$getSetup();
+        RenderSetupAccessor setup = (RenderSetupAccessor) (Object) originalSetup;
+        RenderSetup replacementSetup = RenderSetupAccessor.veyra$create(replacement,
+                setup.veyra$getTextures(), setup.veyra$getUseLightmap(), setup.veyra$getUseOverlay(),
+                setup.veyra$getLayeringTransform(), setup.veyra$getOutputTarget(),
+                setup.veyra$getTextureTransform(), setup.veyra$getOutlineProperty(),
+                setup.veyra$getAffectsCrumbling(), setup.veyra$getSortOnUpload(), setup.veyra$getBufferSize());
+        return RenderTypeAccessor.veyra$create(originalType.toString() + "_veyra_block", replacementSetup);
     }
 
     private static boolean isHandRendering() {
@@ -623,6 +689,7 @@ public final class VeyraRenderer {
     public static void onClientShutdown() {
         restoreUniqueOpaqueLayer();
         replaceEntityPipelines(null);
+        replaceBlockEntityPipelines(null);
         replaceHandPipelines(null);
         replaceParticlePipelines(null);
         replaceWeatherPipelines(null);
@@ -642,6 +709,7 @@ public final class VeyraRenderer {
         PipelineSet prepared = null;
         TerrainPipelineSet preparedTerrain = null;
         EntityPipelineSet preparedEntities = null;
+        EntityPipelineSet preparedBlockEntities = null;
         EntityPipelineSet preparedHand = null;
         ParticlePipelineSet preparedParticles = null;
         WeatherPipelineSet preparedWeather = null;
@@ -663,6 +731,9 @@ public final class VeyraRenderer {
             }
             if (pack.hasEntityFragment()) {
                 preparedEntities = compileEntityPipelines(pack);
+            }
+            if (pack.supportsBlockEntityPipeline()) {
+                preparedBlockEntities = compileBlockEntityPipelines(pack);
             }
             if (pack.supportsHandPipeline()) {
                 preparedHand = compileEntityPipelines(pack, true);
@@ -711,6 +782,8 @@ public final class VeyraRenderer {
             preparedTerrain = null;
             replaceEntityPipelines(preparedEntities);
             preparedEntities = null;
+            replaceBlockEntityPipelines(preparedBlockEntities);
+            preparedBlockEntities = null;
             replaceHandPipelines(preparedHand);
             preparedHand = null;
             replaceParticlePipelines(preparedParticles);
@@ -740,6 +813,7 @@ public final class VeyraRenderer {
             pipelinesDirty = false;
             terrainPipelineDirty = false;
             entityPipelineDirty = false;
+            blockEntityPipelineDirty = false;
             handPipelineDirty = false;
             particlePipelineDirty = false;
             weatherPipelineDirty = false;
@@ -758,6 +832,7 @@ public final class VeyraRenderer {
             boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
             int terrainProgramCount = hasTerrainPipelines ? terrainPipelineSet.pipelines().size() : 0;
             int entityPipelineCount = entityPipelineSet == null ? 0 : entityPipelineSet.pipelines().size();
+            int blockEntityPipelineCount = blockEntityPipelineSet == null ? 0 : blockEntityPipelineSet.pipelines().size();
             int handPipelineCount = handPipelineSet == null ? 0 : handPipelineSet.pipelines().size();
             int particlePipelineCount = particlePipelineSet == null ? 0 : particlePipelineSet.pipelines().size();
             int weatherPipelineCount = weatherPipelineSet == null ? 0 : weatherPipelineSet.pipelines().size();
@@ -770,8 +845,8 @@ public final class VeyraRenderer {
             int texturedPipelineCount = worldBorderPipelineSet == null ? 0 : worldBorderPipelineSet.pipelines().size();
             int damagedBlockPipelineCount = damagedBlockPipelineSet == null ? 0 : damagedBlockPipelineSet.pipelines().size();
             int beaconBeamPipelineCount = beaconBeamPipelineSet == null ? 0 : beaconBeamPipelineSet.pipelines().size();
-            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), {} entity pipeline(s), {} hand pipeline(s), {} damaged-block pipeline(s), {} particle pipeline(s), {} weather pipeline(s), {} lightning pipeline(s), {} basic pipeline(s), {} line pipeline(s), {} glint pipeline(s), {} basic sky pipeline(s), {} textured sky pipeline(s), {} textured world-border pipeline(s), {} beacon beam pipeline(s), clouds={} from shader pack '{}'.",
-                    pipelineSet.passCount(), terrainProgramCount, entityPipelineCount, handPipelineCount, damagedBlockPipelineCount,
+            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), {} entity pipeline(s), {} block entity pipeline(s), {} hand pipeline(s), {} damaged-block pipeline(s), {} particle pipeline(s), {} weather pipeline(s), {} lightning pipeline(s), {} basic pipeline(s), {} line pipeline(s), {} glint pipeline(s), {} basic sky pipeline(s), {} textured sky pipeline(s), {} textured world-border pipeline(s), {} beacon beam pipeline(s), clouds={} from shader pack '{}'.",
+                    pipelineSet.passCount(), terrainProgramCount, entityPipelineCount, blockEntityPipelineCount, handPipelineCount, damagedBlockPipelineCount,
                     particlePipelineCount, weatherPipelineCount, lightningPipelineCount, basicPipelineCount, linePipelineCount,
                     glintPipelineCount, skyBasicPipelineCount, skyTexturedPipelineCount,
                     texturedPipelineCount, beaconBeamPipelineCount, cloudPipeline != null, pack.name());
@@ -787,6 +862,9 @@ public final class VeyraRenderer {
             }
             if (entityPipelineCount > 0) {
                 features.add(entityPipelineCount + " entity pipelines");
+            }
+            if (blockEntityPipelineCount > 0) {
+                features.add(blockEntityPipelineCount + " block entity pipelines");
             }
             if (handPipelineCount > 0) {
                 features.add(handPipelineCount + " first-person hand pipelines");
@@ -862,6 +940,7 @@ public final class VeyraRenderer {
             pipelinesDirty = false;
             terrainPipelineDirty = false;
             entityPipelineDirty = false;
+            blockEntityPipelineDirty = false;
             handPipelineDirty = false;
             particlePipelineDirty = false;
             weatherPipelineDirty = false;
@@ -877,6 +956,7 @@ public final class VeyraRenderer {
             replacePipelineSet(null);
             replaceTerrainPipelines(null);
             replaceEntityPipelines(null);
+            replaceBlockEntityPipelines(null);
             replaceHandPipelines(null);
             replaceParticlePipelines(null);
             replaceWeatherPipelines(null);
@@ -906,6 +986,7 @@ public final class VeyraRenderer {
         replacePipelineSet(null);
         replaceTerrainPipelines(null);
         replaceEntityPipelines(null);
+        replaceBlockEntityPipelines(null);
         replaceHandPipelines(null);
         replaceParticlePipelines(null);
         replaceWeatherPipelines(null);
@@ -921,6 +1002,7 @@ public final class VeyraRenderer {
         replaceCloudPipeline(null);
         terrainPipelineDirty = selectedPack().map(ShaderPack::hasTerrainFragment).orElse(false);
         entityPipelineDirty = selectedPack().map(ShaderPack::hasEntityFragment).orElse(false);
+        blockEntityPipelineDirty = selectedPack().map(ShaderPack::supportsBlockEntityPipeline).orElse(false);
         handPipelineDirty = selectedPack().map(ShaderPack::supportsHandPipeline).orElse(false);
         particlePipelineDirty = selectedPack().map(ShaderPack::hasParticleFragment).orElse(false);
         weatherPipelineDirty = selectedPack().map(ShaderPack::hasWeatherFragment).orElse(false);
@@ -1183,6 +1265,71 @@ public final class VeyraRenderer {
                     : "VulkanMod's Minecraft entity render pipelines were not found.");
         }
         return new EntityPipelineSet(pipelines);
+    }
+
+    private static EntityPipelineSet compileBlockEntityPipelines(ShaderPack pack) throws IOException {
+        List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
+                .filter(VeyraRenderer::isEntityRenderPipeline)
+                .toList();
+        Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        for (RenderPipeline original : candidates) {
+            String programName = resolveBlockEntityProgram(pack, original);
+            if (programName == null) {
+                continue;
+            }
+            boolean fallback = !pack.blockPrograms().contains(programName);
+            String fragmentSource;
+            try {
+                fragmentSource = pack.readBlockFragment(programName)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+            } catch (IOException exception) {
+                if (!fallback) {
+                    throw exception;
+                }
+                VeyraClient.LOGGER.warn("Skipping incompatible {} block entity fallback for {}: {}",
+                        programName, original.getLocation(), exception.getMessage());
+                continue;
+            }
+            String sourceHash = sha256(programName + '\n' + fragmentSource);
+            EntityPipelineKey cacheKey = new EntityPipelineKey(original, programName, sourceHash);
+            RenderPipeline blockPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
+            if (blockPipeline == null) {
+                try {
+                    blockPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                } catch (IOException exception) {
+                    if (!fallback) {
+                        throw exception;
+                    }
+                    VeyraClient.LOGGER.warn("Skipping incompatible {} block entity fallback for {}: {}",
+                            programName, original.getLocation(), exception.getMessage());
+                    continue;
+                }
+                ENTITY_PIPELINE_CACHE.put(cacheKey, blockPipeline);
+            }
+            pipelines.put(original, blockPipeline);
+        }
+        if (pipelines.isEmpty() && !pack.blockPrograms().isEmpty()) {
+            throw new IOException("Minecraft's block entity render pipelines were not found or do not support this shader interface.");
+        }
+        return new EntityPipelineSet(pipelines);
+    }
+
+    private static String resolveBlockEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
+        if (pipeline.getBlendFunction().isPresent()
+                && pack.blockPrograms().contains("gbuffers_block_translucent")) {
+            return "gbuffers_block_translucent";
+        }
+        if (pack.blockPrograms().contains("gbuffers_block")) {
+            return "gbuffers_block";
+        }
+        if (pack.terrainPrograms().contains("gbuffers_terrain")) {
+            return "gbuffers_terrain";
+        }
+        if (pack.hasTexturedLitFragment()) {
+            return "gbuffers_textured_lit";
+        }
+        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
     }
 
     private static boolean isEntityRenderPipeline(RenderPipeline pipeline) {
@@ -2599,6 +2746,11 @@ public final class VeyraRenderer {
 
     private static void replaceEntityPipelines(EntityPipelineSet next) {
         entityPipelineSet = next;
+    }
+
+    private static void replaceBlockEntityPipelines(EntityPipelineSet next) {
+        blockEntityPipelineSet = next;
+        blockEntityPipelineRoutingLogged = false;
     }
 
     private static void replaceHandPipelines(EntityPipelineSet next) {
