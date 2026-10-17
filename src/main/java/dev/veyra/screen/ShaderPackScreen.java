@@ -11,7 +11,8 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 public final class ShaderPackScreen extends Screen {
-    private String status = "Supports colortex0/1, depthtex0, and Iris post passes. Higher buffers, gbuffers, and shadows are not connected.";
+    private String status = "Supports terrain fragments with texture, color, and lightmap inputs plus Iris post passes. Other gbuffers and shadows are not connected.";
+    private int firstVisiblePack;
 
     public ShaderPackScreen() {
         super(Component.literal("Veyra Shader Packs"));
@@ -27,35 +28,47 @@ public final class ShaderPackScreen extends Screen {
 
         List<ShaderPack> packs = VeyraClient.shaderPacks.getPacks();
         int availableRows = Math.max(1, (height - 156) / 26);
-        int shown = Math.min(packs.size(), availableRows);
+        int lastPageStart = packs.isEmpty() ? 0 : ((packs.size() - 1) / availableRows) * availableRows;
+        firstVisiblePack = Math.min(firstVisiblePack, lastPageStart);
+        int shown = Math.min(availableRows, packs.size() - firstVisiblePack);
         for (int i = 0; i < shown; i++) {
-            ShaderPack pack = packs.get(i);
+            ShaderPack pack = packs.get(firstVisiblePack + i);
             String prefix = VeyraRenderer.selectedPack().filter(pack::equals).isPresent() ? "[Active] " : "";
-            String suffix = pack.supportsPostProcessing() ? "" : " (unsupported)";
+            String suffix = pack.supportsShaderPrograms() ? "" : " (unsupported)";
             Button button = Button.builder(Component.literal(prefix + pack.name() + suffix), ignored -> {
-                if (!pack.supportsPostProcessing()) {
+                if (!pack.supportsShaderPrograms()) {
                     status = pack.issue();
                     return;
                 }
                 status = VeyraRenderer.select(pack);
             }).bounds(center - 160, top + 28 + i * 26, 320, 22).build();
-            button.active = pack.supportsPostProcessing();
+            button.active = pack.supportsShaderPrograms();
             addRenderableWidget(button);
         }
 
         if (packs.isEmpty()) {
             status = "Put a shader pack folder or .zip in " + VeyraClient.shaderPacks.getDirectory();
-        } else if (packs.size() > shown) {
-            status = "Showing " + shown + " of " + packs.size() + " packs. Remove or move packs to see the rest.";
+        } else if (packs.size() > availableRows) {
+            int first = firstVisiblePack + 1;
+            int last = firstVisiblePack + shown;
+            status = "Showing packs " + first + "-" + last + " of " + packs.size() + ".";
         }
 
+        addRenderableWidget(Button.builder(Component.literal("Previous"), button -> {
+            firstVisiblePack = Math.max(0, firstVisiblePack - availableRows);
+            rebuildWidgets();
+        }).bounds(center - 205, height - 58, 95, 20).build()).active = firstVisiblePack > 0;
         addRenderableWidget(Button.builder(Component.literal("Refresh list"), button -> {
             VeyraClient.shaderPacks.scan();
             status = "Shader pack list refreshed.";
             rebuildWidgets();
-        }).bounds(center - 160, height - 58, 155, 20).build());
+        }).bounds(center - 100, height - 58, 95, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Done"), button -> onClose())
-                .bounds(center + 5, height - 58, 155, 20).build());
+                .bounds(center + 5, height - 58, 95, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Next"), button -> {
+            firstVisiblePack = Math.min(lastPageStart, firstVisiblePack + availableRows);
+            rebuildWidgets();
+        }).bounds(center + 110, height - 58, 95, 20).build()).active = firstVisiblePack < lastPageStart;
     }
 
     @Override
