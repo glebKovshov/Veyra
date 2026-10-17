@@ -17,6 +17,7 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
@@ -42,6 +43,7 @@ import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
+import net.vulkanmod.vulkan.shader.PipelineConfig;
 import net.vulkanmod.vulkan.shader.SPIRVUtils;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import net.vulkanmod.vulkan.texture.VulkanImage;
@@ -135,10 +137,12 @@ public final class VeyraRenderer {
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
     private static TerrainPipelineSet terrainPipelineSet;
+    private static GraphicsPipeline cloudPipeline;
     private static GpuTexture sampledDepthTexture;
     private static GpuTextureView sampledDepthTextureView;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
+    private static boolean cloudPipelineDirty = true;
     private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
     private static String lastError = "";
@@ -160,6 +164,9 @@ public final class VeyraRenderer {
                 .isPresent();
         terrainPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasTerrainFragment)
+                .orElse(false);
+        cloudPipelineDirty = packRepository.getSelected()
+                .map(ShaderPack::hasCloudFragment)
                 .orElse(false);
         updateTerrainLayerMode(packRepository.getSelected().orElse(null));
     }
@@ -199,22 +206,48 @@ public final class VeyraRenderer {
         return terrainPipelineSet == null ? null : terrainPipelineSet.pipelines().get(programName);
     }
 
+    public static GraphicsPipeline getCloudsPipeline() {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.hasCloudFragment()) {
+            return null;
+        }
+        if (!cloudPipelineDirty) {
+            return cloudPipeline;
+        }
+
+        cloudPipelineDirty = false;
+        try {
+            replaceCloudPipeline(compileCloudPipeline(pack));
+            lastError = "";
+            VeyraClient.LOGGER.info("Loaded gbuffers_clouds from shader pack '{}'.", pack.name());
+        } catch (Exception exception) {
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not load gbuffers_clouds from shader pack '{}'.", pack.name(), exception);
+        }
+        return cloudPipeline;
+    }
+
     public static String getLastError() {
         return lastError;
     }
 
     public static void onClientShutdown() {
         restoreUniqueOpaqueLayer();
+        replaceCloudPipeline(null);
     }
 
     public static String select(ShaderPack pack) {
         PipelineSet prepared = null;
         TerrainPipelineSet preparedTerrain = null;
+        GraphicsPipeline preparedClouds = null;
         try {
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
             if (pack.hasTerrainFragment()) {
                 preparedTerrain = compileTerrainPipelines(pack);
+            }
+            if (pack.hasCloudFragment()) {
+                preparedClouds = compileCloudPipeline(pack);
             }
             repository.select(pack);
             updateTerrainLayerMode(pack);
@@ -222,24 +255,37 @@ public final class VeyraRenderer {
             prepared = null;
             replaceTerrainPipelines(preparedTerrain);
             preparedTerrain = null;
+            replaceCloudPipeline(preparedClouds);
+            preparedClouds = null;
             pipelinesDirty = false;
             terrainPipelineDirty = false;
+            cloudPipelineDirty = false;
             renderingEnabled = pipelineSet.passCount() > 0;
             lastError = "";
             boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
-            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es) and {} terrain program(s) from shader pack '{}'.",
-                    pipelineSet.passCount(), hasTerrainPipelines ? terrainPipelineSet.pipelines().size() : 0, pack.name());
-            String features = pipelineSet.passCount() > 0 && hasTerrainPipelines
-                    ? pipelineSet.passCount() + " post passes, " + terrainPipelineSet.pipelines().size() + " terrain programs"
-                    : pipelineSet.passCount() > 0 ? pipelineSet.passCount() + " post passes"
-                    : terrainPipelineSet.pipelines().size() + " terrain programs";
-            return "Enabled " + pack.name() + " (" + features + ").";
+            int terrainProgramCount = hasTerrainPipelines ? terrainPipelineSet.pipelines().size() : 0;
+            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), clouds={} from shader pack '{}'.",
+                    pipelineSet.passCount(), terrainProgramCount, cloudPipeline != null, pack.name());
+            List<String> features = new ArrayList<>();
+            if (pipelineSet.passCount() > 0) {
+                features.add(pipelineSet.passCount() + " post passes");
+            }
+            if (terrainProgramCount > 0) {
+                features.add(terrainProgramCount + " terrain programs");
+            }
+            if (cloudPipeline != null) {
+                features.add("cloud shader");
+            }
+            return "Enabled " + pack.name() + " (" + String.join(", ", features) + ").";
         } catch (Exception exception) {
             if (prepared != null) {
                 prepared.close();
             }
             if (preparedTerrain != null) {
                 preparedTerrain.close();
+            }
+            if (preparedClouds != null) {
+                preparedClouds.scheduleCleanUp();
             }
             lastError = shortError(exception);
             VeyraClient.LOGGER.error("Could not enable shader pack '{}'.", pack.name(), exception);
@@ -256,6 +302,7 @@ public final class VeyraRenderer {
             terrainPipelineDirty = false;
             replacePipelineSet(null);
             replaceTerrainPipelines(null);
+            replaceCloudPipeline(null);
             lastError = "";
             return "Shader pack disabled.";
         } catch (IOException exception) {
@@ -271,7 +318,9 @@ public final class VeyraRenderer {
         COMPILED_PIPELINES.clear();
         replacePipelineSet(null);
         replaceTerrainPipelines(null);
+        replaceCloudPipeline(null);
         terrainPipelineDirty = selectedPack().map(ShaderPack::hasTerrainFragment).orElse(false);
+        cloudPipelineDirty = selectedPack().map(ShaderPack::hasCloudFragment).orElse(false);
     }
 
     public static void render(Minecraft minecraft) {
@@ -441,6 +490,25 @@ public final class VeyraRenderer {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             throw exception;
         }
+    }
+
+    private static GraphicsPipeline compileCloudPipeline(ShaderPack pack) throws IOException {
+        String shaderPath = ShaderLoadUtil.resolveShaderPath("basic/clouds");
+        String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "clouds.vsh");
+        String fragmentSource = pack.readCloudFragment()
+                .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_clouds.fsh."));
+        fragmentSource = CloudShaderAdapter.adaptFragment(fragmentSource);
+        PipelineConfig config = PipelineConfig.fromJson("clouds", ShaderLoadUtil.getJsonConfig(shaderPath, "clouds"));
+
+        Pipeline.Builder builder = new Pipeline.Builder(DefaultVertexFormat.POSITION_COLOR, "veyra_clouds");
+        builder.applyConfig(config);
+        builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+        builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
+        GraphicsPipeline pipeline = builder.createGraphicsPipeline();
+        for (UBO ubo : pipeline.getBuffers()) {
+            ubo.setUseGlobalBuffer(true);
+        }
+        return pipeline;
     }
 
     private static String resolveTerrainProgram(ShaderPack pack, TerrainRenderType terrainRenderType) {
@@ -1156,6 +1224,14 @@ public final class VeyraRenderer {
         terrainPipelineSet = next;
         if (old != null && old != next) {
             old.close();
+        }
+    }
+
+    private static void replaceCloudPipeline(GraphicsPipeline next) {
+        GraphicsPipeline old = cloudPipeline;
+        cloudPipeline = next;
+        if (old != null && old != next) {
+            old.scheduleCleanUp();
         }
     }
 

@@ -11,6 +11,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = PipelineManager.class, remap = false)
 public abstract class PipelineManagerMixin {
+    @Inject(method = "getCloudsPipeline", at = @At("HEAD"), cancellable = true, remap = false)
+    private static void veyra$useCloudsShader(CallbackInfoReturnable<GraphicsPipeline> callback) {
+        GraphicsPipeline pipeline = VeyraRenderer.getCloudsPipeline();
+        if (pipeline != null) {
+            callback.setReturnValue(pipeline);
+        }
+    }
+
     @Inject(method = "getTerrainShader", at = @At("HEAD"), cancellable = true, remap = false)
     private static void veyra$useTerrainShader(
             TerrainRenderType terrainRenderType, CallbackInfoReturnable<GraphicsPipeline> callback) {
