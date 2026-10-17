@@ -24,6 +24,12 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getLightningPipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getBasicPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getLinePipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }

@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Adapts Iris lightning fragment inputs to Minecraft's position-color lightning vertex stage. */
-public final class LightningShaderAdapter {
+/** Adapts Iris color and fog-distance inputs to Minecraft's position-color vertex stages. */
+public final class ColorDistanceShaderAdapter {
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern PRECISION_DECLARATION = Pattern.compile(
@@ -45,15 +45,15 @@ public final class LightningShaderAdapter {
             Map.entry("gl_Color", "2"),
             Map.entry("vertexColor", "2"));
 
-    private LightningShaderAdapter() {
+    private ColorDistanceShaderAdapter() {
     }
 
-    public static String adaptFragment(String source) throws IOException {
+    public static String adaptFragment(String source, String programName, boolean flatVertexColor) throws IOException {
         if (source == null || source.isBlank()) {
-            throw new IOException("gbuffers_lightning fragment shader is empty.");
+            throw new IOException(programName + " fragment shader is empty.");
         }
         if (source.length() > 1024 * 1024) {
-            throw new IOException("gbuffers_lightning fragment shader exceeds the 1 MiB size limit.");
+            throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
         String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
@@ -64,7 +64,7 @@ public final class LightningShaderAdapter {
         }
         adapted = PRECISION_DECLARATION.matcher(extensionMatcher.replaceAll("")).replaceAll("");
         if (UNSUPPORTED_UNIFORM.matcher(adapted).find()) {
-            throw new IOException("gbuffers_lightning does not expose samplers or custom uniforms yet.");
+            throw new IOException(programName + " does not expose samplers or custom uniforms yet.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -74,31 +74,31 @@ public final class LightningShaderAdapter {
             String name = varyingMatcher.group(3);
             String expectedType = INPUT_TYPES.get(name);
             if (expectedType == null) {
-                throw new IOException("gbuffers_lightning input '" + name + "' is not provided by Veyra's lightning bridge yet.");
+                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's color-distance bridge yet.");
             }
             if (!expectedType.equals(type)) {
-                throw new IOException("gbuffers_lightning input '" + name + "' must use " + expectedType + ".");
+                throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
             }
             String location = varyingMatcher.group(1);
             if (location != null && !location.equals(INPUT_LOCATIONS.get(name))) {
-                throw new IOException("gbuffers_lightning input '" + name + "' uses an unsupported location.");
+                throw new IOException(programName + " input '" + name + "' uses an unsupported location.");
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_lightning declares inputs that are not provided by Veyra's lightning bridge yet.");
+            throw new IOException(programName + " declares inputs that are not provided by Veyra's color-distance bridge yet.");
         }
 
-        String outputName = "veyraLightningFragColor";
+        String outputName = "veyraColorDistanceFragColor";
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
         int outputCount = 0;
         while (outputMatcher.find()) {
             String location = outputMatcher.group(1);
             if (location != null && !location.equals("0")) {
-                throw new IOException("gbuffers_lightning can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
             outputName = outputMatcher.group(2);
             outputCount++;
@@ -106,22 +106,22 @@ public final class LightningShaderAdapter {
         }
         outputMatcher.appendTail(withoutOutputs);
         if (outputCount > 1) {
-            throw new IOException("gbuffers_lightning can declare only one fragment output.");
+            throw new IOException(programName + " can declare only one fragment output.");
         }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_lightning supports one vec4 fragment output.");
+            throw new IOException(programName + " supports one vec4 fragment output.");
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_TEXTURE.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_lightning cannot sample textures because lightning geometry has no UVs.");
+            throw new IOException(programName + " cannot sample textures because its vertex bridge has no UVs.");
         }
-        validateTargetComments(source);
+        validateTargetComments(source, programName);
         Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
         while (fragDataMatcher.find()) {
             if (!fragDataMatcher.group(1).equals("0")) {
-                throw new IOException("gbuffers_lightning can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
 
@@ -133,9 +133,9 @@ public final class LightningShaderAdapter {
         String bridge = """
                 layout(location = 0) in float sphericalVertexDistance;
                 layout(location = 1) in float cylindricalVertexDistance;
-                layout(location = 2) in vec4 vertexColor;
-                layout(location = 0) out vec4 veyraLightningFragColor;
-                """.replace("veyraLightningFragColor;", outputName + ";");
+                layout(location = 2) %sin vec4 vertexColor;
+                layout(location = 0) out vec4 %s;
+                """.formatted(flatVertexColor ? "flat " : "", outputName);
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
@@ -144,18 +144,18 @@ public final class LightningShaderAdapter {
         return result.append(adapted).toString();
     }
 
-    private static void validateTargetComments(String source) throws IOException {
+    private static void validateTargetComments(String source, String programName) throws IOException {
         Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
         while (renderTargets.find()) {
             String[] targets = renderTargets.group(1).split(",");
             if (targets.length != 1 || !targets[0].trim().equals("0")) {
-                throw new IOException("gbuffers_lightning can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
         Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
         while (drawBuffers.find()) {
             if (!drawBuffers.group(1).equals("0")) {
-                throw new IOException("gbuffers_lightning can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
     }
