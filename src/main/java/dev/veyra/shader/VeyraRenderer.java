@@ -75,6 +75,8 @@ public final class VeyraRenderer {
     private static final String SHADERPACK_UNIFORMS = "VeyraParameters";
     private static final String COLORTEX1_INPUT_NAME = "VeyraColortex1";
     private static final String COLORTEX1_INPUT_SAMPLER = COLORTEX1_INPUT_NAME + "Sampler";
+    private static final String HAND_PROGRAM = "gbuffers_hand";
+    private static final String HAND_WATER_PROGRAM = "gbuffers_hand_water";
     private static final float WETNESS_RISE_HALF_LIFE_SECONDS = 600.0F / 20.0F;
     private static final float WETNESS_FALL_HALF_LIFE_SECONDS = 200.0F / 20.0F;
     private static final float LN_OF_TWO = (float) Math.log(2.0);
@@ -359,7 +361,7 @@ public final class VeyraRenderer {
                         handPipelineSet.pipelines().size(), pack.name());
             } catch (Exception exception) {
                 lastError = shortError(exception);
-                VeyraClient.LOGGER.error("Could not load gbuffers_hand from shader pack '{}'.", pack.name(), exception);
+                VeyraClient.LOGGER.error("Could not load first-person hand shader programs from shader pack '{}'.", pack.name(), exception);
                 return null;
             }
         }
@@ -1139,7 +1141,8 @@ public final class VeyraRenderer {
                 continue;
             }
             boolean fallback = hand
-                    ? !pack.hasHandFragment()
+                    ? !(HAND_PROGRAM.equals(programName) && pack.hasHandFragment()
+                    || HAND_WATER_PROGRAM.equals(programName) && pack.hasHandWaterFragment())
                     : !pack.entityPrograms().contains(programName);
             String fragmentSource;
             try {
@@ -1172,7 +1175,9 @@ public final class VeyraRenderer {
             }
             pipelines.put(original, entityPipeline);
         }
-        if (pipelines.isEmpty() && (hand ? pack.hasHandFragment() : !pack.entityPrograms().isEmpty())) {
+        if (pipelines.isEmpty() && (hand
+                ? pack.hasHandFragment() || pack.hasHandWaterFragment()
+                : !pack.entityPrograms().isEmpty())) {
             throw new IOException(hand
                     ? "VulkanMod's Minecraft first-person hand render pipelines were not found."
                     : "VulkanMod's Minecraft entity render pipelines were not found.");
@@ -1218,8 +1223,11 @@ public final class VeyraRenderer {
         if (pipeline.getLocation().getPath().equals("pipeline/eyes")) {
             return null;
         }
+        if (pipeline.getBlendFunction().isPresent() && pack.hasHandWaterFragment()) {
+            return HAND_WATER_PROGRAM;
+        }
         if (pack.hasHandFragment()) {
-            return "gbuffers_hand";
+            return HAND_PROGRAM;
         }
         if (pack.hasTexturedLitFragment()) {
             return "gbuffers_textured_lit";
