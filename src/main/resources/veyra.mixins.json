@@ -7,6 +7,7 @@
     "GuiRendererMixin",
     "ShaderManagerMixin",
     "PipelineManagerMixin",
+    "VkRenderPassMixin",
     "accessor.MinecraftAccessor",
     "accessor.ShaderManagerAccessor",
     "accessor.PostPassAccessor"
