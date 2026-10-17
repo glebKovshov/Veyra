@@ -1011,19 +1011,39 @@ public final class VeyraRenderer {
             if (programName == null) {
                 continue;
             }
-            String fragmentSource = pack.readEntityFragment(programName)
-                    .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-            fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+            boolean fallback = !pack.entityPrograms().contains(programName);
+            String fragmentSource;
+            try {
+                fragmentSource = pack.readEntityFragment(programName)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+            } catch (IOException exception) {
+                if (!fallback) {
+                    throw exception;
+                }
+                VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
+                        programName, original.getLocation(), exception.getMessage());
+                continue;
+            }
             String sourceHash = sha256(programName + '\n' + fragmentSource);
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, programName, sourceHash);
             RenderPipeline entityPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (entityPipeline == null) {
-                entityPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                try {
+                    entityPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                } catch (IOException exception) {
+                    if (!fallback) {
+                        throw exception;
+                    }
+                    VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
+                            programName, original.getLocation(), exception.getMessage());
+                    continue;
+                }
                 ENTITY_PIPELINE_CACHE.put(cacheKey, entityPipeline);
             }
             pipelines.put(original, entityPipeline);
         }
-        if (pipelines.isEmpty()) {
+        if (pipelines.isEmpty() && !pack.entityPrograms().isEmpty()) {
             throw new IOException("VulkanMod's Minecraft entity render pipelines were not found.");
         }
         return new EntityPipelineSet(pipelines);
@@ -1042,7 +1062,8 @@ public final class VeyraRenderer {
     }
 
     private static String resolveEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
-        if (pipeline.getLocation().getPath().equals("pipeline/eyes")
+        boolean eyes = pipeline.getLocation().getPath().equals("pipeline/eyes");
+        if (eyes
                 && pack.entityPrograms().contains("gbuffers_spidereyes")) {
             return "gbuffers_spidereyes";
         }
@@ -1050,7 +1071,16 @@ public final class VeyraRenderer {
                 && pack.entityPrograms().contains("gbuffers_entities_translucent")) {
             return "gbuffers_entities_translucent";
         }
-        return pack.entityPrograms().contains("gbuffers_entities") ? "gbuffers_entities" : null;
+        if (pack.entityPrograms().contains("gbuffers_entities")) {
+            return "gbuffers_entities";
+        }
+        if (eyes) {
+            return null;
+        }
+        if (pack.hasTexturedLitFragment()) {
+            return "gbuffers_textured_lit";
+        }
+        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
     }
 
     private static RenderPipeline compileEntityPipeline(
@@ -1133,19 +1163,39 @@ public final class VeyraRenderer {
             if (programName == null) {
                 continue;
             }
-            String fragmentSource = pack.readParticleFragment(programName)
-                    .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-            fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, "gbuffers_particles", true);
+            boolean fallback = !pack.particlePrograms().contains(programName);
+            String fragmentSource;
+            try {
+                fragmentSource = pack.readParticleFragment(programName)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, programName, true);
+            } catch (IOException exception) {
+                if (!fallback) {
+                    throw exception;
+                }
+                VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
+                        programName, original.getLocation(), exception.getMessage());
+                continue;
+            }
             String sourceHash = sha256(programName + '\n' + fragmentSource);
             ParticlePipelineKey cacheKey = new ParticlePipelineKey(original, programName, sourceHash);
             RenderPipeline particlePipeline = PARTICLE_PIPELINE_CACHE.get(cacheKey);
             if (particlePipeline == null) {
-                particlePipeline = compileParticlePipeline(original, fragmentSource, sourceHash);
+                try {
+                    particlePipeline = compileParticlePipeline(original, fragmentSource, sourceHash);
+                } catch (IOException exception) {
+                    if (!fallback) {
+                        throw exception;
+                    }
+                    VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
+                            programName, original.getLocation(), exception.getMessage());
+                    continue;
+                }
                 PARTICLE_PIPELINE_CACHE.put(cacheKey, particlePipeline);
             }
             pipelines.put(original, particlePipeline);
         }
-        if (pipelines.isEmpty()) {
+        if (pipelines.isEmpty() && !pack.particlePrograms().isEmpty()) {
             throw new IOException("VulkanMod's Minecraft particle render pipelines were not found.");
         }
         return new ParticlePipelineSet(pipelines);
@@ -1166,7 +1216,13 @@ public final class VeyraRenderer {
                 && pack.particlePrograms().contains("gbuffers_particles_translucent")) {
             return "gbuffers_particles_translucent";
         }
-        return pack.particlePrograms().contains("gbuffers_particles") ? "gbuffers_particles" : null;
+        if (pack.particlePrograms().contains("gbuffers_particles")) {
+            return "gbuffers_particles";
+        }
+        if (pack.hasTexturedLitFragment()) {
+            return "gbuffers_textured_lit";
+        }
+        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
     }
 
     private static RenderPipeline compileParticlePipeline(
@@ -1195,20 +1251,42 @@ public final class VeyraRenderer {
                 .toList();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
-            String programName = "gbuffers_weather";
-            String fragmentSource = pack.readWeatherFragment(programName)
-                    .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-            fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, programName, true);
+            String programName = pack.weatherPrograms().contains("gbuffers_weather")
+                    ? "gbuffers_weather"
+                    : pack.hasTexturedLitFragment() ? "gbuffers_textured_lit" : "gbuffers_textured";
+            boolean fallback = !pack.weatherPrograms().contains(programName);
+            String fragmentSource;
+            try {
+                fragmentSource = pack.readWeatherFragment(programName)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, programName, true);
+            } catch (IOException exception) {
+                if (!fallback) {
+                    throw exception;
+                }
+                VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
+                        programName, original.getLocation(), exception.getMessage());
+                continue;
+            }
             String sourceHash = sha256(programName + '\n' + fragmentSource);
             WeatherPipelineKey cacheKey = new WeatherPipelineKey(original, sourceHash);
             RenderPipeline weatherPipeline = WEATHER_PIPELINE_CACHE.get(cacheKey);
             if (weatherPipeline == null) {
-                weatherPipeline = compileWeatherPipeline(original, fragmentSource, sourceHash);
+                try {
+                    weatherPipeline = compileWeatherPipeline(original, fragmentSource, sourceHash);
+                } catch (IOException exception) {
+                    if (!fallback) {
+                        throw exception;
+                    }
+                    VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
+                            programName, original.getLocation(), exception.getMessage());
+                    continue;
+                }
                 WEATHER_PIPELINE_CACHE.put(cacheKey, weatherPipeline);
             }
             pipelines.put(original, weatherPipeline);
         }
-        if (pipelines.isEmpty()) {
+        if (pipelines.isEmpty() && !pack.weatherPrograms().isEmpty()) {
             throw new IOException("VulkanMod's Minecraft weather render pipelines were not found.");
         }
         return new WeatherPipelineSet(pipelines);
