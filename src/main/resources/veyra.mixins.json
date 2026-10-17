@@ -7,7 +7,8 @@
     "GuiRendererMixin",
     "ShaderManagerMixin",
     "accessor.MinecraftAccessor",
-    "accessor.ShaderManagerAccessor"
+    "accessor.ShaderManagerAccessor",
+    "accessor.PostPassAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
