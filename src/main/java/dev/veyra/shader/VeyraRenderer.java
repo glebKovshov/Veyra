@@ -5,7 +5,9 @@ import com.mojang.blaze3d.pipeline.CompiledRenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import com.mojang.blaze3d.framegraph.FramePass;
@@ -25,6 +27,7 @@ import dev.veyra.mixin.accessor.RenderSetupAccessor;
 import dev.veyra.mixin.accessor.RenderTypeAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
+import dev.veyra.vulkan.VeyraDepthTextureSnapshot;
 import net.vulkanmod.Initializer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -81,6 +84,19 @@ import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 public final class VeyraRenderer {
     private static final Identifier SWAP_TARGET_A_ID = Identifier.fromNamespaceAndPath("veyra", "swap_a");
     private static final Identifier SWAP_TARGET_B_ID = Identifier.fromNamespaceAndPath("veyra", "swap_b");
+    private static final Identifier DEPTH1_TARGET_ID = Identifier.fromNamespaceAndPath("veyra", "depthtex1_snapshot");
+    private static final Identifier DEPTH1_CAPTURE_SHADER_ID = Identifier.fromNamespaceAndPath("veyra", "depthtex1_capture");
+    private static final Identifier DEPTH1_CAPTURE_PIPELINE_ID = Identifier.fromNamespaceAndPath("veyra", "depthtex1_capture");
+    private static final String DEPTH1_CAPTURE_FRAGMENT_SOURCE = """
+            #version 450
+            in vec2 texCoord;
+            out vec4 outColor;
+            uniform sampler2D Sampler1Sampler;
+            void main() {
+                gl_FragDepth = texture(Sampler1Sampler, texCoord).r;
+                outColor = vec4(0.0);
+            }
+            """;
     private static final int MAX_COLORTEX_INDEX = 15;
     private static final String SHADERPACK_UNIFORMS = "VeyraParameters";
     private static final String HAND_PROGRAM = "gbuffers_hand";
@@ -116,13 +132,18 @@ public final class VeyraRenderer {
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
-    private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?!0\\b)[A-Za-z0-9_]*\\b");
+    private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![01]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
+    private static final Pattern DEPTH1_SAMPLER = Pattern.compile("\\bdepthtex1\\b");
     private static final Pattern DEPTH_SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+(?:depthtex0|DepthSampler)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern DEPTH1_SAMPLER_DECLARATION = Pattern.compile(
+            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     // PostPass appends "Sampler" to every input name when binding it to the render pass.
     private static final String DEPTH_INPUT_NAME = "Sampler1";
     private static final String DEPTH_INPUT_SAMPLER = DEPTH_INPUT_NAME + "Sampler";
+    private static final String DEPTH1_INPUT_NAME = "VeyraDepthTex1";
+    private static final String DEPTH1_INPUT_SAMPLER = DEPTH1_INPUT_NAME + "Sampler";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
@@ -174,6 +195,8 @@ public final class VeyraRenderer {
     private static boolean clearColorTargets;
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
+    private static PipelineProgram depthTex1CaptureProgram;
+    private static PostPass depthTex1CapturePass;
     private static TerrainPipelineSet terrainPipelineSet;
     private static EntityPipelineSet entityPipelineSet;
     private static EntityPipelineSet blockEntityPipelineSet;
@@ -192,6 +215,7 @@ public final class VeyraRenderer {
     private static GraphicsPipeline cloudPipeline;
     private static GpuTexture sampledDepthTexture;
     private static GpuTextureView sampledDepthTextureView;
+    private static final VeyraDepthTextureSnapshot depthTex1Snapshot = new VeyraDepthTextureSnapshot();
     private static FrameMatrices frameMatrices = FrameMatrices.IDENTITY;
     private static boolean frameMatricesInitialized;
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
@@ -322,6 +346,98 @@ public final class VeyraRenderer {
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition());
         cameraUniformsInitialized = true;
+    }
+
+    public static void captureDepthTex1() {
+        if (repository == null || repository.getSelected().isEmpty() || !selectedPackUsesDepth1Sampler()) {
+            return;
+        }
+        try {
+            captureDepthTex1Snapshot();
+        } catch (RuntimeException exception) {
+            renderingEnabled = false;
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not capture the depthtex1 snapshot.", exception);
+        }
+    }
+
+    private static boolean selectedPackUsesDepth1Sampler() {
+        if (!pipelinesDirty && pipelineSet != null) {
+            return pipelineSet.usesDepth1Sampler();
+        }
+        ShaderPack pack = repository.getSelected().orElse(null);
+        if (pack == null) {
+            return false;
+        }
+        try {
+            return pack.readPrograms().stream().anyMatch(program -> DEPTH1_SAMPLER.matcher(
+                    COMMENTS.matcher(program.source()).replaceAll("")).find());
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    private static void captureDepthTex1Snapshot() {
+        RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+        GpuTexture mainDepth = Renderer.getInstance().getMainPass().getDepthAttachment();
+        if (!(mainDepth instanceof VkGpuTexture vulkanDepth) || vulkanDepth.isClosed()) {
+            throw new IllegalStateException("VulkanMod's main depth attachment is unavailable for depthtex1.");
+        }
+        depthTex1Snapshot.ensure(mainTarget.width, mainTarget.height, vulkanDepth.getVulkanImage().format);
+
+        PipelineProgram copyProgram = depthTex1CaptureProgram();
+        if (depthTex1CapturePass == null) {
+            depthTex1CapturePass = new PostPass(copyProgram.pipeline(), DEPTH1_TARGET_ID, Map.of(), List.of(
+                    new PostPass.TargetInput("In", PostChain.MAIN_TARGET_ID, false, true),
+                    new ExternalTextureInput(DEPTH_INPUT_NAME)));
+        }
+
+        DepthSamplerState depthSamplerState = prepareDepthSampler();
+        try {
+            RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(depthTex1Snapshot.depthTexture(), 1.0);
+            depthTex1Snapshot.transitionToAttachment();
+
+            FrameGraphBuilder graph = new FrameGraphBuilder();
+            Map<Identifier, ResourceHandle<RenderTarget>> targets = new HashMap<>();
+            targets.put(PostChain.MAIN_TARGET_ID, graph.importExternal("veyra:depthtex1-source", mainTarget));
+            targets.put(DEPTH1_TARGET_ID,
+                    graph.importExternal("veyra:depthtex1-target", depthTex1Snapshot.renderTarget()));
+            GpuBufferSlice samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
+            depthTex1CapturePass.addToFrame(graph, targets, samplerInfo);
+            graph.execute(GraphicsResourceAllocator.UNPOOLED);
+        } finally {
+            if (Renderer.getInstance().getBoundRenderPass() != null) {
+                Renderer.getInstance().endRenderPass();
+            }
+            try {
+                depthTex1Snapshot.transitionToSampling();
+            } finally {
+                restoreDepthSampler(depthSamplerState);
+            }
+        }
+    }
+
+    private static PipelineProgram depthTex1CaptureProgram() {
+        if (depthTex1CaptureProgram != null) {
+            return depthTex1CaptureProgram;
+        }
+
+        RenderPipeline pipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
+                .withFragmentShader(DEPTH1_CAPTURE_SHADER_ID)
+                .withVertexShader(BLIT_VERTEX_ID)
+                .withLocation(DEPTH1_CAPTURE_PIPELINE_ID)
+                .withSampler("InSampler")
+                .withSampler(DEPTH_INPUT_SAMPLER)
+                .withUniform("SamplerInfo", UniformType.UNIFORM_BUFFER)
+                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                .withDepthWrite(true)
+                .withColorWrite(false)
+                .build();
+        PipelineProgram program = new PipelineProgram(DEPTH1_CAPTURE_SHADER_ID,
+                DEPTH1_CAPTURE_FRAGMENT_SOURCE, List.of(), true, false, Set.of(), 0, pipeline);
+        compilePipeline(program);
+        depthTex1CaptureProgram = program;
+        return program;
     }
 
     private static CameraPosition cameraPosition(double x, double y, double z) {
@@ -1199,6 +1315,7 @@ public final class VeyraRenderer {
         List<ShaderPack.Program> sources = pack.readPrograms();
         List<ProgramGroup> programs = new ArrayList<>(sources.size());
         boolean usesDepthSampler = false;
+        boolean usesDepth1Sampler = false;
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
         for (ShaderPack.Program source : sources) {
             List<PipelineProgram> outputs = new ArrayList<>();
@@ -1208,6 +1325,7 @@ public final class VeyraRenderer {
                 compilePipeline(program);
                 outputs.add(program);
                 usesDepthSampler |= adapted.usesDepthSampler();
+                usesDepth1Sampler |= adapted.usesDepth1Sampler();
                 adapted.colorSamplers().stream().filter(index -> index > 0).forEach(colorTargetIndices::add);
                 if (adapted.outputTarget() > 0) {
                     colorTargetIndices.add(adapted.outputTarget());
@@ -1219,7 +1337,7 @@ public final class VeyraRenderer {
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
             copyProgram = pipelineProgram("copy",
-                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, Set.of(), 0));
+                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, Set.of(), 0));
             compilePipeline(copyProgram);
         }
 
@@ -1236,7 +1354,7 @@ public final class VeyraRenderer {
                     ? firstPlan
                     : buildFramePlan(programs, copyProgram, width, height, secondPlanInputs);
             return new PipelineSet(firstPlan, secondPlan, width, height,
-                    usesDepthSampler, Set.copyOf(colorTargetIndices));
+                    usesDepthSampler, usesDepth1Sampler, Set.copyOf(colorTargetIndices));
         } catch (RuntimeException exception) {
             if (firstPlan != null) {
                 firstPlan.close();
@@ -2268,6 +2386,9 @@ public final class VeyraRenderer {
                     if (program.usesDepthSampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH_INPUT_NAME));
                     }
+                    if (program.usesDepth1Sampler()) {
+                        inputs.add(new ExternalTextureInput(DEPTH1_INPUT_NAME));
+                    }
                     PostPass pass = new PostPass(program.pipeline(),
                             outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
@@ -2336,9 +2457,9 @@ public final class VeyraRenderer {
             Identifier shaderId = Identifier.fromNamespaceAndPath("veyra", "shaderpack/" + suffix);
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
             return new PipelineProgram(shaderId, shader.source(), shader.uniforms(),
-                    shader.usesDepthSampler(), shader.colorSamplers(), shader.outputTarget(),
+                    shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.colorSamplers(), shader.outputTarget(),
                     createPipeline(pipelineId, shaderId, shader.uniforms(),
-                            shader.usesDepthSampler(), shader.colorSamplers()));
+                            shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.colorSamplers()));
         });
     }
 
@@ -2363,7 +2484,7 @@ public final class VeyraRenderer {
 
     private static RenderPipeline createPipeline(
             Identifier pipeline, Identifier fragmentShader, List<String> uniforms,
-            boolean usesDepthSampler, Set<Integer> colorSamplers) {
+            boolean usesDepthSampler, boolean usesDepth1Sampler, Set<Integer> colorSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                 .withFragmentShader(fragmentShader)
                 .withVertexShader(BLIT_VERTEX_ID)
@@ -2372,6 +2493,9 @@ public final class VeyraRenderer {
                 .withUniform("SamplerInfo", UniformType.UNIFORM_BUFFER);
         if (usesDepthSampler) {
             builder.withSampler(DEPTH_INPUT_SAMPLER);
+        }
+        if (usesDepth1Sampler) {
+            builder.withSampler(DEPTH1_INPUT_SAMPLER);
         }
         for (int colorSampler : colorSamplers) {
             if (colorSampler > 0) {
@@ -2398,10 +2522,12 @@ public final class VeyraRenderer {
 
         Matcher unsupportedDepthSampler = UNSUPPORTED_DEPTH_SAMPLER.matcher(body);
         if (unsupportedDepthSampler.find()) {
-            throw new IOException("Only depthtex0 is currently available for depth texture sampling on VulkanMod.");
+            throw new IOException("Veyra supports depthtex0 and depthtex1 for depth texture sampling on VulkanMod.");
         }
         Matcher depthSampler = DEPTH_SAMPLER.matcher(body);
         boolean usesDepthSampler = depthSampler.find();
+        Matcher depth1Sampler = DEPTH1_SAMPLER.matcher(body);
+        boolean usesDepth1Sampler = depth1Sampler.find();
         Set<Integer> colorSamplers = new java.util.TreeSet<>();
         Matcher colorSamplerMatcher = COLORTEX_SAMPLER.matcher(body);
         while (colorSamplerMatcher.find()) {
@@ -2448,6 +2574,7 @@ public final class VeyraRenderer {
         body = MAIN_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = COLORTEX_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH_SAMPLER_DECLARATION.matcher(body).replaceAll("");
+        body = DEPTH1_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
@@ -2515,9 +2642,13 @@ public final class VeyraRenderer {
                         .append("#define depthtex0 ").append(DEPTH_INPUT_SAMPLER).append('\n')
                         .append("#define DepthSampler ").append(DEPTH_INPUT_SAMPLER).append('\n');
             }
+            if (usesDepth1Sampler) {
+                adapted.append("uniform sampler2D ").append(DEPTH1_INPUT_SAMPLER).append(";\n")
+                        .append("#define depthtex1 ").append(DEPTH1_INPUT_SAMPLER).append('\n');
+            }
             adapted.append(outputBody);
             adaptedShaders.add(new AdaptedShader(adapted.toString(), uniforms,
-                    usesDepthSampler, Set.copyOf(colorSamplers), output.targetIndex()));
+                    usesDepthSampler, usesDepth1Sampler, Set.copyOf(colorSamplers), output.targetIndex()));
         }
         return List.copyOf(adaptedShaders);
     }
@@ -2971,6 +3102,9 @@ public final class VeyraRenderer {
             sampledDepthTextureView = null;
             sampledDepthTexture = null;
         }
+        if (next == null || !next.usesDepth1Sampler()) {
+            depthTex1Snapshot.close();
+        }
     }
 
     private static void replaceTerrainPipelines(TerrainPipelineSet next) {
@@ -3054,14 +3188,15 @@ public final class VeyraRenderer {
     }
 
     private record AdaptedShader(String source, List<String> uniforms,
-                                 boolean usesDepthSampler, Set<Integer> colorSamplers, int outputTarget) {
+                                 boolean usesDepthSampler, boolean usesDepth1Sampler,
+                                 Set<Integer> colorSamplers, int outputTarget) {
     }
 
     private record DepthSamplerState(VulkanImage sourceImage, VulkanImage sampledImage) {
     }
 
     private record PipelineProgram(Identifier shaderId, String fragmentSource, List<String> uniforms,
-                                   boolean usesDepthSampler, Set<Integer> colorSamplers,
+                                   boolean usesDepthSampler, boolean usesDepth1Sampler, Set<Integer> colorSamplers,
                                    int outputTarget, RenderPipeline pipeline) {
     }
 
@@ -3150,7 +3285,8 @@ public final class VeyraRenderer {
     }
 
     private record PipelineSet(FramePlan planA, FramePlan planB, int width, int height,
-                               boolean usesDepthSampler, Set<Integer> colorTargetIndices) implements AutoCloseable {
+                               boolean usesDepthSampler, boolean usesDepth1Sampler,
+                               Set<Integer> colorTargetIndices) implements AutoCloseable {
         private FramePlan framePlan(Map<Integer, Identifier> currentColorTargets) {
             if (planA.initialColorTargets().equals(currentColorTargets)) {
                 return planA;
@@ -3222,7 +3358,7 @@ public final class VeyraRenderer {
 
         @Override
         public GpuTextureView texture(Map<Identifier, ResourceHandle<RenderTarget>> targets) {
-            return sampledDepthTextureView();
+            return samplerName.equals(DEPTH1_INPUT_NAME) ? depthTex1Snapshot.sampledView() : sampledDepthTextureView();
         }
 
         @Override

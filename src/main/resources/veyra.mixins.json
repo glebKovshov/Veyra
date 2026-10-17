@@ -18,7 +18,8 @@
     "accessor.ShaderManagerAccessor",
     "accessor.PostPassAccessor",
     "accessor.RenderSetupAccessor",
-    "accessor.RenderTypeAccessor"
+    "accessor.RenderTypeAccessor",
+    "accessor.RenderTargetAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
