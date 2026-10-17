@@ -31,6 +31,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: veyra-minecraft-1.21.11
-          path: build/libs/veyra-*.jar
+          path: build/libs/veyra-*-mc1.21.11.jar
           if-no-files-found: error
           retention-days: 14
