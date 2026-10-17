@@ -27,6 +27,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.client.renderer.UniformValue;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.FluidTags;
 import org.lwjgl.system.MemoryStack;
 
 import java.io.IOException;
@@ -68,16 +69,23 @@ public final class VeyraRenderer {
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
     private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|eyeAltitude|screenBrightness|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern OTHER_COLOR_SAMPLER = Pattern.compile("\\bcolortex([1-9][0-9]*)\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex[0-9]*|DepthSampler)\\b");
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
-            "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay");
-    private static final List<String> INTEGER_UNIFORMS = List.of("frameCounter", "worldTime", "worldDay");
+            "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
+            "eyeAltitude", "screenBrightness", "isEyeInWater", "isSpectator", "is_sneaking", "is_sprinting",
+            "is_on_ground", "is_hurt", "is_invisible", "is_burning");
+    private static final List<String> BOOLEAN_UNIFORMS = List.of(
+            "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
+    private static final List<String> INTEGER_UNIFORMS = List.of(
+            "frameCounter", "worldTime", "worldDay", "isEyeInWater", "isSpectator", "is_sneaking",
+            "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
-            "worldTime", "worldDay");
+            "worldTime", "worldDay", "eyeAltitude", "screenBrightness", "isEyeInWater", "isSpectator",
+            "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
     private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -349,10 +357,19 @@ public final class VeyraRenderer {
         if (!uniforms.isEmpty()) {
             adapted.append("layout(std140) uniform ").append(SHADERPACK_UNIFORMS).append(" {\n");
             for (String uniform : uniforms) {
-                adapted.append("    ").append(INTEGER_UNIFORMS.contains(uniform) ? "int" : "float")
-                        .append(' ').append(uniform).append(";\n");
+                String type = INTEGER_UNIFORMS.contains(uniform) ? "int" : "float";
+                // VulkanMod's shader parser rejects bool members in uniform blocks, so expose them through int fields.
+                String memberName = BOOLEAN_UNIFORMS.contains(uniform) ? "veyra_" + uniform : uniform;
+                adapted.append("    ").append(type)
+                        .append(' ').append(memberName).append(";\n");
             }
             adapted.append("};\n");
+            for (String uniform : uniforms) {
+                if (BOOLEAN_UNIFORMS.contains(uniform)) {
+                    adapted.append("#define ").append(uniform).append(" (veyra_")
+                            .append(uniform).append(" != 0)\n");
+                }
+            }
         }
         adapted.append("uniform sampler2D InSampler;\n")
                 .append("#define colortex0 InSampler\n")
@@ -398,6 +415,16 @@ public final class VeyraRenderer {
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
                 case "worldTime" -> new UniformValue.IntUniform(frameUniforms.worldTime());
                 case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
+                case "eyeAltitude" -> new UniformValue.FloatUniform(frameUniforms.eyeAltitude());
+                case "screenBrightness" -> new UniformValue.FloatUniform(frameUniforms.screenBrightness());
+                case "isEyeInWater" -> new UniformValue.IntUniform(frameUniforms.isEyeInWater());
+                case "isSpectator" -> new UniformValue.IntUniform(frameUniforms.isSpectator() ? 1 : 0);
+                case "is_sneaking" -> new UniformValue.IntUniform(frameUniforms.isSneaking() ? 1 : 0);
+                case "is_sprinting" -> new UniformValue.IntUniform(frameUniforms.isSprinting() ? 1 : 0);
+                case "is_on_ground" -> new UniformValue.IntUniform(frameUniforms.isOnGround() ? 1 : 0);
+                case "is_hurt" -> new UniformValue.IntUniform(frameUniforms.isHurt() ? 1 : 0);
+                case "is_invisible" -> new UniformValue.IntUniform(frameUniforms.isInvisible() ? 1 : 0);
+                case "is_burning" -> new UniformValue.IntUniform(frameUniforms.isBurning() ? 1 : 0);
                 default -> throw new IllegalArgumentException("Unknown shader pack uniform " + uniform + ".");
             });
         }
@@ -475,8 +502,13 @@ public final class VeyraRenderer {
             wetnessInitialized = false;
         }
         float wetness = smoothWetness(rainStrength, frameTime);
+        var player = minecraft.player;
+        int isEyeInWater = player.isEyeInFluid(FluidTags.WATER) ? 1
+                : player.isEyeInFluid(FluidTags.LAVA) ? 2 : player.isInPowderSnow ? 3 : 0;
         return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength, wetness,
-                thunderStrength, worldTime, worldDay);
+                thunderStrength, worldTime, worldDay, (float) player.getEyeY(), (float) (double) minecraft.options.gamma().get(),
+                isEyeInWater, player.isSpectator(), player.isCrouching(), player.isSprinting(), player.onGround(),
+                player.hurtTime > 0, player.isInvisible(), player.isOnFire());
     }
 
     private static float smoothWetness(float rainStrength, float deltaSeconds) {
@@ -539,9 +571,12 @@ public final class VeyraRenderer {
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
                                  float sunAngle, float rainStrength, float wetness, float thunderStrength,
-                                 int worldTime, int worldDay) {
+                                 int worldTime, int worldDay, float eyeAltitude, float screenBrightness,
+                                 int isEyeInWater, boolean isSpectator, boolean isSneaking, boolean isSprinting,
+                                 boolean isOnGround, boolean isHurt, boolean isInvisible, boolean isBurning) {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
-                0.0F, 0.0F, 0.0F, 0.0F, 0, 0);
+                0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0.0F, 0.0F, 0,
+                false, false, false, false, false, false, false);
     }
 
     private record PipelineSet(List<ShaderPass> shaderPasses, PostPass copyPass, int width, int height) implements AutoCloseable {
