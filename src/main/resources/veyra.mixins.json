@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "dev.veyra.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinecraftMixin",
+    "GuiRendererMixin",
+    "ShaderManagerMixin",
+    "accessor.MinecraftAccessor",
+    "accessor.ShaderManagerAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "veyra",
+  "version": "${version}",
+  "name": "Veyra",
+  "description": "A VulkanMod shader loader for Minecraft.",
+  "authors": ["Veyra contributors"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.veyra.VeyraClient"]
+  },
+  "mixins": ["veyra.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "1.21.11",
+    "vulkanmod": ">=0.6.8"
+  }
+}
