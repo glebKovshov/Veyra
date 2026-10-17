@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 public final class ShaderPackScreen extends Screen {
-    private String status = "Supports terrain, entity and block entity models, first-person hands, sky, particles, weather, lightning, glint, beacon beams, clouds, and Iris post passes. Sign text, other gbuffers programs, and shadows are not routed yet.";
+    private String status = "Supports terrain, terrain-only shadow maps, entity and block entity models, first-person hands, sky, particles, weather, lightning, glint, beacon beams, clouds, and Iris post passes. Entity and block entity shadow draws, sign text, and other gbuffers programs are not routed yet.";
     private int firstVisiblePack;
 
     public ShaderPackScreen() {

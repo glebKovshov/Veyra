@@ -114,6 +114,26 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return !terrainPrograms.isEmpty();
     }
 
+    public boolean hasShadowFragment() {
+        try {
+            return readShader("shadow.fsh").isPresent();
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    public Optional<String> readShadowFragment() throws IOException {
+        if (!supportsShaderPrograms() || !hasShadowFragment()) {
+            return Optional.empty();
+        }
+        String fileName = "shadow.fsh";
+        Optional<String> source = readShader(fileName);
+        if (source.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+    }
+
     public boolean hasDamagedBlockPipeline() {
         return hasDamagedBlockFragment || terrainPrograms.contains("gbuffers_terrain");
     }
@@ -537,7 +557,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .filter(ShaderPack::isSupportedWeatherProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
-            return hasPostProcessing || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
+            return hasPostProcessing || files.contains("shadow.fsh") || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
                     || !particlePrograms.isEmpty() || !weatherPrograms.isEmpty() || hasBeaconBeamFragment
                     || hasLightningFragment || hasBasicFragment || hasLineFragment || hasGlintFragment
                     || hasSkyBasicFragment || hasSkyTexturedFragment || hasTexturedFragment || hasTexturedLitFragment
@@ -630,7 +650,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private static boolean isSupportedProgramFile(String fileName) {
-        return fileName.equals("gbuffers_clouds.fsh")
+        return fileName.equals("shadow.fsh")
+                || fileName.equals("gbuffers_clouds.fsh")
                 || fileName.equals(BEACON_BEAM_PROGRAM + ".fsh")
                 || fileName.equals(LIGHTNING_PROGRAM + ".fsh")
                 || fileName.equals(BASIC_PROGRAM + ".fsh")

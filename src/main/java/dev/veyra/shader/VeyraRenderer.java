@@ -71,6 +71,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 public final class VeyraRenderer {
     private static final Identifier SWAP_TARGET_A_ID = Identifier.fromNamespaceAndPath("veyra", "swap_a");
     private static final Identifier SWAP_TARGET_B_ID = Identifier.fromNamespaceAndPath("veyra", "swap_b");
@@ -204,11 +206,12 @@ public final class VeyraRenderer {
 
     public static void initialize(ShaderPackRepository packRepository) {
         repository = packRepository;
+        VeyraShadowRenderer.initialize();
         renderingEnabled = packRepository.getSelected()
                 .filter(ShaderPack::hasPostProcessing)
                 .isPresent();
         terrainPipelineDirty = packRepository.getSelected()
-                .map(ShaderPack::hasTerrainFragment)
+                .map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment())
                 .orElse(false);
         entityPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasEntityFragment)
@@ -260,6 +263,10 @@ public final class VeyraRenderer {
 
     public static Optional<ShaderPack> selectedPack() {
         return repository == null ? Optional.empty() : repository.getSelected();
+    }
+
+    public static boolean hasShadowPass() {
+        return selectedPack().map(ShaderPack::hasShadowFragment).orElse(false);
     }
 
     public static boolean isRenderingEnabled() {
@@ -340,6 +347,24 @@ public final class VeyraRenderer {
 
     public static GraphicsPipeline getTerrainPipeline(TerrainRenderType terrainRenderType) {
         ShaderPack pack = selectedPack().orElse(null);
+        if (VeyraShadowRenderer.isRendering()) {
+            if (pack == null || !pack.hasShadowFragment()) {
+                return null;
+            }
+            if (terrainPipelineDirty) {
+                terrainPipelineDirty = false;
+                try {
+                    replaceTerrainPipelines(compileTerrainPipelines(pack));
+                    lastError = "";
+                    VeyraClient.LOGGER.info("Loaded shadow and terrain shader programs from shader pack '{}'.", pack.name());
+                } catch (Exception exception) {
+                    lastError = shortError(exception);
+                    VeyraClient.LOGGER.error("Could not load shadow shader program from shader pack '{}'.", pack.name(), exception);
+                    return null;
+                }
+            }
+            return terrainPipelineSet == null ? null : terrainPipelineSet.shadowPipeline();
+        }
         if (pack == null || !pack.hasTerrainFragment() || terrainRenderType == null) {
             return null;
         }
@@ -698,6 +723,7 @@ public final class VeyraRenderer {
         replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
+        VeyraShadowRenderer.release();
     }
 
     public static String select(ShaderPack pack) {
@@ -721,7 +747,7 @@ public final class VeyraRenderer {
         try {
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
-            if (pack.hasTerrainFragment()) {
+            if (pack.hasTerrainFragment() || pack.hasShadowFragment()) {
                 preparedTerrain = compileTerrainPipelines(pack);
             }
             if (pack.hasEntityFragment()) {
@@ -852,6 +878,9 @@ public final class VeyraRenderer {
             if (terrainProgramCount > 0) {
                 features.add(terrainProgramCount + " terrain programs");
             }
+            if (terrainPipelineSet != null && terrainPipelineSet.shadowPipeline() != null) {
+                features.add("terrain shadow map");
+            }
             if (cloudPipeline != null) {
                 features.add("cloud shader");
             }
@@ -965,6 +994,7 @@ public final class VeyraRenderer {
             replaceDamagedBlockPipelines(null);
             replaceBeaconBeamPipelines(null);
             replaceCloudPipeline(null);
+            VeyraShadowRenderer.clearBinding();
             lastError = "";
             return "Shader pack disabled.";
         } catch (IOException exception) {
@@ -995,7 +1025,7 @@ public final class VeyraRenderer {
         replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
-        terrainPipelineDirty = selectedPack().map(ShaderPack::hasTerrainFragment).orElse(false);
+        terrainPipelineDirty = selectedPack().map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment()).orElse(false);
         entityPipelineDirty = selectedPack().map(ShaderPack::hasEntityFragment).orElse(false);
         blockEntityPipelineDirty = selectedPack().map(ShaderPack::supportsBlockEntityPipeline).orElse(false);
         handPipelineDirty = selectedPack().map(ShaderPack::supportsHandPipeline).orElse(false);
@@ -1162,6 +1192,8 @@ public final class VeyraRenderer {
         String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "terrain/terrain.vsh");
         vertexSource = TerrainShaderAdapter.adaptVertex(vertexSource);
         Map<String, GraphicsPipeline> pipelines = new HashMap<>();
+        GraphicsPipeline shadowPipeline = null;
+        boolean shadowSamplerAvailable = pack.hasShadowFragment();
         try {
             for (String programName : List.of(
                     "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water")) {
@@ -1170,23 +1202,82 @@ public final class VeyraRenderer {
                 }
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource);
+                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable);
 
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                builder.applyConfig(PipelineConfigs.TERRAIN);
+                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable));
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
+                setShadowSamplerLayout(pipeline, shadowSamplerAvailable);
                 for (UBO ubo : pipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
                 }
                 pipelines.put(programName, pipeline);
             }
-            return new TerrainPipelineSet(Map.copyOf(pipelines));
+            if (shadowSamplerAvailable) {
+                String fragmentSource = pack.readShadowFragment()
+                        .orElseThrow(() -> new IOException("The pack no longer contains shadow.fsh."));
+                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
+                Pipeline.Builder builder = new Pipeline.Builder(
+                        PipelineManager.getTerrainVertexFormat(), "veyra_shadow");
+                builder.applyConfig(terrainPipelineConfig(false));
+                builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+                builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
+                shadowPipeline = builder.createGraphicsPipeline();
+                for (UBO ubo : shadowPipeline.getBuffers()) {
+                    ubo.setUseGlobalBuffer(true);
+                }
+            }
+            return new TerrainPipelineSet(Map.copyOf(pipelines), shadowPipeline);
         } catch (IOException | RuntimeException exception) {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
+            if (shadowPipeline != null) {
+                shadowPipeline.scheduleCleanUp();
+            }
             throw exception;
+        }
+    }
+
+    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable) {
+        PipelineConfig.UB terrainUniforms = PipelineConfig.UB.builder(
+                        1, org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_ALL_GRAPHICS)
+                .addUniform("vec4", "FogColor")
+                .addUniform("float", "FogEnvironmentalStart")
+                .addUniform("float", "FogEnvironmentalEnd")
+                .addUniform("float", "FogRenderDistanceStart")
+                .addUniform("float", "FogRenderDistanceEnd")
+                .addUniform("float", "FogSkyEnd")
+                .addUniform("float", "FogCloudsEnd")
+                .addUniform("float", "AlphaCutout")
+                .addUniform("vec2", "TextureSize")
+                .addUniform("vec2", "TexelSize")
+                .addUniform("int", "UseRgss")
+                .addUniform("mat4", "shadowModelView")
+                .addUniform("mat4", "shadowProjection")
+                .build();
+        PipelineConfig.Builder config = PipelineConfig.builder()
+                .addUB(PipelineConfigs.TERRAIN_UB0)
+                .addUB(terrainUniforms)
+                .addUB(PipelineConfigs.TERRAIN_UB2)
+                .setPushConstants(PipelineConfigs.TERRAIN_PC)
+                .addImageDescriptor(3, "sampler2D", "Sampler0", 0)
+                .addImageDescriptor(4, "sampler2D", "LightTexture", 2);
+        if (shadowSamplerAvailable) {
+            config.addImageDescriptor(5, "sampler2D", "VeyraShadowSampler", 3);
+        }
+        return config.build();
+    }
+
+    private static void setShadowSamplerLayout(GraphicsPipeline pipeline, boolean shadowSamplerAvailable) {
+        if (shadowSamplerAvailable) {
+            var shadowSampler = pipeline.getImageDescriptor("VeyraShadowSampler");
+            shadowSampler.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            // VulkanMod wraps the depth-only view in a separate VulkanImage object. The render pass
+            // already transitions the shared image to this final layout; asking the wrapper to
+            // transition it again uses stale per-wrapper layout tracking and can crash native drivers.
+            shadowSampler.isReadOnlyLayout = false;
         }
     }
 
@@ -2954,10 +3045,14 @@ public final class VeyraRenderer {
         }
     }
 
-    private record TerrainPipelineSet(Map<String, GraphicsPipeline> pipelines) implements AutoCloseable {
+    private record TerrainPipelineSet(Map<String, GraphicsPipeline> pipelines,
+                                      GraphicsPipeline shadowPipeline) implements AutoCloseable {
         @Override
         public void close() {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
+            if (shadowPipeline != null) {
+                shadowPipeline.scheduleCleanUp();
+            }
         }
     }
 

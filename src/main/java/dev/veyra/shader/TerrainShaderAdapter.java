@@ -14,6 +14,8 @@ public final class TerrainShaderAdapter {
     private static final Pattern PRECISION_DECLARATION = Pattern.compile("(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)");
     private static final Pattern ALPHA_TEST_UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?float\\s+alphaTestRef\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern SHADOW_MATRIX_UNIFORM = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+mat4\\s+(?:shadowModelView|shadowProjection)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
@@ -36,7 +38,9 @@ public final class TerrainShaderAdapter {
             Map.entry("lightMapCoord", new Varying("vec2", 5)),
             Map.entry("glcolor", new Varying("vec4", 0)),
             Map.entry("glColor", new Varying("vec4", 0)),
-            Map.entry("gl_Color", new Varying("vec4", 0)));
+            Map.entry("gl_Color", new Varying("vec4", 0)),
+            Map.entry("shadowPos", new Varying("vec4", 6)),
+            Map.entry("shadowCoord", new Varying("vec4", 6)));
 
     private static final String FRAGMENT_BRIDGE = """
             layout(binding = 1) uniform VeyraTerrainUniformBuffer {
@@ -51,12 +55,16 @@ public final class TerrainShaderAdapter {
                 ivec2 TextureSize;
                 vec2 TexelSize;
                 int UseRgss;
+                mat4 shadowModelView;
+                mat4 shadowProjection;
             };
             layout(binding = 3) uniform sampler2D Sampler0;
             layout(binding = 4) uniform sampler2D LightTexture;
+            layout(binding = 5) uniform sampler2D VeyraShadowSampler;
             layout(location = 0) in vec4 veyraVertexColor;
             layout(location = 1) in vec2 veyraTexCoord;
             layout(location = 5) in vec2 veyraLightmapCoord;
+            layout(location = 6) in vec4 veyraShadowPos;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -67,9 +75,17 @@ public final class TerrainShaderAdapter {
             vec4 veyraSampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                 return textureGrad(sourceSampler, sourceUv, dx, dy);
             }
+            vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                float visibility = step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                return vec4(visibility);
+            }
             #define texture Sampler0
             #define gtexture Sampler0
             #define lightmap LightTexture
+            #define shadowtex0 VeyraShadowSampler
+            #define shadowPos veyraShadowPos
+            #define shadowCoord veyraShadowPos
+            #define shadow2D(sampler, coord) veyraSample(sampler, coord)
             #define alphaTestRef AlphaCutout
             #define texcoord veyraTexCoord
             #define texCoord veyraTexCoord
@@ -86,6 +102,10 @@ public final class TerrainShaderAdapter {
     }
 
     public static String adaptFragment(String source) throws IOException {
+        return adaptFragment(source, true);
+    }
+
+    public static String adaptFragment(String source, boolean shadowSamplerAvailable) throws IOException {
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
@@ -95,15 +115,20 @@ public final class TerrainShaderAdapter {
         adapted = extensionMatcher.replaceAll("");
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
+        adapted = SHADOW_MATRIX_UNIFORM.matcher(adapted).replaceAll("");
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("lightmap")) {
+            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
+                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
-            if (!samplerMatcher.group(1).equals("sampler2D")) {
+            String samplerType = samplerMatcher.group(1);
+            if (!samplerType.equals("sampler2D")
+                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable
+                    && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException("gbuffers_terrain sampler '" + sampler + "' must use sampler2D.");
             }
             samplerMatcher.appendReplacement(withoutSamplers, "");
@@ -176,7 +201,13 @@ public final class TerrainShaderAdapter {
         for (String extension : extensions) {
             result.append(extension).append('\n');
         }
-        result.append(FRAGMENT_BRIDGE
+        String bridge = FRAGMENT_BRIDGE;
+        if (!shadowSamplerAvailable) {
+            bridge = bridge.replace("            layout(binding = 5) uniform sampler2D VeyraShadowSampler;\n", "")
+                    .replace("            #define shadowtex0 VeyraShadowSampler\n", "")
+                    .replace("            #define shadow2D(sampler, coord) veyraSample(sampler, coord)\n", "");
+        }
+        result.append(bridge
                 .replace("veyraFragColor;", outputName + ";")
                 .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName));
         return result.append(adapted).toString();
@@ -188,18 +219,31 @@ public final class TerrainShaderAdapter {
             throw new IOException("VulkanMod's built-in terrain vertex shader changed; Veyra cannot bridge gbuffers_terrain inputs.");
         }
         String adapted = source.replace(outputMarker,
-                outputMarker + "\nlayout (location = 5) out vec2 veyraLightmapCoord;");
+                outputMarker + "\nlayout (location = 5) out vec2 veyraLightmapCoord;"
+                        + "\nlayout (location = 6) out vec4 veyraShadowPos;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
         }
-        return adapted.replace(lightmapMarker, """
+        adapted = adapted.replace(lightmapMarker, """
                 vertexColor = Color;
                 const ivec2 lightCoord = ivec2(
                     bitfieldExtract(uint(Position.a), 4, 4),
                     bitfieldExtract(uint(Position.a), 12, 4));
                 veyraLightmapCoord = (vec2(lightCoord) + vec2(0.5)) / 16.0;
                 """);
+        String uniformMarker = "    int UseRgss;";
+        if (!adapted.contains(uniformMarker)) {
+            throw new IOException("VulkanMod's terrain uniform buffer changed; Veyra cannot provide shadow matrices.");
+        }
+        adapted = adapted.replace(uniformMarker,
+                uniformMarker + "\n    mat4 shadowModelView;\n    mat4 shadowProjection;");
+        String positionMarker = "    const vec3 pos = getVertexPosition();";
+        if (!adapted.contains(positionMarker)) {
+            throw new IOException("VulkanMod's terrain vertex position changed; Veyra cannot calculate shadow coordinates.");
+        }
+        return adapted.replace(positionMarker,
+                positionMarker + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);");
     }
 
     private record Varying(String type, int location) {
