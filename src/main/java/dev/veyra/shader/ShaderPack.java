@@ -24,7 +24,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          Set<String> weatherPrograms,
                          boolean hasBeaconBeamFragment, boolean hasLightningFragment,
                          boolean hasBasicFragment, boolean hasLineFragment, boolean hasGlintFragment,
-                         boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment, String issue) {
+                         boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment,
+                         boolean hasTexturedFragment, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
     private static final int MAX_INCLUDE_DEPTH = 32;
@@ -44,6 +45,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final String GLINT_PROGRAM = "gbuffers_armor_glint";
     private static final String SKY_BASIC_PROGRAM = "gbuffers_skybasic";
     private static final String SKY_TEXTURED_PROGRAM = "gbuffers_skytextured";
+    private static final String TEXTURED_PROGRAM = "gbuffers_textured";
     private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
             "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
 
@@ -55,7 +57,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                               Set<String> entityPrograms, Set<String> particlePrograms, Set<String> weatherPrograms,
                               boolean hasBeaconBeamFragment, boolean hasLightningFragment,
                               boolean hasBasicFragment, boolean hasLineFragment, boolean hasGlintFragment,
-                              boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment) {
+                              boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment,
+                              boolean hasTexturedFragment) {
     }
 
     public static ShaderPack inspect(Path path) {
@@ -77,12 +80,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection != null && inspection.hasGlintFragment(),
                     inspection != null && inspection.hasSkyBasicFragment(),
                     inspection != null && inspection.hasSkyTexturedFragment(),
+                    inspection != null && inspection.hasTexturedFragment(),
                     inspection == null
-                            ? "No supported terrain, clouds, sky, entities, particles, weather, beacon beam, lightning, basic, line, glint, prepare, deferred, composite, or final fragment programs were found."
-                            : "Supported terrain, clouds, sky, entities, particles, weather, beacon beam, lightning, basic, line, glint, and/or post-processing fragment programs are available.");
+                            ? "No supported terrain, clouds, sky, entities, particles, weather, beacon beam, lightning, basic, line, glint, textured, prepare, deferred, composite, or final fragment programs were found."
+                            : "Supported terrain, clouds, sky, entities, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.");
         } catch (IOException | RuntimeException exception) {
             return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false, false,
-                    false, false, false, false, false,
+                    false, false, false, false, false, false,
                     "Could not read pack: " + exception.getMessage());
         }
     }
@@ -241,15 +245,25 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public Optional<String> readGlintFragment() throws IOException {
-        return readColorDistanceFragment(GLINT_PROGRAM, hasGlintFragment);
+        return hasGlintFragment
+                ? readColorDistanceFragment(GLINT_PROGRAM, true)
+                : readTexturedFragment();
     }
 
     public Optional<String> readSkyBasicFragment() throws IOException {
-        return readColorDistanceFragment(SKY_BASIC_PROGRAM, hasSkyBasicFragment);
+        return hasSkyBasicFragment
+                ? readColorDistanceFragment(SKY_BASIC_PROGRAM, true)
+                : readBasicFragment();
     }
 
     public Optional<String> readSkyTexturedFragment() throws IOException {
-        return readColorDistanceFragment(SKY_TEXTURED_PROGRAM, hasSkyTexturedFragment);
+        return hasSkyTexturedFragment
+                ? readColorDistanceFragment(SKY_TEXTURED_PROGRAM, true)
+                : readTexturedFragment();
+    }
+
+    public Optional<String> readTexturedFragment() throws IOException {
+        return readColorDistanceFragment(TEXTURED_PROGRAM, hasTexturedFragment);
     }
 
     private Optional<String> readColorDistanceFragment(String programName, boolean present) throws IOException {
@@ -427,6 +441,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             boolean hasGlintFragment = files.contains(GLINT_PROGRAM + ".fsh");
             boolean hasSkyBasicFragment = files.contains(SKY_BASIC_PROGRAM + ".fsh");
             boolean hasSkyTexturedFragment = files.contains(SKY_TEXTURED_PROGRAM + ".fsh");
+            boolean hasTexturedFragment = files.contains(TEXTURED_PROGRAM + ".fsh");
             Set<String> entityPrograms = files.stream()
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
@@ -442,11 +457,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             return hasPostProcessing || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
                     || !particlePrograms.isEmpty() || !weatherPrograms.isEmpty() || hasBeaconBeamFragment
                     || hasLightningFragment || hasBasicFragment || hasLineFragment || hasGlintFragment
-                    || hasSkyBasicFragment || hasSkyTexturedFragment
+                    || hasSkyBasicFragment || hasSkyTexturedFragment || hasTexturedFragment
                     ? new Inspection("shaders", hasPostProcessing, terrainPrograms, hasCloudFragment,
                             entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment, hasLightningFragment,
                             hasBasicFragment, hasLineFragment, hasGlintFragment,
-                            hasSkyBasicFragment, hasSkyTexturedFragment) : null;
+                            hasSkyBasicFragment, hasSkyTexturedFragment, hasTexturedFragment) : null;
         }
     }
 
@@ -492,6 +507,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             boolean hasGlintFragment = files.contains(GLINT_PROGRAM + ".fsh");
             boolean hasSkyBasicFragment = files.contains(SKY_BASIC_PROGRAM + ".fsh");
             boolean hasSkyTexturedFragment = files.contains(SKY_TEXTURED_PROGRAM + ".fsh");
+            boolean hasTexturedFragment = files.contains(TEXTURED_PROGRAM + ".fsh");
             Set<String> entityPrograms = files.stream()
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
@@ -507,7 +523,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             return new Inspection(shaderDirectory, hasPostProcessing, terrainPrograms, hasCloudFragment,
                     entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment, hasLightningFragment,
                     hasBasicFragment, hasLineFragment, hasGlintFragment,
-                    hasSkyBasicFragment, hasSkyTexturedFragment);
+                    hasSkyBasicFragment, hasSkyTexturedFragment, hasTexturedFragment);
         }
     }
 
@@ -528,6 +544,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 || fileName.equals(GLINT_PROGRAM + ".fsh")
                 || fileName.equals(SKY_BASIC_PROGRAM + ".fsh")
                 || fileName.equals(SKY_TEXTURED_PROGRAM + ".fsh")
+                || fileName.equals(TEXTURED_PROGRAM + ".fsh")
                 || isSupportedTerrainProgramFile(fileName)
                 || isSupportedEntityProgramFile(fileName)
                 || isSupportedParticleProgramFile(fileName)
