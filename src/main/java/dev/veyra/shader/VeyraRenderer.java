@@ -192,7 +192,7 @@ public final class VeyraRenderer {
     private static RenderTarget swapTargetB;
     private static final Map<Integer, ColorTargetPair> colorTargets = new HashMap<>();
     private static final Map<Integer, Identifier> currentColorTargets = new HashMap<>();
-    private static boolean clearColorTargets;
+    private static final Set<Integer> initializedColorTargets = new java.util.HashSet<>();
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
     private static PipelineProgram depthTex1CaptureProgram;
@@ -1238,6 +1238,7 @@ public final class VeyraRenderer {
             ensurePipelines(mainTarget.width, mainTarget.height);
             ensureSwapTargets(mainTarget.width, mainTarget.height);
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices());
+            clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
             FramePlan framePlan = pipelineSet.framePlan(currentColorTargets);
 
             FrameGraphBuilder graph = new FrameGraphBuilder();
@@ -1313,6 +1314,7 @@ public final class VeyraRenderer {
 
     private static PipelineSet compilePipelines(ShaderPack pack, int width, int height) throws IOException {
         List<ShaderPack.Program> sources = pack.readPrograms();
+        Map<Integer, ColorTargetSettings> colorTargetSettings = pack.readColorTargetSettings();
         List<ProgramGroup> programs = new ArrayList<>(sources.size());
         boolean usesDepthSampler = false;
         boolean usesDepth1Sampler = false;
@@ -1354,7 +1356,8 @@ public final class VeyraRenderer {
                     ? firstPlan
                     : buildFramePlan(programs, copyProgram, width, height, secondPlanInputs);
             return new PipelineSet(firstPlan, secondPlan, width, height,
-                    usesDepthSampler, usesDepth1Sampler, Set.copyOf(colorTargetIndices));
+                    usesDepthSampler, usesDepth1Sampler, Map.copyOf(colorTargetSettings),
+                    Set.copyOf(colorTargetIndices));
         } catch (RuntimeException exception) {
             if (firstPlan != null) {
                 firstPlan.close();
@@ -3051,11 +3054,13 @@ public final class VeyraRenderer {
                         new TextureTarget("Veyra shader pack colortex" + index + " A", width, height, false),
                         new TextureTarget("Veyra shader pack colortex" + index + " B", width, height, false));
                 colorTargets.put(index, pair);
+                initializedColorTargets.remove(index);
                 resized = true;
             } else if (pair.targetA().width != width || pair.targetA().height != height
                     || pair.targetB().width != width || pair.targetB().height != height) {
                 pair.targetA().resize(width, height);
                 pair.targetB().resize(width, height);
+                initializedColorTargets.remove(index);
                 resized = true;
             }
         }
@@ -3064,20 +3069,33 @@ public final class VeyraRenderer {
             for (int index : indices) {
                 currentColorTargets.put(index, colorTargetAId(index));
             }
-            clearColorTargets = !indices.isEmpty();
         }
-        if (clearColorTargets) {
-            Renderer renderer = Renderer.getInstance();
-            if (renderer.getBoundRenderPass() != null) {
-                renderer.endRenderPass();
+    }
+
+    private static void clearColorTargetBuffers(Set<Integer> indices,
+                                                Map<Integer, ColorTargetSettings> settings) {
+        boolean hasTargetsToClear = indices.stream().anyMatch(index -> {
+            ColorTargetSettings targetSettings = settings.getOrDefault(index, ColorTargetSettings.defaults(index));
+            return !initializedColorTargets.contains(index) || targetSettings.clearEachFrame();
+        });
+        if (!hasTargetsToClear) {
+            return;
+        }
+
+        Renderer renderer = Renderer.getInstance();
+        if (renderer.getBoundRenderPass() != null) {
+            renderer.endRenderPass();
+        }
+        var commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+        for (int index : indices) {
+            ColorTargetSettings targetSettings = settings.getOrDefault(index, ColorTargetSettings.defaults(index));
+            if (initializedColorTargets.contains(index) && !targetSettings.clearEachFrame()) {
+                continue;
             }
-            var commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-            for (int index : indices) {
-                ColorTargetPair pair = colorTargets.get(index);
-                commandEncoder.clearColorTexture(pair.targetA().getColorTexture(), 0);
-                commandEncoder.clearColorTexture(pair.targetB().getColorTexture(), 0);
-            }
-            clearColorTargets = false;
+            ColorTargetPair pair = colorTargets.get(index);
+            commandEncoder.clearColorTexture(pair.targetA().getColorTexture(), targetSettings.clearColor());
+            commandEncoder.clearColorTexture(pair.targetB().getColorTexture(), targetSettings.clearColor());
+            initializedColorTargets.add(index);
         }
     }
 
@@ -3093,8 +3111,8 @@ public final class VeyraRenderer {
                 for (int index : next.colorTargetIndices()) {
                     currentColorTargets.put(index, colorTargetAId(index));
                 }
+                initializedColorTargets.removeAll(next.colorTargetIndices());
             }
-            clearColorTargets = next != null && !next.colorTargetIndices().isEmpty();
         }
         if ((next == null || !next.usesDepthSampler())
                 && sampledDepthTextureView != null && !sampledDepthTextureView.isClosed()) {
@@ -3286,6 +3304,7 @@ public final class VeyraRenderer {
 
     private record PipelineSet(FramePlan planA, FramePlan planB, int width, int height,
                                boolean usesDepthSampler, boolean usesDepth1Sampler,
+                               Map<Integer, ColorTargetSettings> colorTargetSettings,
                                Set<Integer> colorTargetIndices) implements AutoCloseable {
         private FramePlan framePlan(Map<Integer, Identifier> currentColorTargets) {
             if (planA.initialColorTargets().equals(currentColorTargets)) {

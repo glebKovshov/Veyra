@@ -8,9 +8,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -53,8 +55,16 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final String HAND_PROGRAM = "gbuffers_hand";
     private static final String HAND_WATER_PROGRAM = "gbuffers_hand_water";
     private static final String DAMAGED_BLOCK_PROGRAM = "gbuffers_damagedblock";
+    private static final int MAX_COLOR_TARGET_INDEX = 15;
     private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
             "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
+    private static final Pattern GLSL_COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
+    private static final Pattern COLOR_TARGET_CLEAR = Pattern.compile(
+            "(?m)\\bconst\\s+bool\\s+colortex(\\d+)Clear\\s*=\\s*(true|false)\\s*;");
+    private static final Pattern COLOR_TARGET_CLEAR_COLOR = Pattern.compile(
+            "(?is)\\bconst\\s+vec4\\s+colortex(\\d+)ClearColor\\s*=\\s*vec4\\s*\\(([^)]*)\\)\\s*;");
+    private static final Pattern FLOAT_LITERAL = Pattern.compile(
+            "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
 
     public record Program(String name, String source) {
     }
@@ -179,6 +189,106 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             throw new IOException("The pack no longer contains a supported fragment pass.");
         }
         return List.copyOf(programs);
+    }
+
+    public Map<Integer, ColorTargetSettings> readColorTargetSettings() throws IOException {
+        Map<Integer, MutableColorTargetSettings> parsed = new HashMap<>();
+        for (String fileName : listShaderFiles().stream().sorted().toList()) {
+            if (!isGlslSource(fileName)) {
+                continue;
+            }
+            Optional<String> source = readShader(fileName);
+            if (source.isEmpty()) {
+                continue;
+            }
+            String expanded = expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0);
+            parseColorTargetSettings(GLSL_COMMENTS.matcher(expanded).replaceAll(""), parsed, fileName);
+        }
+
+        Map<Integer, ColorTargetSettings> settings = new HashMap<>();
+        parsed.forEach((index, value) -> {
+            ColorTargetSettings defaults = ColorTargetSettings.defaults(index);
+            settings.put(index, new ColorTargetSettings(
+                    value.clearEachFrame == null || value.clearEachFrame,
+                    value.clearColor == null ? defaults.clearColor() : value.clearColor));
+        });
+        return Map.copyOf(settings);
+    }
+
+    private static void parseColorTargetSettings(String source,
+                                                 Map<Integer, MutableColorTargetSettings> settings,
+                                                 String sourceFile) throws IOException {
+        Matcher clearMatcher = COLOR_TARGET_CLEAR.matcher(source);
+        while (clearMatcher.find()) {
+            int index = Integer.parseInt(clearMatcher.group(1));
+            if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
+                continue;
+            }
+            boolean clear = Boolean.parseBoolean(clearMatcher.group(2));
+            MutableColorTargetSettings target = settings.computeIfAbsent(index,
+                    ignored -> new MutableColorTargetSettings());
+            if (target.clearEachFrame != null && target.clearEachFrame != clear) {
+                throw new IOException("Shader pack declares conflicting colortex" + index + "Clear values in "
+                        + sourceFile + ".");
+            }
+            target.clearEachFrame = clear;
+        }
+
+        Matcher colorMatcher = COLOR_TARGET_CLEAR_COLOR.matcher(source);
+        while (colorMatcher.find()) {
+            int index = Integer.parseInt(colorMatcher.group(1));
+            if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
+                continue;
+            }
+            int color = parseClearColor(colorMatcher.group(2), index, sourceFile);
+            MutableColorTargetSettings target = settings.computeIfAbsent(index,
+                    ignored -> new MutableColorTargetSettings());
+            if (target.clearColor != null && target.clearColor != color) {
+                throw new IOException("Shader pack declares conflicting colortex" + index + "ClearColor values in "
+                        + sourceFile + ".");
+            }
+            target.clearColor = color;
+        }
+    }
+
+    private static int parseClearColor(String componentsText, int index, String sourceFile) throws IOException {
+        String[] components = componentsText.split(",");
+        if (components.length != 1 && components.length != 4) {
+            throw new IOException("colortex" + index + "ClearColor in " + sourceFile
+                    + " must use vec4(value) or vec4(red, green, blue, alpha).");
+        }
+
+        int[] channels = new int[4];
+        for (int component = 0; component < components.length; component++) {
+            Matcher matcher = FLOAT_LITERAL.matcher(components[component].trim());
+            if (!matcher.matches()) {
+                throw new IOException("colortex" + index + "ClearColor in " + sourceFile
+                        + " must use numeric float literals.");
+            }
+            float value = Float.parseFloat(matcher.group(1));
+            if (!Float.isFinite(value)) {
+                throw new IOException("colortex" + index + "ClearColor in " + sourceFile
+                        + " contains a non-finite value.");
+            }
+            int channel = Math.round(Math.clamp(value, 0.0F, 1.0F) * 255.0F);
+            if (components.length == 1) {
+                java.util.Arrays.fill(channels, channel);
+            } else {
+                channels[component] = channel;
+            }
+        }
+        return channels[3] << 24 | channels[0] << 16 | channels[1] << 8 | channels[2];
+    }
+
+    private static boolean isGlslSource(String fileName) {
+        String lower = fileName.toLowerCase(java.util.Locale.ROOT);
+        return lower.endsWith(".fsh") || lower.endsWith(".vsh") || lower.endsWith(".gsh")
+                || lower.endsWith(".glsl") || lower.endsWith(".csh");
+    }
+
+    private static final class MutableColorTargetSettings {
+        private Boolean clearEachFrame;
+        private Integer clearColor;
     }
 
     public Optional<String> readTerrainFragment() throws IOException {
