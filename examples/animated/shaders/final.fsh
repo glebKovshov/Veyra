@@ -4,8 +4,10 @@ uniform sampler2D colortex0;
 uniform float frameTimeCounter;
 in vec2 texcoord;
 
+#include "/lib/pulse.glsl"
+
 void main() {
     vec4 color = texture2D(colortex0, texcoord);
-    float pulse = 0.92 + 0.08 * sin(frameTimeCounter * 2.0);
+    float pulse = veyraPulse(frameTimeCounter);
     gl_FragColor = vec4(color.rgb * pulse, color.a);
 }

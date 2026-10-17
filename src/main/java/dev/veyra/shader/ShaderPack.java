@@ -9,16 +9,23 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public record ShaderPack(Path path, String name, String shaderDirectory, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
+    private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
+    private static final int MAX_INCLUDE_DEPTH = 32;
     private static final int MAX_PASS_SUFFIX = 99;
     private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
+    private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
+            "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
 
     public record Program(String name, String source) {
     }
@@ -51,12 +58,20 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
                 String programName = suffix == 0 ? prefix : prefix + suffix;
                 String fileName = programName + ".fsh";
                 if (availableFiles.contains(fileName)) {
-                    readShader(fileName).ifPresent(source -> programs.add(new Program(programName, source)));
+                    Optional<String> source = readShader(fileName);
+                    if (source.isPresent()) {
+                        programs.add(new Program(programName, expandIncludes(
+                                fileName, source.get(), new LinkedHashSet<>(), 0)));
+                    }
                 }
             }
         }
         if (availableFiles.contains("final.fsh")) {
-            readShader("final.fsh").ifPresent(source -> programs.add(new Program("final", source)));
+            Optional<String> source = readShader("final.fsh");
+            if (source.isPresent()) {
+                programs.add(new Program("final", expandIncludes(
+                        "final.fsh", source.get(), new LinkedHashSet<>(), 0)));
+            }
         }
 
         if (programs.isEmpty()) {
@@ -95,15 +110,30 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
     private Optional<String> readShader(String fileName) throws IOException {
         byte[] bytes;
         if (Files.isDirectory(path)) {
-            Path packRoot = path.toAbsolutePath().normalize();
-            Path shader = packRoot.resolve(shaderDirectory).resolve(fileName).normalize();
-            if (!shader.startsWith(packRoot)) {
-                throw new IOException("Shader path escapes the pack directory.");
+            Path packRoot = path.toRealPath();
+            Path shaderRoot = packRoot.resolve(shaderDirectory).normalize();
+            if (!shaderRoot.startsWith(packRoot)) {
+                throw new IOException("Shader directory escapes the pack directory.");
             }
-            if (!Files.isRegularFile(shader)) {
+            Path realShaderRoot = shaderRoot.toRealPath();
+            if (!realShaderRoot.startsWith(packRoot)) {
+                throw new IOException("Shader directory resolves outside the pack directory.");
+            }
+            Path shader = realShaderRoot.resolve(fileName).normalize();
+            if (!shader.startsWith(realShaderRoot)) {
+                throw new IOException("Shader path escapes the shaders directory.");
+            }
+            if (!Files.exists(shader)) {
                 return Optional.empty();
             }
-            try (InputStream input = Files.newInputStream(shader)) {
+            Path realShader = shader.toRealPath();
+            if (!realShader.startsWith(realShaderRoot)) {
+                throw new IOException("Shader path resolves outside the shaders directory.");
+            }
+            if (!Files.isRegularFile(realShader)) {
+                return Optional.empty();
+            }
+            try (InputStream input = Files.newInputStream(realShader)) {
                 bytes = readBounded(input);
             }
         } else {
@@ -118,6 +148,77 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
             }
         }
         return Optional.of(new String(bytes, StandardCharsets.UTF_8));
+    }
+
+    private String expandIncludes(String fileName, String source, Set<String> includeStack, int depth)
+            throws IOException {
+        if (depth > MAX_INCLUDE_DEPTH) {
+            throw new IOException("Shader includes exceed the maximum nesting depth of " + MAX_INCLUDE_DEPTH + ".");
+        }
+        if (!includeStack.add(fileName)) {
+            throw new IOException("Shader include cycle detected at " + fileName + ".");
+        }
+
+        try {
+            Matcher matcher = INCLUDE_DIRECTIVE.matcher(source);
+            StringBuilder expanded = new StringBuilder(source.length());
+            int copiedThrough = 0;
+            while (matcher.find()) {
+                expanded.append(source, copiedThrough, matcher.start());
+                String requestedPath = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+                String includePath = resolveIncludePath(fileName, requestedPath);
+                String includeSource = readShader(includePath)
+                        .orElseThrow(() -> new IOException("Shader include was not found: " + includePath));
+                String expandedInclude = expandIncludes(includePath, includeSource, includeStack, depth + 1);
+                expanded.append(expandedInclude);
+                if (matcher.group().endsWith("\n") && !expandedInclude.endsWith("\n")) {
+                    expanded.append('\n');
+                }
+                copiedThrough = matcher.end();
+                if (expanded.length() > MAX_EXPANDED_SHADER_CHARS) {
+                    throw new IOException("Expanded shader exceeds the 4 MiB size limit.");
+                }
+            }
+            expanded.append(source, copiedThrough, source.length());
+            if (expanded.length() > MAX_EXPANDED_SHADER_CHARS) {
+                throw new IOException("Expanded shader exceeds the 4 MiB size limit.");
+            }
+            return expanded.toString();
+        } finally {
+            includeStack.remove(fileName);
+        }
+    }
+
+    private static String resolveIncludePath(String includingFile, String requestedPath) throws IOException {
+        String portablePath = requestedPath.replace('\\', '/');
+        boolean rootRelative = portablePath.startsWith("/");
+        List<String> segments = new ArrayList<>();
+        if (!rootRelative) {
+            String parent = includingFile.contains("/")
+                    ? includingFile.substring(0, includingFile.lastIndexOf('/')) : "";
+            for (String segment : parent.split("/")) {
+                if (!segment.isEmpty()) {
+                    segments.add(segment);
+                }
+            }
+        }
+        for (String segment : portablePath.split("/")) {
+            if (segment.isEmpty() || segment.equals(".")) {
+                continue;
+            }
+            if (segment.equals("..")) {
+                if (segments.isEmpty()) {
+                    throw new IOException("Shader include escapes the shaders directory: " + requestedPath);
+                }
+                segments.remove(segments.size() - 1);
+            } else {
+                segments.add(segment);
+            }
+        }
+        if (segments.isEmpty()) {
+            throw new IOException("Shader include path is empty: " + requestedPath);
+        }
+        return String.join("/", segments);
     }
 
     private static String inspectDirectory(Path path) throws IOException {
