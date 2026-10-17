@@ -12,6 +12,9 @@ public abstract class VkRenderPassMixin {
     @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true, remap = false)
     private RenderPipeline veyra$routeEntityPipeline(RenderPipeline original) {
         RenderPipeline replacement = VeyraRenderer.getEntityPipeline(original);
+        if (replacement == null) {
+            replacement = VeyraRenderer.getBeaconBeamPipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }
