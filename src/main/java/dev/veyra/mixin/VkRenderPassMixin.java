@@ -30,6 +30,9 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getLinePipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getGlintPipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }

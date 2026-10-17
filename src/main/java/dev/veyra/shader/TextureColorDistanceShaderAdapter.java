@@ -4,11 +4,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Adapts the common Iris particle and weather fragment inputs to Minecraft's particle vertex outputs. */
-public final class ParticleShaderAdapter {
+/** Adapts Iris texture, color, and fog-distance inputs to Minecraft's vertex outputs. */
+public final class TextureColorDistanceShaderAdapter {
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern PRECISION_DECLARATION = Pattern.compile(
@@ -41,15 +42,20 @@ public final class ParticleShaderAdapter {
             Map.entry("vertexColor", "vec4"),
             Map.entry("sphericalVertexDistance", "float"),
             Map.entry("cylindricalVertexDistance", "float"));
+    private static final Set<String> COLOR_INPUTS = Set.of("color", "glcolor", "glColor", "gl_Color", "vertexColor");
 
-    private ParticleShaderAdapter() {
+    private TextureColorDistanceShaderAdapter() {
     }
 
     public static String adaptFragment(String source) throws IOException {
-        return adaptFragment(source, "gbuffers_particles");
+        return adaptFragment(source, "gbuffers_particles", true);
     }
 
     public static String adaptFragment(String source, String programName) throws IOException {
+        return adaptFragment(source, programName, true);
+    }
+
+    public static String adaptFragment(String source, String programName, boolean hasVertexColor) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -90,7 +96,10 @@ public final class ParticleShaderAdapter {
             String name = varyingMatcher.group(3);
             String expectedType = INPUT_TYPES.get(name);
             if (expectedType == null) {
-                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's particle bridge yet.");
+                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's texture-distance bridge yet.");
+            }
+            if (!hasVertexColor && COLOR_INPUTS.contains(name)) {
+                throw new IOException(programName + " does not receive vertex color from Minecraft's vertex shader.");
             }
             if (!expectedType.equals(type)) {
                 throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
@@ -100,10 +109,10 @@ public final class ParticleShaderAdapter {
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException(programName + " declares inputs that are not provided by Veyra's particle bridge yet.");
+            throw new IOException(programName + " declares inputs that are not provided by Veyra's texture-distance bridge yet.");
         }
 
-        String outputName = "veyraParticleFragColor";
+        String outputName = "veyraTextureFragColor";
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
         int outputCount = 0;
@@ -127,7 +136,7 @@ public final class ParticleShaderAdapter {
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
-            throw new IOException(programName + " uses a texture sampling function that Veyra's particle bridge does not support yet.");
+            throw new IOException(programName + " uses a texture sampling function that Veyra's texture-distance bridge does not support yet.");
         }
         validateTargetComments(source, programName);
         Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
@@ -139,12 +148,12 @@ public final class ParticleShaderAdapter {
 
         adapted = adapted
                 .replaceAll("\\bgl_FragData\\s*\\[\\s*0\\s*\\]", outputName)
-                .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "veyraParticleSampleLod(")
-                .replaceAll("\\btextureLod\\s*\\(", "veyraParticleSampleLod(")
-                .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraParticleSampleGrad(")
-                .replaceAll("\\btextureGrad\\s*\\(", "veyraParticleSampleGrad(")
-                .replaceAll("\\btexture2D\\s*\\(", "veyraParticleSample(")
-                .replaceAll("\\btexture\\s*\\(", "veyraParticleSample(")
+                .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "veyraTextureSampleLod(")
+                .replaceAll("\\btextureLod\\s*\\(", "veyraTextureSampleLod(")
+                .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraTextureSampleGrad(")
+                .replaceAll("\\btextureGrad\\s*\\(", "veyraTextureSampleGrad(")
+                .replaceAll("\\btexture2D\\s*\\(", "veyraTextureSample(")
+                .replaceAll("\\btexture\\s*\\(", "veyraTextureSample(")
                 .replaceAll("\\bgl_FragColor\\b", outputName)
                 .replaceAll("\\btexcoord\\b|\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
@@ -152,22 +161,22 @@ public final class ParticleShaderAdapter {
         String bridge = """
                 in float sphericalVertexDistance;
                 in float cylindricalVertexDistance;
-                in vec4 vertexColor;
+                %s
                 in vec2 texCoord0;
-                out vec4 veyraParticleFragColor;
+                out vec4 %s;
                 uniform sampler2D Sampler0;
-                vec4 veyraParticleSample(sampler2D sourceSampler, vec2 sourceUv) {
+                vec4 veyraTextureSample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
                 }
-                vec4 veyraParticleSampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
+                vec4 veyraTextureSampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
                     return textureLod(sourceSampler, sourceUv, lod);
                 }
-                vec4 veyraParticleSampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
+                vec4 veyraTextureSampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
                 #define texture Sampler0
                 #define gtexture Sampler0
-                """.replace("veyraParticleFragColor;", outputName + ";");
+                """.formatted(hasVertexColor ? "in vec4 vertexColor;" : "", outputName);
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
