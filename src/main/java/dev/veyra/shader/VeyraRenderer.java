@@ -74,11 +74,8 @@ import java.util.regex.Pattern;
 public final class VeyraRenderer {
     private static final Identifier SWAP_TARGET_A_ID = Identifier.fromNamespaceAndPath("veyra", "swap_a");
     private static final Identifier SWAP_TARGET_B_ID = Identifier.fromNamespaceAndPath("veyra", "swap_b");
-    private static final Identifier COLORTEX1_TARGET_A_ID = Identifier.fromNamespaceAndPath("veyra", "colortex1_a");
-    private static final Identifier COLORTEX1_TARGET_B_ID = Identifier.fromNamespaceAndPath("veyra", "colortex1_b");
+    private static final int MAX_COLORTEX_INDEX = 15;
     private static final String SHADERPACK_UNIFORMS = "VeyraParameters";
-    private static final String COLORTEX1_INPUT_NAME = "VeyraColortex1";
-    private static final String COLORTEX1_INPUT_SAMPLER = COLORTEX1_INPUT_NAME + "Sampler";
     private static final String HAND_PROGRAM = "gbuffers_hand";
     private static final String HAND_WATER_PROGRAM = "gbuffers_hand_water";
     private static final float WETNESS_RISE_HALF_LIFE_SECONDS = 600.0F / 20.0F;
@@ -105,10 +102,9 @@ public final class VeyraRenderer {
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
     private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final Pattern COLORTEX1_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern UNSUPPORTED_COLOR_SAMPLER = Pattern.compile("\\bcolortex(?:[2-9]|[1-9][0-9]+)\\b");
-    private static final Pattern COLORTEX1_SAMPLER = Pattern.compile("\\bcolortex1\\b");
+    private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?!0\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
     private static final Pattern DEPTH_SAMPLER_DECLARATION = Pattern.compile(
@@ -147,10 +143,9 @@ public final class VeyraRenderer {
     private static ShaderPackRepository repository;
     private static RenderTarget swapTargetA;
     private static RenderTarget swapTargetB;
-    private static RenderTarget colortex1TargetA;
-    private static RenderTarget colortex1TargetB;
-    private static Identifier currentColortex1Target = COLORTEX1_TARGET_A_ID;
-    private static boolean clearColortex1Targets;
+    private static final Map<Integer, ColorTargetPair> colorTargets = new HashMap<>();
+    private static final Map<Integer, Identifier> currentColorTargets = new HashMap<>();
+    private static boolean clearColorTargets;
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
     private static TerrainPipelineSet terrainPipelineSet;
@@ -1031,10 +1026,8 @@ public final class VeyraRenderer {
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
             ensureSwapTargets(mainTarget.width, mainTarget.height);
-            if (pipelineSet.usesColortex1()) {
-                ensureColortex1Targets(mainTarget.width, mainTarget.height);
-            }
-            FramePlan framePlan = pipelineSet.framePlan(currentColortex1Target);
+            ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices());
+            FramePlan framePlan = pipelineSet.framePlan(currentColorTargets);
 
             FrameGraphBuilder graph = new FrameGraphBuilder();
             ResourceHandle<RenderTarget> main = graph.importExternal("main", mainTarget);
@@ -1044,12 +1037,12 @@ public final class VeyraRenderer {
             targets.put(PostChain.MAIN_TARGET_ID, main);
             targets.put(SWAP_TARGET_A_ID, swapA);
             targets.put(SWAP_TARGET_B_ID, swapB);
-            if (pipelineSet.usesColortex1()) {
-                ensureColortex1Targets(mainTarget.width, mainTarget.height);
-                targets.put(COLORTEX1_TARGET_A_ID,
-                        graph.importExternal("veyra:shaderpack-colortex1-a", colortex1TargetA));
-                targets.put(COLORTEX1_TARGET_B_ID,
-                        graph.importExternal("veyra:shaderpack-colortex1-b", colortex1TargetB));
+            for (int index : pipelineSet.colorTargetIndices()) {
+                ColorTargetPair pair = colorTargets.get(index);
+                targets.put(colorTargetAId(index), graph.importExternal(
+                        "veyra:shaderpack-colortex" + index + "-a", pair.targetA()));
+                targets.put(colorTargetBId(index), graph.importExternal(
+                        "veyra:shaderpack-colortex" + index + "-b", pair.targetB()));
             }
 
             var samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
@@ -1070,8 +1063,9 @@ public final class VeyraRenderer {
             if (depthSamplerState != null) {
                 restoreDepthSampler(depthSamplerState);
             }
-            if (pipelineSet.usesColortex1()) {
-                currentColortex1Target = framePlan.colortex1OutputTarget();
+            if (!pipelineSet.colorTargetIndices().isEmpty()) {
+                currentColorTargets.clear();
+                currentColorTargets.putAll(framePlan.outputColorTargets());
             }
         } catch (Exception exception) {
             if (depthSampling) {
@@ -1110,7 +1104,7 @@ public final class VeyraRenderer {
         List<ShaderPack.Program> sources = pack.readPrograms();
         List<ProgramGroup> programs = new ArrayList<>(sources.size());
         boolean usesDepthSampler = false;
-        boolean usesColortex1 = false;
+        Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
         for (ShaderPack.Program source : sources) {
             List<PipelineProgram> outputs = new ArrayList<>();
             for (AdaptedShader adapted : adaptShader(source.source())) {
@@ -1119,7 +1113,10 @@ public final class VeyraRenderer {
                 compilePipeline(program);
                 outputs.add(program);
                 usesDepthSampler |= adapted.usesDepthSampler();
-                usesColortex1 |= adapted.usesColortex1Sampler() || adapted.outputTarget() == 1;
+                adapted.colorSamplers().stream().filter(index -> index > 0).forEach(colorTargetIndices::add);
+                if (adapted.outputTarget() > 0) {
+                    colorTargetIndices.add(adapted.outputTarget());
+                }
             }
             programs.add(new ProgramGroup(List.copyOf(outputs)));
         }
@@ -1127,18 +1124,24 @@ public final class VeyraRenderer {
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
             copyProgram = pipelineProgram("copy",
-                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, 0));
+                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, Set.of(), 0));
             compilePipeline(copyProgram);
         }
 
         FramePlan firstPlan = null;
         FramePlan secondPlan = null;
         try {
-            firstPlan = buildFramePlan(programs, copyProgram, width, height, COLORTEX1_TARGET_A_ID);
-            secondPlan = usesColortex1
-                    ? buildFramePlan(programs, copyProgram, width, height, COLORTEX1_TARGET_B_ID)
-                    : firstPlan;
-            return new PipelineSet(firstPlan, secondPlan, width, height, usesDepthSampler, usesColortex1);
+            Map<Integer, Identifier> initialColorTargets = new HashMap<>();
+            for (int index : colorTargetIndices) {
+                initialColorTargets.put(index, colorTargetAId(index));
+            }
+            firstPlan = buildFramePlan(programs, copyProgram, width, height, initialColorTargets);
+            Map<Integer, Identifier> secondPlanInputs = firstPlan.outputColorTargets();
+            secondPlan = initialColorTargets.equals(secondPlanInputs)
+                    ? firstPlan
+                    : buildFramePlan(programs, copyProgram, width, height, secondPlanInputs);
+            return new PipelineSet(firstPlan, secondPlan, width, height,
+                    usesDepthSampler, Set.copyOf(colorTargetIndices));
         } catch (RuntimeException exception) {
             if (firstPlan != null) {
                 firstPlan.close();
@@ -2081,12 +2084,12 @@ public final class VeyraRenderer {
 
     private static FramePlan buildFramePlan(
             List<ProgramGroup> programs, PipelineProgram copyProgram,
-            int width, int height, Identifier initialColortex1Target) {
+            int width, int height, Map<Integer, Identifier> initialColorTargets) {
         List<ShaderPass> passes = new ArrayList<>();
         PostPass copyPass = null;
         Map<Integer, Identifier> currentTargets = new HashMap<>();
         currentTargets.put(0, PostChain.MAIN_TARGET_ID);
-        currentTargets.put(1, initialColortex1Target);
+        currentTargets.putAll(initialColorTargets);
         try {
             for (ProgramGroup group : programs) {
                 Map<Integer, Identifier> outputTargets = new HashMap<>();
@@ -2096,13 +2099,15 @@ public final class VeyraRenderer {
                 }
 
                 Identifier inputColortex0 = currentTargets.get(0);
-                Identifier inputColortex1 = currentTargets.get(1);
                 for (PipelineProgram program : group.outputs()) {
                     List<PostPass.Input> inputs = new ArrayList<>();
                     inputs.add(new PostPass.TargetInput("In", inputColortex0, false, true));
-                    if (program.usesColortex1Sampler()) {
+                    for (int samplerIndex : program.colorSamplers()) {
+                        if (samplerIndex == 0) {
+                            continue;
+                        }
                         inputs.add(new PostPass.TargetInput(
-                                COLORTEX1_INPUT_NAME, inputColortex1, false, true));
+                                colorTargetInputName(samplerIndex), currentTargets.get(samplerIndex), false, true));
                     }
                     if (program.usesDepthSampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH_INPUT_NAME));
@@ -2123,7 +2128,14 @@ public final class VeyraRenderer {
                 copyPass = new PostPass(copyProgram.pipeline(), PostChain.MAIN_TARGET_ID, Map.of(),
                         List.of(new PostPass.TargetInput("In", finalColortex0, false, true)));
             }
-            return new FramePlan(List.copyOf(passes), copyPass, currentTargets.get(1));
+            Map<Integer, Identifier> outputColorTargets = new HashMap<>();
+            currentTargets.forEach((index, target) -> {
+                if (index > 0) {
+                    outputColorTargets.put(index, target);
+                }
+            });
+            return new FramePlan(List.copyOf(passes), copyPass,
+                    Map.copyOf(initialColorTargets), Map.copyOf(outputColorTargets));
         } catch (RuntimeException exception) {
             passes.forEach(shaderPass -> shaderPass.pass().close());
             if (copyPass != null) {
@@ -2137,11 +2149,27 @@ public final class VeyraRenderer {
         if (targetIndex == 0) {
             return currentTarget.equals(SWAP_TARGET_A_ID) ? SWAP_TARGET_B_ID : SWAP_TARGET_A_ID;
         }
-        if (targetIndex == 1) {
-            return currentTarget.equals(COLORTEX1_TARGET_A_ID)
-                    ? COLORTEX1_TARGET_B_ID : COLORTEX1_TARGET_A_ID;
+        if (targetIndex > MAX_COLORTEX_INDEX) {
+            throw new IllegalArgumentException("Veyra only allocates colortex0 through colortex" + MAX_COLORTEX_INDEX + ".");
         }
-        throw new IllegalArgumentException("Veyra only allocates colortex0 and colortex1.");
+        return currentTarget.equals(colorTargetAId(targetIndex))
+                ? colorTargetBId(targetIndex) : colorTargetAId(targetIndex);
+    }
+
+    private static Identifier colorTargetAId(int index) {
+        return Identifier.fromNamespaceAndPath("veyra", "colortex" + index + "_a");
+    }
+
+    private static Identifier colorTargetBId(int index) {
+        return Identifier.fromNamespaceAndPath("veyra", "colortex" + index + "_b");
+    }
+
+    private static String colorTargetInputName(int index) {
+        return "VeyraColortex" + index;
+    }
+
+    private static String colorTargetInputSampler(int index) {
+        return colorTargetInputName(index) + "Sampler";
     }
 
     private static PipelineProgram pipelineProgram(String name, AdaptedShader shader) {
@@ -2152,9 +2180,9 @@ public final class VeyraRenderer {
             Identifier shaderId = Identifier.fromNamespaceAndPath("veyra", "shaderpack/" + suffix);
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
             return new PipelineProgram(shaderId, shader.source(), shader.uniforms(),
-                    shader.usesDepthSampler(), shader.usesColortex1Sampler(), shader.outputTarget(),
+                    shader.usesDepthSampler(), shader.colorSamplers(), shader.outputTarget(),
                     createPipeline(pipelineId, shaderId, shader.uniforms(),
-                            shader.usesDepthSampler(), shader.usesColortex1Sampler()));
+                            shader.usesDepthSampler(), shader.colorSamplers()));
         });
     }
 
@@ -2179,7 +2207,7 @@ public final class VeyraRenderer {
 
     private static RenderPipeline createPipeline(
             Identifier pipeline, Identifier fragmentShader, List<String> uniforms,
-            boolean usesDepthSampler, boolean usesColortex1Sampler) {
+            boolean usesDepthSampler, Set<Integer> colorSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                 .withFragmentShader(fragmentShader)
                 .withVertexShader(BLIT_VERTEX_ID)
@@ -2189,8 +2217,10 @@ public final class VeyraRenderer {
         if (usesDepthSampler) {
             builder.withSampler(DEPTH_INPUT_SAMPLER);
         }
-        if (usesColortex1Sampler) {
-            builder.withSampler(COLORTEX1_INPUT_SAMPLER);
+        for (int colorSampler : colorSamplers) {
+            if (colorSampler > 0) {
+                builder.withSampler(colorTargetInputSampler(colorSampler));
+            }
         }
         if (!uniforms.isEmpty()) {
             builder.withUniform(SHADERPACK_UNIFORMS, UniformType.UNIFORM_BUFFER);
@@ -2210,17 +2240,21 @@ public final class VeyraRenderer {
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
 
-        Matcher unsupportedColorSampler = UNSUPPORTED_COLOR_SAMPLER.matcher(body);
-        if (unsupportedColorSampler.find()) {
-            throw new IOException("Only colortex0 and colortex1 are currently available to post-processing passes.");
-        }
         Matcher unsupportedDepthSampler = UNSUPPORTED_DEPTH_SAMPLER.matcher(body);
         if (unsupportedDepthSampler.find()) {
             throw new IOException("Only depthtex0 is currently available for depth texture sampling on VulkanMod.");
         }
         Matcher depthSampler = DEPTH_SAMPLER.matcher(body);
         boolean usesDepthSampler = depthSampler.find();
-        boolean usesColortex1Sampler = COLORTEX1_SAMPLER.matcher(body).find();
+        Set<Integer> colorSamplers = new java.util.TreeSet<>();
+        Matcher colorSamplerMatcher = COLORTEX_SAMPLER.matcher(body);
+        while (colorSamplerMatcher.find()) {
+            int index = Integer.parseInt(colorSamplerMatcher.group(1));
+            if (index > MAX_COLORTEX_INDEX) {
+                throw new IOException("Veyra supports color samplers colortex0 through colortex" + MAX_COLORTEX_INDEX + ".");
+            }
+            colorSamplers.add(index);
+        }
         List<String> uniforms = SUPPORTED_UNIFORMS.stream().filter(body::contains).toList();
         List<OutputMapping> outputMappings = outputMappings(original, body);
         boolean usesFragData = body.contains("gl_FragData");
@@ -2253,7 +2287,7 @@ public final class VeyraRenderer {
         body = extensionMatcher.replaceAll("");
         body = VARYING_DECLARATION.matcher(body).replaceAll("");
         body = MAIN_SAMPLER_DECLARATION.matcher(body).replaceAll("");
-        body = COLORTEX1_SAMPLER_DECLARATION.matcher(body).replaceAll("");
+        body = COLORTEX_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
@@ -2304,9 +2338,13 @@ public final class VeyraRenderer {
                     .append("#define texcoord texCoord\n")
                     .append("#define gl_FragColor ").append(outputName).append('\n')
                     .append("#define texture2D texture\n");
-            if (usesColortex1Sampler) {
-                adapted.append("uniform sampler2D ").append(COLORTEX1_INPUT_SAMPLER).append(";\n")
-                        .append("#define colortex1 ").append(COLORTEX1_INPUT_SAMPLER).append('\n');
+            for (int colorSampler : colorSamplers) {
+                if (colorSampler > 0) {
+                    String samplerName = colorTargetInputSampler(colorSampler);
+                    adapted.append("uniform sampler2D ").append(samplerName).append(";\n")
+                            .append("#define colortex").append(colorSampler).append(' ')
+                            .append(samplerName).append('\n');
+                }
             }
             if (usesDepthSampler) {
                 adapted.append("uniform sampler2D ").append(DEPTH_INPUT_SAMPLER).append(";\n")
@@ -2315,7 +2353,7 @@ public final class VeyraRenderer {
             }
             adapted.append(outputBody);
             adaptedShaders.add(new AdaptedShader(adapted.toString(), uniforms,
-                    usesDepthSampler, usesColortex1Sampler, output.targetIndex()));
+                    usesDepthSampler, Set.copyOf(colorSamplers), output.targetIndex()));
         }
         return List.copyOf(adaptedShaders);
     }
@@ -2364,13 +2402,10 @@ public final class VeyraRenderer {
             mappings.add(new OutputMapping(-1, target));
         }
 
-        if (mappings.size() > 2) {
-            throw new IOException("Veyra currently supports at most two outputs: colortex0 and colortex1.");
-        }
         Set<Integer> uniqueTargets = new java.util.HashSet<>();
         for (OutputMapping mapping : mappings) {
-            if (mapping.targetIndex() < 0 || mapping.targetIndex() > 1) {
-                throw new IOException("Only colortex0 and colortex1 are currently available as render targets.");
+            if (mapping.targetIndex() < 0 || mapping.targetIndex() > MAX_COLORTEX_INDEX) {
+                throw new IOException("Veyra supports render targets colortex0 through colortex" + MAX_COLORTEX_INDEX + ".");
             }
             if (!uniqueTargets.add(mapping.targetIndex())) {
                 throw new IOException("A pass cannot write to the same render target more than once.");
@@ -2678,35 +2713,42 @@ public final class VeyraRenderer {
         }
     }
 
-    private static void ensureColortex1Targets(int width, int height) {
+    private static void ensureColorTargets(int width, int height, Set<Integer> indices) {
         boolean resized = false;
-        if (colortex1TargetA == null) {
-            colortex1TargetA = new TextureTarget("Veyra shader pack colortex1 A", width, height, false);
-            resized = true;
-        } else if (colortex1TargetA.width != width || colortex1TargetA.height != height) {
-            colortex1TargetA.resize(width, height);
-            resized = true;
-        }
-        if (colortex1TargetB == null) {
-            colortex1TargetB = new TextureTarget("Veyra shader pack colortex1 B", width, height, false);
-            resized = true;
-        } else if (colortex1TargetB.width != width || colortex1TargetB.height != height) {
-            colortex1TargetB.resize(width, height);
-            resized = true;
+        for (int index : indices) {
+            ColorTargetPair pair = colorTargets.get(index);
+            if (pair == null) {
+                pair = new ColorTargetPair(
+                        new TextureTarget("Veyra shader pack colortex" + index + " A", width, height, false),
+                        new TextureTarget("Veyra shader pack colortex" + index + " B", width, height, false));
+                colorTargets.put(index, pair);
+                resized = true;
+            } else if (pair.targetA().width != width || pair.targetA().height != height
+                    || pair.targetB().width != width || pair.targetB().height != height) {
+                pair.targetA().resize(width, height);
+                pair.targetB().resize(width, height);
+                resized = true;
+            }
         }
         if (resized) {
-            currentColortex1Target = COLORTEX1_TARGET_A_ID;
-            clearColortex1Targets = true;
+            currentColorTargets.clear();
+            for (int index : indices) {
+                currentColorTargets.put(index, colorTargetAId(index));
+            }
+            clearColorTargets = !indices.isEmpty();
         }
-        if (clearColortex1Targets) {
+        if (clearColorTargets) {
             Renderer renderer = Renderer.getInstance();
             if (renderer.getBoundRenderPass() != null) {
                 renderer.endRenderPass();
             }
             var commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-            commandEncoder.clearColorTexture(colortex1TargetA.getColorTexture(), 0);
-            commandEncoder.clearColorTexture(colortex1TargetB.getColorTexture(), 0);
-            clearColortex1Targets = false;
+            for (int index : indices) {
+                ColorTargetPair pair = colorTargets.get(index);
+                commandEncoder.clearColorTexture(pair.targetA().getColorTexture(), 0);
+                commandEncoder.clearColorTexture(pair.targetB().getColorTexture(), 0);
+            }
+            clearColorTargets = false;
         }
     }
 
@@ -2717,8 +2759,13 @@ public final class VeyraRenderer {
             old.close();
         }
         if (old != next) {
-            currentColortex1Target = COLORTEX1_TARGET_A_ID;
-            clearColortex1Targets = next != null && next.usesColortex1();
+            currentColorTargets.clear();
+            if (next != null) {
+                for (int index : next.colorTargetIndices()) {
+                    currentColorTargets.put(index, colorTargetAId(index));
+                }
+            }
+            clearColorTargets = next != null && !next.colorTargetIndices().isEmpty();
         }
         if ((next == null || !next.usesDepthSampler())
                 && sampledDepthTextureView != null && !sampledDepthTextureView.isClosed()) {
@@ -2809,14 +2856,14 @@ public final class VeyraRenderer {
     }
 
     private record AdaptedShader(String source, List<String> uniforms,
-                                 boolean usesDepthSampler, boolean usesColortex1Sampler, int outputTarget) {
+                                 boolean usesDepthSampler, Set<Integer> colorSamplers, int outputTarget) {
     }
 
     private record DepthSamplerState(VulkanImage sourceImage, VulkanImage sampledImage) {
     }
 
     private record PipelineProgram(Identifier shaderId, String fragmentSource, List<String> uniforms,
-                                   boolean usesDepthSampler, boolean usesColortex1Sampler,
+                                   boolean usesDepthSampler, Set<Integer> colorSamplers,
                                    int outputTarget, RenderPipeline pipeline) {
     }
 
@@ -2850,6 +2897,9 @@ public final class VeyraRenderer {
     private record ProgramGroup(List<PipelineProgram> outputs) {
     }
 
+    private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {
+    }
+
     private record OutputMapping(int fragmentOutputIndex, int targetIndex) {
     }
 
@@ -2868,7 +2918,8 @@ public final class VeyraRenderer {
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass,
-                             Identifier colortex1OutputTarget) implements AutoCloseable {
+                             Map<Integer, Identifier> initialColorTargets,
+                             Map<Integer, Identifier> outputColorTargets) implements AutoCloseable {
         @Override
         public void close() {
             shaderPasses.forEach(shaderPass -> shaderPass.pass().close());
@@ -2879,9 +2930,15 @@ public final class VeyraRenderer {
     }
 
     private record PipelineSet(FramePlan planA, FramePlan planB, int width, int height,
-                               boolean usesDepthSampler, boolean usesColortex1) implements AutoCloseable {
-        private FramePlan framePlan(Identifier currentColortex1Target) {
-            return COLORTEX1_TARGET_B_ID.equals(currentColortex1Target) ? planB : planA;
+                               boolean usesDepthSampler, Set<Integer> colorTargetIndices) implements AutoCloseable {
+        private FramePlan framePlan(Map<Integer, Identifier> currentColorTargets) {
+            if (planA.initialColorTargets().equals(currentColorTargets)) {
+                return planA;
+            }
+            if (planB.initialColorTargets().equals(currentColorTargets)) {
+                return planB;
+            }
+            throw new IllegalStateException("The current colortex buffers do not match either compiled frame plan.");
         }
 
         private int passCount() {
