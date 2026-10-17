@@ -1,6 +1,7 @@
 package dev.veyra.mixin;
 
 import dev.veyra.screen.ShaderPackScreen;
+import dev.veyra.shader.VeyraRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.lwjgl.glfw.GLFW;
@@ -23,5 +24,10 @@ public abstract class MinecraftMixin {
             minecraft.setScreen(new ShaderPackScreen());
         }
         veyra$f6WasDown = f6Down;
+    }
+
+    @Inject(method = "close", at = @At("HEAD"))
+    private void veyra$restoreTerrainLayerMode(CallbackInfo callback) {
+        VeyraRenderer.onClientShutdown();
     }
 }

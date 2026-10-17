@@ -19,19 +19,21 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public record ShaderPack(Path path, String name, String shaderDirectory,
-                         boolean hasPostProcessing, boolean hasTerrainFragment, String issue) {
+                         boolean hasPostProcessing, Set<String> terrainPrograms, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
     private static final int MAX_INCLUDE_DEPTH = 32;
     private static final int MAX_PASS_SUFFIX = 99;
     private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
+    private static final List<String> TERRAIN_PROGRAMS = List.of(
+            "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water");
     private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
             "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
 
     public record Program(String name, String source) {
     }
 
-    private record Inspection(String shaderDirectory, boolean hasPostProcessing, boolean hasTerrainFragment) {
+    private record Inspection(String shaderDirectory, boolean hasPostProcessing, Set<String> terrainPrograms) {
     }
 
     public static ShaderPack inspect(Path path) {
@@ -41,17 +43,21 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             return new ShaderPack(path, name,
                     inspection == null ? null : inspection.shaderDirectory(),
                     inspection != null && inspection.hasPostProcessing(),
-                    inspection != null && inspection.hasTerrainFragment(),
+                    inspection == null ? Set.of() : inspection.terrainPrograms(),
                     inspection == null
-                            ? "No supported gbuffers_terrain, prepare, deferred, composite, or final fragment programs were found."
+                            ? "No supported terrain, prepare, deferred, composite, or final fragment programs were found."
                             : "Supported terrain and/or post-processing fragment programs are available.");
         } catch (IOException | RuntimeException exception) {
-            return new ShaderPack(path, name, null, false, false, "Could not read pack: " + exception.getMessage());
+            return new ShaderPack(path, name, null, false, Set.of(), "Could not read pack: " + exception.getMessage());
         }
     }
 
     public boolean supportsShaderPrograms() {
         return shaderDirectory != null;
+    }
+
+    public boolean hasTerrainFragment() {
+        return !terrainPrograms.isEmpty();
     }
 
     public List<Program> readPrograms() throws IOException {
@@ -92,14 +98,19 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public Optional<String> readTerrainFragment() throws IOException {
-        if (!supportsShaderPrograms() || !hasTerrainFragment) {
+        return readTerrainFragment("gbuffers_terrain");
+    }
+
+    public Optional<String> readTerrainFragment(String programName) throws IOException {
+        if (!supportsShaderPrograms() || !terrainPrograms.contains(programName)) {
             return Optional.empty();
         }
-        Optional<String> source = readShader("gbuffers_terrain.fsh");
+        String fileName = programName + ".fsh";
+        Optional<String> source = readShader(fileName);
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes("gbuffers_terrain.fsh", source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
     }
 
     private Set<String> listShaderFiles() throws IOException {
@@ -253,9 +264,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .map(entry -> entry.getFileName().toString())
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
             boolean hasPostProcessing = files.stream().anyMatch(ShaderPack::isPostProcessingProgramFile);
-            boolean hasTerrainFragment = files.contains("gbuffers_terrain.fsh");
-            return hasPostProcessing || hasTerrainFragment
-                    ? new Inspection("shaders", hasPostProcessing, hasTerrainFragment) : null;
+            Set<String> terrainPrograms = files.stream()
+                    .filter(ShaderPack::isSupportedTerrainProgramFile)
+                    .map(fileName -> fileName.substring(0, fileName.length() - 4))
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            return hasPostProcessing || !terrainPrograms.isEmpty()
+                    ? new Inspection("shaders", hasPostProcessing, terrainPrograms) : null;
         }
     }
 
@@ -289,8 +303,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 }
             }
             boolean hasPostProcessing = files.stream().anyMatch(ShaderPack::isPostProcessingProgramFile);
-            boolean hasTerrainFragment = files.contains("gbuffers_terrain.fsh");
-            return new Inspection(shaderDirectory, hasPostProcessing, hasTerrainFragment);
+            Set<String> terrainPrograms = files.stream()
+                    .filter(ShaderPack::isSupportedTerrainProgramFile)
+                    .map(fileName -> fileName.substring(0, fileName.length() - 4))
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            return new Inspection(shaderDirectory, hasPostProcessing, terrainPrograms);
         }
     }
 
@@ -303,7 +320,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private static boolean isSupportedProgramFile(String fileName) {
-        return fileName.equals("gbuffers_terrain.fsh") || isPostProcessingProgramFile(fileName);
+        return isSupportedTerrainProgramFile(fileName) || isPostProcessingProgramFile(fileName);
+    }
+
+    private static boolean isSupportedTerrainProgramFile(String fileName) {
+        return fileName.endsWith(".fsh")
+                && TERRAIN_PROGRAMS.contains(fileName.substring(0, fileName.length() - 4));
     }
 
     private static boolean isPostProcessingProgramFile(String fileName) {

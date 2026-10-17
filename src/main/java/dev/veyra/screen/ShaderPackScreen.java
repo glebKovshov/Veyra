@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 public final class ShaderPackScreen extends Screen {
-    private String status = "Supports terrain fragments with texture, color, and lightmap inputs plus Iris post passes. Other gbuffers and shadows are not connected.";
+    private String status = "Supports terrain layers and Iris post passes; other gbuffers and shadows are unavailable.";
     private int firstVisiblePack;
 
     public ShaderPackScreen() {

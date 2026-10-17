@@ -14,7 +14,7 @@ public abstract class PipelineManagerMixin {
     @Inject(method = "getTerrainShader", at = @At("HEAD"), cancellable = true, remap = false)
     private static void veyra$useTerrainShader(
             TerrainRenderType terrainRenderType, CallbackInfoReturnable<GraphicsPipeline> callback) {
-        GraphicsPipeline pipeline = VeyraRenderer.getTerrainPipeline();
+        GraphicsPipeline pipeline = VeyraRenderer.getTerrainPipeline(terrainRenderType);
         if (pipeline != null) {
             callback.setReturnValue(pipeline);
         }

@@ -22,6 +22,7 @@ import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
+import net.vulkanmod.Initializer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
@@ -37,6 +38,7 @@ import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.shader.PipelineConfigs;
 import net.vulkanmod.render.shader.PipelineManager;
 import net.vulkanmod.render.shader.ShaderLoadUtil;
+import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
@@ -132,11 +134,12 @@ public final class VeyraRenderer {
     private static boolean clearColortex1Targets;
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
-    private static GraphicsPipeline terrainPipeline;
+    private static TerrainPipelineSet terrainPipelineSet;
     private static GpuTexture sampledDepthTexture;
     private static GpuTextureView sampledDepthTextureView;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
+    private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
     private static String lastError = "";
     private static long previousFrameNanos;
@@ -158,6 +161,7 @@ public final class VeyraRenderer {
         terrainPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasTerrainFragment)
                 .orElse(false);
+        updateTerrainLayerMode(packRepository.getSelected().orElse(null));
     }
 
     public static Optional<ShaderPack> selectedPack() {
@@ -168,62 +172,74 @@ public final class VeyraRenderer {
         return renderingEnabled && selectedPack().isPresent();
     }
 
-    public static GraphicsPipeline getTerrainPipeline() {
+    public static GraphicsPipeline getTerrainPipeline(TerrainRenderType terrainRenderType) {
         ShaderPack pack = selectedPack().orElse(null);
-        if (pack == null || !pack.hasTerrainFragment()) {
+        if (pack == null || !pack.hasTerrainFragment() || terrainRenderType == null) {
+            return null;
+        }
+        updateTerrainLayerMode(pack);
+        String programName = resolveTerrainProgram(pack, terrainRenderType);
+        if (programName == null) {
             return null;
         }
         if (!terrainPipelineDirty) {
-            return terrainPipeline;
+            return terrainPipelineSet == null ? null : terrainPipelineSet.pipelines().get(programName);
         }
 
         terrainPipelineDirty = false;
         try {
-            replaceTerrainPipeline(compileTerrainPipeline(pack));
+            replaceTerrainPipelines(compileTerrainPipelines(pack));
             lastError = "";
-            VeyraClient.LOGGER.info("Loaded gbuffers_terrain from shader pack '{}'.", pack.name());
+            VeyraClient.LOGGER.info("Loaded terrain shader programs {} from shader pack '{}'.",
+                    terrainPipelineSet.pipelines().keySet(), pack.name());
         } catch (Exception exception) {
             lastError = shortError(exception);
-            VeyraClient.LOGGER.error("Could not load gbuffers_terrain from shader pack '{}'.", pack.name(), exception);
+            VeyraClient.LOGGER.error("Could not load terrain shader programs from shader pack '{}'.", pack.name(), exception);
         }
-        return terrainPipeline;
+        return terrainPipelineSet == null ? null : terrainPipelineSet.pipelines().get(programName);
     }
 
     public static String getLastError() {
         return lastError;
     }
 
+    public static void onClientShutdown() {
+        restoreUniqueOpaqueLayer();
+    }
+
     public static String select(ShaderPack pack) {
         PipelineSet prepared = null;
-        GraphicsPipeline preparedTerrain = null;
+        TerrainPipelineSet preparedTerrain = null;
         try {
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
             if (pack.hasTerrainFragment()) {
-                preparedTerrain = compileTerrainPipeline(pack);
+                preparedTerrain = compileTerrainPipelines(pack);
             }
             repository.select(pack);
+            updateTerrainLayerMode(pack);
             replacePipelineSet(prepared);
             prepared = null;
-            replaceTerrainPipeline(preparedTerrain);
+            replaceTerrainPipelines(preparedTerrain);
             preparedTerrain = null;
             pipelinesDirty = false;
             terrainPipelineDirty = false;
             renderingEnabled = pipelineSet.passCount() > 0;
             lastError = "";
-            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es) and terrain={} from shader pack '{}'.",
-                    pipelineSet.passCount(), terrainPipeline != null, pack.name());
-            String features = pipelineSet.passCount() > 0 && terrainPipeline != null
-                    ? pipelineSet.passCount() + " post passes, terrain gbuffer"
+            boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
+            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es) and {} terrain program(s) from shader pack '{}'.",
+                    pipelineSet.passCount(), hasTerrainPipelines ? terrainPipelineSet.pipelines().size() : 0, pack.name());
+            String features = pipelineSet.passCount() > 0 && hasTerrainPipelines
+                    ? pipelineSet.passCount() + " post passes, " + terrainPipelineSet.pipelines().size() + " terrain programs"
                     : pipelineSet.passCount() > 0 ? pipelineSet.passCount() + " post passes"
-                    : "terrain gbuffer";
+                    : terrainPipelineSet.pipelines().size() + " terrain programs";
             return "Enabled " + pack.name() + " (" + features + ").";
         } catch (Exception exception) {
             if (prepared != null) {
                 prepared.close();
             }
             if (preparedTerrain != null) {
-                preparedTerrain.scheduleCleanUp();
+                preparedTerrain.close();
             }
             lastError = shortError(exception);
             VeyraClient.LOGGER.error("Could not enable shader pack '{}'.", pack.name(), exception);
@@ -234,11 +250,12 @@ public final class VeyraRenderer {
     public static String disable() {
         try {
             repository.select(null);
+            updateTerrainLayerMode(null);
             renderingEnabled = false;
             pipelinesDirty = false;
             terrainPipelineDirty = false;
             replacePipelineSet(null);
-            replaceTerrainPipeline(null);
+            replaceTerrainPipelines(null);
             lastError = "";
             return "Shader pack disabled.";
         } catch (IOException exception) {
@@ -253,7 +270,7 @@ public final class VeyraRenderer {
         PIPELINE_CACHE.clear();
         COMPILED_PIPELINES.clear();
         replacePipelineSet(null);
-        replaceTerrainPipeline(null);
+        replaceTerrainPipelines(null);
         terrainPipelineDirty = selectedPack().map(ShaderPack::hasTerrainFragment).orElse(false);
     }
 
@@ -389,9 +406,7 @@ public final class VeyraRenderer {
         }
     }
 
-    private static GraphicsPipeline compileTerrainPipeline(ShaderPack pack) throws IOException {
-        String fragmentSource = pack.readTerrainFragment()
-                .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_terrain.fsh."));
+    private static TerrainPipelineSet compileTerrainPipelines(ShaderPack pack) throws IOException {
         if (PipelineManager.getTerrainVertexFormat() == null) {
             throw new IOException("VulkanMod has not initialized its terrain vertex format yet.");
         }
@@ -399,17 +414,92 @@ public final class VeyraRenderer {
         String shaderPath = ShaderLoadUtil.resolveShaderPath("basic");
         String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "terrain/terrain.vsh");
         vertexSource = TerrainShaderAdapter.adaptVertex(vertexSource);
-        fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource);
+        Map<String, GraphicsPipeline> pipelines = new HashMap<>();
+        try {
+            for (String programName : List.of(
+                    "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water")) {
+                if (!pack.terrainPrograms().contains(programName)) {
+                    continue;
+                }
+                String fragmentSource = pack.readTerrainFragment(programName)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource);
 
-        Pipeline.Builder builder = new Pipeline.Builder(PipelineManager.getTerrainVertexFormat(), "veyra_terrain");
-        builder.applyConfig(PipelineConfigs.TERRAIN);
-        builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
-        builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
-        GraphicsPipeline pipeline = builder.createGraphicsPipeline();
-        for (UBO ubo : pipeline.getBuffers()) {
-            ubo.setUseGlobalBuffer(true);
+                Pipeline.Builder builder = new Pipeline.Builder(
+                        PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
+                builder.applyConfig(PipelineConfigs.TERRAIN);
+                builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+                builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
+                GraphicsPipeline pipeline = builder.createGraphicsPipeline();
+                for (UBO ubo : pipeline.getBuffers()) {
+                    ubo.setUseGlobalBuffer(true);
+                }
+                pipelines.put(programName, pipeline);
+            }
+            return new TerrainPipelineSet(Map.copyOf(pipelines));
+        } catch (IOException | RuntimeException exception) {
+            pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
+            throw exception;
         }
-        return pipeline;
+    }
+
+    private static String resolveTerrainProgram(ShaderPack pack, TerrainRenderType terrainRenderType) {
+        String specializedProgram = switch (terrainRenderType) {
+            case SOLID -> "gbuffers_terrain_solid";
+            case CUTOUT, TRIPWIRE -> "gbuffers_terrain_cutout";
+            case TRANSLUCENT -> "gbuffers_water";
+        };
+        if (pack.terrainPrograms().contains(specializedProgram)) {
+            return specializedProgram;
+        }
+        return pack.terrainPrograms().contains("gbuffers_terrain") ? "gbuffers_terrain" : null;
+    }
+
+    private static void updateTerrainLayerMode(ShaderPack pack) {
+        if (Initializer.CONFIG == null) {
+            return;
+        }
+        boolean needsSeparateOpaqueLayers = pack != null
+                && (pack.terrainPrograms().contains("gbuffers_terrain_solid")
+                || pack.terrainPrograms().contains("gbuffers_terrain_cutout"));
+        if (!needsSeparateOpaqueLayers) {
+            restoreUniqueOpaqueLayer();
+            return;
+        }
+
+        if (previousUniqueOpaqueLayer == null) {
+            previousUniqueOpaqueLayer = Initializer.CONFIG.uniqueOpaqueLayer;
+        }
+        if (Initializer.CONFIG.uniqueOpaqueLayer) {
+            Initializer.CONFIG.uniqueOpaqueLayer = false;
+            TerrainRenderType.updateMapping();
+            rebuildTerrainSections();
+            VeyraClient.LOGGER.info(
+                    "Temporarily enabled separate solid and cutout terrain layers for the active shader pack.");
+        }
+    }
+
+    private static void restoreUniqueOpaqueLayer() {
+        if (previousUniqueOpaqueLayer == null || Initializer.CONFIG == null) {
+            return;
+        }
+        boolean originalValue = previousUniqueOpaqueLayer;
+        boolean changed = Initializer.CONFIG.uniqueOpaqueLayer != originalValue;
+        Initializer.CONFIG.uniqueOpaqueLayer = originalValue;
+        previousUniqueOpaqueLayer = null;
+        if (changed) {
+            TerrainRenderType.updateMapping();
+            rebuildTerrainSections();
+            VeyraClient.LOGGER.info(
+                    "Restored VulkanMod uniqueOpaqueLayer to {} after shader pack use.", originalValue);
+        }
+    }
+
+    private static void rebuildTerrainSections() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level != null && minecraft.levelRenderer != null) {
+            minecraft.levelRenderer.allChanged();
+        }
     }
 
     private static FramePlan buildFramePlan(
@@ -1061,11 +1151,11 @@ public final class VeyraRenderer {
         }
     }
 
-    private static void replaceTerrainPipeline(GraphicsPipeline next) {
-        GraphicsPipeline old = terrainPipeline;
-        terrainPipeline = next;
+    private static void replaceTerrainPipelines(TerrainPipelineSet next) {
+        TerrainPipelineSet old = terrainPipelineSet;
+        terrainPipelineSet = next;
         if (old != null && old != next) {
-            old.scheduleCleanUp();
+            old.close();
         }
     }
 
@@ -1133,6 +1223,13 @@ public final class VeyraRenderer {
             if (planB != planA) {
                 planB.close();
             }
+        }
+    }
+
+    private record TerrainPipelineSet(Map<String, GraphicsPipeline> pipelines) implements AutoCloseable {
+        @Override
+        public void close() {
+            pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
         }
     }
 
