@@ -64,12 +64,16 @@ public final class VeyraRenderer {
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
     private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|thunderStrength|worldTime|worldDay)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern OTHER_COLOR_SAMPLER = Pattern.compile("\\bcolortex([1-9][0-9]*)\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex[0-9]*|DepthSampler)\\b");
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
-            "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter");
-    private static final List<String> DYNAMIC_UNIFORMS = List.of("frameTimeCounter", "frameTime", "frameCounter");
+            "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "sunAngle", "rainStrength", "thunderStrength", "worldTime", "worldDay");
+    private static final List<String> INTEGER_UNIFORMS = List.of("frameCounter", "worldTime", "worldDay");
+    private static final List<String> DYNAMIC_UNIFORMS = List.of(
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "thunderStrength",
+            "worldTime", "worldDay");
     private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
     private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -175,7 +179,7 @@ public final class VeyraRenderer {
             targets.put(SWAP_TARGET_B_ID, swapB);
 
             var samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
-            FrameUniforms frameUniforms = updateFrameUniforms();
+            FrameUniforms frameUniforms = updateFrameUniforms(minecraft);
             for (ShaderPass shaderPass : pipelineSet.shaderPasses()) {
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
                 shaderPass.pass().addToFrame(graph, targets, samplerInfo);
@@ -338,7 +342,7 @@ public final class VeyraRenderer {
         if (!uniforms.isEmpty()) {
             adapted.append("layout(std140) uniform ").append(SHADERPACK_UNIFORMS).append(" {\n");
             for (String uniform : uniforms) {
-                adapted.append("    ").append(uniform.equals("frameCounter") ? "int" : "float")
+                adapted.append("    ").append(INTEGER_UNIFORMS.contains(uniform) ? "int" : "float")
                         .append(' ').append(uniform).append(";\n");
             }
             adapted.append("};\n");
@@ -381,6 +385,11 @@ public final class VeyraRenderer {
                 case "frameTimeCounter" -> new UniformValue.FloatUniform(frameUniforms.frameTimeCounter());
                 case "frameTime" -> new UniformValue.FloatUniform(frameUniforms.frameTime());
                 case "frameCounter" -> new UniformValue.IntUniform(frameUniforms.frameCounter());
+                case "sunAngle" -> new UniformValue.FloatUniform(frameUniforms.sunAngle());
+                case "rainStrength" -> new UniformValue.FloatUniform(frameUniforms.rainStrength());
+                case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
+                case "worldTime" -> new UniformValue.IntUniform(frameUniforms.worldTime());
+                case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
                 default -> throw new IllegalArgumentException("Unknown shader pack uniform " + uniform + ".");
             });
         }
@@ -439,13 +448,22 @@ public final class VeyraRenderer {
         }
     }
 
-    private static FrameUniforms updateFrameUniforms() {
+    private static FrameUniforms updateFrameUniforms(Minecraft minecraft) {
         long now = System.nanoTime();
         frameTime = previousFrameNanos == 0L ? 0.0F : (now - previousFrameNanos) / 1_000_000_000.0F;
         previousFrameNanos = now;
         frameTimeCounter = (frameTimeCounter + frameTime) % 3600.0F;
         frameCounter = frameCounter >= 720719 ? 0 : frameCounter + 1;
-        return new FrameUniforms(frameTimeCounter, frameTime, frameCounter);
+
+        float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        long dayTime = minecraft.level.getDayTime();
+        int worldTime = (int) Math.floorMod(dayTime, 24000L);
+        float sunAngle = (worldTime + partialTick) / 24000.0F;
+        int worldDay = (int) Math.floorDiv(dayTime, 24000L);
+        float rainStrength = minecraft.level.getRainLevel(partialTick);
+        float thunderStrength = minecraft.level.getThunderLevel(partialTick);
+        return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength,
+                thunderStrength, worldTime, worldDay);
     }
 
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer() {
@@ -492,8 +510,11 @@ public final class VeyraRenderer {
     private record ShaderPass(PostPass pass, PipelineProgram program) {
     }
 
-    private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter) {
-        private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0);
+    private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
+                                 float sunAngle, float rainStrength, float thunderStrength,
+                                 int worldTime, int worldDay) {
+        private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
+                0.0F, 0.0F, 0.0F, 0, 0);
     }
 
     private record PipelineSet(List<ShaderPass> shaderPasses, PostPass copyPass, int width, int height) implements AutoCloseable {

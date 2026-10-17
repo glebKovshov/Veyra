@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 public final class ShaderPackScreen extends Screen {
-    private String status = "Supports colortex0, viewport, and time uniforms. Depth, gbuffers, and shadows are not connected yet.";
+    private String status = "Supports colortex0, viewport, time, and day/weather uniforms. Depth, gbuffers, and shadows are not connected yet.";
 
     public ShaderPackScreen() {
         super(Component.literal("Veyra Shader Packs"));
