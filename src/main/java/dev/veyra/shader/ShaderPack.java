@@ -20,7 +20,7 @@ import java.util.zip.ZipFile;
 
 public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasPostProcessing, Set<String> terrainPrograms,
-                         boolean hasCloudFragment, Set<String> entityPrograms,
+                         boolean hasCloudFragment, Set<String> entityPrograms, Set<String> particlePrograms,
                          boolean hasBeaconBeamFragment, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
@@ -31,6 +31,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water");
     private static final List<String> ENTITY_PROGRAMS = List.of(
             "gbuffers_entities", "gbuffers_entities_translucent");
+    private static final List<String> PARTICLE_PROGRAMS = List.of(
+            "gbuffers_particles", "gbuffers_particles_translucent");
     private static final String BEACON_BEAM_PROGRAM = "gbuffers_beaconbeam";
     private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
             "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
@@ -40,7 +42,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private record Inspection(String shaderDirectory, boolean hasPostProcessing,
                               Set<String> terrainPrograms, boolean hasCloudFragment,
-                              Set<String> entityPrograms, boolean hasBeaconBeamFragment) {
+                              Set<String> entityPrograms, Set<String> particlePrograms,
+                              boolean hasBeaconBeamFragment) {
     }
 
     public static ShaderPack inspect(Path path) {
@@ -53,12 +56,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection == null ? Set.of() : inspection.terrainPrograms(),
                     inspection != null && inspection.hasCloudFragment(),
                     inspection == null ? Set.of() : inspection.entityPrograms(),
+                    inspection == null ? Set.of() : inspection.particlePrograms(),
                     inspection != null && inspection.hasBeaconBeamFragment(),
                     inspection == null
-                            ? "No supported terrain, clouds, entities, beacon beam, prepare, deferred, composite, or final fragment programs were found."
-                            : "Supported terrain, clouds, entities, beacon beam, and/or post-processing fragment programs are available.");
+                            ? "No supported terrain, clouds, entities, particles, beacon beam, prepare, deferred, composite, or final fragment programs were found."
+                            : "Supported terrain, clouds, entities, particles, beacon beam, and/or post-processing fragment programs are available.");
         } catch (IOException | RuntimeException exception) {
-            return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), false,
+            return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), false,
                     "Could not read pack: " + exception.getMessage());
         }
     }
@@ -142,6 +146,22 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public Optional<String> readEntityFragment(String programName) throws IOException {
         if (!supportsShaderPrograms() || !entityPrograms.contains(programName)) {
+            return Optional.empty();
+        }
+        String fileName = programName + ".fsh";
+        Optional<String> source = readShader(fileName);
+        if (source.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+    }
+
+    public boolean hasParticleFragment() {
+        return !particlePrograms.isEmpty();
+    }
+
+    public Optional<String> readParticleFragment(String programName) throws IOException {
+        if (!supportsShaderPrograms() || !particlePrograms.contains(programName)) {
             return Optional.empty();
         }
         String fileName = programName + ".fsh";
@@ -325,10 +345,14 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            Set<String> particlePrograms = files.stream()
+                    .filter(ShaderPack::isSupportedParticleProgramFile)
+                    .map(fileName -> fileName.substring(0, fileName.length() - 4))
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
             return hasPostProcessing || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
-                    || hasBeaconBeamFragment
+                    || !particlePrograms.isEmpty() || hasBeaconBeamFragment
                     ? new Inspection("shaders", hasPostProcessing, terrainPrograms, hasCloudFragment,
-                            entityPrograms, hasBeaconBeamFragment) : null;
+                            entityPrograms, particlePrograms, hasBeaconBeamFragment) : null;
         }
     }
 
@@ -372,8 +396,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            Set<String> particlePrograms = files.stream()
+                    .filter(ShaderPack::isSupportedParticleProgramFile)
+                    .map(fileName -> fileName.substring(0, fileName.length() - 4))
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
             return new Inspection(shaderDirectory, hasPostProcessing, terrainPrograms, hasCloudFragment,
-                    entityPrograms, hasBeaconBeamFragment);
+                    entityPrograms, particlePrograms, hasBeaconBeamFragment);
         }
     }
 
@@ -390,6 +418,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 || fileName.equals(BEACON_BEAM_PROGRAM + ".fsh")
                 || isSupportedTerrainProgramFile(fileName)
                 || isSupportedEntityProgramFile(fileName)
+                || isSupportedParticleProgramFile(fileName)
                 || isPostProcessingProgramFile(fileName);
     }
 
@@ -401,6 +430,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static boolean isSupportedEntityProgramFile(String fileName) {
         return fileName.endsWith(".fsh")
                 && ENTITY_PROGRAMS.contains(fileName.substring(0, fileName.length() - 4));
+    }
+
+    private static boolean isSupportedParticleProgramFile(String fileName) {
+        return fileName.endsWith(".fsh")
+                && PARTICLE_PROGRAMS.contains(fileName.substring(0, fileName.length() - 4));
     }
 
     private static boolean isPostProcessingProgramFile(String fileName) {

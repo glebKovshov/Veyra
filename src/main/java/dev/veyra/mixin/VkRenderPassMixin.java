@@ -15,6 +15,9 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getBeaconBeamPipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getParticlePipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }
