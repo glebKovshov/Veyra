@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Adapts the common Iris particle fragment inputs to Minecraft's particle vertex outputs. */
+/** Adapts the common Iris particle and weather fragment inputs to Minecraft's particle vertex outputs. */
 public final class ParticleShaderAdapter {
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
@@ -46,11 +46,15 @@ public final class ParticleShaderAdapter {
     }
 
     public static String adaptFragment(String source) throws IOException {
+        return adaptFragment(source, "gbuffers_particles");
+    }
+
+    public static String adaptFragment(String source, String programName) throws IOException {
         if (source == null || source.isBlank()) {
-            throw new IOException("gbuffers_particles fragment shader is empty.");
+            throw new IOException(programName + " fragment shader is empty.");
         }
         if (source.length() > 1024 * 1024) {
-            throw new IOException("gbuffers_particles fragment shader exceeds the 1 MiB size limit.");
+            throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
         String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
@@ -66,17 +70,17 @@ public final class ParticleShaderAdapter {
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")) {
-                throw new IOException("gbuffers_particles uses unsupported sampler '" + sampler + "'.");
+                throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             if (!samplerMatcher.group(1).equals("sampler2D")) {
-                throw new IOException("gbuffers_particles sampler '" + sampler + "' must use sampler2D.");
+                throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_particles custom uniforms are not supported yet; only the particle texture is available.");
+            throw new IOException(programName + " custom uniforms are not supported yet; only its texture is available.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -86,17 +90,17 @@ public final class ParticleShaderAdapter {
             String name = varyingMatcher.group(3);
             String expectedType = INPUT_TYPES.get(name);
             if (expectedType == null) {
-                throw new IOException("gbuffers_particles input '" + name + "' is not provided by Veyra's particle bridge yet.");
+                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's particle bridge yet.");
             }
             if (!expectedType.equals(type)) {
-                throw new IOException("gbuffers_particles input '" + name + "' must use " + expectedType + ".");
+                throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_particles declares inputs that are not provided by Veyra's particle bridge yet.");
+            throw new IOException(programName + " declares inputs that are not provided by Veyra's particle bridge yet.");
         }
 
         String outputName = "veyraParticleFragColor";
@@ -106,7 +110,7 @@ public final class ParticleShaderAdapter {
         while (outputMatcher.find()) {
             String location = outputMatcher.group(1);
             if (location != null && !location.equals("0")) {
-                throw new IOException("gbuffers_particles can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
             outputName = outputMatcher.group(2);
             outputCount++;
@@ -114,22 +118,22 @@ public final class ParticleShaderAdapter {
         }
         outputMatcher.appendTail(withoutOutputs);
         if (outputCount > 1) {
-            throw new IOException("gbuffers_particles can declare only one fragment output.");
+            throw new IOException(programName + " can declare only one fragment output.");
         }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_particles supports one vec4 fragment output.");
+            throw new IOException(programName + " supports one vec4 fragment output.");
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_particles uses a texture sampling function that Veyra's particle bridge does not support yet.");
+            throw new IOException(programName + " uses a texture sampling function that Veyra's particle bridge does not support yet.");
         }
-        validateTargetComments(source);
+        validateTargetComments(source, programName);
         Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
         while (fragDataMatcher.find()) {
             if (!fragDataMatcher.group(1).equals("0")) {
-                throw new IOException("gbuffers_particles can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
 
@@ -172,18 +176,18 @@ public final class ParticleShaderAdapter {
         return result.append(adapted).toString();
     }
 
-    private static void validateTargetComments(String source) throws IOException {
+    private static void validateTargetComments(String source, String programName) throws IOException {
         Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
         while (renderTargets.find()) {
             String[] targets = renderTargets.group(1).split(",");
             if (targets.length != 1 || !targets[0].trim().equals("0")) {
-                throw new IOException("gbuffers_particles can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
         Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
         while (drawBuffers.find()) {
             if (!drawBuffers.group(1).equals("0")) {
-                throw new IOException("gbuffers_particles can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
     }

@@ -18,6 +18,9 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getParticlePipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getWeatherPipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }
