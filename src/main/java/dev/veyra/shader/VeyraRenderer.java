@@ -19,6 +19,7 @@ import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.PostPass;
@@ -48,6 +49,9 @@ public final class VeyraRenderer {
     private static final Identifier SWAP_TARGET_A_ID = Identifier.fromNamespaceAndPath("veyra", "swap_a");
     private static final Identifier SWAP_TARGET_B_ID = Identifier.fromNamespaceAndPath("veyra", "swap_b");
     private static final String SHADERPACK_UNIFORMS = "VeyraParameters";
+    private static final float WETNESS_RISE_HALF_LIFE_SECONDS = 600.0F / 20.0F;
+    private static final float WETNESS_FALL_HALF_LIFE_SECONDS = 200.0F / 20.0F;
+    private static final float LN_OF_TWO = (float) Math.log(2.0);
     private static final Identifier BLIT_VERTEX_ID = Identifier.withDefaultNamespace("core/screenquad");
     private static final String COPY_FRAGMENT_SHADER = """
             #version 450
@@ -64,15 +68,15 @@ public final class VeyraRenderer {
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
     private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|thunderStrength|worldTime|worldDay)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern OTHER_COLOR_SAMPLER = Pattern.compile("\\bcolortex([1-9][0-9]*)\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex[0-9]*|DepthSampler)\\b");
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
-            "sunAngle", "rainStrength", "thunderStrength", "worldTime", "worldDay");
+            "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay");
     private static final List<String> INTEGER_UNIFORMS = List.of("frameCounter", "worldTime", "worldDay");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
-            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "thunderStrength",
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay");
     private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
     private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -89,6 +93,9 @@ public final class VeyraRenderer {
     private static int frameCounter;
     private static float frameTimeCounter;
     private static float frameTime;
+    private static ClientLevel wetnessLevel;
+    private static boolean wetnessInitialized;
+    private static float smoothedWetness;
 
     private VeyraRenderer() {
     }
@@ -387,6 +394,7 @@ public final class VeyraRenderer {
                 case "frameCounter" -> new UniformValue.IntUniform(frameUniforms.frameCounter());
                 case "sunAngle" -> new UniformValue.FloatUniform(frameUniforms.sunAngle());
                 case "rainStrength" -> new UniformValue.FloatUniform(frameUniforms.rainStrength());
+                case "wetness" -> new UniformValue.FloatUniform(frameUniforms.wetness());
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
                 case "worldTime" -> new UniformValue.IntUniform(frameUniforms.worldTime());
                 case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
@@ -462,8 +470,27 @@ public final class VeyraRenderer {
         int worldDay = (int) Math.floorDiv(dayTime, 24000L);
         float rainStrength = minecraft.level.getRainLevel(partialTick);
         float thunderStrength = minecraft.level.getThunderLevel(partialTick);
-        return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength,
+        if (wetnessLevel != minecraft.level) {
+            wetnessLevel = minecraft.level;
+            wetnessInitialized = false;
+        }
+        float wetness = smoothWetness(rainStrength, frameTime);
+        return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength, wetness,
                 thunderStrength, worldTime, worldDay);
+    }
+
+    private static float smoothWetness(float rainStrength, float deltaSeconds) {
+        if (!wetnessInitialized) {
+            smoothedWetness = rainStrength;
+            wetnessInitialized = true;
+            return smoothedWetness;
+        }
+
+        float halfLife = rainStrength > smoothedWetness
+                ? WETNESS_RISE_HALF_LIFE_SECONDS : WETNESS_FALL_HALF_LIFE_SECONDS;
+        float smoothing = 1.0F - (float) Math.exp(-LN_OF_TWO * Math.max(deltaSeconds, 0.0F) / halfLife);
+        smoothedWetness += (rainStrength - smoothedWetness) * smoothing;
+        return smoothedWetness;
     }
 
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer() {
@@ -511,10 +538,10 @@ public final class VeyraRenderer {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
-                                 float sunAngle, float rainStrength, float thunderStrength,
+                                 float sunAngle, float rainStrength, float wetness, float thunderStrength,
                                  int worldTime, int worldDay) {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
-                0.0F, 0.0F, 0.0F, 0, 0);
+                0.0F, 0.0F, 0.0F, 0.0F, 0, 0);
     }
 
     private record PipelineSet(List<ShaderPass> shaderPasses, PostPass copyPass, int width, int height) implements AutoCloseable {
