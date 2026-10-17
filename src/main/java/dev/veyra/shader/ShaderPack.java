@@ -26,7 +26,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasBasicFragment, boolean hasLineFragment, boolean hasGlintFragment,
                          boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment,
                          boolean hasTexturedFragment, boolean hasTexturedLitFragment,
-                         boolean hasHandFragment, String issue) {
+                         boolean hasHandFragment, boolean hasDamagedBlockFragment, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
     private static final int MAX_INCLUDE_DEPTH = 32;
@@ -49,6 +49,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final String TEXTURED_PROGRAM = "gbuffers_textured";
     private static final String TEXTURED_LIT_PROGRAM = "gbuffers_textured_lit";
     private static final String HAND_PROGRAM = "gbuffers_hand";
+    private static final String DAMAGED_BLOCK_PROGRAM = "gbuffers_damagedblock";
     private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
             "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
 
@@ -62,7 +63,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                               boolean hasBasicFragment, boolean hasLineFragment, boolean hasGlintFragment,
                               boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment,
                               boolean hasTexturedFragment, boolean hasTexturedLitFragment,
-                              boolean hasHandFragment) {
+                              boolean hasHandFragment, boolean hasDamagedBlockFragment) {
     }
 
     public static ShaderPack inspect(Path path) {
@@ -87,12 +88,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection != null && inspection.hasTexturedFragment(),
                     inspection != null && inspection.hasTexturedLitFragment(),
                     inspection != null && inspection.hasHandFragment(),
+                    inspection != null && inspection.hasDamagedBlockFragment(),
                     inspection == null
-                            ? "No supported terrain, clouds, sky, entities, hand, particles, weather, beacon beam, lightning, basic, line, glint, textured, prepare, deferred, composite, or final fragment programs were found."
-                            : "Supported terrain, clouds, sky, entities, hand, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.");
+                            ? "No supported terrain, clouds, sky, entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, prepare, deferred, composite, or final fragment programs were found."
+                            : "Supported terrain, clouds, sky, entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.");
         } catch (IOException | RuntimeException exception) {
             return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false, false,
-                    false, false, false, false, false, false, false, false,
+                    false, false, false, false, false, false, false, false, false,
                     "Could not read pack: " + exception.getMessage());
         }
     }
@@ -103,6 +105,16 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public boolean hasTerrainFragment() {
         return !terrainPrograms.isEmpty();
+    }
+
+    public boolean hasDamagedBlockPipeline() {
+        return hasDamagedBlockFragment || terrainPrograms.contains("gbuffers_terrain");
+    }
+
+    public Optional<String> readDamagedBlockFragment() throws IOException {
+        return hasDamagedBlockFragment
+                ? readColorDistanceFragment(DAMAGED_BLOCK_PROGRAM, true)
+                : readTerrainFragment("gbuffers_terrain");
     }
 
     public List<Program> readPrograms() throws IOException {
@@ -475,6 +487,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             boolean hasTexturedFragment = files.contains(TEXTURED_PROGRAM + ".fsh");
             boolean hasTexturedLitFragment = files.contains(TEXTURED_LIT_PROGRAM + ".fsh");
             boolean hasHandFragment = files.contains(HAND_PROGRAM + ".fsh");
+            boolean hasDamagedBlockFragment = files.contains(DAMAGED_BLOCK_PROGRAM + ".fsh");
             Set<String> entityPrograms = files.stream()
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
@@ -491,12 +504,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     || !particlePrograms.isEmpty() || !weatherPrograms.isEmpty() || hasBeaconBeamFragment
                     || hasLightningFragment || hasBasicFragment || hasLineFragment || hasGlintFragment
                     || hasSkyBasicFragment || hasSkyTexturedFragment || hasTexturedFragment || hasTexturedLitFragment
-                    || hasHandFragment
+                    || hasHandFragment || hasDamagedBlockFragment
                     ? new Inspection("shaders", hasPostProcessing, terrainPrograms, hasCloudFragment,
                             entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment, hasLightningFragment,
                             hasBasicFragment, hasLineFragment, hasGlintFragment,
                             hasSkyBasicFragment, hasSkyTexturedFragment, hasTexturedFragment, hasTexturedLitFragment,
-                            hasHandFragment) : null;
+                            hasHandFragment, hasDamagedBlockFragment) : null;
         }
     }
 
@@ -545,6 +558,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             boolean hasTexturedFragment = files.contains(TEXTURED_PROGRAM + ".fsh");
             boolean hasTexturedLitFragment = files.contains(TEXTURED_LIT_PROGRAM + ".fsh");
             boolean hasHandFragment = files.contains(HAND_PROGRAM + ".fsh");
+            boolean hasDamagedBlockFragment = files.contains(DAMAGED_BLOCK_PROGRAM + ".fsh");
             Set<String> entityPrograms = files.stream()
                     .filter(ShaderPack::isSupportedEntityProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
@@ -561,7 +575,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     entityPrograms, particlePrograms, weatherPrograms, hasBeaconBeamFragment, hasLightningFragment,
                     hasBasicFragment, hasLineFragment, hasGlintFragment,
                     hasSkyBasicFragment, hasSkyTexturedFragment, hasTexturedFragment, hasTexturedLitFragment,
-                    hasHandFragment);
+                    hasHandFragment, hasDamagedBlockFragment);
         }
     }
 
@@ -585,6 +599,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 || fileName.equals(TEXTURED_PROGRAM + ".fsh")
                 || fileName.equals(TEXTURED_LIT_PROGRAM + ".fsh")
                 || fileName.equals(HAND_PROGRAM + ".fsh")
+                || fileName.equals(DAMAGED_BLOCK_PROGRAM + ".fsh")
                 || isSupportedTerrainProgramFile(fileName)
                 || isSupportedEntityProgramFile(fileName)
                 || isSupportedParticleProgramFile(fileName)

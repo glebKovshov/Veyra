@@ -159,6 +159,7 @@ public final class VeyraRenderer {
     private static SkyPipelineSet skyBasicPipelineSet;
     private static SkyPipelineSet skyTexturedPipelineSet;
     private static WorldBorderPipelineSet worldBorderPipelineSet;
+    private static DamagedBlockPipelineSet damagedBlockPipelineSet;
     private static BeaconBeamPipelineSet beaconBeamPipelineSet;
     private static GraphicsPipeline cloudPipeline;
     private static GpuTexture sampledDepthTexture;
@@ -176,12 +177,14 @@ public final class VeyraRenderer {
     private static boolean skyBasicPipelineDirty = true;
     private static boolean skyTexturedPipelineDirty = true;
     private static boolean texturedPipelineDirty = true;
+    private static boolean damagedBlockPipelineDirty = true;
     private static boolean beaconBeamPipelineDirty = true;
     private static boolean cloudPipelineDirty = true;
     private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
     private static final ThreadLocal<Integer> HAND_RENDER_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static boolean handPipelineRoutingLogged;
+    private static boolean damagedBlockRoutingLogged;
     private static String lastError = "";
     private static long previousFrameNanos;
     private static int frameCounter;
@@ -234,6 +237,9 @@ public final class VeyraRenderer {
                 .orElse(false);
         texturedPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasTexturedFragment)
+                .orElse(false);
+        damagedBlockPipelineDirty = packRepository.getSelected()
+                .map(ShaderPack::hasDamagedBlockPipeline)
                 .orElse(false);
         beaconBeamPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasBeaconBeamFragment)
@@ -362,6 +368,35 @@ public final class VeyraRenderer {
             VeyraClient.LOGGER.info("Routing first-person hand pipeline {} through {} from shader pack '{}'.",
                     original.getLocation(), resolveHandProgram(pack, original), pack.name());
             handPipelineRoutingLogged = true;
+        }
+        return replacement;
+    }
+
+    public static RenderPipeline getDamagedBlockPipeline(RenderPipeline original) {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.hasDamagedBlockPipeline() || !isDamagedBlockPipeline(original)) {
+            return null;
+        }
+        if (damagedBlockPipelineDirty) {
+            damagedBlockPipelineDirty = false;
+            try {
+                replaceDamagedBlockPipelines(compileDamagedBlockPipelines(pack));
+                lastError = "";
+                VeyraClient.LOGGER.info("Loaded {} damaged-block render pipeline(s) from shader pack '{}'{}.",
+                        damagedBlockPipelineSet.pipelines().size(), pack.name(),
+                        pack.hasDamagedBlockFragment() ? "" : " using gbuffers_terrain fallback");
+            } catch (Exception exception) {
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not load gbuffers_damagedblock from shader pack '{}'.", pack.name(), exception);
+                return null;
+            }
+        }
+        RenderPipeline replacement = damagedBlockPipelineSet == null
+                ? null : damagedBlockPipelineSet.pipelines().get(original);
+        if (replacement != null && !damagedBlockRoutingLogged) {
+            VeyraClient.LOGGER.info("Routing block-breaking overlay pipeline {} through gbuffers_damagedblock from shader pack '{}'.",
+                    original.getLocation(), pack.name());
+            damagedBlockRoutingLogged = true;
         }
         return replacement;
     }
@@ -596,6 +631,7 @@ public final class VeyraRenderer {
         replaceSkyBasicPipelines(null);
         replaceSkyTexturedPipelines(null);
         replaceWorldBorderPipelines(null);
+        replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
     }
@@ -614,6 +650,7 @@ public final class VeyraRenderer {
         SkyPipelineSet preparedSkyBasic = null;
         SkyPipelineSet preparedSkyTextured = null;
         WorldBorderPipelineSet preparedTextured = null;
+        DamagedBlockPipelineSet preparedDamagedBlocks = null;
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
         try {
@@ -655,6 +692,9 @@ public final class VeyraRenderer {
             if (pack.hasTexturedFragment()) {
                 preparedTextured = compileWorldBorderPipelines(pack);
             }
+            if (pack.hasDamagedBlockPipeline()) {
+                preparedDamagedBlocks = compileDamagedBlockPipelines(pack);
+            }
             if (pack.hasBeaconBeamFragment()) {
                 preparedBeaconBeams = compileBeaconBeamPipelines(pack);
             }
@@ -689,6 +729,8 @@ public final class VeyraRenderer {
             preparedSkyTextured = null;
             replaceWorldBorderPipelines(preparedTextured);
             preparedTextured = null;
+            replaceDamagedBlockPipelines(preparedDamagedBlocks);
+            preparedDamagedBlocks = null;
             replaceBeaconBeamPipelines(preparedBeaconBeams);
             preparedBeaconBeams = null;
             replaceCloudPipeline(preparedClouds);
@@ -706,6 +748,7 @@ public final class VeyraRenderer {
             skyBasicPipelineDirty = false;
             skyTexturedPipelineDirty = false;
             texturedPipelineDirty = false;
+            damagedBlockPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             cloudPipelineDirty = false;
             renderingEnabled = pipelineSet.passCount() > 0;
@@ -723,10 +766,11 @@ public final class VeyraRenderer {
             int skyBasicPipelineCount = skyBasicPipelineSet == null ? 0 : skyBasicPipelineSet.pipelines().size();
             int skyTexturedPipelineCount = skyTexturedPipelineSet == null ? 0 : skyTexturedPipelineSet.pipelines().size();
             int texturedPipelineCount = worldBorderPipelineSet == null ? 0 : worldBorderPipelineSet.pipelines().size();
+            int damagedBlockPipelineCount = damagedBlockPipelineSet == null ? 0 : damagedBlockPipelineSet.pipelines().size();
             int beaconBeamPipelineCount = beaconBeamPipelineSet == null ? 0 : beaconBeamPipelineSet.pipelines().size();
-            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), {} entity pipeline(s), {} hand pipeline(s), {} particle pipeline(s), {} weather pipeline(s), {} lightning pipeline(s), {} basic pipeline(s), {} line pipeline(s), {} glint pipeline(s), {} basic sky pipeline(s), {} textured sky pipeline(s), {} textured world-border pipeline(s), {} beacon beam pipeline(s), clouds={} from shader pack '{}'.",
-                    pipelineSet.passCount(), terrainProgramCount, entityPipelineCount, handPipelineCount, particlePipelineCount,
-                    weatherPipelineCount, lightningPipelineCount, basicPipelineCount, linePipelineCount,
+            VeyraClient.LOGGER.info("Enabled {} post-processing pass(es), {} terrain program(s), {} entity pipeline(s), {} hand pipeline(s), {} damaged-block pipeline(s), {} particle pipeline(s), {} weather pipeline(s), {} lightning pipeline(s), {} basic pipeline(s), {} line pipeline(s), {} glint pipeline(s), {} basic sky pipeline(s), {} textured sky pipeline(s), {} textured world-border pipeline(s), {} beacon beam pipeline(s), clouds={} from shader pack '{}'.",
+                    pipelineSet.passCount(), terrainProgramCount, entityPipelineCount, handPipelineCount, damagedBlockPipelineCount,
+                    particlePipelineCount, weatherPipelineCount, lightningPipelineCount, basicPipelineCount, linePipelineCount,
                     glintPipelineCount, skyBasicPipelineCount, skyTexturedPipelineCount,
                     texturedPipelineCount, beaconBeamPipelineCount, cloudPipeline != null, pack.name());
             List<String> features = new ArrayList<>();
@@ -744,6 +788,9 @@ public final class VeyraRenderer {
             }
             if (handPipelineCount > 0) {
                 features.add(handPipelineCount + " first-person hand pipelines");
+            }
+            if (damagedBlockPipelineCount > 0) {
+                features.add(damagedBlockPipelineCount + " damaged-block pipelines");
             }
             if (particlePipelineCount > 0) {
                 features.add(particlePipelineCount + " particle pipelines");
@@ -794,6 +841,7 @@ public final class VeyraRenderer {
             preparedSkyBasic = null;
             preparedSkyTextured = null;
             preparedTextured = null;
+            preparedDamagedBlocks = null;
             preparedBeaconBeams = null;
             if (preparedClouds != null) {
                 preparedClouds.scheduleCleanUp();
@@ -822,6 +870,7 @@ public final class VeyraRenderer {
             skyBasicPipelineDirty = false;
             skyTexturedPipelineDirty = false;
             texturedPipelineDirty = false;
+            damagedBlockPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             replacePipelineSet(null);
             replaceTerrainPipelines(null);
@@ -836,6 +885,7 @@ public final class VeyraRenderer {
             replaceSkyBasicPipelines(null);
             replaceSkyTexturedPipelines(null);
             replaceWorldBorderPipelines(null);
+            replaceDamagedBlockPipelines(null);
             replaceBeaconBeamPipelines(null);
             replaceCloudPipeline(null);
             lastError = "";
@@ -864,6 +914,7 @@ public final class VeyraRenderer {
         replaceSkyBasicPipelines(null);
         replaceSkyTexturedPipelines(null);
         replaceWorldBorderPipelines(null);
+        replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
         terrainPipelineDirty = selectedPack().map(ShaderPack::hasTerrainFragment).orElse(false);
@@ -878,6 +929,7 @@ public final class VeyraRenderer {
         skyBasicPipelineDirty = selectedPack().map(pack -> pack.hasSkyBasicFragment() || pack.hasBasicFragment()).orElse(false);
         skyTexturedPipelineDirty = selectedPack().map(pack -> pack.hasSkyTexturedFragment() || pack.hasTexturedFragment()).orElse(false);
         texturedPipelineDirty = selectedPack().map(ShaderPack::hasTexturedFragment).orElse(false);
+        damagedBlockPipelineDirty = selectedPack().map(ShaderPack::hasDamagedBlockPipeline).orElse(false);
         beaconBeamPipelineDirty = selectedPack().map(ShaderPack::hasBeaconBeamFragment).orElse(false);
         cloudPipelineDirty = selectedPack().map(ShaderPack::hasCloudFragment).orElse(false);
     }
@@ -1732,6 +1784,50 @@ public final class VeyraRenderer {
                 && pipeline.getFragmentShader().equals(Identifier.withDefaultNamespace("core/rendertype_world_border"));
     }
 
+    private static DamagedBlockPipelineSet compileDamagedBlockPipelines(ShaderPack pack) throws IOException {
+        List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
+                .filter(VeyraRenderer::isDamagedBlockPipeline)
+                .toList();
+        boolean fallback = !pack.hasDamagedBlockFragment();
+        String programName = fallback ? "gbuffers_terrain" : "gbuffers_damagedblock";
+        String source = pack.readDamagedBlockFragment()
+                .orElseThrow(() -> new IOException("The pack no longer contains a damaged-block shader or terrain fallback."));
+        Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        for (RenderPipeline original : candidates) {
+            String fragmentSource;
+            try {
+                fragmentSource = DamagedBlockShaderAdapter.adaptFragment(source, programName);
+            } catch (IOException exception) {
+                if (!fallback) {
+                    throw exception;
+                }
+                VeyraClient.LOGGER.debug("Skipping the gbuffers_terrain damaged-block fallback because its inputs are unsupported: {}",
+                        exception.getMessage());
+                return new DamagedBlockPipelineSet(Map.of());
+            }
+            String sourceHash = sha256("gbuffers_damagedblock\n" + fragmentSource);
+            ColorDistancePipelineKey cacheKey = new ColorDistancePipelineKey(original, sourceHash);
+            RenderPipeline replacement = COLOR_DISTANCE_PIPELINE_CACHE.get(cacheKey);
+            if (replacement == null) {
+                replacement = compileColorDistancePipeline(
+                        original, "gbuffers_damagedblock", fragmentSource, sourceHash);
+                COLOR_DISTANCE_PIPELINE_CACHE.put(cacheKey, replacement);
+            }
+            pipelines.put(original, replacement);
+        }
+        if (pipelines.isEmpty() && !fallback) {
+            throw new IOException("Minecraft's block-breaking overlay render pipeline was not found.");
+        }
+        return new DamagedBlockPipelineSet(pipelines);
+    }
+
+    private static boolean isDamagedBlockPipeline(RenderPipeline pipeline) {
+        return pipeline != null
+                && pipeline.getLocation().getPath().equals("pipeline/crumbling")
+                && pipeline.getVertexShader().equals(Identifier.withDefaultNamespace("core/rendertype_crumbling"))
+                && pipeline.getFragmentShader().equals(Identifier.withDefaultNamespace("core/rendertype_crumbling"));
+    }
+
     private static RenderPipeline copyPipelineWithFragment(RenderPipeline original, Identifier fragmentShader) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(original.getLocation())
@@ -2538,6 +2634,11 @@ public final class VeyraRenderer {
         worldBorderPipelineSet = next;
     }
 
+    private static void replaceDamagedBlockPipelines(DamagedBlockPipelineSet next) {
+        damagedBlockPipelineSet = next;
+        damagedBlockRoutingLogged = false;
+    }
+
     private static void replaceBeaconBeamPipelines(BeaconBeamPipelineSet next) {
         beaconBeamPipelineSet = next;
     }
@@ -2665,6 +2766,9 @@ public final class VeyraRenderer {
     }
 
     private record WorldBorderPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
+    }
+
+    private record DamagedBlockPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
     }
 
     private record BeaconBeamPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {

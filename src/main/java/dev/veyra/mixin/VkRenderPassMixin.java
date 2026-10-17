@@ -45,6 +45,9 @@ public abstract class VkRenderPassMixin {
         if (replacement == null) {
             replacement = VeyraRenderer.getWorldBorderPipeline(original);
         }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getDamagedBlockPipeline(original);
+        }
         return replacement == null ? original : replacement;
     }
 }
