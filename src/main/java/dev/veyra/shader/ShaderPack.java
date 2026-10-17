@@ -18,7 +18,8 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-public record ShaderPack(Path path, String name, String shaderDirectory, String issue) {
+public record ShaderPack(Path path, String name, String shaderDirectory,
+                         boolean hasPostProcessing, boolean hasTerrainFragment, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
     private static final int MAX_INCLUDE_DEPTH = 32;
@@ -30,25 +31,35 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
     public record Program(String name, String source) {
     }
 
+    private record Inspection(String shaderDirectory, boolean hasPostProcessing, boolean hasTerrainFragment) {
+    }
+
     public static ShaderPack inspect(Path path) {
         String name = displayName(path);
         try {
-            String shaderDirectory = Files.isDirectory(path) ? inspectDirectory(path) : inspectArchive(path);
-            return new ShaderPack(path, name, shaderDirectory, shaderDirectory == null
-                    ? "No supported prepare, deferred, composite, or final fragment passes were found."
-                    : "Post-processing passes are available.");
+            Inspection inspection = Files.isDirectory(path) ? inspectDirectory(path) : inspectArchive(path);
+            return new ShaderPack(path, name,
+                    inspection == null ? null : inspection.shaderDirectory(),
+                    inspection != null && inspection.hasPostProcessing(),
+                    inspection != null && inspection.hasTerrainFragment(),
+                    inspection == null
+                            ? "No supported gbuffers_terrain, prepare, deferred, composite, or final fragment programs were found."
+                            : "Supported terrain and/or post-processing fragment programs are available.");
         } catch (IOException | RuntimeException exception) {
-            return new ShaderPack(path, name, null, "Could not read pack: " + exception.getMessage());
+            return new ShaderPack(path, name, null, false, false, "Could not read pack: " + exception.getMessage());
         }
     }
 
-    public boolean supportsPostProcessing() {
+    public boolean supportsShaderPrograms() {
         return shaderDirectory != null;
     }
 
     public List<Program> readPrograms() throws IOException {
-        if (!supportsPostProcessing()) {
+        if (!supportsShaderPrograms()) {
             throw new IOException(issue);
+        }
+        if (!hasPostProcessing) {
+            return List.of();
         }
 
         List<Program> programs = new ArrayList<>();
@@ -78,6 +89,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
             throw new IOException("The pack no longer contains a supported fragment pass.");
         }
         return List.copyOf(programs);
+    }
+
+    public Optional<String> readTerrainFragment() throws IOException {
+        if (!supportsShaderPrograms() || !hasTerrainFragment) {
+            return Optional.empty();
+        }
+        Optional<String> source = readShader("gbuffers_terrain.fsh");
+        if (source.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(expandIncludes("gbuffers_terrain.fsh", source.get(), new LinkedHashSet<>(), 0));
     }
 
     private Set<String> listShaderFiles() throws IOException {
@@ -221,28 +243,54 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
         return String.join("/", segments);
     }
 
-    private static String inspectDirectory(Path path) throws IOException {
+    private static Inspection inspectDirectory(Path path) throws IOException {
         Path shaders = path.resolve("shaders");
         if (!Files.isDirectory(shaders)) {
             return null;
         }
         try (var entries = Files.list(shaders)) {
-            return entries.filter(Files::isRegularFile)
+            Set<String> files = entries.filter(Files::isRegularFile)
                     .map(entry -> entry.getFileName().toString())
-                    .anyMatch(ShaderPack::isSupportedProgramFile) ? "shaders" : null;
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            boolean hasPostProcessing = files.stream().anyMatch(ShaderPack::isPostProcessingProgramFile);
+            boolean hasTerrainFragment = files.contains("gbuffers_terrain.fsh");
+            return hasPostProcessing || hasTerrainFragment
+                    ? new Inspection("shaders", hasPostProcessing, hasTerrainFragment) : null;
         }
     }
 
-    private static String inspectArchive(Path path) throws IOException {
+    private static Inspection inspectArchive(Path path) throws IOException {
         try (ZipFile zip = new ZipFile(path.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
-            return Collections.list(entries).stream()
+            List<String> paths = Collections.list(entries).stream()
                     .filter(entry -> !entry.isDirectory())
                     .map(ZipEntry::getName)
                     .filter(ShaderPack::isSupportedArchiveProgramPath)
                     .map(entryName -> entryName.substring(0, entryName.lastIndexOf("shaders/") + 7))
+                    .distinct()
+                    .toList();
+            String shaderDirectory = paths.stream()
                     .min((left, right) -> Integer.compare(left.length(), right.length()))
                     .orElse(null);
+            if (shaderDirectory == null) {
+                return null;
+            }
+
+            Set<String> files = new HashSet<>();
+            Enumeration<? extends ZipEntry> allEntries = zip.entries();
+            while (allEntries.hasMoreElements()) {
+                ZipEntry entry = allEntries.nextElement();
+                String prefix = shaderDirectory + "/";
+                if (!entry.isDirectory() && entry.getName().startsWith(prefix)) {
+                    String fileName = entry.getName().substring(prefix.length());
+                    if (!fileName.contains("/") && isSupportedProgramFile(fileName)) {
+                        files.add(fileName);
+                    }
+                }
+            }
+            boolean hasPostProcessing = files.stream().anyMatch(ShaderPack::isPostProcessingProgramFile);
+            boolean hasTerrainFragment = files.contains("gbuffers_terrain.fsh");
+            return new Inspection(shaderDirectory, hasPostProcessing, hasTerrainFragment);
         }
     }
 
@@ -255,6 +303,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory, String 
     }
 
     private static boolean isSupportedProgramFile(String fileName) {
+        return fileName.equals("gbuffers_terrain.fsh") || isPostProcessingProgramFile(fileName);
+    }
+
+    private static boolean isPostProcessingProgramFile(String fileName) {
         if (fileName.equals("final.fsh")) {
             return true;
         }

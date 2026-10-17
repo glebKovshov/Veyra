@@ -6,6 +6,7 @@
     "MinecraftMixin",
     "GuiRendererMixin",
     "ShaderManagerMixin",
+    "PipelineManagerMixin",
     "accessor.MinecraftAccessor",
     "accessor.ShaderManagerAccessor",
     "accessor.PostPassAccessor"

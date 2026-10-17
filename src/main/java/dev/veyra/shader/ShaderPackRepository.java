@@ -34,7 +34,7 @@ public final class ShaderPackRepository {
             }
             String selectedName = Files.exists(configFile) ? Files.readString(configFile, StandardCharsets.UTF_8).trim() : "";
             selected = packs.stream()
-                    .filter(ShaderPack::supportsPostProcessing)
+                    .filter(ShaderPack::supportsShaderPrograms)
                     .filter(pack -> pack.path().getFileName().toString().equals(selectedName))
                     .findFirst()
                     .orElse(null);
@@ -58,8 +58,8 @@ public final class ShaderPackRepository {
     }
 
     public void select(ShaderPack pack) throws IOException {
-        if (pack != null && (!pack.supportsPostProcessing() || !packs.contains(pack))) {
-            throw new IOException("This pack is not available or does not contain a supported post-processing pass.");
+        if (pack != null && (!pack.supportsShaderPrograms() || !packs.contains(pack))) {
+            throw new IOException("This pack is not available or contains no supported shader program.");
         }
         Files.createDirectories(configFile.getParent());
         Files.writeString(configFile, pack == null ? "" : pack.path().getFileName().toString(), StandardCharsets.UTF_8);
