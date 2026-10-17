@@ -701,7 +701,7 @@ public final class VeyraRenderer {
             }
             String fragmentSource = pack.readEntityFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-            fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource);
+            fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             String sourceHash = sha256(programName + '\n' + fragmentSource);
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, programName, sourceHash);
             RenderPipeline entityPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -725,10 +725,15 @@ public final class VeyraRenderer {
         String location = pipeline.getLocation().getPath();
         return location.startsWith("pipeline/entity_")
                 || location.startsWith("pipeline/armor_")
-                || location.startsWith("pipeline/item_entity_");
+                || location.startsWith("pipeline/item_entity_")
+                || location.equals("pipeline/eyes");
     }
 
     private static String resolveEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
+        if (pipeline.getLocation().getPath().equals("pipeline/eyes")
+                && pack.entityPrograms().contains("gbuffers_spidereyes")) {
+            return "gbuffers_spidereyes";
+        }
         if (pipeline.getBlendFunction().isPresent()
                 && pack.entityPrograms().contains("gbuffers_entities_translucent")) {
             return "gbuffers_entities_translucent";

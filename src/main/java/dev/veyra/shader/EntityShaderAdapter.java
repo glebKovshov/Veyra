@@ -49,11 +49,15 @@ public final class EntityShaderAdapter {
     }
 
     public static String adaptFragment(String source) throws IOException {
+        return adaptFragment(source, "gbuffers_entities");
+    }
+
+    public static String adaptFragment(String source, String programName) throws IOException {
         if (source == null || source.isBlank()) {
-            throw new IOException("gbuffers_entities fragment shader is empty.");
+            throw new IOException(programName + " fragment shader is empty.");
         }
         if (source.length() > 1024 * 1024) {
-            throw new IOException("gbuffers_entities fragment shader exceeds the 1 MiB size limit.");
+            throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
         String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
@@ -71,17 +75,17 @@ public final class EntityShaderAdapter {
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")) {
-                throw new IOException("gbuffers_entities uses unsupported sampler '" + sampler + "'.");
+                throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             if (!samplerMatcher.group(1).equals("sampler2D")) {
-                throw new IOException("gbuffers_entities sampler '" + sampler + "' must use sampler2D.");
+                throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_entities custom uniforms are not supported yet; only the entity texture and alphaTestRef are available.");
+            throw new IOException(programName + " custom uniforms are not supported yet; only the entity texture and alphaTestRef are available.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -91,17 +95,17 @@ public final class EntityShaderAdapter {
             String name = varyingMatcher.group(3);
             Varying varying = SUPPORTED_VARYINGS.get(name);
             if (varying == null) {
-                throw new IOException("gbuffers_entities input '" + name + "' is not provided by Veyra's entity bridge yet.");
+                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's entity bridge yet.");
             }
             if (!varying.type().equals(type)) {
-                throw new IOException("gbuffers_entities input '" + name + "' must use " + varying.type() + ".");
+                throw new IOException(programName + " input '" + name + "' must use " + varying.type() + ".");
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_entities declares inputs that are not provided by Veyra's entity bridge yet.");
+            throw new IOException(programName + " declares inputs that are not provided by Veyra's entity bridge yet.");
         }
 
         String outputName = "veyraEntityFragColor";
@@ -111,7 +115,7 @@ public final class EntityShaderAdapter {
         while (outputMatcher.find()) {
             String location = outputMatcher.group(1);
             if (location != null && !location.equals("0")) {
-                throw new IOException("gbuffers_entities can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
             outputName = outputMatcher.group(2);
             outputCount++;
@@ -119,38 +123,38 @@ public final class EntityShaderAdapter {
         }
         outputMatcher.appendTail(withoutOutputs);
         if (outputCount > 1) {
-            throw new IOException("gbuffers_entities can declare only one fragment output.");
+            throw new IOException(programName + " can declare only one fragment output.");
         }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_entities supports one vec4 fragment output.");
+            throw new IOException(programName + " supports one vec4 fragment output.");
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_ENTITY_INPUT.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_entities uses normals, lightmap coordinates, or fog inputs that Veyra's entity bridge does not provide yet.");
+            throw new IOException(programName + " uses normals, lightmap coordinates, or fog inputs that Veyra's entity bridge does not provide yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_entities uses a texture sampling function that Veyra's entity bridge does not support yet.");
+            throw new IOException(programName + " uses a texture sampling function that Veyra's entity bridge does not support yet.");
         }
 
         Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
         while (renderTargets.find()) {
             String[] targets = renderTargets.group(1).split(",");
             if (targets.length != 1 || !targets[0].trim().equals("0")) {
-                throw new IOException("gbuffers_entities can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
         Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
         while (drawBuffers.find()) {
             if (!drawBuffers.group(1).equals("0")) {
-                throw new IOException("gbuffers_entities can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
         Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
         while (fragDataMatcher.find()) {
             if (!fragDataMatcher.group(1).equals("0")) {
-                throw new IOException("gbuffers_entities can write only color attachment 0.");
+                throw new IOException(programName + " can write only color attachment 0.");
             }
         }
 

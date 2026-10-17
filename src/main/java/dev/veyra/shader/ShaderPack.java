@@ -31,7 +31,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final List<String> TERRAIN_PROGRAMS = List.of(
             "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water");
     private static final List<String> ENTITY_PROGRAMS = List.of(
-            "gbuffers_entities", "gbuffers_entities_translucent");
+            "gbuffers_entities", "gbuffers_entities_translucent", "gbuffers_spidereyes");
     private static final List<String> PARTICLE_PROGRAMS = List.of(
             "gbuffers_particles", "gbuffers_particles_translucent");
     private static final List<String> WEATHER_PROGRAMS = List.of("gbuffers_weather");
