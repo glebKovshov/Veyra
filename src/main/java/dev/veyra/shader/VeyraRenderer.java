@@ -39,6 +39,7 @@ import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.shader.PipelineConfigs;
@@ -54,6 +55,8 @@ import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Vector3f;
+import org.joml.Vector3i;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 
@@ -110,6 +113,8 @@ public final class VeyraRenderer {
     private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?!0\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
@@ -125,11 +130,15 @@ public final class VeyraRenderer {
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
-            "shadowProjection", "shadowProjectionInverse");
+            "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
+            "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract");
     private static final List<String> MATRIX_UNIFORMS = List.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse");
+    private static final List<String> VECTOR3_UNIFORMS = List.of(
+            "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract");
+    private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> INTEGER_UNIFORMS = List.of(
@@ -142,7 +151,8 @@ public final class VeyraRenderer {
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
-            "shadowProjection", "shadowProjectionInverse");
+            "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
+            "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract");
     private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
     private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<EntityPipelineKey, RenderPipeline> ENTITY_PIPELINE_CACHE = new HashMap<>();
@@ -184,6 +194,8 @@ public final class VeyraRenderer {
     private static GpuTextureView sampledDepthTextureView;
     private static FrameMatrices frameMatrices = FrameMatrices.IDENTITY;
     private static boolean frameMatricesInitialized;
+    private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
+    private static boolean cameraUniformsInitialized;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
     private static boolean entityPipelineDirty = true;
@@ -285,7 +297,7 @@ public final class VeyraRenderer {
         return selectedPack().map(ShaderPack::hasShadowFragment).orElse(false);
     }
 
-    public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection) {
+    public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
         Matrix4f currentModelView = new Matrix4f(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
@@ -301,6 +313,25 @@ public final class VeyraRenderer {
                 shadowModelView, new Matrix4f(shadowModelView).invert(),
                 shadowProjection, new Matrix4f(shadowProjection).invert());
         frameMatricesInitialized = true;
+
+        CameraPosition currentCameraPosition = cameraPosition(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+        CameraPosition previousCameraPosition = cameraUniformsInitialized
+                ? new CameraPosition(cameraUniforms.cameraPosition(), cameraUniforms.cameraPositionInt(), cameraUniforms.cameraPositionFract())
+                : currentCameraPosition;
+        cameraUniforms = new CameraUniforms(
+                currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
+                previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition());
+        cameraUniformsInitialized = true;
+    }
+
+    private static CameraPosition cameraPosition(double x, double y, double z) {
+        int integerX = (int) Math.floor(x);
+        int integerY = (int) Math.floor(y);
+        int integerZ = (int) Math.floor(z);
+        return new CameraPosition(
+                new Vector3f((float) x, (float) y, (float) z),
+                new Vector3i(integerX, integerY, integerZ),
+                new Vector3f((float) (x - integerX), (float) (y - integerY), (float) (z - integerZ)));
     }
 
     public static boolean isRenderingEnabled() {
@@ -2419,6 +2450,7 @@ public final class VeyraRenderer {
         body = DEPTH_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
+        body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
         body = body.replace("texture2D(", "texture(");
 
@@ -2448,6 +2480,8 @@ public final class VeyraRenderer {
                 adapted.append("layout(std140) uniform ").append(SHADERPACK_UNIFORMS).append(" {\n");
                 for (String uniform : uniforms) {
                     String type = MATRIX_UNIFORMS.contains(uniform) ? "mat4"
+                            : IVECTOR3_UNIFORMS.contains(uniform) ? "ivec3"
+                            : VECTOR3_UNIFORMS.contains(uniform) ? "vec3"
                             : INTEGER_UNIFORMS.contains(uniform) ? "int" : "float";
                     // VulkanMod's shader parser rejects bool members in uniform blocks, so expose them through int fields.
                     String memberName = BOOLEAN_UNIFORMS.contains(uniform) ? "veyra_" + uniform : uniform;
@@ -2725,6 +2759,12 @@ public final class VeyraRenderer {
                 case "shadowModelViewInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowModelViewInverse());
                 case "shadowProjection" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowProjection());
                 case "shadowProjectionInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowProjectionInverse());
+                case "cameraPosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().cameraPosition());
+                case "cameraPositionInt" -> new UniformValue.IVec3Uniform(frameUniforms.camera().cameraPositionInt());
+                case "cameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().cameraPositionFract());
+                case "previousCameraPosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPosition());
+                case "previousCameraPositionInt" -> new UniformValue.IVec3Uniform(frameUniforms.camera().previousCameraPositionInt());
+                case "previousCameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPositionFract());
                 default -> throw new IllegalArgumentException("Unknown shader pack uniform " + uniform + ".");
             });
         }
@@ -2815,7 +2855,7 @@ public final class VeyraRenderer {
                 thunderStrength, worldTime, worldDay, (float) player.getEyeY(),
                 (float) (double) minecraft.options.gamma().get(), blindness, nightVision, darknessFactor,
                 isEyeInWater, player.isSpectator(), player.isCrouching(), player.isSprinting(), player.onGround(),
-                player.hurtTime > 0, player.isInvisible(), player.isOnFire(), frameMatrices);
+                player.hurtTime > 0, player.isInvisible(), player.isOnFire(), frameMatrices, cameraUniforms);
     }
 
     private static boolean containsIdentifier(String source, String identifier) {
@@ -3070,10 +3110,10 @@ public final class VeyraRenderer {
                                  float blindness, float nightVision, float darknessFactor,
                                  int isEyeInWater, boolean isSpectator, boolean isSneaking, boolean isSprinting,
                                  boolean isOnGround, boolean isHurt, boolean isInvisible, boolean isBurning,
-                                 FrameMatrices matrices) {
+                                 FrameMatrices matrices, CameraUniforms camera) {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
                 0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
-                false, false, false, false, false, false, false, FrameMatrices.IDENTITY);
+                false, false, false, false, false, false, false, FrameMatrices.IDENTITY, CameraUniforms.ZERO);
     }
 
     private record FrameMatrices(Matrix4f gbufferModelView, Matrix4f gbufferModelViewInverse,
@@ -3084,6 +3124,17 @@ public final class VeyraRenderer {
         private static final FrameMatrices IDENTITY = new FrameMatrices(
                 new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(),
                 new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f());
+    }
+
+    private record CameraPosition(Vector3f position, Vector3i integerPosition, Vector3f fractionalPosition) {
+    }
+
+    private record CameraUniforms(Vector3f cameraPosition, Vector3i cameraPositionInt, Vector3f cameraPositionFract,
+                                  Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
+                                  Vector3f previousCameraPositionFract) {
+        private static final CameraUniforms ZERO = new CameraUniforms(
+                new Vector3f(), new Vector3i(), new Vector3f(),
+                new Vector3f(), new Vector3i(), new Vector3f());
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass,

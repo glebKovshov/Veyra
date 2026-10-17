@@ -21,7 +21,7 @@ This is still a compatibility layer in progress, not a general Iris or OptiFine 
 
 ## Matrix uniforms
 
-Post-processing programs (`prepare`, `deferred`, `composite`, and `final`) can use Iris matrix uniforms: `gbufferModelView`, `gbufferModelViewInverse`, `gbufferProjection`, `gbufferProjectionInverse`, `gbufferPreviousModelView`, `gbufferPreviousProjection`, `shadowModelView`, `shadowModelViewInverse`, `shadowProjection`, and `shadowProjectionInverse`. Current and previous G-buffer matrices update once per world frame. Inverse matrices are calculated on the CPU. VulkanMod uses zero-to-one clip-space depth, so reconstruct view-space positions with the sampled `depthtex0` value as NDC Z. `examples/matrix-depth` demonstrates depth reconstruction with the inverse projection and model-view matrices.
+Post-processing programs (`prepare`, `deferred`, `composite`, and `final`) can use Iris matrix uniforms: `gbufferModelView`, `gbufferModelViewInverse`, `gbufferProjection`, `gbufferProjectionInverse`, `gbufferPreviousModelView`, `gbufferPreviousProjection`, `shadowModelView`, `shadowModelViewInverse`, `shadowProjection`, and `shadowProjectionInverse`. Current and previous G-buffer matrices update once per world frame. Inverse matrices are calculated on the CPU. Camera uniforms include `cameraPosition`, `cameraPositionInt`, `cameraPositionFract`, and their `previousCameraPosition` variants; the integer and fractional forms preserve world-coordinate precision. VulkanMod uses zero-to-one clip-space depth, so reconstruct view-space positions with the sampled `depthtex0` value as NDC Z. `examples/matrix-depth` demonstrates depth reconstruction and camera-position uniforms.
 
 ## Build
 

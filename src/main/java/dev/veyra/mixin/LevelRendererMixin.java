@@ -23,6 +23,6 @@ public abstract class LevelRendererMixin {
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
         VeyraShadowRenderer.render(camera, modelView, projection);
-        VeyraRenderer.captureFrameMatrices(modelView, projection);
+        VeyraRenderer.captureFrameMatrices(modelView, projection, camera.position());
     }
 }
