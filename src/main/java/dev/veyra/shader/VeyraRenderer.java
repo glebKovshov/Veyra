@@ -22,6 +22,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
+import dev.veyra.vulkan.VeyraPipelineResources;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.RenderSetupAccessor;
@@ -572,7 +573,45 @@ public final class VeyraRenderer {
         return selectedPack().map(ShaderPack::hasShadowFragment).orElse(false);
     }
 
+    private static Object pipelineLevel;
+
+    private static void synchronizeWorld() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (repository == null || minecraft.level == null || pipelineLevel == minecraft.level) return;
+        pipelineLevel = minecraft.level;
+        frameMatricesInitialized = false;
+        cameraUniformsInitialized = false;
+        previousFrameNanos = 0L;
+        initializedColorTargets.clear();
+        int dimension = minecraft.level.dimension().equals(net.minecraft.world.level.Level.NETHER) ? -1
+                : minecraft.level.dimension().equals(net.minecraft.world.level.Level.END) ? 1 : 0;
+        repository.setDimension(dimension);
+        ShaderPack active = selectedPack().orElse(null);
+        if (active != null && active.configuration().dimension() != dimension) {
+            try {
+                repository.refresh();
+                ShaderPack candidate = active.configured(active.configuration().options(), dimension);
+                if (!candidate.supportsShaderPrograms()) {
+                    disable();
+                    lastError = "This shader pack has no supported programs for world" + dimension;
+                } else {
+                    String result = select(candidate);
+                    // Old-dimension pipelines must never remain installed after a failed transition.
+                    if (selectedPack().map(pack -> pack.configuration().dimension() != dimension).orElse(false)) {
+                        disable();
+                        lastError = result;
+                    }
+                }
+            } catch (IOException exception) {
+                disable();
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not switch shader dimension", exception);
+            }
+        }
+    }
+
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
+        synchronizeWorld();
         Matrix4f currentModelView = new Matrix4f(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
@@ -1349,6 +1388,88 @@ public final class VeyraRenderer {
         return lastError;
     }
 
+    private static void resetShadowPipelineState() {
+        shadowEntityPipelinePack = null;
+        shadowEntityPipelineSet = null;
+        shadowBlockEntityPipelineSet = null;
+        shadowEntityPipelineAttempted = false;
+        shadowBlockEntityPipelineAttempted = false;
+        shadowBeaconBeamPipelinePack = null;
+        shadowBeaconBeamPipelineSet = null;
+        shadowBeaconBeamPipelineAttempted = false;
+    }
+
+    private static void releaseDepthCapturePasses() {
+        if (depthTex1CapturePass != null) depthTex1CapturePass.close();
+        if (depthTex2CapturePass != null) depthTex2CapturePass.close();
+        depthTex1CapturePass = null;
+        depthTex2CapturePass = null;
+        depthTex1CaptureProgram = null;
+    }
+
+    private static void purgeUnusedPipelines() {
+        Set<RenderPipeline> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (pipelineSet != null) {
+            pipelineSet.planA().shaderPasses().forEach(pass -> live.add(pass.program().pipeline()));
+            pipelineSet.planB().shaderPasses().forEach(pass -> live.add(pass.program().pipeline()));
+            PIPELINE_CACHE.values().stream().filter(program -> program.pipeline().getLocation().getPath().contains("/copy_"))
+                    .forEach(program -> live.add(program.pipeline()));
+        }
+        if (depthTex1CaptureProgram != null) live.add(depthTex1CaptureProgram.pipeline());
+        if (entityPipelineSet != null) live.addAll(entityPipelineSet.pipelines().values());
+        if (shadowEntityPipelineSet != null) live.addAll(shadowEntityPipelineSet.pipelines().values());
+        if (shadowBlockEntityPipelineSet != null) live.addAll(shadowBlockEntityPipelineSet.pipelines().values());
+        if (blockEntityPipelineSet != null) live.addAll(blockEntityPipelineSet.pipelines().values());
+        if (handPipelineSet != null) live.addAll(handPipelineSet.pipelines().values());
+        if (particlePipelineSet != null) live.addAll(particlePipelineSet.pipelines().values());
+        if (weatherPipelineSet != null) live.addAll(weatherPipelineSet.pipelines().values());
+        if (lightningPipelineSet != null) live.addAll(lightningPipelineSet.pipelines().values());
+        if (basicPipelineSet != null) live.addAll(basicPipelineSet.pipelines().values());
+        if (linePipelineSet != null) live.addAll(linePipelineSet.pipelines().values());
+        if (glintPipelineSet != null) live.addAll(glintPipelineSet.pipelines().values());
+        if (skyBasicPipelineSet != null) live.addAll(skyBasicPipelineSet.pipelines().values());
+        if (skyTexturedPipelineSet != null) live.addAll(skyTexturedPipelineSet.pipelines().values());
+        if (worldBorderPipelineSet != null) live.addAll(worldBorderPipelineSet.pipelines().values());
+        if (damagedBlockPipelineSet != null) live.addAll(damagedBlockPipelineSet.pipelines().values());
+        if (beaconBeamPipelineSet != null) live.addAll(beaconBeamPipelineSet.pipelines().values());
+        if (shadowBeaconBeamPipelineSet != null) live.addAll(shadowBeaconBeamPipelineSet.pipelines().values());
+        ENTITY_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        PARTICLE_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        WEATHER_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        LIGHTNING_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        COLOR_DISTANCE_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        GLINT_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        SKY_BASIC_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        SKY_TEXTURED_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        TEXTURED_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        BEACON_BEAM_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        PIPELINE_CACHE.values().removeIf(program -> !live.contains(program.pipeline()));
+        COMPILED_PIPELINES.removeIf(program -> !live.contains(program.pipeline()));
+        VeyraPipelineResources.retain(live);
+    }
+
+    public static String selectWithSavedOptions(ShaderPack pack) {
+        try { return select(repository.loadConfiguration(pack)); }
+        catch (IOException exception) {
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not read shader options for {}", pack.name(), exception);
+            return "Could not load options: " + lastError;
+        }
+    }
+
+    public static String applyOptions(ShaderPack pack, Map<String, String> changed) {
+        ShaderPack active = selectedPack().orElse(null);
+        if (active == null || !active.path().equals(pack.path())) return "Select this shader pack before applying its options.";
+        try {
+            Map<String, String> validated = pack.readOptions().validate(changed);
+            if (validated.equals(active.configuration().options())) return "Shader options unchanged.";
+            return select(active.configured(validated, active.configuration().dimension()));
+        } catch (IOException exception) {
+            lastError = shortError(exception);
+            return "Could not apply options: " + lastError;
+        }
+    }
+
     public static String refreshPacks() {
         ShaderPack previous = selectedPack().orElse(null);
         try {
@@ -1366,7 +1487,7 @@ public final class VeyraRenderer {
             return "The active pack is no longer available. " + disable();
         }
         // select() compiles before committing the selection, retaining the old pipelines on failure.
-        return select(refreshed);
+        return selectWithSavedOptions(refreshed);
     }
 
     public static void onClientShutdown() {
@@ -1391,6 +1512,9 @@ public final class VeyraRenderer {
         releaseColorTargets();
         releaseSwapTargets();
         VeyraShadowRenderer.release();
+        resetShadowPipelineState();
+        releaseDepthCapturePasses();
+        purgeUnusedPipelines();
     }
 
     public static String select(ShaderPack pack) {
@@ -1595,6 +1719,8 @@ public final class VeyraRenderer {
             if (beaconBeamPipelineCount > 0) {
                 features.add(beaconBeamPipelineCount + " beacon beam pipelines");
             }
+            resetShadowPipelineState();
+            purgeUnusedPipelines();
             return "Enabled " + pack.name() + " (" + String.join(", ", features) + ").";
         } catch (Exception exception) {
             if (prepared != null) {
@@ -1619,6 +1745,7 @@ public final class VeyraRenderer {
             if (preparedClouds != null) {
                 preparedClouds.scheduleCleanUp();
             }
+            purgeUnusedPipelines();
             lastError = shortError(exception);
             VeyraClient.LOGGER.error("Could not enable shader pack '{}'.", pack.name(), exception);
             return "Shader compile failed: " + lastError;
@@ -1675,6 +1802,9 @@ public final class VeyraRenderer {
         releaseColorTargets();
         releaseSwapTargets();
         VeyraShadowRenderer.release();
+        resetShadowPipelineState();
+        releaseDepthCapturePasses();
+        purgeUnusedPipelines();
         lastError = saveFailure == null ? "" : shortError(saveFailure);
         return saveFailure == null ? "Shader pack disabled."
                 : "Shaders disabled for this session. Could not save the setting: " + lastError;
@@ -1683,6 +1813,8 @@ public final class VeyraRenderer {
     public static void invalidatePipelines() {
         pipelinesDirty = true;
         projectionBuffer = null;
+        resetShadowPipelineState();
+        releaseDepthCapturePasses();
         PIPELINE_CACHE.clear();
         COMPILED_PIPELINES.clear();
         replacePipelineSet(null);
@@ -1702,6 +1834,7 @@ public final class VeyraRenderer {
         replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
+        purgeUnusedPipelines();
         terrainPipelineDirty = selectedPack().map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment()).orElse(false);
         entityPipelineDirty = selectedPack().map(ShaderPack::hasEntityFragment).orElse(false);
         blockEntityPipelineDirty = selectedPack().map(ShaderPack::supportsBlockEntityPipeline).orElse(false);
@@ -2358,6 +2491,7 @@ public final class VeyraRenderer {
                     return shaderManager.getShader(identifier, type);
                 };
                 shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader);
+                VeyraPipelineResources.track(shadowPipeline);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
                     throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2607,6 +2741,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2673,6 +2808,7 @@ public final class VeyraRenderer {
                         "pipeline/shadow_entities_beacon/" + sourceHash + "/"
                                 + original.getLocation().getPath().replace('/', '_'));
                 shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
+                VeyraPipelineResources.track(shadowPipeline);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
                     throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2706,6 +2842,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2798,6 +2935,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2871,6 +3009,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2924,6 +3063,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -3004,6 +3144,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -3520,6 +3661,8 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+
+        VeyraPipelineResources.track(program.pipeline());
 
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(program.pipeline(), source);
         if (!compiled.isValid()) {

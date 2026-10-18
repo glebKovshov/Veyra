@@ -22,6 +22,7 @@ public class ShaderCompileSmoke {
                         Path file = path.getParent().resolve(included);
                         return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                     });
+                    source = GlslPreprocessor.process(name, source);
                     String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
                             : name.startsWith("gbuffers_entities") ? EntityShaderAdapter.adaptFragment(source)
                             : TerrainShaderAdapter.adaptFragment(source);

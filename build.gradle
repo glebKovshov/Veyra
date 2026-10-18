@@ -25,6 +25,8 @@ dependencies {
     modCompileOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
     compileOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
     annotationProcessor 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
+    implementation('org.anarres:jcpp:1.4.14') { transitive = false }
+    include('org.anarres:jcpp:1.4.14') { transitive = false }
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -60,6 +62,7 @@ java {
 }
 
 jar {
+    from('THIRD_PARTY_NOTICES.md')
     from('LICENSE') {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
@@ -90,6 +93,8 @@ if (smokeArch in ['aarch64', 'arm64']) {
 
 dependencies {
     shaderSmokeImplementation 'org.lwjgl:lwjgl-shaderc:3.3.3'
+    shaderSmokeImplementation('org.anarres:jcpp:1.4.14') { transitive = false }
+    shaderSmokeRuntimeOnly 'org.slf4j:slf4j-api:2.0.17'
     shaderSmokeRuntimeOnly "org.lwjgl:lwjgl:3.3.3:${smokeNatives}"
     shaderSmokeRuntimeOnly "org.lwjgl:lwjgl-shaderc:3.3.3:${smokeNatives}"
 }
@@ -100,4 +105,13 @@ tasks.register('validateShaders', JavaExec) {
     dependsOn tasks.named('shaderSmokeClasses')
     classpath = sourceSets.shaderSmoke.runtimeClasspath
     mainClass = 'dev.veyra.shader.ShaderCompileSmoke'
+}
+
+tasks.register('auditShaderPacks', JavaExec) {
+    group = 'verification'
+    description = 'Read-only source audit of external pack paths supplied with -PshaderPacks=path1,path2.'
+    dependsOn tasks.named('shaderSmokeClasses')
+    classpath = sourceSets.shaderSmoke.runtimeClasspath
+    mainClass = 'dev.veyra.shader.ShaderPackAudit'
+    if (project.hasProperty('shaderPacks')) args project.property('shaderPacks').toString().split(',')
 }

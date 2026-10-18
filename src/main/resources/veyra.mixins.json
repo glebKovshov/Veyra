@@ -22,7 +22,9 @@
     "accessor.PostPassAccessor",
     "accessor.RenderSetupAccessor",
     "accessor.RenderTypeAccessor",
-    "accessor.RenderTargetAccessor"
+    "accessor.RenderTargetAccessor",
+    "VkGpuDeviceMixin",
+    "accessor.ShaderCompilationKeyAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

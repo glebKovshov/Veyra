@@ -31,7 +31,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasSkyBasicFragment, boolean hasSkyTexturedFragment,
                          boolean hasTexturedFragment, boolean hasTexturedLitFragment,
                          boolean hasHandFragment, boolean hasHandWaterFragment,
-                         boolean hasDamagedBlockFragment, Set<String> blockPrograms, String issue) {
+                         boolean hasDamagedBlockFragment, Set<String> blockPrograms, String issue, ShaderPackConfiguration configuration) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_PASS_SUFFIX = 99;
     private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
@@ -107,9 +107,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public static ShaderPack inspect(Path path) {
+        return inspect(path, new ShaderPackConfiguration(Map.of(), 0));
+    }
+
+    public static ShaderPack inspect(Path path, ShaderPackConfiguration configuration) {
         String name = displayName(path);
         try {
-            Inspection inspection = Files.isDirectory(path) ? inspectDirectory(path) : inspectArchive(path);
+            Inspection inspection = Files.isDirectory(path) ? inspectDirectory(path, configuration.dimension()) : inspectArchive(path, configuration.dimension());
             return new ShaderPack(path, name,
                     inspection == null ? null : inspection.shaderDirectory(),
                     inspection != null && inspection.hasPostProcessing(),
@@ -133,12 +137,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection == null ? Set.of() : inspection.blockPrograms(),
                     inspection == null
                             ? "No supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, prepare, deferred, composite, or final fragment programs were found."
-                            : "Supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.");
+                            : "Supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.", configuration);
         } catch (IOException | RuntimeException exception) {
             return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false, false,
                     false, false, false, false, false, false, false, false, false, false,
                     Set.of(),
-                    "Could not read pack: " + exception.getMessage());
+                    "Could not read pack: " + exception.getMessage(), configuration);
         }
     }
 
@@ -153,7 +157,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public boolean hasShadowFragment() {
         try {
             for (String programName : SHADOW_PROGRAMS) {
-                if (readShader(programName + ".fsh").isPresent()) {
+                if (readRawShader(programPath(programName + ".fsh")).isPresent() && isProgramEnabled(programName)) {
                     return true;
                 }
             }
@@ -188,7 +192,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public boolean hasShadowWaterFragment() {
         try {
-            return readShader("shadow_water.fsh").isPresent();
+            return readRawShader(programPath("shadow_water.fsh")).isPresent() && isProgramEnabled("shadow_water");
         } catch (IOException exception) {
             return false;
         }
@@ -241,9 +245,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
         }
 
-        if (programs.isEmpty()) {
-            throw new IOException("The pack no longer contains a supported fragment pass.");
-        }
         return List.copyOf(programs);
     }
 
@@ -325,12 +326,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public ShadowSettings readShadowSettings() throws IOException {
         Map<String, String> values = new HashMap<>();
-        for (String fileName : listShaderSourceFiles()) {
+        for (String fileName : listShaderFiles().stream().filter(ShaderPack::isSupportedProgramFile).sorted().toList()) {
             Optional<String> source = readShader(fileName);
             if (source.isEmpty()) {
                 continue;
             }
-            String uncommented = GLSL_COMMENTS.matcher(source.get()).replaceAll("");
+            String uncommented = GLSL_COMMENTS.matcher(expandIncludes(fileName, source.get())).replaceAll("");
             Matcher matcher = SHADOW_SETTING.matcher(uncommented);
             while (matcher.find()) {
                 values.putIfAbsent(matcher.group(2), matcher.group(3).trim());
@@ -749,8 +750,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private Set<String> listShaderFiles() throws IOException {
         if (Files.isDirectory(path)) {
             Path shaders = path.resolve(shaderDirectory);
-            try (var entries = Files.list(shaders)) {
+            try (var entries = Files.walk(shaders, 2)) {
                 return entries.filter(Files::isRegularFile)
+                        .filter(entry -> entry.getParent().equals(shaders) || entry.getParent().equals(shaders.resolve("world" + configuration.dimension())))
                         .map(entry -> entry.getFileName().toString())
                         .collect(java.util.stream.Collectors.toUnmodifiableSet());
             }
@@ -764,9 +766,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 ZipEntry entry = entries.nextElement();
                 if (!entry.isDirectory() && entry.getName().startsWith(prefix)) {
                     String fileName = entry.getName().substring(prefix.length());
-                    if (!fileName.contains("/")) {
-                        files.add(fileName);
-                    }
+                    String local = dimensionFile(fileName, configuration.dimension());
+                    if (local != null) files.add(local);
                 }
             }
         }
@@ -804,7 +805,107 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
     }
 
+    private static String dimensionFile(String path, int dimension) {
+        if (!path.contains("/")) return path;
+        String prefix = "world" + dimension + "/";
+        if (path.startsWith(prefix) && !path.substring(prefix.length()).contains("/")) return path.substring(prefix.length());
+        return null;
+    }
+
+    public ShaderPackOptions readOptions() throws IOException {
+        if (configuration.definitions() != null) return configuration.definitions();
+        Map<String, String> sources = new java.util.LinkedHashMap<>();
+        int total = 0;
+        List<String> files = listShaderSourceFiles();
+        if (files.size() > 4096) throw new IOException("Too many shader source files for option discovery.");
+        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<>(files);
+        Set<String> seen = new HashSet<>();
+        Pattern include = Pattern.compile("(?m)^[\\t ]*#[\\t ]*include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)");
+        while (!pending.isEmpty()) {
+            String file = pending.removeFirst();
+            if (!seen.add(file)) continue;
+            if (seen.size() > 4096) throw new IOException("Too many reachable shader include files.");
+            Optional<String> raw = readRawShader(file);
+            if (raw.isEmpty()) continue; // Missing files in inactive branches are handled during preprocessing.
+            String source = raw.get();
+            total += source.length();
+            if (total > 16 * 1024 * 1024) throw new IOException("Shader option sources exceed 16 MiB.");
+            sources.put(file, source);
+            Matcher matcher = include.matcher(ShaderSource.maskBlockAndLineComments(source));
+            while (matcher.find()) pending.addLast(ShaderIncludes.resolve(file, matcher.group(1) != null ? matcher.group(1) : matcher.group(2)));
+        }
+        String properties = readRawShader("shaders.properties").orElse("");
+        String language = readRawShader("lang/en_US.lang").orElse("");
+        ShaderPackOptions definitions = ShaderPackOptions.parse(sources, properties, language);
+        ShaderPackOptions resolved = ShaderPackOptions.parse(sources, GlslPreprocessor.properties(properties,
+                definitions.effective(configuration.options())), language);
+        configuration.cacheDefinitions(resolved);
+        return resolved;
+    }
+
+    public Set<String> stageFiles() throws IOException {
+        return listShaderFiles().stream().filter(name -> name.matches("[A-Za-z0-9_]+\\.(?:fsh|vsh|gsh|tcs|tes|csh)"))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    public Optional<String> readStage(String fileName) throws IOException {
+        if (!fileName.matches("[A-Za-z0-9_]+\\.(?:fsh|vsh|gsh|tcs|tes|csh)")) throw new IOException("Invalid stage name: " + fileName);
+        Optional<String> source = readRawShader(programPath(fileName));
+        return source.isEmpty() ? Optional.empty() : Optional.of(expandIncludes(fileName,
+                ShaderPackOptions.apply(source.get(), configuration.options())));
+    }
+
+    public ShaderPack configured(Map<String, String> options, int dimension) {
+        return inspect(path, new ShaderPackConfiguration(options, dimension));
+    }
+
+    private String programPath(String fileName) throws IOException {
+        if (!fileName.contains("/") && fileName.matches(".+\\.(?:fsh|vsh|gsh|tcs|tes|csh)")) {
+            String override = "world" + configuration.dimension() + "/" + fileName;
+            if (readRawShader(override).isPresent()) return override;
+        }
+        return fileName;
+    }
+
+    private boolean isProgramEnabled(String program) throws IOException {
+        Boolean cached = configuration.enabled(program);
+        if (cached != null) return cached;
+        if (configuration.options().containsKey("program." + program)) {
+            boolean enabled = Boolean.parseBoolean(configuration.options().get("program." + program));
+            configuration.cacheEnabled(program, enabled);
+            return enabled;
+        }
+        Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        String expression = properties.getProperty("program." + program + ".enabled");
+        boolean enabled = expression == null || GlslPreprocessor.condition(expression, readOptions().effective(configuration.options()));
+        configuration.cacheEnabled(program, enabled);
+        return enabled;
+    }
+
     private Optional<String> readShader(String fileName) throws IOException {
+        if (!fileName.contains("/") && fileName.matches(".+\\.(?:fsh|vsh|gsh|tcs|tes|csh)")
+                && !isProgramEnabled(fileName.substring(0, fileName.lastIndexOf('.')))) return Optional.empty();
+        if (fileName.equals("shaders.properties") && configuration.processed(fileName) != null)
+            return Optional.of(configuration.processed(fileName));
+        Optional<String> source = readRawShader(programPath(fileName));
+        if (source.isEmpty()) return source;
+        if (fileName.equals("shaders.properties")) {
+            String processed = GlslPreprocessor.properties(source.get(), readOptions().effective(configuration.options()));
+            configuration.cacheProcessed(fileName, processed);
+            return Optional.of(processed);
+        }
+        return Optional.of(ShaderPackOptions.apply(source.get(), configuration.options()));
+    }
+
+    private Optional<String> readRawShader(String fileName) throws IOException {
+        Optional<String> cached = configuration.source(fileName);
+        if (cached != null) return cached;
+        Optional<String> source = readUncachedShader(fileName);
+        configuration.cacheSource(fileName, source);
+        return source;
+    }
+
+    private Optional<String> readUncachedShader(String fileName) throws IOException {
         byte[] bytes;
         if (Files.isDirectory(path)) {
             Path packRoot = path.toRealPath();
@@ -849,16 +950,23 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private String expandIncludes(String fileName, String source)
             throws IOException {
-        return ShaderIncludes.expand(fileName, source, this::readShader);
+        String actualFile = programPath(fileName);
+        String cached = configuration.processed(actualFile);
+        if (cached != null) return cached;
+        String processed = GlslPreprocessor.process(actualFile, ShaderIncludes.expand(actualFile, source,
+                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))));
+        configuration.cacheProcessed(actualFile, processed);
+        return processed;
     }
 
-    private static Inspection inspectDirectory(Path path) throws IOException {
+    private static Inspection inspectDirectory(Path path, int dimension) throws IOException {
         Path shaders = path.resolve("shaders");
         if (!Files.isDirectory(shaders)) {
             return null;
         }
-        try (var entries = Files.list(shaders)) {
+        try (var entries = Files.walk(shaders, 2)) {
             Set<String> files = entries.filter(Files::isRegularFile)
+                    .filter(entry -> entry.getParent().equals(shaders) || entry.getParent().equals(shaders.resolve("world" + dimension)))
                     .map(entry -> entry.getFileName().toString())
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
             boolean hasPostProcessing = files.stream().anyMatch(ShaderPack::isPostProcessingProgramFile);
@@ -909,7 +1017,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
     }
 
-    private static Inspection inspectArchive(Path path) throws IOException {
+    private static Inspection inspectArchive(Path path, int dimension) throws IOException {
         try (ZipFile zip = new ZipFile(path.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             List<String> paths = Collections.list(entries).stream()
@@ -933,9 +1041,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 String prefix = shaderDirectory + "/";
                 if (!entry.isDirectory() && entry.getName().startsWith(prefix)) {
                     String fileName = entry.getName().substring(prefix.length());
-                    if (!fileName.contains("/") && isSupportedProgramFile(fileName)) {
-                        files.add(fileName);
-                    }
+                    String local = dimensionFile(fileName, dimension);
+                    if (local != null && isSupportedProgramFile(local)) files.add(local);
                 }
             }
             boolean hasPostProcessing = files.stream().anyMatch(ShaderPack::isPostProcessingProgramFile);
@@ -982,10 +1089,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private static boolean isSupportedArchiveProgramPath(String entryName) {
         int shadersIndex = entryName.lastIndexOf("shaders/");
-        if (shadersIndex < 0 || entryName.indexOf('/', shadersIndex + 8) >= 0) {
-            return false;
-        }
-        return isSupportedProgramFile(entryName.substring(shadersIndex + 8));
+        if (shadersIndex < 0) return false;
+        String local = entryName.substring(shadersIndex + 8);
+        if (local.matches("world(?:-1|0|1)/[^/]+")) local = local.substring(local.indexOf('/') + 1);
+        return !local.contains("/") && isSupportedProgramFile(local);
     }
 
     private static boolean isSupportedProgramFile(String fileName) {

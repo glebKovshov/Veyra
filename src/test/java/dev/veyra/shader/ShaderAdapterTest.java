@@ -26,6 +26,7 @@ class ShaderAdapterTest {
                     Path file = path.getParent().resolve(included);
                     return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                 });
+                source = GlslPreprocessor.process(name, source);
                 String adapted;
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);

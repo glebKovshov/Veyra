@@ -21,29 +21,36 @@ public final class ShaderPackScreen extends Screen {
     @Override
     protected void init() {
         int center = width / 2;
-        int top = 94;
+        int top = 120;
         int panelWidth = Math.max(1, Math.min(320, width - 24));
         addRenderableWidget(Button.builder(Component.literal("Disable shaders"), button -> {
             status = VeyraRenderer.disable();
             rebuildWidgets();
         }).bounds(center - panelWidth / 2, top, panelWidth, 22).build());
 
+        addRenderableWidget(Button.builder(Component.literal("Shader options..."), button -> {
+            ShaderPack active = VeyraRenderer.selectedPack().orElse(null);
+            if (active == null) { status = "Select a shader pack first."; return; }
+            try { minecraft.setScreen(new ShaderOptionsScreen(this, active, active.readOptions())); }
+            catch (java.io.IOException exception) { status = "Could not read options: " + exception.getMessage(); }
+        }).bounds(center - panelWidth / 2, top - 25, panelWidth, 20).build());
+
         List<ShaderPack> packs = VeyraClient.shaderPacks.getPacks();
-        int availableRows = Math.max(0, (height - 184) / 26);
+        int availableRows = Math.max(0, (height - 210) / 26);
         int pageSize = Math.max(1, availableRows);
         int lastPageStart = packs.isEmpty() ? 0 : ((packs.size() - 1) / pageSize) * pageSize;
         firstVisiblePack = Math.min(firstVisiblePack, lastPageStart);
         int shown = Math.min(availableRows, packs.size() - firstVisiblePack);
         for (int i = 0; i < shown; i++) {
             ShaderPack pack = packs.get(firstVisiblePack + i);
-            String prefix = VeyraRenderer.selectedPack().filter(pack::equals).isPresent() ? "[Active] " : "";
+            String prefix = VeyraRenderer.selectedPack().filter(active -> active.path().equals(pack.path())).isPresent() ? "[Active] " : "";
             String suffix = pack.supportsShaderPrograms() ? "" : " (unsupported)";
             Button button = Button.builder(Component.literal(prefix + pack.name() + suffix), ignored -> {
                 if (!pack.supportsShaderPrograms()) {
                     status = pack.issue();
                     return;
                 }
-                status = VeyraRenderer.select(pack);
+                status = VeyraRenderer.selectWithSavedOptions(pack);
                 rebuildWidgets();
             }).bounds(center - panelWidth / 2, top + 28 + i * 26, panelWidth, 22).build();
             button.active = pack.supportsShaderPrograms();
