@@ -63,6 +63,19 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsIrisEntityColorInputToVulkanModVertexColor() throws IOException {
+        String adapted = EntityShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec4 color;
+                void main() { gl_FragColor = color; }
+                """, "gbuffers_spidereyes");
+        assertTrue(adapted.contains("in vec4 vertexColor;"));
+        assertTrue(adapted.contains("#define color veyraEntityColor"));
+        assertTrue(adapted.contains("veyraEntityFragColor = color;"));
+        assertFalse(adapted.contains("varying vec4 color;"));
+    }
+
+    @Test
     void rejectsCloudTextureInputs() {
         assertThrows(IOException.class, () -> CloudShaderAdapter.adaptFragment(
                 "uniform sampler2D texture;\nvarying vec2 texcoord;\nvoid main() { gl_FragColor = texture2D(texture, texcoord); }\n"));

@@ -65,6 +65,7 @@ public final class EntityShaderAdapter {
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
             Map.entry("texCoord0", new Varying("vec2")),
+            Map.entry("color", new Varying("vec4")),
             Map.entry("glcolor", new Varying("vec4")),
             Map.entry("glColor", new Varying("vec4")),
             Map.entry("gl_Color", new Varying("vec4")),
@@ -377,6 +378,7 @@ public final class EntityShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
         boolean suppliesNormal = false;
+        boolean suppliesLegacyColor = false;
         boolean suppliesViewPosition = false;
         boolean suppliesViewNormal = false;
         boolean suppliesSphericalDistance = false;
@@ -395,6 +397,9 @@ public final class EntityShaderAdapter {
             }
             if (name.equals("normal")) {
                 suppliesNormal = true;
+            }
+            if (name.equals("color")) {
+                suppliesLegacyColor = true;
             }
             if (name.equals("viewPos")) {
                 suppliesViewPosition = true;
@@ -499,6 +504,7 @@ public final class EntityShaderAdapter {
         String bridge = textPipeline ? """
                 in vec4 vertexColor;
                 in vec2 texCoord0;
+                __VEYRA_COLOR_ALIAS__
                 __VEYRA_VIEW_POSITION_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_SPHERICAL_DISTANCE__
@@ -535,6 +541,7 @@ public final class EntityShaderAdapter {
                 in vec4 vertexColor;
                 #define veyraEntityColor vertexColor
                 #endif
+                __VEYRA_COLOR_ALIAS__
                 #ifndef EMISSIVE
                 in vec4 lightMapColor;
                 #else
@@ -570,6 +577,7 @@ public final class EntityShaderAdapter {
                 #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraEntityFragColor;", outputName + ";");
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
+                .replace("__VEYRA_COLOR_ALIAS__", suppliesLegacyColor ? "#define color veyraEntityColor\n" : "")
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
                 .replace("__VEYRA_VIEW_NORMAL_INPUT__", suppliesViewNormal ? "in vec3 viewNormal;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
