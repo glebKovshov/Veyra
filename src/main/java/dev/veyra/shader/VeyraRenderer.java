@@ -271,7 +271,7 @@ public final class VeyraRenderer {
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
     private static boolean cameraUniformsInitialized;
     private static volatile FrameUniforms shaderPackFrameUniforms = FrameUniforms.ZERO;
-    private static boolean terrainShaderUniformsRegistered;
+    private static boolean shaderPackUniformsRegistered;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
     private static boolean entityPipelineDirty = true;
@@ -311,7 +311,7 @@ public final class VeyraRenderer {
 
     public static void initialize(ShaderPackRepository packRepository) {
         repository = packRepository;
-        registerTerrainShaderUniforms();
+        registerShaderPackUniforms();
         VeyraShadowRenderer.initialize();
         packRepository.getSelected().ifPresent(pack -> {
             try {
@@ -375,21 +375,25 @@ public final class VeyraRenderer {
         updateTerrainLayerMode(packRepository.getSelected().orElse(null));
     }
 
-    private static void registerTerrainShaderUniforms() {
-        if (terrainShaderUniformsRegistered) {
+    private static void registerShaderPackUniforms() {
+        if (shaderPackUniformsRegistered) {
             return;
         }
         for (TerrainShaderAdapter.ShaderUniform uniform : TerrainShaderAdapter.shaderPackUniforms()) {
             if (uniform.sourceType().equals("float")) {
-                Uniforms.vec1f_uniformMap.put(uniform.name(), () -> terrainShaderFloatUniform(uniform.name()));
+                Uniforms.vec1f_uniformMap.put(uniform.name(), () -> shaderPackFloatUniform(uniform.name()));
             } else {
-                Uniforms.vec1i_uniformMap.put(uniform.name(), () -> terrainShaderIntUniform(uniform.name()));
+                Uniforms.vec1i_uniformMap.put(uniform.name(), () -> shaderPackIntUniform(uniform.name()));
+                if (uniform.booleanField()) {
+                    Uniforms.vec1i_uniformMap.put(uniform.blockMemberName(),
+                            () -> shaderPackIntUniform(uniform.name()));
+                }
             }
         }
-        terrainShaderUniformsRegistered = true;
+        shaderPackUniformsRegistered = true;
     }
 
-    private static float terrainShaderFloatUniform(String name) {
+    private static float shaderPackFloatUniform(String name) {
         Minecraft minecraft = Minecraft.getInstance();
         if (name.equals("viewWidth")) {
             return minecraft.getWindow().getWidth();
@@ -419,7 +423,7 @@ public final class VeyraRenderer {
         };
     }
 
-    private static int terrainShaderIntUniform(String name) {
+    private static int shaderPackIntUniform(String name) {
         FrameUniforms frame = shaderPackFrameUniforms;
         return switch (name) {
             case "frameCounter" -> frame.frameCounter();
@@ -1994,10 +1998,15 @@ public final class VeyraRenderer {
     private static GraphicsPipeline compileCloudPipeline(ShaderPack pack) throws IOException {
         String shaderPath = ShaderLoadUtil.resolveShaderPath("basic/clouds");
         String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "clouds.vsh");
-        String fragmentSource = pack.readCloudFragment()
+        String source = pack.readCloudFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_clouds.fsh."));
-        fragmentSource = CloudShaderAdapter.adaptFragment(fragmentSource);
+        CloudShaderAdapter.AdaptedFragment adaptedFragment = CloudShaderAdapter.adapt(source);
+        String fragmentSource = adaptedFragment.source();
         PipelineConfig config = PipelineConfig.fromJson("clouds", ShaderLoadUtil.getJsonConfig(shaderPath, "clouds"));
+        if (!adaptedFragment.uniformFields().isEmpty()) {
+            vertexSource = addCloudUniformFields(vertexSource, adaptedFragment.uniformFields());
+            config = addCloudUniformBufferFields(config, adaptedFragment.uniformFields());
+        }
 
         Pipeline.Builder builder = new Pipeline.Builder(DefaultVertexFormat.POSITION_COLOR, "veyra_clouds");
         builder.applyConfig(config);
@@ -2008,6 +2017,51 @@ public final class VeyraRenderer {
             ubo.setUseGlobalBuffer(true);
         }
         return pipeline;
+    }
+
+    private static String addCloudUniformFields(
+            String vertexSource, List<ShaderPackUniformAdapter.UniformField> fields) throws IOException {
+        String marker = "FogCloudsEnd;";
+        int markerIndex = vertexSource.indexOf(marker);
+        if (markerIndex < 0 || vertexSource.indexOf(marker, markerIndex + marker.length()) >= 0) {
+            throw new IOException("VulkanMod's cloud vertex shader does not contain one FogCloudsEnd field.");
+        }
+        int lineEnd = vertexSource.indexOf('\n', markerIndex);
+        if (lineEnd < 0) {
+            throw new IOException("VulkanMod's cloud vertex shader has an incomplete cloud uniform block.");
+        }
+        StringBuilder additions = new StringBuilder();
+        for (ShaderPackUniformAdapter.UniformField field : fields) {
+            additions.append("    ").append(field.type()).append(' ').append(field.name()).append(";\n");
+        }
+        return vertexSource.substring(0, lineEnd + 1) + additions + vertexSource.substring(lineEnd + 1);
+    }
+
+    private static PipelineConfig addCloudUniformBufferFields(
+            PipelineConfig config, List<ShaderPackUniformAdapter.UniformField> fields) throws IOException {
+        List<PipelineConfig.UB> buffers = new ArrayList<>(config.ubs.size());
+        boolean replacedUniforms = false;
+        for (PipelineConfig.UB uniformBuffer : config.ubs) {
+            if (uniformBuffer.binding != 1) {
+                buffers.add(uniformBuffer);
+                continue;
+            }
+            if (replacedUniforms) {
+                throw new IOException("VulkanMod's cloud pipeline contains duplicate binding 1 uniform buffers.");
+            }
+            PipelineConfig.UB.Builder builder = PipelineConfig.UB.builder(uniformBuffer.binding, uniformBuffer.stage)
+                    .addUniform("vec4", "ColorModulator")
+                    .addUniform("float", "FogCloudsEnd");
+            for (ShaderPackUniformAdapter.UniformField field : fields) {
+                builder.addUniform(field.type(), field.name());
+            }
+            buffers.add(builder.build());
+            replacedUniforms = true;
+        }
+        if (!replacedUniforms) {
+            throw new IOException("VulkanMod's cloud pipeline does not declare its binding 1 uniform buffer.");
+        }
+        return new PipelineConfig(config.shaderPaths, buffers, config.imageDescriptors, config.pushConstantsInfo);
     }
 
     private static EntityPipelineSet compileEntityPipelines(ShaderPack pack) throws IOException {

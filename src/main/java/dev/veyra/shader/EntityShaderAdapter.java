@@ -103,8 +103,11 @@ public final class EntityShaderAdapter {
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
+        ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
+                ShaderPackUniformAdapter.extract(adapted, programName);
+        adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException(programName + " custom uniforms are not supported yet; only the entity texture and alphaTestRef are available.");
+            throw new IOException(programName + " has an unsupported uniform declaration.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -259,6 +262,8 @@ public final class EntityShaderAdapter {
             result.append(extension).append('\n');
         }
         result.append(bridge);
+        result.append(shaderPackUniforms.declarations());
+        result.append(shaderPackUniforms.macros());
         return result.append(adapted).toString();
     }
 

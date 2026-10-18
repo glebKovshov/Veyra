@@ -50,6 +50,10 @@ public final class CloudShaderAdapter {
     }
 
     public static String adaptFragment(String source) throws IOException {
+        return adapt(source).source();
+    }
+
+    public static AdaptedFragment adapt(String source) throws IOException {
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
@@ -58,6 +62,9 @@ public final class CloudShaderAdapter {
         }
         adapted = extensionMatcher.replaceAll("");
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
+        ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
+                ShaderPackUniformAdapter.extract(adapted, "gbuffers_clouds");
+        adapted = shaderPackUniforms.source();
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_CLOUD_INPUT.matcher(uncommented).find()) {
@@ -129,7 +136,20 @@ public final class CloudShaderAdapter {
             result.append(extension).append('\n');
         }
         result.append(FRAGMENT_BRIDGE.replace("veyraCloudFragColor;", outputName + ";"));
-        return result.append(adapted).toString();
+        if (!shaderPackUniforms.fields().isEmpty()) {
+            result.append("layout(binding = 1) uniform VeyraCloudUniformBuffer {\n")
+                    .append("    vec4 ColorModulator;\n")
+                    .append("    float FogCloudsEnd;\n");
+            for (ShaderPackUniformAdapter.UniformField field : shaderPackUniforms.fields()) {
+                result.append("    ").append(field.type()).append(' ').append(field.name()).append(";\n");
+            }
+            result.append("};\n");
+        }
+        result.append(shaderPackUniforms.macros());
+        return new AdaptedFragment(result.append(adapted).toString(), shaderPackUniforms.fields());
+    }
+
+    public record AdaptedFragment(String source, List<ShaderPackUniformAdapter.UniformField> uniformFields) {
     }
 
     private record Varying(String type, int location) {

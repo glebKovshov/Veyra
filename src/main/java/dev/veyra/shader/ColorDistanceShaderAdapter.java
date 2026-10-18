@@ -63,8 +63,11 @@ public final class ColorDistanceShaderAdapter {
             extensions.add(extensionMatcher.group().strip());
         }
         adapted = PRECISION_DECLARATION.matcher(extensionMatcher.replaceAll("")).replaceAll("");
+        ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
+                ShaderPackUniformAdapter.extract(adapted, programName);
+        adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM.matcher(adapted).find()) {
-            throw new IOException(programName + " does not expose samplers or custom uniforms yet.");
+            throw new IOException(programName + " has an unsupported uniform declaration.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -156,6 +159,8 @@ public final class ColorDistanceShaderAdapter {
             result.append(extension).append('\n');
         }
         result.append(bridge);
+        result.append(shaderPackUniforms.declarations());
+        result.append(shaderPackUniforms.macros());
         return result.append(adapted).toString();
     }
 
