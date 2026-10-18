@@ -674,7 +674,6 @@ public final class VeyraRenderer {
         updateShaderPackVectorUniforms(cameraUniforms);
         updateShaderPackIntegerVector2Uniforms(cameraUniforms);
         updateShaderPackIntegerVectorUniforms(cameraUniforms);
-        Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level != null && minecraft.player != null) {
             shaderPackFrameUniforms = updateFrameUniforms(minecraft);
         }
