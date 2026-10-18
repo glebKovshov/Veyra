@@ -1,0 +1,37 @@
+name: Shaderpack source audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/iris-compatibility-0.2']
+    paths:
+      - '.github/workflows/shaderpack-audit.yml'
+      - 'scripts/run_shaderpack_source_audit.py'
+      - 'validation/shaderpack-inputs.json'
+      - 'validation/shaderpack-profile-audit.json'
+      - 'src/main/java/dev/veyra/shader/**'
+
+permissions:
+  contents: read
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Audit pinned shaderpack sources and profiles
+        run: python3 scripts/run_shaderpack_source_audit.py
+      - name: Upload source audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shaderpack-source-audit
+          path: build/reports/external-shaderpacks/
+          if-no-files-found: warn
+          retention-days: 14
