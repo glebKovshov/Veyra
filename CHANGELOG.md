@@ -27,3 +27,5 @@
 - Fixed pack refresh/reload, selection persistence and resource cleanup.
 - Added 35 regression tests and native shaderc example checks.
 - Published a build-verified release with documented GPU validation limits.
+
+- Ensure composite passes execute when the GUI is hidden; retain the pre-GUI path when visible.
