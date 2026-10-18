@@ -13,6 +13,8 @@ public final class BeaconBeamShaderAdapter {
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern PRECISION_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)");
+    private static final Pattern ALPHA_TEST_UNIFORM = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?float\\s+alphaTestRef\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
@@ -58,6 +60,7 @@ public final class BeaconBeamShaderAdapter {
             extensions.add(extensionMatcher.group().strip());
         }
         adapted = PRECISION_DECLARATION.matcher(extensionMatcher.replaceAll("")).replaceAll("");
+        adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
@@ -74,7 +77,7 @@ public final class BeaconBeamShaderAdapter {
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_beaconbeam custom uniforms are not supported yet; only the beacon texture is available.");
+            throw new IOException("gbuffers_beaconbeam custom uniforms are not supported yet; the beacon texture and alphaTestRef are available.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -159,6 +162,10 @@ public final class BeaconBeamShaderAdapter {
                 }
                 #define texture Sampler0
                 #define gtexture Sampler0
+                #ifndef ALPHA_CUTOUT
+                #define ALPHA_CUTOUT 0.1
+                #endif
+                #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraBeaconFragColor;", outputName + ";");
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {

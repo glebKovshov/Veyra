@@ -38,6 +38,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final int MAX_INCLUDE_DEPTH = 32;
     private static final int MAX_PASS_SUFFIX = 99;
     private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
+    private static final List<String> SHADOW_PROGRAMS = List.of(
+            "shadow", "shadow_solid", "shadow_cutout", "shadow_water", "shadow_entities", "shadow_block");
     private static final List<String> TERRAIN_PROGRAMS = List.of(
             "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water");
     private static final List<String> ENTITY_PROGRAMS = List.of(
@@ -155,20 +157,36 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public boolean hasShadowFragment() {
         try {
-            return readShader("shadow.fsh").isPresent() || readShader("shadow_water.fsh").isPresent();
+            for (String programName : SHADOW_PROGRAMS) {
+                if (readShader(programName + ".fsh").isPresent()) {
+                    return true;
+                }
+            }
+            return false;
         } catch (IOException exception) {
             return false;
         }
     }
 
     public Optional<String> readShadowFragment() throws IOException {
+        return readShadowFragment("shadow");
+    }
+
+    public Optional<String> readShadowFragment(String programName) throws IOException {
         if (!supportsShaderPrograms()) {
             return Optional.empty();
         }
-        String fileName = "shadow.fsh";
+        if (!SHADOW_PROGRAMS.contains(programName)) {
+            throw new IOException("Unsupported Iris shadow program '" + programName + "'.");
+        }
+        String fileName = programName + ".fsh";
         Optional<String> source = readShader(fileName);
+        if (source.isEmpty() && !programName.equals("shadow")) {
+            fileName = "shadow.fsh";
+            source = readShader(fileName);
+        }
         if (source.isEmpty()) {
-            return hasShadowWaterFragment() ? Optional.of(DEFAULT_SHADOW_FRAGMENT) : Optional.empty();
+            return hasShadowFragment() ? Optional.of(DEFAULT_SHADOW_FRAGMENT) : Optional.empty();
         }
         return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
     }
@@ -182,18 +200,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public Optional<String> readShadowWaterFragment() throws IOException {
-        if (!supportsShaderPrograms()) {
-            return Optional.empty();
-        }
-        if (!hasShadowWaterFragment()) {
-            return readShadowFragment();
-        }
-        String fileName = "shadow_water.fsh";
-        Optional<String> source = readShader(fileName);
-        if (source.isEmpty()) {
-            return readShadowFragment();
-        }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return readShadowFragment("shadow_water");
     }
 
     public boolean hasDamagedBlockPipeline() {
@@ -944,7 +951,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .filter(ShaderPack::isSupportedWeatherProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
-            return hasPostProcessing || files.contains("shadow.fsh") || files.contains("shadow_water.fsh")
+            return hasPostProcessing || hasShadowProgram(files)
                     || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
                     || !particlePrograms.isEmpty() || !weatherPrograms.isEmpty() || hasBeaconBeamFragment
                     || hasLightningFragment || hasBasicFragment || hasLineFragment || hasGlintFragment
@@ -1038,8 +1045,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private static boolean isSupportedProgramFile(String fileName) {
-        return fileName.equals("shadow.fsh")
-                || fileName.equals("shadow_water.fsh")
+        return isSupportedShadowProgramFile(fileName)
                 || fileName.equals("gbuffers_clouds.fsh")
                 || fileName.equals(BEACON_BEAM_PROGRAM + ".fsh")
                 || fileName.equals(LIGHTNING_PROGRAM + ".fsh")
@@ -1059,6 +1065,15 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 || isSupportedParticleProgramFile(fileName)
                 || isSupportedWeatherProgramFile(fileName)
                 || isPostProcessingProgramFile(fileName);
+    }
+
+    private static boolean hasShadowProgram(Set<String> files) {
+        return SHADOW_PROGRAMS.stream().anyMatch(programName -> files.contains(programName + ".fsh"));
+    }
+
+    private static boolean isSupportedShadowProgramFile(String fileName) {
+        return fileName.endsWith(".fsh")
+                && SHADOW_PROGRAMS.contains(fileName.substring(0, fileName.length() - 4));
     }
 
     private static boolean isSupportedTerrainProgramFile(String fileName) {

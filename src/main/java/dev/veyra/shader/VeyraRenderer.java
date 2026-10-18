@@ -217,9 +217,16 @@ public final class VeyraRenderer {
     private static TerrainPipelineSet terrainPipelineSet;
     private static EntityPipelineSet entityPipelineSet;
     private static EntityPipelineSet shadowEntityPipelineSet;
+    private static EntityPipelineSet shadowBlockEntityPipelineSet;
     private static ShaderPack shadowEntityPipelinePack;
     private static boolean shadowEntityPipelineAttempted;
+    private static boolean shadowBlockEntityPipelineAttempted;
     private static boolean shadowEntityRoutingLogged;
+    private static boolean shadowBlockEntityRoutingLogged;
+    private static BeaconBeamPipelineSet shadowBeaconBeamPipelineSet;
+    private static ShaderPack shadowBeaconBeamPipelinePack;
+    private static boolean shadowBeaconBeamPipelineAttempted;
+    private static boolean shadowBeaconBeamRoutingLogged;
     private static EntityPipelineSet blockEntityPipelineSet;
     private static EntityPipelineSet handPipelineSet;
     private static ParticlePipelineSet particlePipelineSet;
@@ -571,7 +578,7 @@ public final class VeyraRenderer {
         }
         RenderPipeline original = originalType.pipeline();
         if (VeyraShadowRenderer.isRendering()) {
-            RenderPipeline shadowPipeline = getShadowEntityPipeline(original);
+            RenderPipeline shadowPipeline = getShadowEntityPipeline(original, true);
             return shadowPipeline == null ? originalType
                     : replaceRenderTypePipeline(originalType, shadowPipeline, "_veyra_shadow_block");
         }
@@ -712,7 +719,7 @@ public final class VeyraRenderer {
 
     public static RenderPipeline getEntityPipeline(RenderPipeline original) {
         if (VeyraShadowRenderer.isRendering()) {
-            return getShadowEntityPipeline(original);
+            return getShadowEntityPipeline(original, false);
         }
         ShaderPack pack = selectedPack().orElse(null);
         if (isHandRendering() || pack == null || !pack.hasEntityFragment() || !isEntityRenderPipeline(original)) {
@@ -734,7 +741,7 @@ public final class VeyraRenderer {
         return entityPipelineSet == null ? null : entityPipelineSet.pipelines().get(original);
     }
 
-    private static RenderPipeline getShadowEntityPipeline(RenderPipeline original) {
+    private static RenderPipeline getShadowEntityPipeline(RenderPipeline original, boolean blockEntity) {
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasShadowFragment() || !isEntityRenderPipeline(original)) {
             return null;
@@ -742,28 +749,52 @@ public final class VeyraRenderer {
         if (shadowEntityPipelinePack != pack) {
             shadowEntityPipelinePack = pack;
             shadowEntityPipelineSet = null;
+            shadowBlockEntityPipelineSet = null;
             shadowEntityPipelineAttempted = false;
+            shadowBlockEntityPipelineAttempted = false;
             shadowEntityRoutingLogged = false;
+            shadowBlockEntityRoutingLogged = false;
         }
-        if (!shadowEntityPipelineAttempted) {
-            shadowEntityPipelineAttempted = true;
+        String programName = blockEntity ? "shadow_block" : "shadow_entities";
+        EntityPipelineSet pipelineSet;
+        boolean pipelineAttempted;
+        if (blockEntity) {
+            pipelineSet = shadowBlockEntityPipelineSet;
+            pipelineAttempted = shadowBlockEntityPipelineAttempted;
+        } else {
+            pipelineSet = shadowEntityPipelineSet;
+            pipelineAttempted = shadowEntityPipelineAttempted;
+        }
+        if (!pipelineAttempted) {
             try {
-                shadowEntityPipelineSet = compileShadowEntityPipelines(pack);
-                VeyraClient.LOGGER.info("Loaded {} opaque entity and block entity shadow pipelines from shader pack '{}'.",
-                        shadowEntityPipelineSet.pipelines().size(), pack.name());
+                pipelineSet = compileShadowEntityPipelines(pack, programName);
                 lastError = "";
+                VeyraClient.LOGGER.info("Loaded {} {} shadow pipelines from shader pack '{}'.",
+                        pipelineSet.pipelines().size(), blockEntity ? "block entity" : "entity", pack.name());
             } catch (Exception exception) {
                 lastError = shortError(exception);
-                VeyraClient.LOGGER.error("Could not load entity and block entity shadow programs from shader pack '{}'.",
-                        pack.name(), exception);
+                VeyraClient.LOGGER.error("Could not load {} shadow program from shader pack '{}'.",
+                        programName, pack.name(), exception);
+            }
+            if (blockEntity) {
+                shadowBlockEntityPipelineSet = pipelineSet;
+                shadowBlockEntityPipelineAttempted = true;
+            } else {
+                shadowEntityPipelineSet = pipelineSet;
+                shadowEntityPipelineAttempted = true;
             }
         }
-        RenderPipeline replacement = shadowEntityPipelineSet == null
-                ? null : shadowEntityPipelineSet.pipelines().get(original);
-        if (replacement != null && !shadowEntityRoutingLogged) {
-            VeyraClient.LOGGER.info("Rendering opaque entities and block entities with the shadow fragment from shader pack '{}'.",
-                    pack.name());
-            shadowEntityRoutingLogged = true;
+        RenderPipeline replacement = pipelineSet == null ? null : pipelineSet.pipelines().get(original);
+        if (replacement != null) {
+            if (blockEntity && !shadowBlockEntityRoutingLogged) {
+                VeyraClient.LOGGER.info("Rendering block entities with the {} fragment from shader pack '{}'.",
+                        programName, pack.name());
+                shadowBlockEntityRoutingLogged = true;
+            } else if (!blockEntity && !shadowEntityRoutingLogged) {
+                VeyraClient.LOGGER.info("Rendering entities with the {} fragment from shader pack '{}'.",
+                        programName, pack.name());
+                shadowEntityRoutingLogged = true;
+            }
         }
         return replacement;
     }
@@ -826,6 +857,9 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getBeaconBeamPipeline(RenderPipeline original) {
+        if (VeyraShadowRenderer.isRendering()) {
+            return getShadowBeaconBeamPipeline(original);
+        }
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasBeaconBeamFragment() || !isBeaconBeamPipeline(original)) {
             return null;
@@ -844,6 +878,38 @@ public final class VeyraRenderer {
             }
         }
         return beaconBeamPipelineSet == null ? null : beaconBeamPipelineSet.pipelines().get(original);
+    }
+
+    private static RenderPipeline getShadowBeaconBeamPipeline(RenderPipeline original) {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.hasShadowFragment() || !isBeaconBeamPipeline(original)) {
+            return null;
+        }
+        if (shadowBeaconBeamPipelinePack != pack) {
+            shadowBeaconBeamPipelinePack = pack;
+            shadowBeaconBeamPipelineSet = null;
+            shadowBeaconBeamPipelineAttempted = false;
+            shadowBeaconBeamRoutingLogged = false;
+        }
+        if (!shadowBeaconBeamPipelineAttempted) {
+            shadowBeaconBeamPipelineAttempted = true;
+            try {
+                shadowBeaconBeamPipelineSet = compileShadowBeaconBeamPipelines(pack);
+                VeyraClient.LOGGER.info("Loaded {} beacon beam shadow pipelines from shader pack '{}'.",
+                        shadowBeaconBeamPipelineSet.pipelines().size(), pack.name());
+            } catch (Exception exception) {
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not load the shadow_entities program for beacon beams from shader pack '{}'.",
+                        pack.name(), exception);
+            }
+        }
+        RenderPipeline replacement = shadowBeaconBeamPipelineSet == null
+                ? null : shadowBeaconBeamPipelineSet.pipelines().get(original);
+        if (replacement != null && !shadowBeaconBeamRoutingLogged) {
+            VeyraClient.LOGGER.info("Rendering beacon beams with shadow_entities from shader pack '{}'.", pack.name());
+            shadowBeaconBeamRoutingLogged = true;
+        }
+        return replacement;
     }
 
     public static RenderPipeline getParticlePipeline(RenderPipeline original) {
@@ -1216,7 +1282,7 @@ public final class VeyraRenderer {
             if (terrainProgramCount > 0) {
                 features.add(terrainProgramCount + " terrain programs");
             }
-            if (terrainPipelineSet != null && terrainPipelineSet.shadowPipeline() != null) {
+            if (terrainPipelineSet != null && terrainPipelineSet.hasShadowPipelines()) {
                 features.add("terrain shadow map");
             }
             if (cloudPipeline != null) {
@@ -1566,8 +1632,7 @@ public final class VeyraRenderer {
         String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "terrain/terrain.vsh");
         vertexSource = TerrainShaderAdapter.adaptVertex(vertexSource);
         Map<String, GraphicsPipeline> pipelines = new HashMap<>();
-        GraphicsPipeline shadowPipeline = null;
-        GraphicsPipeline translucentShadowPipeline = null;
+        Map<String, GraphicsPipeline> shadowPipelines = new HashMap<>();
         boolean shadowSamplerAvailable = pack.hasShadowFragment();
         try {
             for (String programName : List.of(
@@ -1592,43 +1657,26 @@ public final class VeyraRenderer {
                 pipelines.put(programName, pipeline);
             }
             if (shadowSamplerAvailable) {
-                String fragmentSource = pack.readShadowFragment()
-                        .orElseThrow(() -> new IOException("The pack no longer contains shadow.fsh."));
-                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
-                Pipeline.Builder builder = new Pipeline.Builder(
-                        PipelineManager.getTerrainVertexFormat(), "veyra_shadow");
-                builder.applyConfig(terrainPipelineConfig(false));
-                builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
-                builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
-                shadowPipeline = builder.createGraphicsPipeline();
-                for (UBO ubo : shadowPipeline.getBuffers()) {
-                    ubo.setUseGlobalBuffer(true);
-                }
-
-                if (pack.hasShadowWaterFragment()) {
-                    String waterFragmentSource = pack.readShadowWaterFragment()
-                            .orElseThrow(() -> new IOException("The pack no longer contains shadow_water.fsh."));
-                    waterFragmentSource = TerrainShaderAdapter.adaptFragment(waterFragmentSource, false);
-                    Pipeline.Builder waterBuilder = new Pipeline.Builder(
-                            PipelineManager.getTerrainVertexFormat(), "veyra_shadow_water");
-                    waterBuilder.applyConfig(terrainPipelineConfig(false));
-                    waterBuilder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
-                    waterBuilder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, waterFragmentSource);
-                    translucentShadowPipeline = waterBuilder.createGraphicsPipeline();
-                    for (UBO ubo : translucentShadowPipeline.getBuffers()) {
+                for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
+                    String fragmentSource = pack.readShadowFragment(programName)
+                            .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+                    fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
+                    Pipeline.Builder builder = new Pipeline.Builder(
+                            PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
+                    builder.applyConfig(terrainPipelineConfig(false));
+                    builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+                    builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
+                    GraphicsPipeline shadowPipeline = builder.createGraphicsPipeline();
+                    for (UBO ubo : shadowPipeline.getBuffers()) {
                         ubo.setUseGlobalBuffer(true);
                     }
+                    shadowPipelines.put(programName, shadowPipeline);
                 }
             }
-            return new TerrainPipelineSet(Map.copyOf(pipelines), shadowPipeline, translucentShadowPipeline);
+            return new TerrainPipelineSet(Map.copyOf(pipelines), Map.copyOf(shadowPipelines));
         } catch (IOException | RuntimeException exception) {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
-            if (shadowPipeline != null) {
-                shadowPipeline.scheduleCleanUp();
-            }
-            if (translucentShadowPipeline != null) {
-                translucentShadowPipeline.scheduleCleanUp();
-            }
+            shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             throw exception;
         }
     }
@@ -1754,13 +1802,13 @@ public final class VeyraRenderer {
         return new EntityPipelineSet(pipelines);
     }
 
-    private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack) throws IOException {
-        String fragmentSource = pack.readShadowFragment()
-                .orElseThrow(() -> new IOException("The pack no longer contains shadow.fsh."));
-        fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, "shadow");
-        String sourceHash = sha256("shadow_entities\n" + fragmentSource);
+    private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack, String programName) throws IOException {
+        String fragmentSource = pack.readShadowFragment(programName)
+                .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+        fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+        String sourceHash = sha256(programName + '\n' + fragmentSource);
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
-                "veyra", "shaderpack/shadow_entities/" + sourceHash);
+                "veyra", "shaderpack/" + programName + "/" + sourceHash);
         String adaptedFragment = fragmentSource;
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         ShaderSource source = (identifier, type) -> {
@@ -1772,15 +1820,14 @@ public final class VeyraRenderer {
 
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isEntityRenderPipeline)
-                .filter(pipeline -> pipeline.getBlendFunction().isEmpty())
                 .toList();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
-            EntityPipelineKey cacheKey = new EntityPipelineKey(original, "shadow_entities", sourceHash);
+            EntityPipelineKey cacheKey = new EntityPipelineKey(original, programName, sourceHash);
             RenderPipeline shadowPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (shadowPipeline == null) {
                 Identifier location = Identifier.fromNamespaceAndPath("veyra",
-                        "pipeline/shadow_entities/" + sourceHash + "/"
+                        "pipeline/" + programName + "/" + sourceHash + "/"
                                 + original.getLocation().getPath().replace('/', '_'));
                 shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
@@ -2019,6 +2066,49 @@ public final class VeyraRenderer {
         }
         if (pipelines.isEmpty()) {
             throw new IOException("VulkanMod's Minecraft beacon beam render pipelines were not found.");
+        }
+        return new BeaconBeamPipelineSet(pipelines);
+    }
+
+    private static BeaconBeamPipelineSet compileShadowBeaconBeamPipelines(ShaderPack pack) throws IOException {
+        List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
+                .filter(VeyraRenderer::isBeaconBeamPipeline)
+                .toList();
+        String fragmentSource = pack.readShadowFragment("shadow_entities")
+                .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+        fragmentSource = BeaconBeamShaderAdapter.adaptFragment(fragmentSource);
+        String sourceHash = sha256("shadow_entities_beacon\n" + fragmentSource);
+        Identifier fragmentShader = Identifier.fromNamespaceAndPath(
+                "veyra", "shaderpack/shadow_entities_beacon/" + sourceHash);
+        String adaptedFragment = fragmentSource;
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+        ShaderSource source = (identifier, type) -> {
+            if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
+                return adaptedFragment;
+            }
+            return shaderManager.getShader(identifier, type);
+        };
+
+        Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        for (RenderPipeline original : candidates) {
+            BeaconBeamPipelineKey cacheKey = new BeaconBeamPipelineKey(original, sourceHash);
+            RenderPipeline shadowPipeline = BEACON_BEAM_PIPELINE_CACHE.get(cacheKey);
+            if (shadowPipeline == null) {
+                Identifier location = Identifier.fromNamespaceAndPath("veyra",
+                        "pipeline/shadow_entities_beacon/" + sourceHash + "/"
+                                + original.getLocation().getPath().replace('/', '_'));
+                shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
+                CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
+                if (!compiled.isValid()) {
+                    throw new IOException("VulkanMod could not compile " + original.getLocation()
+                            + " with the shadow_entities shader.");
+                }
+                BEACON_BEAM_PIPELINE_CACHE.put(cacheKey, shadowPipeline);
+            }
+            pipelines.put(original, shadowPipeline);
+        }
+        if (pipelines.isEmpty()) {
+            throw new IOException("VulkanMod's Minecraft beacon beam render pipelines were not found for the shadow pass.");
         }
         return new BeaconBeamPipelineSet(pipelines);
     }
@@ -3869,23 +3959,27 @@ public final class VeyraRenderer {
     }
 
     private record TerrainPipelineSet(Map<String, GraphicsPipeline> pipelines,
-                                      GraphicsPipeline shadowPipeline,
-                                      GraphicsPipeline translucentShadowPipeline) implements AutoCloseable {
+                                      Map<String, GraphicsPipeline> shadowPipelines) implements AutoCloseable {
+        private boolean hasShadowPipelines() {
+            return !shadowPipelines.isEmpty();
+        }
+
         private GraphicsPipeline shadowPipeline(TerrainRenderType terrainRenderType) {
-            return terrainRenderType == TerrainRenderType.TRANSLUCENT && translucentShadowPipeline != null
-                    ? translucentShadowPipeline
-                    : shadowPipeline;
+            if (terrainRenderType == null) {
+                return null;
+            }
+            String programName = switch (terrainRenderType) {
+                case CUTOUT, TRIPWIRE -> "shadow_cutout";
+                case TRANSLUCENT -> "shadow_water";
+                case SOLID -> "shadow_solid";
+            };
+            return shadowPipelines.get(programName);
         }
 
         @Override
         public void close() {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
-            if (shadowPipeline != null) {
-                shadowPipeline.scheduleCleanUp();
-            }
-            if (translucentShadowPipeline != null) {
-                translucentShadowPipeline.scheduleCleanUp();
-            }
+            shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
         }
     }
 

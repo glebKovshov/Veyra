@@ -171,6 +171,8 @@ public final class VeyraShadowRenderer {
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
             worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.CUTOUT,
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
+            worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRIPWIRE,
+                    cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
             if (shadowSettings.shadowTranslucent()) {
                 worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT,
                         cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
