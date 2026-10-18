@@ -84,7 +84,7 @@ Include expansion ignores commented-out directives and preserves comments used f
 
 Run `./gradlew packageExamplePacks` to package the example folders. Extract `build/distributions/veyra-example-packs-*.zip` into `shaderpacks/`. Start with `grayscale` or `animated` to check post-processing, then test the geometry and depth examples on your GPU.
 
-To publish, push a tag matching `v` plus `mod_version`, for example `v0.1.1+mc1.21.11`. The Release workflow builds and tests that exact commit before uploading the mod, sources, examples, and SHA-256 checksums. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the scope and validation limitations of this version.
+To publish, push a branch matching `release/` plus `mod_version` (for example `release/0.1.1+mc1.21.11`) or a matching tag (`v0.1.1+mc1.21.11`). The Release workflow builds and tests that exact commit, creates its version tag if necessary, and uploads the mod, sources, examples, and SHA-256 checksums. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the scope and validation limitations of this version.
 
 ## License
 

@@ -14,4 +14,6 @@ Changes:
 - Add automated regression tests and a tag-triggered release workflow with checksums.
 - Restrict VulkanMod to the version used by the implementation, and declare Java 21 explicitly.
 
+Validation: the full Fabric Loom CI build passed, along with 35 JUnit tests and CPU shaderc checks (18 examples preprocessed, 15 compiled directly to Vulkan SPIR-V, and four conditional-include cases). The final release workflow repeats these checks before publication.
+
 Compatibility remains the supported subset described in README.md. This release does not add arbitrary Iris/OptiFine shaderpack support, custom geometry vertex stages, compute shaders, or full GLSL preprocessing before interface adaptation. No in-game GPU validation was performed in the build environment; test your target pack and GPU before relying on it.

@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - 'release/**'
     tags:
       - 'v*'
 
@@ -20,11 +22,17 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Check tag matches mod version
+      - name: Check release ref matches mod version
+        id: version
         shell: bash
         run: |
           version=$(sed -n 's/^mod_version=//p' gradle.properties)
-          test "$GITHUB_REF_NAME" = "v$version"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            test "$GITHUB_REF_NAME" = "v$version"
+          else
+            test "$GITHUB_REF_NAME" = "release/$version"
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: ./gradlew --no-daemon build validateShaders packageExamplePacks
       - name: Prepare release assets
@@ -38,8 +46,12 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" release-assets/* \
-            --verify-tag --title "Veyra ${GITHUB_REF_NAME#v}" \
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" > existing-tag.txt; then
+            test "$(cut -f1 existing-tag.txt)" = "$GITHUB_SHA"
+          fi
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --target "$GITHUB_SHA" --title "Veyra ${RELEASE_TAG#v}" \
             --notes-file RELEASE_NOTES.md
