@@ -75,6 +75,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -141,7 +142,9 @@ public final class VeyraRenderer {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:in|attribute)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_OTHER_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|out)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern POST_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
+    private static final Pattern POST_VERTEX_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
     private static final Pattern POST_VERTEX_MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
     private static final Pattern POST_VERTEX_LEGACY_ATTRIBUTES = Pattern.compile(
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
@@ -1559,10 +1562,13 @@ public final class VeyraRenderer {
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
         for (ShaderPack.Program source : sources) {
             List<PipelineProgram> outputs = new ArrayList<>();
-            String vertexSource = source.vertexSource()
-                    .map(shader -> adaptPostVertexShader(shader, source.name()))
-                    .orElse(null);
-            for (AdaptedShader adapted : adaptShader(source.source())) {
+            List<String> vertexUniforms = source.vertexSource()
+                    .map(shader -> readPostVertexUniforms(shader, source.name()))
+                    .orElse(List.of());
+            for (AdaptedShader adapted : adaptShader(source.source(), vertexUniforms)) {
+                String vertexSource = source.vertexSource()
+                        .map(shader -> adaptPostVertexShader(shader, source.name(), adapted.uniforms()))
+                        .orElse(null);
                 String variantName = source.name() + "_colortex" + adapted.outputTarget();
                 PipelineProgram program = pipelineProgram(variantName, adapted, vertexSource);
                 compilePipeline(program);
@@ -1637,7 +1643,80 @@ public final class VeyraRenderer {
         }
     }
 
-    private static String adaptPostVertexShader(String source, String programName) {
+    private static List<String> readPostVertexUniforms(String source, String programName) {
+        if (source == null || source.isBlank()) {
+            throw new IllegalArgumentException(programName + ".vsh is empty.");
+        }
+        if (source.length() > 1024 * 1024) {
+            throw new IllegalArgumentException(programName + ".vsh exceeds the 1 MiB size limit.");
+        }
+
+        String uncommented = COMMENTS.matcher(source.replace("\uFEFF", "")).replaceAll("");
+        Matcher matcher = POST_VERTEX_UNIFORM_DECLARATION.matcher(uncommented);
+        Set<String> declaredUniforms = new HashSet<>();
+        while (matcher.find()) {
+            String type = matcher.group(1);
+            String name = matcher.group(2);
+            String supportedType = shaderPackUniformType(name);
+            if (supportedType == null) {
+                throw new IllegalArgumentException(programName + ".vsh declares unsupported custom uniform '" + name + "'.");
+            }
+            boolean validType = BOOLEAN_UNIFORMS.contains(name)
+                    ? type.equals("bool") || type.equals("int")
+                    : type.equals(supportedType);
+            if (!validType) {
+                throw new IllegalArgumentException(programName + ".vsh uniform '" + name
+                        + "' must use " + (BOOLEAN_UNIFORMS.contains(name) ? "bool or int" : supportedType) + ".");
+            }
+            if (!declaredUniforms.add(name)) {
+                throw new IllegalArgumentException(programName + ".vsh declares uniform '" + name + "' more than once.");
+            }
+        }
+        String withoutSupportedUniforms = POST_VERTEX_UNIFORM_DECLARATION.matcher(uncommented).replaceAll("");
+        if (UNSUPPORTED_VERTEX_UNIFORM_DECLARATION.matcher(withoutSupportedUniforms).find()) {
+            throw new IllegalArgumentException(programName
+                    + ".vsh uses an unsupported uniform declaration; only Veyra's built-in shader-pack uniforms are available.");
+        }
+        return SUPPORTED_UNIFORMS.stream().filter(declaredUniforms::contains).toList();
+    }
+
+    private static String shaderPackUniformType(String uniform) {
+        if (MATRIX_UNIFORMS.contains(uniform)) {
+            return "mat4";
+        }
+        if (IVECTOR3_UNIFORMS.contains(uniform)) {
+            return "ivec3";
+        }
+        if (VECTOR3_UNIFORMS.contains(uniform)) {
+            return "vec3";
+        }
+        if (INTEGER_UNIFORMS.contains(uniform)) {
+            return "int";
+        }
+        return SUPPORTED_UNIFORMS.contains(uniform) ? "float" : null;
+    }
+
+    private static void appendShaderPackUniformBlock(StringBuilder source, List<String> uniforms) {
+        if (uniforms.isEmpty()) {
+            return;
+        }
+        source.append("layout(std140) uniform ").append(SHADERPACK_UNIFORMS).append(" {\n");
+        for (String uniform : uniforms) {
+            String type = shaderPackUniformType(uniform);
+            // VulkanMod's shader parser rejects bool members in uniform blocks, so expose them through int fields.
+            String memberName = BOOLEAN_UNIFORMS.contains(uniform) ? "veyra_" + uniform : uniform;
+            source.append("    ").append(type).append(' ').append(memberName).append(";\n");
+        }
+        source.append("};\n");
+        for (String uniform : uniforms) {
+            if (BOOLEAN_UNIFORMS.contains(uniform)) {
+                source.append("#define ").append(uniform).append(" (veyra_")
+                        .append(uniform).append(" != 0)\n");
+            }
+        }
+    }
+
+    private static String adaptPostVertexShader(String source, String programName, List<String> uniforms) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException(programName + ".vsh is empty.");
         }
@@ -1655,17 +1734,19 @@ public final class VeyraRenderer {
         body = VERSION_DIRECTIVE.matcher(body).replaceAll("");
         body = Pattern.compile("(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)")
                 .matcher(body).replaceAll("");
+        body = COMMENTS.matcher(body).replaceAll("");
 
-        String uncommented = COMMENTS.matcher(body).replaceAll("");
-        if (POST_VERTEX_UNIFORM_DECLARATION.matcher(uncommented).find()) {
+        if (UNSUPPORTED_VERTEX_UNIFORM_DECLARATION.matcher(POST_VERTEX_UNIFORM_DECLARATION.matcher(body).replaceAll(""))
+                .find()) {
             throw new IllegalArgumentException(programName
-                    + ".vsh custom uniforms are not supported yet; use the provided full-screen triangle inputs.");
+                    + ".vsh uses an unsupported uniform declaration; only Veyra's built-in shader-pack uniforms are available.");
         }
-        if (POST_VERTEX_INPUT_DECLARATION.matcher(uncommented).find()) {
+        body = POST_VERTEX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
+        if (POST_VERTEX_INPUT_DECLARATION.matcher(body).find()) {
             throw new IllegalArgumentException(programName
                     + ".vsh vertex attributes are not available in Veyra's full-screen triangle bridge.");
         }
-        if (POST_VERTEX_LEGACY_ATTRIBUTES.matcher(uncommented).find()) {
+        if (POST_VERTEX_LEGACY_ATTRIBUTES.matcher(body).find()) {
             throw new IllegalArgumentException(programName
                     + ".vsh uses legacy vertex attributes or matrices that Veyra does not provide for post passes.");
         }
@@ -1692,7 +1773,7 @@ public final class VeyraRenderer {
         if (outputCount > 1) {
             throw new IllegalArgumentException(programName + ".vsh can declare only one texture-coordinate output.");
         }
-        if (POST_VERTEX_OTHER_OUTPUT_DECLARATION.matcher(COMMENTS.matcher(body).replaceAll("")).find()) {
+        if (POST_VERTEX_OTHER_OUTPUT_DECLARATION.matcher(body).find()) {
             throw new IllegalArgumentException(programName
                     + ".vsh declares unsupported outputs; use only vec2 texcoord or vec2 texCoord.");
         }
@@ -1711,9 +1792,9 @@ public final class VeyraRenderer {
                 .replaceAll("\\btexcoord\\b", "texCoord")
                 .replaceAll("texture2D\\s*\\(", "texture(");
 
-        return """
-                #version 450
-                %s
+        StringBuilder adapted = new StringBuilder("#version 450\n").append(extensions);
+        appendShaderPackUniformBlock(adapted, uniforms);
+        return adapted.append("""
                 out vec2 texCoord;
                 vec2 veyraFullscreenUv() {
                     return vec2((gl_VertexIndex << 1) & 2, 1.0 - (gl_VertexIndex & 2));
@@ -1722,8 +1803,7 @@ public final class VeyraRenderer {
                     vec2 uv = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
                     return vec4(uv * 2.0 - 1.0, 0.0, 1.0);
                 }
-                %s
-                """.formatted(extensions, body);
+                """).append(body).toString();
     }
 
     private static TerrainPipelineSet compileTerrainPipelines(ShaderPack pack) throws IOException {
@@ -3071,7 +3151,7 @@ public final class VeyraRenderer {
         return builder.build();
     }
 
-    private static List<AdaptedShader> adaptShader(String source) throws IOException {
+    private static List<AdaptedShader> adaptShader(String source, List<String> additionalUniforms) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException("Fragment shader is empty.");
         }
@@ -3105,7 +3185,7 @@ public final class VeyraRenderer {
         }
         String uniformSource = body;
         List<String> uniforms = SUPPORTED_UNIFORMS.stream()
-                .filter(uniform -> containsIdentifier(uniformSource, uniform))
+                .filter(uniform -> containsIdentifier(uniformSource, uniform) || additionalUniforms.contains(uniform))
                 .toList();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(body).find()) {
             throw new IOException("Veyra only supports vec4 fragment output declarations.");
@@ -3167,26 +3247,7 @@ public final class VeyraRenderer {
                     adapted.append("vec4 veyraDiscardOutput").append(discarded).append(";\n");
                 }
             }
-            if (!uniforms.isEmpty()) {
-                adapted.append("layout(std140) uniform ").append(SHADERPACK_UNIFORMS).append(" {\n");
-                for (String uniform : uniforms) {
-                    String type = MATRIX_UNIFORMS.contains(uniform) ? "mat4"
-                            : IVECTOR3_UNIFORMS.contains(uniform) ? "ivec3"
-                            : VECTOR3_UNIFORMS.contains(uniform) ? "vec3"
-                            : INTEGER_UNIFORMS.contains(uniform) ? "int" : "float";
-                    // VulkanMod's shader parser rejects bool members in uniform blocks, so expose them through int fields.
-                    String memberName = BOOLEAN_UNIFORMS.contains(uniform) ? "veyra_" + uniform : uniform;
-                    adapted.append("    ").append(type)
-                            .append(' ').append(memberName).append(";\n");
-                }
-                adapted.append("};\n");
-                for (String uniform : uniforms) {
-                    if (BOOLEAN_UNIFORMS.contains(uniform)) {
-                        adapted.append("#define ").append(uniform).append(" (veyra_")
-                                .append(uniform).append(" != 0)\n");
-                    }
-                }
-            }
+            appendShaderPackUniformBlock(adapted, uniforms);
             adapted.append("uniform sampler2D InSampler;\n")
                     .append("#define colortex0 InSampler\n")
                     .append("#define Sampler0 InSampler\n")
