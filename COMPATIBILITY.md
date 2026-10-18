@@ -13,6 +13,8 @@ Adapter checks attempted terrain, water, entity/block/hand-family and cloud frag
 
 The exact source URLs and SHA-512 checksums are in [validation/shaderpack-inputs.json](validation/shaderpack-inputs.json). The machine-readable results, including rejection messages and dimensions, are in [validation/shaderpack-source-audit.json](validation/shaderpack-source-audit.json). These files contain metadata only; packs remain under their authors' licenses. The archives are not included in Veyra.
 
+All declared quality profiles were additionally source-audited in each dimension: 24 cases each for Complementary Reimagined/Unbound and 15 for BSL, or 63 cases total. All 4,429 inventoried stage sources preprocessed. No tested geometry fragment passed the adapter checks. Nine cases in each Complementary edition enable the unsupported shadowcomp compute stage. BSL's five quality profiles kept that stage disabled. Sildur's declares no profiles in this input. [Profile audit results](validation/shaderpack-profile-audit.json) record every case. This covers declared profiles, not arbitrary combinations of individual options, and still provides no visual validation.
+
 ## Reproduce source checks
 
 Download the exact input versions legally from their source and verify the recorded checksums. With JDK 21, run:
@@ -24,7 +26,7 @@ Download the exact input versions legally from their source and verify the recor
 ./gradlew auditShaderPacks -PshaderPacks=--profile=PROFILE_NAME,/absolute/path/pack.zip
 ```
 
-The profile audit option selects one declared profile. The recorded matrix tests defaults only; it does not establish that all profiles/options preprocess or render correctly.
+The profile audit option selects one declared profile. The default matrix and separate profile report distinguish those selections; neither establishes that arbitrary options or complete pipelines render correctly.
 
 ## Remaining release checks
 
