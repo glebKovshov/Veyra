@@ -1,6 +1,7 @@
 package dev.veyra.vulkan;
 
 import dev.veyra.shader.FragmentOutputs;
+import dev.veyra.shader.GeometryBlendSettings;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.mixin.accessor.RendererFramebufferAccessor;
 import dev.veyra.mixin.accessor.NativePipelineRegistryAccessor;
@@ -25,26 +26,31 @@ import static org.lwjgl.vulkan.VK10.*;
 /** Routes registered geometry programs without changing vanilla/offscreen pipeline targets. */
 public final class VeyraGeometryTargets {
     private static final Map<GraphicsPipeline, FragmentOutputs> layouts = new IdentityHashMap<>();
+    private static final Map<GraphicsPipeline, GeometryBlendSettings> blends = new IdentityHashMap<>();
     private static final Map<Key, VeyraMrtFramebuffer> framebuffers = new HashMap<>();
     private static final Map<Framebuffer, RenderPass> resumePasses = new IdentityHashMap<>();
     private static Framebuffer scene;
     private VeyraGeometryTargets() { }
 
-    public static void register(GraphicsPipeline pipeline, FragmentOutputs layout) {
+    public static void register(GraphicsPipeline pipeline, FragmentOutputs layout, GeometryBlendSettings blend) {
         if (layout.targets().size() > VeyraDeviceFeatures.maxColorAttachments)
             throw new IllegalStateException("This geometry program exceeds the Vulkan device's color attachment limit.");
         if (!VeyraDeviceFeatures.independentBlendEnabled && layout.variables().size() != layout.targets().size())
             throw new IllegalStateException("Sparse geometry output masks require Vulkan independentBlend support.");
-        if (!layout.sceneOnly()) layouts.put(pipeline, layout);
+        if (!VeyraDeviceFeatures.independentBlendEnabled && layout.targets().size() > 1 && !blend.targets().isEmpty())
+            throw new IllegalStateException("Per-buffer geometry blend properties require Vulkan independentBlend support.");
+        layouts.put(pipeline, layout);
+        blends.put(pipeline, blend);
     }
     public static FragmentOutputs layout(GraphicsPipeline pipeline) { return layouts.get(pipeline); }
-    public static void unregister(GraphicsPipeline pipeline) { layouts.remove(pipeline); }
+    public static GeometryBlendSettings blend(GraphicsPipeline pipeline) { return blends.get(pipeline); }
+    public static void unregister(GraphicsPipeline pipeline) { layouts.remove(pipeline); blends.remove(pipeline); }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
         Renderer renderer = Renderer.getInstance();
         FragmentOutputs layout = layouts.get(pipeline);
         Framebuffer bound = renderer.getBoundFramebuffer();
-        if (layout == null) {
+        if (layout == null || layout.sceneOnly()) {
             if (bound instanceof VeyraMrtFramebuffer) resumeScene(renderer);
             return;
         }

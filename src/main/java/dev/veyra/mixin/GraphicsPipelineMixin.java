@@ -42,12 +42,19 @@ public abstract class GraphicsPipelineMixin implements VeyraPipelinePassCache {
     private VkPipelineColorBlendStateCreateInfo veyra$colorAttachments(VkPipelineColorBlendStateCreateInfo info,
             VkPipelineColorBlendAttachmentState.Buffer original, PipelineState state) {
         var pass = ((PipelineStateAccessor) state).veyra$getRenderPass();
-        if (pass == null || !(pass.getFramebuffer() instanceof VeyraMrtFramebuffer target)) return info.pAttachments(original);
-        var attachments = VkPipelineColorBlendAttachmentState.calloc(target.colors().size(), MemoryStack.stackGet());
         var layout = VeyraGeometryTargets.layout((GraphicsPipeline) (Object) this);
+        var blending = VeyraGeometryTargets.blend((GraphicsPipeline) (Object) this);
+        int count = pass != null && pass.getFramebuffer() instanceof VeyraMrtFramebuffer target ? target.colors().size() : original.remaining();
+        if (layout == null) return info.pAttachments(original);
+        var attachments = VkPipelineColorBlendAttachmentState.calloc(count, MemoryStack.stackGet());
         for (int i = 0; i < attachments.capacity(); i++) {
             attachments.get(i).set(original.get(0));
-            if (layout != null && !layout.writes(i)) attachments.get(i).colorWriteMask(0);
+            if (!layout.writes(i)) attachments.get(i).colorWriteMask(0);
+            var mode = blending.forTarget(layout.targets().get(i));
+            if (mode != null) attachments.get(i).blendEnable(mode.enabled())
+                    .srcColorBlendFactor(mode.sourceColor()).dstColorBlendFactor(mode.destinationColor())
+                    .srcAlphaBlendFactor(mode.sourceAlpha()).dstAlphaBlendFactor(mode.destinationAlpha())
+                    .colorBlendOp(VK10.VK_BLEND_OP_ADD).alphaBlendOp(VK10.VK_BLEND_OP_ADD);
         }
         return info.pAttachments(attachments);
     }

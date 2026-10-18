@@ -849,6 +849,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
+    public GeometryBlendSettings readGeometryBlendSettings(String program) throws IOException {
+        return GeometryBlendSettings.read(ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse("")), program);
+    }
+
     /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
     public void validatePipelineCapabilities() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
