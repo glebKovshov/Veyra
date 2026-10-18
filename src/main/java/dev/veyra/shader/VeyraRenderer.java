@@ -270,6 +270,7 @@ public final class VeyraRenderer {
     private static FrameMatrices frameMatrices = FrameMatrices.IDENTITY;
     private static boolean frameMatricesInitialized;
     private static final Map<String, MappedBuffer> SHADER_PACK_MATRIX_BUFFERS = new HashMap<>();
+    private static final Map<String, MappedBuffer> SHADER_PACK_VECTOR_BUFFERS = new HashMap<>();
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
     private static boolean cameraUniformsInitialized;
     private static volatile FrameUniforms shaderPackFrameUniforms = FrameUniforms.ZERO;
@@ -384,6 +385,8 @@ public final class VeyraRenderer {
         for (TerrainShaderAdapter.ShaderUniform uniform : TerrainShaderAdapter.shaderPackUniforms()) {
             if (uniform.sourceType().equals("float")) {
                 Uniforms.vec1f_uniformMap.put(uniform.name(), () -> shaderPackFloatUniform(uniform.name()));
+            } else if (uniform.sourceType().equals("vec3")) {
+                registerShaderPackVectorUniform(uniform.name());
             } else if (uniform.sourceType().equals("mat4")) {
                 registerShaderPackMatrixUniform(uniform.name());
             } else {
@@ -395,6 +398,30 @@ public final class VeyraRenderer {
             }
         }
         shaderPackUniformsRegistered = true;
+    }
+
+    private static void registerShaderPackVectorUniform(String name) {
+        MappedBuffer buffer = new MappedBuffer(4 * Float.BYTES);
+        SHADER_PACK_VECTOR_BUFFERS.put(name, buffer);
+        updateShaderPackVectorUniform(name, buffer, cameraUniforms);
+        Uniforms.vec3f_uniformMap.put(name, () -> buffer);
+    }
+
+    private static void updateShaderPackVectorUniforms(CameraUniforms uniforms) {
+        SHADER_PACK_VECTOR_BUFFERS.forEach((name, buffer) -> updateShaderPackVectorUniform(name, buffer, uniforms));
+    }
+
+    private static void updateShaderPackVectorUniform(String name, MappedBuffer buffer, CameraUniforms uniforms) {
+        Vector3f value = switch (name) {
+            case "cameraPosition" -> uniforms.cameraPosition();
+            case "cameraPositionFract" -> uniforms.cameraPositionFract();
+            case "previousCameraPosition" -> uniforms.previousCameraPosition();
+            case "previousCameraPositionFract" -> uniforms.previousCameraPositionFract();
+            default -> throw new IllegalArgumentException("Unknown shader pack vector uniform " + name + ".");
+        };
+        buffer.putFloat(0, value.x);
+        buffer.putFloat(Float.BYTES, value.y);
+        buffer.putFloat(Float.BYTES * 2, value.z);
     }
 
     private static void registerShaderPackMatrixUniform(String name) {
@@ -512,6 +539,7 @@ public final class VeyraRenderer {
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition());
         cameraUniformsInitialized = true;
+        updateShaderPackVectorUniforms(cameraUniforms);
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level != null && minecraft.player != null) {
             shaderPackFrameUniforms = updateFrameUniforms(minecraft);
