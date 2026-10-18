@@ -2009,13 +2009,13 @@ public final class VeyraRenderer {
                     if (!(color instanceof VkGpuTexture texture)) throw new IllegalStateException("Shaderpack input is not a Vulkan image.");
                     var image = texture.getVulkanImage();
                     if (Boolean.getBoolean("veyra.graphicsSmoke")) {
-                        VeyraClient.LOGGER.info("Sample transition: {} image={} layout-before={}",
-                                handle.get().getColorTexture().getLabel(), Long.toHexString(image.getId()), image.getCurrentLayout());
+                        VeyraClient.LOGGER.info("Sample transition: {} image={} layout-before={} command={}",
+                                handle.get().getColorTexture().getLabel(), Long.toHexString(image.getId()), image.getCurrentLayout(), Long.toHexString(Renderer.getCommandBuffer().address()));
                     }
                     image.transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                     if (Boolean.getBoolean("veyra.graphicsSmoke")) {
-                        VeyraClient.LOGGER.info("Sample transition complete: image={} layout-after={}",
-                                Long.toHexString(image.getId()), image.getCurrentLayout());
+                        VeyraClient.LOGGER.info("Sample transition complete: image={} layout-after={} command={}",
+                                Long.toHexString(image.getId()), image.getCurrentLayout(), Long.toHexString(Renderer.getCommandBuffer().address()));
                     }
                 }
             }
