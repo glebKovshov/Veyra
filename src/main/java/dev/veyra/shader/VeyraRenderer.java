@@ -216,6 +216,10 @@ public final class VeyraRenderer {
     private static PostPass depthTex2CapturePass;
     private static TerrainPipelineSet terrainPipelineSet;
     private static EntityPipelineSet entityPipelineSet;
+    private static EntityPipelineSet shadowEntityPipelineSet;
+    private static ShaderPack shadowEntityPipelinePack;
+    private static boolean shadowEntityPipelineAttempted;
+    private static boolean shadowEntityRoutingLogged;
     private static EntityPipelineSet blockEntityPipelineSet;
     private static EntityPipelineSet handPipelineSet;
     private static ParticlePipelineSet particlePipelineSet;
@@ -565,6 +569,11 @@ public final class VeyraRenderer {
             return originalType;
         }
         RenderPipeline original = originalType.pipeline();
+        if (VeyraShadowRenderer.isRendering()) {
+            RenderPipeline shadowPipeline = getShadowEntityPipeline(original);
+            return shadowPipeline == null ? originalType
+                    : replaceRenderTypePipeline(originalType, shadowPipeline, "_veyra_shadow_block");
+        }
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.supportsBlockEntityPipeline() || !isEntityRenderPipeline(original)) {
             return originalType;
@@ -592,6 +601,11 @@ public final class VeyraRenderer {
                     original.getLocation(), resolveBlockEntityProgram(pack, original), pack.name());
             blockEntityPipelineRoutingLogged = true;
         }
+        return replaceRenderTypePipeline(originalType, replacement, "_veyra_block");
+    }
+
+    private static RenderType replaceRenderTypePipeline(RenderType originalType,
+                                                        RenderPipeline replacement, String suffix) {
         RenderSetup originalSetup = ((RenderTypeAccessor) (Object) originalType).veyra$getSetup();
         RenderSetupAccessor setup = (RenderSetupAccessor) (Object) originalSetup;
         RenderSetup replacementSetup = RenderSetupAccessor.veyra$create(replacement,
@@ -599,7 +613,7 @@ public final class VeyraRenderer {
                 setup.veyra$getLayeringTransform(), setup.veyra$getOutputTarget(),
                 setup.veyra$getTextureTransform(), setup.veyra$getOutlineProperty(),
                 setup.veyra$getAffectsCrumbling(), setup.veyra$getSortOnUpload(), setup.veyra$getBufferSize());
-        return RenderTypeAccessor.veyra$create(originalType.toString() + "_veyra_block", replacementSetup);
+        return RenderTypeAccessor.veyra$create(originalType.toString() + suffix, replacementSetup);
     }
 
     private static boolean isHandRendering() {
@@ -673,6 +687,9 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getEntityPipeline(RenderPipeline original) {
+        if (VeyraShadowRenderer.isRendering()) {
+            return getShadowEntityPipeline(original);
+        }
         ShaderPack pack = selectedPack().orElse(null);
         if (isHandRendering() || pack == null || !pack.hasEntityFragment() || !isEntityRenderPipeline(original)) {
             return null;
@@ -691,6 +708,40 @@ public final class VeyraRenderer {
             }
         }
         return entityPipelineSet == null ? null : entityPipelineSet.pipelines().get(original);
+    }
+
+    private static RenderPipeline getShadowEntityPipeline(RenderPipeline original) {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.hasShadowFragment() || !isEntityRenderPipeline(original)) {
+            return null;
+        }
+        if (shadowEntityPipelinePack != pack) {
+            shadowEntityPipelinePack = pack;
+            shadowEntityPipelineSet = null;
+            shadowEntityPipelineAttempted = false;
+            shadowEntityRoutingLogged = false;
+        }
+        if (!shadowEntityPipelineAttempted) {
+            shadowEntityPipelineAttempted = true;
+            try {
+                shadowEntityPipelineSet = compileShadowEntityPipelines(pack);
+                VeyraClient.LOGGER.info("Loaded {} opaque entity and block entity shadow pipelines from shader pack '{}'.",
+                        shadowEntityPipelineSet.pipelines().size(), pack.name());
+                lastError = "";
+            } catch (Exception exception) {
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not load entity and block entity shadow programs from shader pack '{}'.",
+                        pack.name(), exception);
+            }
+        }
+        RenderPipeline replacement = shadowEntityPipelineSet == null
+                ? null : shadowEntityPipelineSet.pipelines().get(original);
+        if (replacement != null && !shadowEntityRoutingLogged) {
+            VeyraClient.LOGGER.info("Rendering opaque entities and block entities with the shadow fragment from shader pack '{}'.",
+                    pack.name());
+            shadowEntityRoutingLogged = true;
+        }
+        return replacement;
     }
 
     public static RenderPipeline getHandPipeline(RenderPipeline original) {
@@ -1660,6 +1711,50 @@ public final class VeyraRenderer {
         return new EntityPipelineSet(pipelines);
     }
 
+    private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack) throws IOException {
+        String fragmentSource = pack.readShadowFragment()
+                .orElseThrow(() -> new IOException("The pack no longer contains shadow.fsh."));
+        fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, "shadow");
+        String sourceHash = sha256("shadow_entities\n" + fragmentSource);
+        Identifier fragmentShader = Identifier.fromNamespaceAndPath(
+                "veyra", "shaderpack/shadow_entities/" + sourceHash);
+        String adaptedFragment = fragmentSource;
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+        ShaderSource source = (identifier, type) -> {
+            if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
+                return adaptedFragment;
+            }
+            return shaderManager.getShader(identifier, type);
+        };
+
+        List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
+                .filter(VeyraRenderer::isEntityRenderPipeline)
+                .filter(pipeline -> pipeline.getBlendFunction().isEmpty())
+                .toList();
+        Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        for (RenderPipeline original : candidates) {
+            EntityPipelineKey cacheKey = new EntityPipelineKey(original, "shadow_entities", sourceHash);
+            RenderPipeline shadowPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
+            if (shadowPipeline == null) {
+                Identifier location = Identifier.fromNamespaceAndPath("veyra",
+                        "pipeline/shadow_entities/" + sourceHash + "/"
+                                + original.getLocation().getPath().replace('/', '_'));
+                shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
+                CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
+                if (!compiled.isValid()) {
+                    throw new IOException("VulkanMod could not compile " + original.getLocation()
+                            + " with the selected shadow shader.");
+                }
+                ENTITY_PIPELINE_CACHE.put(cacheKey, shadowPipeline);
+            }
+            pipelines.put(original, shadowPipeline);
+        }
+        if (pipelines.isEmpty()) {
+            throw new IOException("Minecraft's entity render pipelines were not found for the shadow pass.");
+        }
+        return new EntityPipelineSet(pipelines);
+    }
+
     private static EntityPipelineSet compileBlockEntityPipelines(ShaderPack pack) throws IOException {
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isEntityRenderPipeline)
@@ -2393,6 +2488,40 @@ public final class VeyraRenderer {
         if (original.getColorLogic() != null) {
             builder.withColorLogic(original.getColorLogic());
         }
+        ShaderDefines defines = original.getShaderDefines();
+        defines.values().forEach((name, value) -> {
+            try {
+                builder.withShaderDefine(name, Integer.parseInt(value));
+            } catch (NumberFormatException exception) {
+                builder.withShaderDefine(name, Float.parseFloat(value));
+            }
+        });
+        defines.flags().forEach(builder::withShaderDefine);
+        original.getSamplers().forEach(builder::withSampler);
+        for (RenderPipeline.UniformDescription uniform : original.getUniforms()) {
+            if (uniform.type() == UniformType.TEXEL_BUFFER) {
+                builder.withUniform(uniform.name(), uniform.type(), uniform.textureFormat());
+            } else {
+                builder.withUniform(uniform.name(), uniform.type());
+            }
+        }
+        return builder.build();
+    }
+
+    private static RenderPipeline copyShadowPipelineWithFragment(
+            RenderPipeline original, Identifier location, Identifier fragmentShader) {
+        RenderPipeline.Builder builder = RenderPipeline.builder()
+                .withLocation(location)
+                .withVertexShader(original.getVertexShader())
+                .withFragmentShader(fragmentShader)
+                .withDepthTestFunction(original.getDepthTestFunction())
+                .withPolygonMode(original.getPolygonMode())
+                .withCull(false)
+                .withColorWrite(false, false)
+                .withDepthWrite(true)
+                .withVertexFormat(original.getVertexFormat(), original.getVertexFormatMode())
+                .withDepthBias(original.getDepthBiasScaleFactor(), original.getDepthBiasConstant());
+
         ShaderDefines defines = original.getShaderDefines();
         defines.values().forEach((name, value) -> {
             try {

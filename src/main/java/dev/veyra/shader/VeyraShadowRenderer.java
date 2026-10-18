@@ -1,15 +1,22 @@
 package dev.veyra.shader;
 
 import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.veyra.VeyraClient;
 import dev.veyra.mixin.accessor.CameraAccessor;
-import dev.veyra.vulkan.VeyraDepthTextureView;
 import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
+import net.minecraft.client.renderer.state.LevelRenderState;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.render.chunk.WorldRenderer;
-import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
@@ -18,15 +25,18 @@ import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import net.vulkanmod.vulkan.util.MappedBuffer;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_STORE_OP_STORE;
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-/** Renders VulkanMod's opaque chunk layers into an Iris-compatible shadow depth map. */
+/** Renders VulkanMod terrain, entity, and block entity geometry into an Iris-compatible shadow map. */
 public final class VeyraShadowRenderer {
     private static final MappedBuffer SHADOW_MODEL_VIEW_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final MappedBuffer SHADOW_PROJECTION_BUFFER = new MappedBuffer(16 * Float.BYTES);
@@ -36,8 +46,12 @@ public final class VeyraShadowRenderer {
     private static TextureTarget target;
     private static Framebuffer framebuffer;
     private static RenderPass renderPass;
-    private static VeyraDepthTextureView depthTextureView;
+    private static GpuTextureView depthTextureView;
+    private static RenderBuffers shadowRenderBuffers;
+    private static SubmitNodeStorage shadowSubmitNodeStorage;
+    private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
     private static boolean rendering;
+    private static boolean renderingFeatures;
     private static ShadowSettings shadowSettings = ShadowSettings.DEFAULT;
 
     static {
@@ -56,6 +70,18 @@ public final class VeyraShadowRenderer {
 
     public static boolean isRendering() {
         return rendering;
+    }
+
+    public static boolean isRenderingFeatures() {
+        return renderingFeatures;
+    }
+
+    public static GpuTextureView shadowColorTextureView() {
+        return target == null ? null : target.getColorTextureView();
+    }
+
+    public static GpuTextureView shadowDepthTextureView() {
+        return target == null ? null : target.getDepthTextureView();
     }
 
     public static Matrix4f shadowModelView() {
@@ -78,7 +104,8 @@ public final class VeyraShadowRenderer {
         shadowSettings = settings;
     }
 
-    public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection) {
+    public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
+                              DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.hasShadowPass()) {
             shadowModelView.identity();
@@ -126,9 +153,15 @@ public final class VeyraShadowRenderer {
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
             worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.CUTOUT,
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
+            renderer.endRenderPass();
+            shadowRenderPassStarted = false;
+            renderEntityAndBlockEntityGeometry(camera, deltaTracker, levelRenderState,
+                    shadowFrustum, cameraPosition, shadowModelView, shadowProjection,
+                    mainModelView, mainProjection, worldRenderer);
         } catch (Exception exception) {
             VeyraClient.LOGGER.error("Could not render the shader pack shadow map.", exception);
         } finally {
+            renderingFeatures = false;
             rendering = false;
             if (shadowRenderPassStarted) {
                 renderer.endRenderPass();
@@ -153,10 +186,7 @@ public final class VeyraShadowRenderer {
             rendering = false;
         }
         VRenderSystem.setShaderTexture(3, null);
-        if (depthTextureView != null) {
-            depthTextureView.close();
-            depthTextureView = null;
-        }
+        depthTextureView = null;
         if (framebuffer != null) {
             framebuffer.cleanUp(false);
             framebuffer = null;
@@ -169,6 +199,7 @@ public final class VeyraShadowRenderer {
             target.destroyBuffers();
             target = null;
         }
+        releaseFeatureDispatcher();
         shadowModelView.identity();
         shadowProjection.identity();
         writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
@@ -185,8 +216,8 @@ public final class VeyraShadowRenderer {
         }
         target = new TextureTarget("Veyra shadow map", shadowSettings.resolution(),
                 shadowSettings.resolution(), true);
-        VkGpuTexture colorTexture = (VkGpuTexture) target.getColorTexture();
-        VkGpuTexture depthTexture = (VkGpuTexture) target.getDepthTexture();
+        var colorTexture = (net.vulkanmod.render.engine.VkGpuTexture) target.getColorTexture();
+        var depthTexture = (net.vulkanmod.render.engine.VkGpuTexture) target.getDepthTexture();
         framebuffer = Framebuffer.builder(colorTexture.getVulkanImage(), depthTexture.getVulkanImage()).build();
         RenderPass.Builder passBuilder = RenderPass.builder(framebuffer);
         passBuilder.getColorAttachmentInfo().setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -194,7 +225,89 @@ public final class VeyraShadowRenderer {
                 .setOps(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE)
                 .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         renderPass = passBuilder.build();
-        depthTextureView = new VeyraDepthTextureView(depthTexture);
+        // The target owns this view. Sampling its native depth view avoids creating a second
+        // Vulkan view object for the same image, which can upset VulkanMod's descriptor binding.
+        depthTextureView = target.getDepthTextureView();
+    }
+
+    private static void renderEntityAndBlockEntityGeometry(
+            Camera camera, DeltaTracker deltaTracker, LevelRenderState levelRenderState,
+            Frustum shadowFrustum, Vec3 cameraPosition, Matrix4f modelView, Matrix4f projection,
+            Matrix4f mainModelView, Matrix4f mainProjection, WorldRenderer worldRenderer) {
+        Minecraft minecraft = Minecraft.getInstance();
+        RenderBuffers buffers = minecraft.renderBuffers();
+        ensureFeatureDispatcher(minecraft, buffers);
+
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        Matrix4f savedModelView = new Matrix4f(modelViewStack);
+        PoseStack poseStack = new PoseStack();
+        SubmitNodeStorage submits = shadowSubmitNodeStorage;
+        Set<Object> submittedEntities = new HashSet<>();
+        try {
+            modelViewStack.identity().mul(modelView);
+            VRenderSystem.applyMVP(modelView, projection);
+            renderingFeatures = true;
+
+            float tickDelta = deltaTracker.getGameTimeDeltaPartialTick(false);
+            var entityDispatcher = minecraft.getEntityRenderDispatcher();
+            entityDispatcher.prepare(camera, minecraft.crosshairPickEntity);
+            for (var entity : minecraft.level.entitiesForRendering()) {
+                if (!entityDispatcher.shouldRender(entity, shadowFrustum,
+                        cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
+                    continue;
+                }
+                EntityRenderState state = entityDispatcher.extractEntity(entity, tickDelta);
+                entityDispatcher.submit(state, levelRenderState.cameraRenderState,
+                        state.x - cameraPosition.x, state.y - cameraPosition.y, state.z - cameraPosition.z,
+                        poseStack, submits);
+                submittedEntities.add(entity);
+            }
+
+            var player = minecraft.player;
+            if (player != null && submittedEntities.add(player)
+                    && entityDispatcher.shouldRender(player, shadowFrustum,
+                    cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
+                EntityRenderState state = entityDispatcher.extractEntity(player, tickDelta);
+                entityDispatcher.submit(state, levelRenderState.cameraRenderState,
+                        state.x - cameraPosition.x, state.y - cameraPosition.y, state.z - cameraPosition.z,
+                        poseStack, submits);
+            }
+
+            worldRenderer.renderBlockEntities(poseStack, levelRenderState, submits,
+                    new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
+            shadowFeatureRenderDispatcher.renderAllFeatures();
+            buffers.bufferSource().endBatch();
+            shadowFeatureRenderDispatcher.endFrame();
+        } finally {
+            submits.clear();
+            renderingFeatures = false;
+            modelViewStack.set(savedModelView);
+            VRenderSystem.applyMVP(mainModelView, mainProjection);
+        }
+    }
+
+    private static void ensureFeatureDispatcher(Minecraft minecraft, RenderBuffers buffers) {
+        if (shadowFeatureRenderDispatcher != null && shadowRenderBuffers == buffers) {
+            return;
+        }
+        releaseFeatureDispatcher();
+        shadowRenderBuffers = buffers;
+        shadowSubmitNodeStorage = new SubmitNodeStorage();
+        shadowFeatureRenderDispatcher = new FeatureRenderDispatcher(shadowSubmitNodeStorage,
+                minecraft.getBlockRenderer(), buffers.bufferSource(), minecraft.getAtlasManager(),
+                buffers.outlineBufferSource(), buffers.crumblingBufferSource(), minecraft.font);
+    }
+
+    private static void releaseFeatureDispatcher() {
+        if (shadowFeatureRenderDispatcher != null) {
+            shadowFeatureRenderDispatcher.close();
+            shadowFeatureRenderDispatcher = null;
+        }
+        if (shadowSubmitNodeStorage != null) {
+            shadowSubmitNodeStorage.clear();
+            shadowSubmitNodeStorage = null;
+        }
+        shadowRenderBuffers = null;
     }
 
     private static ShadowView createShadowView(float sunAngle, Vec3 cameraPosition) {
