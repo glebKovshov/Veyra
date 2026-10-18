@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "veyra_graphics_smoke",
+  "version": "0.0.0",
+  "name": "Veyra graphics integration harness",
+  "license": "MIT",
+  "environment": "client",
+  "mixins": ["veyra-graphics-smoke.mixins.json"],
+  "depends": {"fabricloader": ">=0.18.4", "minecraft": "1.21.11", "veyra": "*", "vulkanmod": "0.6.8"}
+}

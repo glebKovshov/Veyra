@@ -7,5 +7,5 @@ void main() {
     vec4 scene = texture2D(texture, texcoord) * glcolor;
     if (scene.a < 0.1) discard;
     gl_FragData[0] = scene;
-    gl_FragData[1] = vec4(scene.rgb * vec3(0.25, 1.0, 0.25), 1.0);
+    gl_FragData[1] = vec4(0.95, 0.02, 0.8, 1.0);
 }

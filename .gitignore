@@ -1,6 +1,9 @@
 .gradle/
 build/
 run/
+run-graphics-smoke/
+__pycache__/
+*.pyc
 *.iml
 .idea/
 .vscode/

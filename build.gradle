@@ -23,6 +23,7 @@ dependencies {
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modCompileOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
+    modRuntimeOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
     compileOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
     annotationProcessor 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
     implementation('org.anarres:jcpp:1.4.14') { transitive = false }
@@ -116,4 +117,28 @@ tasks.register('auditShaderPacks', JavaExec) {
     classpath = sourceSets.shaderSmoke.runtimeClasspath
     mainClass = 'dev.veyra.shader.ShaderPackAudit'
     if (project.hasProperty('shaderPacks')) args project.property('shaderPacks').toString().split(',')
+}
+
+// Development-only client integration harness; never included in the distributable mod.
+sourceSets {
+    graphicsSmoke {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+loom {
+    mods {
+        veyra { sourceSet sourceSets.main }
+        veyra_graphics_smoke { sourceSet sourceSets.graphicsSmoke }
+    }
+    runs {
+        graphicsSmoke {
+            client()
+            source = sourceSets.graphicsSmoke
+            runDir = 'run-graphics-smoke'
+            vmArgs '-Xmx3G', '-Dveyra.graphicsSmoke=true',
+                    "-Dveyra.graphicsSmoke.output=${layout.buildDirectory.dir('reports/graphics-smoke').get().asFile.absolutePath}"
+            programArgs '--quickPlaySingleplayer', 'VeyraValidation', '--width', '640', '--height', '360'
+        }
+    }
 }

@@ -1,0 +1,70 @@
+name: Graphics smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/iris-compatibility-0.2']
+    paths:
+      - '.github/workflows/graphics-smoke.yml'
+      - 'src/graphicsSmoke/**'
+      - 'scripts/prepare_graphics_smoke.py'
+      - 'src/main/**'
+      - 'examples/geometry-mrt/**'
+      - 'build.gradle'
+
+permissions:
+  contents: read
+
+jobs:
+  lavapipe-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install software Vulkan and validation layers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools vulkan-validationlayers xvfb libglfw3
+      - name: Prepare original validation world
+        run: python3 scripts/prepare_graphics_smoke.py
+      - name: Launch Minecraft with software Vulkan
+        shell: bash
+        env:
+          LP_NUM_THREADS: '2'
+          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+        run: |
+          set -o pipefail
+          export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
+          test -n "$VK_ICD_FILENAMES"
+          vulkaninfo --summary > vulkan-device.txt 2>&1
+          timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke 2>&1 | tee graphics-client.log
+      - name: Verify real frame readback and validation output
+        run: |
+          python3 - <<'PY'
+          import json,pathlib,re
+          result=json.loads(pathlib.Path('build/reports/graphics-smoke/result.json').read_text())
+          print(json.dumps(result,indent=2))
+          assert result['status']=='passed', result
+          text=pathlib.Path('graphics-client.log').read_text(errors='replace')
+          errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
+          pathlib.Path('build/reports/graphics-smoke/validation-errors.txt').write_text('\n'.join(errors))
+          assert not errors, 'Vulkan validation errors were reported; inspect the uploaded log'
+          PY
+      - name: Upload graphics evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics-smoke-evidence
+          path: |
+            build/reports/graphics-smoke/
+            run-graphics-smoke/logs/
+            run-graphics-smoke/crash-reports/
+            graphics-client.log
+            vulkan-device.txt
+          if-no-files-found: warn
+          retention-days: 14

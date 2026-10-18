@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "dev.veyra.smoke",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["GraphicsSmokeMixin"],
+  "injectors": {"defaultRequire": 1}
+}
