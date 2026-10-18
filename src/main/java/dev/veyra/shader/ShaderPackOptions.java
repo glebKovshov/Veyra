@@ -71,7 +71,7 @@ public final class ShaderPackOptions {
         Properties properties = loadProperties(propertySource);
         for (String property : properties.stringPropertyNames()) {
             if (!property.startsWith("profile.")) continue;
-            Matcher program = Pattern.compile("!?program\\.[A-Za-z0-9_]+").matcher(properties.getProperty(property));
+            Matcher program = Pattern.compile("!?program\\.(?:world(?:-1|0|1)/)?[A-Za-z0-9_]+").matcher(properties.getProperty(property));
             while (program.find()) {
                 String name = program.group().replace("!", "");
                 found.putIfAbsent(name, new Option(name, "true", List.of("false", "true"), true, false, "Profile program toggle"));

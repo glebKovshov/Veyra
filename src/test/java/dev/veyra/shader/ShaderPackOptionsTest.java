@@ -111,4 +111,32 @@ class ShaderPackOptionsTest {
         IOException error = assertThrows(IOException.class, () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
         assertTrue(error.getMessage().contains("SSBO CUSTOM_IMAGES"));
     }
+    @Test void brokenSelectedPackDoesNotHideOtherDiscoveredPacks() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("shaderpacks/broken/shaders"));
+        Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "screen=\\uBROKEN\n");
+        Path valid = Files.createDirectories(root.resolve("shaderpacks/valid/shaders"));
+        Files.writeString(valid.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.createDirectories(root.resolve("veyra"));
+        Files.writeString(root.resolve("veyra/selected-pack.txt"), "broken");
+        ShaderPackRepository repository = new ShaderPackRepository(root);
+        repository.scan();
+        assertEquals(2, repository.getPacks().size());
+        assertTrue(repository.getSelected().isEmpty());
+        repository.select(repository.getPacks().stream().filter(pack -> pack.name().equals("valid")).findFirst().orElseThrow());
+        assertEquals("valid", repository.getSelected().orElseThrow().name());
+    }
+    @Test void programConditionsAndProfileTogglesUseTheResolvedDimensionPath() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("pack/shaders/world0"));
+        Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(0.0);}\n");
+        Files.writeString(shader.getParent().resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.writeString(shader.getParent().resolve("shaders.properties"),
+                "program.final.enabled=false\nprogram.world0/final.enabled=true\nprofile.DISABLED=!program.world0/final\n");
+        ShaderPack pack = ShaderPack.inspect(shader.getParent().getParent());
+        assertEquals(1, pack.readPrograms().size());
+        assertTrue(pack.configured(Map.of(), -1).readPrograms().isEmpty());
+        Map<String, String> profile = pack.readOptions().profiles().get("DISABLED");
+        assertEquals("false", profile.get("program.world0/final"));
+        assertTrue(pack.configured(profile, 0).readPrograms().isEmpty());
+    }
 }

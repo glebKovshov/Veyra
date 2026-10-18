@@ -4,12 +4,12 @@ All results below are **source checks without a GPU**, using default pack settin
 
 | Pack | Version | Options / profiles discovered | Stages preprocessed, Overworld / Nether / End | Confirmed blockers | In-game result |
 | --- | --- | --- | --- | --- | --- |
-| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Active shadowcomp compute stage; geometry color samplers/IDs, arbitrary vertex programs and MRT | Not tested; incompatible pipeline |
-| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Active shadowcomp compute stage; geometry color samplers/IDs, arbitrary vertex programs and MRT | Not tested; incompatible pipeline |
-| BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | Active shadowcomp compute stage; noisetex/gaux2, extra varyings/uniforms and geometry MRT | Not tested; incompatible pipeline |
+| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Geometry color samplers/IDs, arbitrary vertex programs and MRT | Not tested; incompatible pipeline |
+| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Geometry color samplers/IDs, arbitrary vertex programs and MRT | Not tested; incompatible pipeline |
+| BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | Noisetex/gaux2, extra varyings/uniforms and geometry MRT | Not tested; incompatible pipeline |
 | Sildur's Vibrant | 2.02 Extreme | 115 / 0 | 42/42, 42/42, 42/42 | Geometry colortex4 sampler, cloud texture uniform and arbitrary geometry vertex programs | Not tested; incompatible pipeline |
 
-Adapter checks attempted terrain, water, entity/block/hand-family and cloud fragments; other bridges need VulkanMod pipeline-specific inputs. Accepted geometry fragment counts were zero in these default-setting runs. Compute counts inventory available stages; execution support has not been implemented. The capability preflight now refuses unsupported active stages before loading a replacement pack; this is an error report, not a compute implementation.
+Adapter checks attempted terrain, water, entity/block/hand-family and cloud fragments; other bridges need VulkanMod pipeline-specific inputs. Accepted geometry fragment counts were zero in these default-setting runs. Compute counts inventory available stages, including disabled programs; execution support has not been implemented. Dimension-specific program conditions disable the inventoried compute stages at these default settings. The capability preflight now refuses unsupported active stages before loading a replacement pack; this is an error report, not a compute implementation.
 
 The exact source URLs and SHA-512 checksums are in [validation/shaderpack-inputs.json](validation/shaderpack-inputs.json). The machine-readable results, including rejection messages and dimensions, are in [validation/shaderpack-source-audit.json](validation/shaderpack-source-audit.json). These files contain metadata only; packs remain under their authors' licenses. The archives are not included in Veyra.
 

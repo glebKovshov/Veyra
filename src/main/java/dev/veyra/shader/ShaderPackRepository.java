@@ -30,6 +30,13 @@ public final class ShaderPackRepository {
     public void scan() {
         try {
             refresh();
+        } catch (IOException exception) {
+            packs = List.of();
+            selected = null;
+            LOGGER.error("Could not scan shader pack directory {}", directory, exception);
+            return;
+        }
+        try {
             String selectedName = Files.exists(configFile) ? Files.readString(configFile, StandardCharsets.UTF_8).trim() : "";
             selected = packs.stream()
                     .filter(ShaderPack::supportsShaderPrograms)
@@ -38,9 +45,8 @@ public final class ShaderPackRepository {
                     .orElse(null);
             if (selected != null) selected = loadConfiguration(selected);
         } catch (IOException exception) {
-            packs = List.of();
             selected = null;
-            LOGGER.error("Could not scan shader pack directory {}", directory, exception);
+            LOGGER.error("Could not restore the selected shader pack; discovered packs remain available.", exception);
         }
     }
 

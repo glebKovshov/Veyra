@@ -894,13 +894,21 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private boolean isProgramEnabled(String program) throws IOException {
         Boolean cached = configuration.enabled(program);
         if (cached != null) return cached;
-        if (configuration.options().containsKey("program." + program)) {
-            boolean enabled = Boolean.parseBoolean(configuration.options().get("program." + program));
+        String resolved = program;
+        String dimensionProgram = "world" + configuration.dimension() + "/" + program;
+        for (String extension : List.of("fsh", "vsh", "csh", "gsh", "tcs", "tes")) {
+            if (readRawShader(dimensionProgram + "." + extension).isPresent()) {
+                resolved = dimensionProgram;
+                break;
+            }
+        }
+        if (configuration.options().containsKey("program." + resolved)) {
+            boolean enabled = Boolean.parseBoolean(configuration.options().get("program." + resolved));
             configuration.cacheEnabled(program, enabled);
             return enabled;
         }
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
-        String expression = properties.getProperty("program." + program + ".enabled");
+        String expression = properties.getProperty("program." + resolved + ".enabled");
         boolean enabled = expression == null || GlslPreprocessor.condition(expression, readOptions().effective(configuration.options()));
         configuration.cacheEnabled(program, enabled);
         return enabled;

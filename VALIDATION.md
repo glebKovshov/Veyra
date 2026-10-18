@@ -1,8 +1,8 @@
 # 0.2 development validation status
 
-Full Fabric Loom builds passed for commits `96d6c2e82b998a38d16455f6c20833e348ca0cfb` and `35c3fde204c8050c212bccb1dd4054f96a1b3cdc` ([latest phase integration run](https://github.com/glebKovshov/Veyra/actions/runs/39134690456)). Subsequent capability diagnostics, depth-clear fixes and packaging verification require another CI run.
+Full Fabric Loom builds passed for commits `96d6c2e82b998a38d16455f6c20833e348ca0cfb` and `35c3fde204c8050c212bccb1dd4054f96a1b3cdc` ([latest phase integration run](https://github.com/glebKovshov/Veyra/actions/runs/39134690456)). Capability diagnostics, depth-clear fixes and distributable verification also passed [CI run 39135233586](https://github.com/glebKovshov/Veyra/actions/runs/39135233586) at commit `bb08ede5a28d814059a6f0b61fa10bc20f8b1853`. The following dimension-condition and broken-selection regressions require a final CI run.
 
-- 55 local JUnit tests pass with no skips or failures, using production pack/preprocessor/adapter classes on JDK 21.
+- 57 local JUnit tests pass with no skips or failures, using production pack/preprocessor/adapter classes on JDK 21.
 - Native shaderc checks preprocess 18 bundled geometry shaders and compile 15 directly to Vulkan SPIR-V; four conditional-include compiler checks pass. This does not validate VulkanMod descriptor interfaces or full post/geometry pipeline execution.
 - Four external packs were source-audited in three dimensions: all inventoried stages preprocess at default settings. Geometry adapters reject the tested pack fragments. See COMPATIBILITY.md for exact results and reproducible input hashes.
 - The distributable verification script checks metadata, compiled mixin classes, refmap, settings screen, license notices and the Fabric-declared nested JCPP dependency. CI now uploads JUnit reports as well as the mod JAR.
