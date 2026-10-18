@@ -160,6 +160,11 @@ public final class VeyraRenderer {
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
     private static final Pattern DEPTH1_SAMPLER = Pattern.compile("\\bdepthtex1\\b");
     private static final Pattern DEPTH2_SAMPLER = Pattern.compile("\\bdepthtex2\\b");
+    private static final Pattern UNSUPPORTED_SHADOW_SAMPLER = Pattern.compile(
+            "\\b(?:shadowtex(?!0\\b)[A-Za-z0-9_]*|shadowcolor[A-Za-z0-9_]*)\\b");
+    private static final Pattern SHADOW_DEPTH_SAMPLER = Pattern.compile("\\bshadowtex0\\b");
+    private static final Pattern SHADOW_DEPTH_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+shadowtex0\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern DEPTH_SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+(?:depthtex0|DepthSampler)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern DEPTH1_SAMPLER_DECLARATION = Pattern.compile(
@@ -173,6 +178,8 @@ public final class VeyraRenderer {
     private static final String DEPTH1_INPUT_SAMPLER = DEPTH1_INPUT_NAME + "Sampler";
     private static final String DEPTH2_INPUT_NAME = "VeyraDepthTex2";
     private static final String DEPTH2_INPUT_SAMPLER = DEPTH2_INPUT_NAME + "Sampler";
+    private static final String SHADOW_DEPTH_INPUT_NAME = "VeyraShadowDepth";
+    private static final String SHADOW_DEPTH_INPUT_SAMPLER = SHADOW_DEPTH_INPUT_NAME + "Sampler";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
@@ -540,7 +547,7 @@ public final class VeyraRenderer {
                 .build();
         PipelineProgram program = new PipelineProgram(DEPTH1_CAPTURE_SHADER_ID,
                 DEPTH1_CAPTURE_FRAGMENT_SOURCE, BLIT_VERTEX_ID, null,
-                List.of(), true, false, false, Set.of(), 0, pipeline);
+                List.of(), true, false, false, false, Set.of(), 0, pipeline);
         compilePipeline(program);
         depthTex1CaptureProgram = program;
         return program;
@@ -1474,6 +1481,9 @@ public final class VeyraRenderer {
                 return;
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
+            if (pipelineSet.usesShadowSampler() && VeyraShadowRenderer.shadowDepthTextureView() == null) {
+                throw new IllegalStateException("The shader pack samples shadowtex0, but VulkanMod did not produce a shadow map.");
+            }
             ensureSwapTargets(mainTarget.width, mainTarget.height);
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
@@ -1559,13 +1569,14 @@ public final class VeyraRenderer {
         boolean usesDepthSampler = false;
         boolean usesDepth1Sampler = false;
         boolean usesDepth2Sampler = false;
+        boolean usesShadowSampler = false;
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
         for (ShaderPack.Program source : sources) {
             List<PipelineProgram> outputs = new ArrayList<>();
             List<String> vertexUniforms = source.vertexSource()
                     .map(shader -> readPostVertexUniforms(shader, source.name()))
                     .orElse(List.of());
-            for (AdaptedShader adapted : adaptShader(source.source(), vertexUniforms)) {
+            for (AdaptedShader adapted : adaptShader(source.source(), vertexUniforms, pack.hasShadowFragment())) {
                 String vertexSource = source.vertexSource()
                         .map(shader -> adaptPostVertexShader(shader, source.name(), adapted.uniforms()))
                         .orElse(null);
@@ -1576,6 +1587,7 @@ public final class VeyraRenderer {
                 usesDepthSampler |= adapted.usesDepthSampler();
                 usesDepth1Sampler |= adapted.usesDepth1Sampler();
                 usesDepth2Sampler |= adapted.usesDepth2Sampler();
+                usesShadowSampler |= adapted.usesShadowSampler();
                 adapted.colorSamplers().stream().filter(index -> index > 0).forEach(colorTargetIndices::add);
                 if (adapted.outputTarget() > 0) {
                     colorTargetIndices.add(adapted.outputTarget());
@@ -1592,7 +1604,7 @@ public final class VeyraRenderer {
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
             copyProgram = pipelineProgram("copy",
-                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, false, Set.of(), 0), null);
+                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, false, false, Set.of(), 0), null);
             compilePipeline(copyProgram);
         }
 
@@ -1609,7 +1621,8 @@ public final class VeyraRenderer {
                     ? firstPlan
                     : buildFramePlan(programs, copyProgram, width, height, secondPlanInputs);
             return new PipelineSet(firstPlan, secondPlan, width, height,
-                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, Map.copyOf(colorTargetSettings),
+                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler,
+                    Map.copyOf(colorTargetSettings),
                     Set.copyOf(colorTargetIndices));
         } catch (RuntimeException exception) {
             if (firstPlan != null) {
@@ -3019,6 +3032,9 @@ public final class VeyraRenderer {
                     if (program.usesDepth2Sampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH2_INPUT_NAME));
                     }
+                    if (program.usesShadowSampler()) {
+                        inputs.add(new ExternalTextureInput(SHADOW_DEPTH_INPUT_NAME));
+                    }
                     PostPass pass = new PostPass(program.pipeline(),
                             outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
@@ -3091,9 +3107,11 @@ public final class VeyraRenderer {
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
             return new PipelineProgram(shaderId, shader.source(), vertexShaderId, vertexSource, shader.uniforms(),
                     shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
+                    shader.usesShadowSampler(),
                     shader.colorSamplers(), shader.outputTarget(),
                     createPipeline(pipelineId, shaderId, vertexShaderId, shader.uniforms(),
                             shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
+                            shader.usesShadowSampler(),
                             shader.colorSamplers()));
         });
     }
@@ -3124,6 +3142,7 @@ public final class VeyraRenderer {
     private static RenderPipeline createPipeline(
             Identifier pipeline, Identifier fragmentShader, Identifier vertexShader, List<String> uniforms,
             boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
+            boolean usesShadowSampler,
             Set<Integer> colorSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                 .withFragmentShader(fragmentShader)
@@ -3140,6 +3159,9 @@ public final class VeyraRenderer {
         if (usesDepth2Sampler) {
             builder.withSampler(DEPTH2_INPUT_SAMPLER);
         }
+        if (usesShadowSampler) {
+            builder.withSampler(SHADOW_DEPTH_INPUT_SAMPLER);
+        }
         for (int colorSampler : colorSamplers) {
             if (colorSampler > 0) {
                 builder.withSampler(colorTargetInputSampler(colorSampler));
@@ -3151,7 +3173,8 @@ public final class VeyraRenderer {
         return builder.build();
     }
 
-    private static List<AdaptedShader> adaptShader(String source, List<String> additionalUniforms) throws IOException {
+    private static List<AdaptedShader> adaptShader(
+            String source, List<String> additionalUniforms, boolean shadowPassAvailable) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException("Fragment shader is empty.");
         }
@@ -3168,6 +3191,30 @@ public final class VeyraRenderer {
         if (unsupportedDepthSampler.find()) {
             throw new IOException("Veyra supports depthtex0, depthtex1, and depthtex2 for depth texture sampling on VulkanMod.");
         }
+        Matcher unsupportedShadowSampler = UNSUPPORTED_SHADOW_SAMPLER.matcher(body);
+        if (unsupportedShadowSampler.find()) {
+            throw new IOException("Veyra currently supports only the shadowtex0 depth sampler in post-processing programs.");
+        }
+        boolean usesShadowSampler = SHADOW_DEPTH_SAMPLER.matcher(body).find();
+        if (usesShadowSampler && !shadowPassAvailable) {
+            throw new IOException("The post-processing program samples shadowtex0, but the shader pack has no shadow pass.");
+        }
+        Matcher shadowSamplerDeclaration = SHADOW_DEPTH_UNIFORM_DECLARATION.matcher(body);
+        StringBuffer bodyWithoutShadowSampler = new StringBuffer();
+        boolean declaredShadowSampler = false;
+        while (shadowSamplerDeclaration.find()) {
+            String samplerType = shadowSamplerDeclaration.group(1);
+            if (!samplerType.equals("sampler2D") && !samplerType.equals("sampler2DShadow")) {
+                throw new IOException("shadowtex0 must be declared as sampler2D or sampler2DShadow.");
+            }
+            if (declaredShadowSampler) {
+                throw new IOException("shadowtex0 is declared more than once.");
+            }
+            declaredShadowSampler = true;
+            shadowSamplerDeclaration.appendReplacement(bodyWithoutShadowSampler, "");
+        }
+        shadowSamplerDeclaration.appendTail(bodyWithoutShadowSampler);
+        body = bodyWithoutShadowSampler.toString();
         Matcher depthSampler = DEPTH_SAMPLER.matcher(body);
         boolean usesDepthSampler = depthSampler.find();
         Matcher depth1Sampler = DEPTH1_SAMPLER.matcher(body);
@@ -3221,7 +3268,10 @@ public final class VeyraRenderer {
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
-        body = body.replace("texture2D(", "texture(");
+        if (usesShadowSampler) {
+            body = body.replaceAll("\\b(?:texture2D|texture)\\s*\\(\\s*shadowtex0\\s*,", "veyraSample(shadowtex0,");
+        }
+        body = body.replaceAll("\\btexture2D\\s*\\(", "texture(");
 
         List<AdaptedShader> adaptedShaders = new ArrayList<>(outputMappings.size());
         for (OutputMapping output : outputMappings) {
@@ -3248,6 +3298,25 @@ public final class VeyraRenderer {
                 }
             }
             appendShaderPackUniformBlock(adapted, uniforms);
+            if (usesShadowSampler) {
+                adapted.append("""
+                        vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
+                            return texture(sourceSampler, sourceUv);
+                        }
+                        vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv, float lodBias) {
+                            return texture(sourceSampler, sourceUv, lodBias);
+                        }
+                        vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                            float visibility = step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                            return vec4(visibility);
+                        }
+                        vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord, float lodBias) {
+                            float visibility = step(sourceCoord.z - 0.0005,
+                                    textureLod(sourceSampler, sourceCoord.xy, lodBias).r);
+                            return vec4(visibility);
+                        }
+                        """);
+            }
             adapted.append("uniform sampler2D InSampler;\n")
                     .append("#define colortex0 InSampler\n")
                     .append("#define Sampler0 InSampler\n")
@@ -3275,9 +3344,14 @@ public final class VeyraRenderer {
                 adapted.append("uniform sampler2D ").append(DEPTH2_INPUT_SAMPLER).append(";\n")
                         .append("#define depthtex2 ").append(DEPTH2_INPUT_SAMPLER).append('\n');
             }
+            if (usesShadowSampler) {
+                adapted.append("uniform sampler2D ").append(SHADOW_DEPTH_INPUT_SAMPLER).append(";\n")
+                        .append("#define shadowtex0 ").append(SHADOW_DEPTH_INPUT_SAMPLER).append('\n')
+                        .append("#define shadow2D(shadowSampler, coord) veyraSample(shadowSampler, coord)\n");
+            }
             adapted.append(outputBody);
             adaptedShaders.add(new AdaptedShader(adapted.toString(), uniforms,
-                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler,
+                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler,
                     Set.copyOf(colorSamplers), output.targetIndex()));
         }
         return List.copyOf(adaptedShaders);
@@ -4003,6 +4077,7 @@ public final class VeyraRenderer {
 
     private record AdaptedShader(String source, List<String> uniforms,
                                  boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
+                                 boolean usesShadowSampler,
                                  Set<Integer> colorSamplers, int outputTarget) {
     }
 
@@ -4015,6 +4090,7 @@ public final class VeyraRenderer {
     private record PipelineProgram(Identifier shaderId, String fragmentSource,
                                    Identifier vertexShaderId, String vertexSource, List<String> uniforms,
                                    boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
+                                   boolean usesShadowSampler,
                                    Set<Integer> colorSamplers,
                                    int outputTarget, RenderPipeline pipeline) {
     }
@@ -4105,6 +4181,7 @@ public final class VeyraRenderer {
 
     private record PipelineSet(FramePlan planA, FramePlan planB, int width, int height,
                                boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
+                               boolean usesShadowSampler,
                                Map<Integer, ColorTargetSettings> colorTargetSettings,
                                Set<Integer> colorTargetIndices) implements AutoCloseable {
         private FramePlan framePlan(Map<Integer, Identifier> currentColorTargets) {
@@ -4197,6 +4274,9 @@ public final class VeyraRenderer {
             }
             if (samplerName.equals(DEPTH2_INPUT_NAME)) {
                 return depthTex2Snapshot.sampledView();
+            }
+            if (samplerName.equals(SHADOW_DEPTH_INPUT_NAME)) {
+                return VeyraShadowRenderer.shadowDepthTextureView();
             }
             return sampledDepthTextureView();
         }
