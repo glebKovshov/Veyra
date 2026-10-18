@@ -63,6 +63,7 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("moonPhase", "int", false),
             new ShaderUniform("eyeAltitude", "float", false),
             new ShaderUniform("eyeBrightness", "ivec2", false),
+            new ShaderUniform("eyeBrightnessSmooth", "ivec2", false),
             new ShaderUniform("cameraPosition", "vec3", false),
             new ShaderUniform("cameraPositionInt", "ivec3", false),
             new ShaderUniform("cameraPositionFract", "vec3", false),

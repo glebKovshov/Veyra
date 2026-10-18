@@ -80,6 +80,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
     private static final Pattern NOISE_TEXTURE_RESOLUTION = Pattern.compile(
             "\\bconst\\s+int\\s+noiseTextureResolution\\s*=\\s*([+-]?\\d+)\\s*;");
+    private static final Pattern EYE_BRIGHTNESS_HALF_LIFE = Pattern.compile(
+            "\\bconst\\s+float\\s+eyeBrightnessHalflife\\s*=\\s*([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?)[fF]?\\s*;");
     private static final Pattern INTEGER_LITERAL = Pattern.compile("[+-]?\\d+");
     private static final String DEFAULT_SHADOW_FRAGMENT = """
             #version 120
@@ -376,6 +378,33 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             throw new IOException("noiseTextureResolution must be between 1 and 4096 for VulkanMod.");
         }
         return resolution;
+    }
+
+    /** Reads Iris' GLSL eye-brightness smoothing constant, defaulting to ten game ticks. */
+    public float readEyeBrightnessHalflife() throws IOException {
+        float halfLife = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
+        boolean found = false;
+        for (String fileName : listShaderSourceFiles()) {
+            String source = readRawShader(fileName).orElse("");
+            Matcher matcher = EYE_BRIGHTNESS_HALF_LIFE.matcher(GLSL_COMMENTS.matcher(source).replaceAll(""));
+            while (matcher.find()) {
+                float parsed;
+                try {
+                    parsed = Float.parseFloat(matcher.group(1));
+                } catch (NumberFormatException exception) {
+                    throw new IOException("eyeBrightnessHalflife is outside the supported float range.", exception);
+                }
+                if (!Float.isFinite(parsed) || parsed < 0.0F) {
+                    throw new IOException("eyeBrightnessHalflife must be finite and non-negative.");
+                }
+                if (found && Float.compare(halfLife, parsed) != 0) {
+                    throw new IOException("The shader pack declares conflicting eyeBrightnessHalflife values.");
+                }
+                halfLife = parsed;
+                found = true;
+            }
+        }
+        return halfLife;
     }
 
     private boolean readBooleanProperty(String propertyName, boolean defaultValue) throws IOException {

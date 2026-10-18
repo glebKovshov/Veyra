@@ -162,6 +162,8 @@ public final class VeyraRenderer {
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+eyeBrightnessSmooth\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
@@ -199,7 +201,7 @@ public final class VeyraRenderer {
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase",
-            "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
+            "eyeAltitude", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
@@ -219,7 +221,7 @@ public final class VeyraRenderer {
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
-            "worldTime", "worldDay", "moonPhase", "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor",
+            "worldTime", "worldDay", "moonPhase", "eyeAltitude", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
@@ -324,6 +326,10 @@ public final class VeyraRenderer {
     private static ClientLevel wetnessLevel;
     private static boolean wetnessInitialized;
     private static float smoothedWetness;
+    private static final EyeBrightnessSmoother eyeBrightnessSmoother = new EyeBrightnessSmoother();
+    private static ClientLevel eyeBrightnessSmoothLevel;
+    private static ShaderPack eyeBrightnessHalfLifePack;
+    private static float eyeBrightnessHalfLifeTicks = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
 
     private VeyraRenderer() {
     }
@@ -462,10 +468,11 @@ public final class VeyraRenderer {
     }
 
     private static void updateShaderPackIntegerVector2Uniform(String name, MappedBuffer buffer, CameraUniforms uniforms) {
-        if (!name.equals("eyeBrightness")) {
-            throw new IllegalArgumentException("Unknown shader pack integer vector uniform " + name + ".");
-        }
-        Vector2i value = uniforms.eyeBrightness();
+        Vector2i value = switch (name) {
+            case "eyeBrightness" -> uniforms.eyeBrightness();
+            case "eyeBrightnessSmooth" -> uniforms.eyeBrightnessSmooth();
+            default -> throw new IllegalArgumentException("Unknown shader pack integer vector uniform " + name + ".");
+        };
         buffer.putInt(0, value.x);
         buffer.putInt(Integer.BYTES, value.y);
     }
@@ -593,6 +600,9 @@ public final class VeyraRenderer {
         frameMatricesInitialized = false;
         cameraUniformsInitialized = false;
         previousFrameNanos = 0L;
+        frameTime = 0.0F;
+        eyeBrightnessSmoothLevel = minecraft.level;
+        eyeBrightnessSmoother.reset();
         initializedColorTargets.clear();
         depthTex1Snapshot.close();
         depthTex2Snapshot.close();
@@ -625,6 +635,7 @@ public final class VeyraRenderer {
 
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
+        updateFrameClock();
         nextPostPhase = 0;
         Matrix4f currentModelView = new Matrix4f(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
@@ -647,10 +658,18 @@ public final class VeyraRenderer {
         CameraPosition previousCameraPosition = cameraUniformsInitialized
                 ? new CameraPosition(cameraUniforms.cameraPosition(), cameraUniforms.cameraPositionInt(), cameraUniforms.cameraPositionFract())
                 : currentCameraPosition;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (eyeBrightnessSmoothLevel != minecraft.level) {
+            eyeBrightnessSmoothLevel = minecraft.level;
+            eyeBrightnessSmoother.reset();
+        }
+        Vector2i brightness = eyeBrightness(minecraft, cameraPosition);
+        Vector2i smoothedBrightness = eyeBrightnessSmoother.update(
+                brightness.x, brightness.y, frameTime, selectedEyeBrightnessHalfLifeTicks());
         cameraUniforms = new CameraUniforms(
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition(),
-                eyeBrightness(Minecraft.getInstance(), cameraPosition));
+                brightness, smoothedBrightness);
         cameraUniformsInitialized = true;
         updateShaderPackVectorUniforms(cameraUniforms);
         updateShaderPackIntegerVector2Uniforms(cameraUniforms);
@@ -4027,6 +4046,7 @@ public final class VeyraRenderer {
         body = DEPTH1_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH2_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
+        body = SUPPORTED_IVEC2_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
@@ -4419,6 +4439,7 @@ public final class VeyraRenderer {
                 case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
                 case "moonPhase" -> new UniformValue.IntUniform(frameUniforms.moonPhase());
                 case "eyeAltitude" -> new UniformValue.FloatUniform(frameUniforms.eyeAltitude());
+                case "eyeBrightnessSmooth" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightnessSmooth());
                 case "screenBrightness" -> new UniformValue.FloatUniform(frameUniforms.screenBrightness());
                 case "blindness" -> new UniformValue.FloatUniform(frameUniforms.blindness());
                 case "nightVision" -> new UniformValue.FloatUniform(frameUniforms.nightVision());
@@ -4506,12 +4527,6 @@ public final class VeyraRenderer {
     }
 
     private static FrameUniforms updateFrameUniforms(Minecraft minecraft) {
-        long now = System.nanoTime();
-        frameTime = previousFrameNanos == 0L ? 0.0F : (now - previousFrameNanos) / 1_000_000_000.0F;
-        previousFrameNanos = now;
-        frameTimeCounter = (frameTimeCounter + frameTime) % 3600.0F;
-        frameCounter = frameCounter >= 720719 ? 0 : frameCounter + 1;
-
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         long dayTime = minecraft.level.getDayTime();
         int worldTime = (int) Math.floorMod(dayTime, 24000L);
@@ -4541,6 +4556,34 @@ public final class VeyraRenderer {
                 (float) (double) minecraft.options.gamma().get(), blindness, nightVision, darknessFactor,
                 isEyeInWater, player.isSpectator(), player.isCrouching(), player.isSprinting(), player.onGround(),
                 player.hurtTime > 0, player.isInvisible(), player.isOnFire(), frameMatrices, cameraUniforms);
+    }
+
+    private static void updateFrameClock() {
+        long now = System.nanoTime();
+        frameTime = previousFrameNanos == 0L ? 0.0F
+                : Math.max(0.0F, (now - previousFrameNanos) / 1_000_000_000.0F);
+        previousFrameNanos = now;
+        frameTimeCounter = (frameTimeCounter + frameTime) % 3600.0F;
+        frameCounter = frameCounter >= 720719 ? 0 : frameCounter + 1;
+    }
+
+    private static float selectedEyeBrightnessHalfLifeTicks() {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == eyeBrightnessHalfLifePack) {
+            return eyeBrightnessHalfLifeTicks;
+        }
+        eyeBrightnessHalfLifePack = pack;
+        if (pack == null) {
+            eyeBrightnessHalfLifeTicks = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
+            return eyeBrightnessHalfLifeTicks;
+        }
+        try {
+            eyeBrightnessHalfLifeTicks = pack.readEyeBrightnessHalflife();
+        } catch (IOException exception) {
+            eyeBrightnessHalfLifeTicks = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
+            VeyraClient.LOGGER.warn("Could not read eyeBrightnessHalflife; using Iris' default of ten ticks.", exception);
+        }
+        return eyeBrightnessHalfLifeTicks;
     }
 
     private static boolean containsIdentifier(String source, String identifier) {
@@ -4977,10 +5020,10 @@ public final class VeyraRenderer {
 
     private record CameraUniforms(Vector3f cameraPosition, Vector3i cameraPositionInt, Vector3f cameraPositionFract,
                                   Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
-                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness) {
+                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness, Vector2i eyeBrightnessSmooth) {
         private static final CameraUniforms ZERO = new CameraUniforms(
                 new Vector3f(), new Vector3i(), new Vector3f(),
-                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i());
+                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i(), new Vector2i());
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,
