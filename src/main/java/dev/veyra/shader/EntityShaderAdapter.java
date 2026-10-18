@@ -30,9 +30,9 @@ public final class EntityShaderAdapter {
     private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_ENTITY_INPUT = Pattern.compile(
-            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
-            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|lightMapColor|overlayColor|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
@@ -153,6 +153,8 @@ public final class EntityShaderAdapter {
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
+        IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
+        adapted = fogUniforms.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, programName);
         adapted = shaderPackUniforms.source();
@@ -163,6 +165,8 @@ public final class EntityShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
         boolean suppliesNormal = false;
+        boolean suppliesSphericalDistance = false;
+        boolean suppliesCylindricalDistance = false;
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -176,6 +180,12 @@ public final class EntityShaderAdapter {
             }
             if (name.equals("normal")) {
                 suppliesNormal = true;
+            }
+            if (name.equals("sphericalVertexDistance")) {
+                suppliesSphericalDistance = true;
+            }
+            if (name.equals("cylindricalVertexDistance")) {
+                suppliesCylindricalDistance = true;
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
@@ -257,7 +267,10 @@ public final class EntityShaderAdapter {
                 in float cylindricalVertexDistance;
                 in vec4 vertexColor;
                 in vec2 texCoord0;
+                __VEYRA_SPHERICAL_DISTANCE__
+                __VEYRA_CYLINDRICAL_DISTANCE__
                 out vec4 veyraEntityFragColor;
+                __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -276,8 +289,8 @@ public final class EntityShaderAdapter {
                 #endif
                 #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraEntityFragColor;", outputName + ";") : """
-                in float sphericalVertexDistance;
-                in float cylindricalVertexDistance;
+                __VEYRA_SPHERICAL_DISTANCE__
+                __VEYRA_CYLINDRICAL_DISTANCE__
                 #ifdef PER_FACE_LIGHTING
                 in vec4 vertexPerFaceColorBack;
                 in vec4 vertexPerFaceColorFront;
@@ -299,6 +312,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_NORMAL_INPUT__
                 in vec2 texCoord0;
                 out vec4 veyraEntityFragColor;
+                __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -316,7 +330,12 @@ public final class EntityShaderAdapter {
                 #endif
                 #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraEntityFragColor;", outputName + ";");
-        bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "");
+        bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
+                .replace("__VEYRA_SPHERICAL_DISTANCE__",
+                        suppliesSphericalDistance ? "in float sphericalVertexDistance;\n" : "")
+                .replace("__VEYRA_CYLINDRICAL_DISTANCE__",
+                        suppliesCylindricalDistance ? "in float cylindricalVertexDistance;\n" : "")
+                .replace("__VEYRA_FOG_BRIDGE__", fogUniforms.bridge());
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');

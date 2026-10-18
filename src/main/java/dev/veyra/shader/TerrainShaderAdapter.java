@@ -43,7 +43,9 @@ public final class TerrainShaderAdapter {
             Map.entry("gl_Color", new Varying("vec4", 0)),
             Map.entry("shadowPos", new Varying("vec4", 6)),
             Map.entry("shadowCoord", new Varying("vec4", 6)),
-            Map.entry("normal", new Varying("vec3", 7)));
+            Map.entry("normal", new Varying("vec3", 7)),
+            Map.entry("sphericalVertexDistance", new Varying("float", 8)),
+            Map.entry("cylindricalVertexDistance", new Varying("float", 9)));
     private static final List<ShaderUniform> SHADERPACK_UNIFORMS = List.of(
             new ShaderUniform("viewWidth", "float", false),
             new ShaderUniform("viewHeight", "float", false),
@@ -104,6 +106,8 @@ public final class TerrainShaderAdapter {
             layout(location = 5) in vec2 veyraLightmapCoord;
             layout(location = 6) in vec4 veyraShadowPos;
             layout(location = 7) in vec3 veyraTerrainPosition;
+            layout(location = 8) in float veyraSphericalVertexDistance;
+            layout(location = 9) in float veyraCylindricalVertexDistance;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -125,6 +129,8 @@ public final class TerrainShaderAdapter {
             #define shadowPos veyraShadowPos
             #define shadowCoord veyraShadowPos
             #define shadow2D(sampler, coord) veyraSample(sampler, coord)
+            #define sphericalVertexDistance veyraSphericalVertexDistance
+            #define cylindricalVertexDistance veyraCylindricalVertexDistance
             #define alphaTestRef AlphaCutout
             #define texcoord veyraTexCoord
             #define texCoord veyraTexCoord
@@ -174,6 +180,9 @@ public final class TerrainShaderAdapter {
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
+        IrisFogUniformAdapter.AdaptedShader fogUniforms =
+                IrisFogUniformAdapter.extract(adapted, "gbuffers_terrain", true);
+        adapted = fogUniforms.source();
         Matcher uniformMatcher = SHADERPACK_UNIFORM_DECLARATION.matcher(adapted);
         StringBuffer withoutShaderPackUniforms = new StringBuffer();
         java.util.Map<String, String> declaredUniforms = new java.util.HashMap<>();
@@ -264,7 +273,8 @@ public final class TerrainShaderAdapter {
         }
         String bridge = FRAGMENT_BRIDGE
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
-                .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms) + "#define texture Sampler0");
+                .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
+                        + fogUniforms.bridge() + "#define texture Sampler0");
         if (declaredVaryings.contains("normal")) {
             bridge = bridge.replace("#define texture Sampler0", """
                     vec3 veyraTerrainNormal() {
@@ -330,7 +340,9 @@ public final class TerrainShaderAdapter {
         String adapted = source.replace(outputMarker,
                 outputMarker + "\nlayout (location = 5) out vec2 veyraLightmapCoord;"
                         + "\nlayout (location = 6) out vec4 veyraShadowPos;"
-                        + "\nlayout (location = 7) out vec3 veyraTerrainPosition;");
+                        + "\nlayout (location = 7) out vec3 veyraTerrainPosition;"
+                        + "\nlayout (location = 8) out float veyraSphericalVertexDistance;"
+                        + "\nlayout (location = 9) out float veyraCylindricalVertexDistance;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
@@ -354,7 +366,9 @@ public final class TerrainShaderAdapter {
         }
         return adapted.replace(positionMarker,
                 positionMarker + "\n    veyraTerrainPosition = pos;"
-                        + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);");
+                        + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);"
+                        + "\n    veyraSphericalVertexDistance = length(pos);"
+                        + "\n    veyraCylindricalVertexDistance = max(length(pos.xz), abs(pos.y));");
     }
 
     private record Varying(String type, int location) {
