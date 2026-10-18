@@ -29,10 +29,12 @@ public abstract class GraphicsDescriptorsMixin {
         var renderer = Renderer.getInstance();
         var boundFramebuffer = renderer.getBoundFramebuffer();
         var boundRenderPass = renderer.getBoundRenderPass();
-        LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                "Framebuffer evidence: pipeline={} bound={} renderPassTarget={}",
-                pipeline.getLocation(), veyra$describe(boundFramebuffer),
-                boundRenderPass == null ? "none" : veyra$describe(boundRenderPass.getFramebuffer()));
+        if (veyra$seen.add("framebuffer:" + pipeline.getLocation())) {
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Framebuffer evidence: pipeline={} bound={} renderPassTarget={}",
+                    pipeline.getLocation(), veyra$describe(boundFramebuffer),
+                    boundRenderPass == null ? "none" : veyra$describe(boundRenderPass.getFramebuffer()));
+        }
         for (var descriptor : nativePipeline.getImageDescriptors()) {
             var image = VTextureSelector.getImage(descriptor.imageIdx);
             String key = pipeline.getLocation() + ":" + descriptor.name;
