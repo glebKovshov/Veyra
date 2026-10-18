@@ -7,8 +7,10 @@ on:
     paths:
       - '.github/workflows/shaderpack-audit.yml'
       - 'scripts/run_shaderpack_source_audit.py'
+      - 'build.gradle'
       - 'validation/shaderpack-inputs.json'
-      - 'validation/shaderpack-profile-audit.json'
+      - 'validation/shaderpack-profile-matrix.json'
+      - 'src/shaderSmoke/**'
       - 'src/main/java/dev/veyra/shader/**'
 
 permissions:

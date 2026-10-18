@@ -13,7 +13,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUTS = ROOT / "validation" / "shaderpack-inputs.json"
-PROFILE_MATRIX = ROOT / "validation" / "shaderpack-profile-audit.json"
+PROFILE_MATRIX = ROOT / "validation" / "shaderpack-profile-matrix.json"
 DOWNLOADS = ROOT / "build" / "shaderpack-source-audit" / "inputs"
 REPORTS = ROOT / "build" / "reports" / "external-shaderpacks"
 DIMENSIONS = (0, -1, 1)

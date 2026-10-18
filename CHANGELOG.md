@@ -9,6 +9,7 @@
 - Kept discovered packs available when restoring a broken active pack fails.
 - Added `world0`, `world-1` and `world1` program overrides and dimension-aware relative includes. Pack/world changes reset temporal matrix and depth history.
 - Added Iris' integer `moonPhase` uniform to the shared geometry and post-pass frame snapshot, using the active dimension's moon phase.
+- Added the Iris entity `varying vec4 color` input alias, bridged to VulkanMod's entity vertex color and covered by a regression test.
 - Scheduled prepare, deferred and composite/final at separate rendering boundaries, preserving auxiliary ping-pong buffers between phases. Deferred runs after the opaque depth snapshot and before translucent terrain.
 - Initialized first-frame depth history with a real Vulkan transfer clear, including usage/format checks and layout transitions. VulkanMod's unbound `clearDepthTexture` only queues a later attachment clear and is insufficient for immediate sampling.
 - Added source/configuration caches scoped to a pack load. Reload creates fresh snapshots; changing options recompiles only when values change.
@@ -19,7 +20,7 @@
 - Corrected swapchain image usage metadata and requested transfer-source usage only where the surface supports it. Ordered sampled color-image transitions in the main frame graph after their producers.
 - Added a development-only real Minecraft world/readback harness using software Vulkan in CI. Runtime results remain separate from unit/build success.
 - Added explicit errors for unsupported required Iris features and active compute, geometry, tessellation or begin stages.
-- Added a read-only external shaderpack source audit, 37 new regression tests (72 total), embedded JCPP license notices, distributable checks and CI test-report artifacts.
+- Added a checksum-pinned external shaderpack source-audit workflow for four public packs and their declared profiles, 39 new regression tests (74 total), embedded JCPP license notices, distributable checks and CI test-report artifacts.
 - Remaining release blockers: arbitrary geometry vertex inputs, MRT for the other geometry bridges, unsupported samplers/custom uniforms, compute/tessellation execution, and real client/Vulkan validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
 
 ## 0.1.1

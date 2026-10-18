@@ -1,0 +1,317 @@
+[
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 0,
+    "profile": "MINIMUM"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": -1,
+    "profile": "MINIMUM"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 1,
+    "profile": "MINIMUM"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 0,
+    "profile": "LOW"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": -1,
+    "profile": "LOW"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 1,
+    "profile": "LOW"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 0,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": -1,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 1,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 0,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": -1,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 1,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 0,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": -1,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "bsl-shaders.zip",
+    "dimension": 1,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "COMPLEMENTARY"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "COMPLEMENTARY"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "COMPLEMENTARY"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "LOW"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "LOW"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "LOW"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "POTATO"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "POTATO"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "POTATO"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "VERYHIGH"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "VERYHIGH"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "VERYHIGH"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 0,
+    "profile": "VERYLOW"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": -1,
+    "profile": "VERYLOW"
+  },
+  {
+    "pack": "complementary-reimagined.zip",
+    "dimension": 1,
+    "profile": "VERYLOW"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "COMPLEMENTARY"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "COMPLEMENTARY"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "COMPLEMENTARY"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "HIGH"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "LOW"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "LOW"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "LOW"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "MEDIUM"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "POTATO"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "POTATO"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "POTATO"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "ULTRA"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "VERYHIGH"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "VERYHIGH"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "VERYHIGH"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 0,
+    "profile": "VERYLOW"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": -1,
+    "profile": "VERYLOW"
+  },
+  {
+    "pack": "complementary-unbound.zip",
+    "dimension": 1,
+    "profile": "VERYLOW"
+  }
+]
