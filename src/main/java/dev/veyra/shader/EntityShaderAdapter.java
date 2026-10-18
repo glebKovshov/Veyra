@@ -30,17 +30,24 @@ public final class EntityShaderAdapter {
     private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_ENTITY_INPUT = Pattern.compile(
-            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|gl_Fog\\w*)\\b");
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
-            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
     private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+normal\\s*;");
+    private static final Pattern LIGHTMAP_VERTEX_ATTRIBUTE = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+ivec2\\s+UV2\\s*;");
+    private static final Pattern LIGHTMAP_VERTEX_OUTPUT = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec2\\s+lmcoord\\s*;");
     private static final Pattern MAIN_FUNCTION = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
     private static final Pattern NORMAL_REFERENCE = Pattern.compile("\\bnormal\\b");
+    private static final Pattern NORMAL_ASSIGNMENT = Pattern.compile("\\bnormal\\s*=");
+    private static final Pattern LIGHTMAP_REFERENCE = Pattern.compile("\\b(?:lmcoord|lightMapCoord)\\b");
+    private static final Pattern LIGHTMAP_ASSIGNMENT = Pattern.compile("\\blmcoord\\s*=");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -50,6 +57,8 @@ public final class EntityShaderAdapter {
             Map.entry("gl_Color", new Varying("vec4")),
             Map.entry("sphericalVertexDistance", new Varying("float")),
             Map.entry("cylindricalVertexDistance", new Varying("float")),
+            Map.entry("lmcoord", new Varying("vec2")),
+            Map.entry("lightMapCoord", new Varying("vec2")),
             Map.entry("lightMapColor", new Varying("vec4")),
             Map.entry("overlayColor", new Varying("vec4")),
             Map.entry("normal", new Varying("vec3")));
@@ -61,7 +70,9 @@ public final class EntityShaderAdapter {
             Map.entry("glColor", new Varying("vec4")),
             Map.entry("gl_Color", new Varying("vec4")),
             Map.entry("sphericalVertexDistance", new Varying("float")),
-            Map.entry("cylindricalVertexDistance", new Varying("float")));
+            Map.entry("cylindricalVertexDistance", new Varying("float")),
+            Map.entry("lmcoord", new Varying("vec2")),
+            Map.entry("lightMapCoord", new Varying("vec2")));
 
     private EntityShaderAdapter() {
     }
@@ -89,35 +100,85 @@ public final class EntityShaderAdapter {
         return false;
     }
 
-    public static String adaptVertexShader(String source, boolean shadowPass, String programName) throws IOException {
-        if (source == null || source.isBlank()) {
-            throw new IOException(programName + " requires a normal input, but its VulkanMod vertex shader is empty.");
+    public static boolean requiresLightmapInput(String source) {
+        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
+        while (matcher.find()) {
+            if (matcher.group(3).equals("lmcoord") || matcher.group(3).equals("lightMapCoord")) {
+                return true;
+            }
         }
-        String uncommented = COMMENTS.matcher(source).replaceAll("");
-        if (NORMAL_VERTEX_OUTPUT.matcher(uncommented).find()) {
+        return false;
+    }
+
+    public static String adaptVertexShader(String source, boolean shadowPass, String programName) throws IOException {
+        return adaptVertexShader(source, shadowPass, programName, true, false);
+    }
+
+    public static String adaptVertexShader(String source, boolean shadowPass, String programName,
+                                          boolean requiresNormal, boolean requiresLightmapCoord) throws IOException {
+        if (source == null || source.isBlank()) {
+            String requiredInputs = requiresNormal && requiresLightmapCoord
+                    ? "normals and lightmap coordinates"
+                    : requiresNormal ? "normals" : "lightmap coordinates";
+            throw new IOException(programName + " requires " + requiredInputs
+                    + ", but its VulkanMod vertex shader is empty.");
+        }
+        if (!requiresNormal && !requiresLightmapCoord) {
             return source;
         }
-        if (!NORMAL_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
+        String uncommented = COMMENTS.matcher(source).replaceAll("");
+        boolean hasNormalOutput = NORMAL_VERTEX_OUTPUT.matcher(uncommented).find();
+        boolean hasNormalAssignment = NORMAL_ASSIGNMENT.matcher(uncommented).find();
+        boolean addNormalOutput = requiresNormal && !hasNormalOutput;
+        boolean addNormalAssignment = requiresNormal && !hasNormalAssignment;
+        if (addNormalAssignment && !NORMAL_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
             throw new IOException(programName + " requires normals, but VulkanMod's vertex format does not provide them.");
+        }
+        boolean hasLightmapOutput = LIGHTMAP_VERTEX_OUTPUT.matcher(uncommented).find();
+        boolean hasLightmapAssignment = LIGHTMAP_ASSIGNMENT.matcher(uncommented).find();
+        boolean addLightmapOutput = requiresLightmapCoord && !hasLightmapOutput;
+        boolean addLightmapAssignment = requiresLightmapCoord && !hasLightmapAssignment;
+        if (addLightmapAssignment && !LIGHTMAP_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
+            throw new IOException(programName + " requires lmcoord, but VulkanMod's vertex format does not provide UV2.");
+        }
+        if (!addNormalOutput && !addNormalAssignment && !addLightmapOutput && !addLightmapAssignment) {
+            return source;
         }
         Matcher main = MAIN_FUNCTION.matcher(source);
         if (!main.find()) {
-            throw new IOException(programName + " requires normals, but its VulkanMod vertex shader has no main function.");
+            throw new IOException(programName + " requires additional vertex outputs, but its VulkanMod vertex shader has no main function.");
         }
 
+        StringBuilder declarations = new StringBuilder();
         String inverseMatrix = shadowPass ? "shadowModelViewInverse" : "gbufferModelViewInverse";
-        Pattern inverseMatrixUniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
-                + Pattern.quote(inverseMatrix) + "\\s*;");
-        String declarations = (inverseMatrixUniform.matcher(uncommented).find()
-                ? "" : "uniform mat4 " + inverseMatrix + ";\n") + "out vec3 normal;\n";
+        if (addNormalAssignment) {
+            Pattern inverseMatrixUniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
+                    + Pattern.quote(inverseMatrix) + "\\s*;");
+            if (!inverseMatrixUniform.matcher(uncommented).find()) {
+                declarations.append("uniform mat4 ").append(inverseMatrix).append(";\n");
+            }
+        }
+        if (addNormalOutput) {
+            declarations.append("out vec3 normal;\n");
+        }
+        if (addLightmapOutput) {
+            declarations.append("out vec2 lmcoord;\n");
+        }
         String withDeclarations = source.substring(0, main.start()) + declarations + source.substring(main.start());
         Matcher adaptedMain = MAIN_FUNCTION.matcher(withDeclarations);
         if (!adaptedMain.find()) {
-            throw new IOException(programName + " requires normals, but its VulkanMod vertex shader could not be adapted.");
+            throw new IOException(programName + " could not add its required vertex outputs.");
         }
-        String transformedNormal = "normal = normalize(mat3(" + inverseMatrix
-                + ") * transpose(inverse(mat3(ModelViewMat))) * Normal);\n";
-        return withDeclarations.substring(0, adaptedMain.end()) + transformedNormal
+        StringBuilder vertexAssignments = new StringBuilder();
+        if (addNormalAssignment) {
+            vertexAssignments.append("normal = normalize(mat3(").append(inverseMatrix)
+                    .append(") * transpose(inverse(mat3(ModelViewMat))) * Normal);\n");
+        }
+        if (addLightmapAssignment) {
+            vertexAssignments.append("lmcoord = (vec2(UV2) / 256.0) + vec2(0.03125);\n");
+        }
+        return withDeclarations.substring(0, adaptedMain.end()) + vertexAssignments
                 + withDeclarations.substring(adaptedMain.end());
     }
 
@@ -141,18 +202,27 @@ public final class EntityShaderAdapter {
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
+        boolean usesLightmapSampler = false;
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")) {
+            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
+                    && !sampler.equals("lightmap")) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             if (!samplerMatcher.group(1).equals("sampler2D")) {
                 throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
+            if (sampler.equals("lightmap")) {
+                usesLightmapSampler = true;
+            }
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
+        if (!usesLightmapSampler) {
+            usesLightmapSampler = Pattern.compile("\\blightmap\\b")
+                    .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
+        }
         IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
         adapted = fogUniforms.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
@@ -167,6 +237,7 @@ public final class EntityShaderAdapter {
         boolean suppliesNormal = false;
         boolean suppliesSphericalDistance = false;
         boolean suppliesCylindricalDistance = false;
+        boolean suppliesLightmapCoord = false;
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -186,6 +257,9 @@ public final class EntityShaderAdapter {
             }
             if (name.equals("cylindricalVertexDistance")) {
                 suppliesCylindricalDistance = true;
+            }
+            if (name.equals("lmcoord") || name.equals("lightMapCoord")) {
+                suppliesLightmapCoord = true;
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
@@ -225,6 +299,9 @@ public final class EntityShaderAdapter {
         if (!suppliesNormal && !textPipeline && NORMAL_REFERENCE.matcher(uncommented).find()) {
             throw new IOException(programName + " uses 'normal' without declaring it as a fragment input.");
         }
+        if (!suppliesLightmapCoord && LIGHTMAP_REFERENCE.matcher(uncommented).find()) {
+            throw new IOException(programName + " uses Iris lightmap coordinates without declaring lmcoord.");
+        }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException(programName + " uses a texture sampling function that Veyra's entity bridge does not support yet.");
         }
@@ -260,18 +337,19 @@ public final class EntityShaderAdapter {
                 .replaceAll("\\bgl_FragColor\\b", outputName)
                 .replaceAll("\\btexcoord\\b", "texCoord0")
                 .replaceAll("\\btexCoord\\b", "texCoord0")
+                .replaceAll("\\blightMapCoord\\b", "lmcoord")
                 .replaceAll("\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "veyraEntityColor");
 
         String bridge = textPipeline ? """
-                in float sphericalVertexDistance;
-                in float cylindricalVertexDistance;
                 in vec4 vertexColor;
                 in vec2 texCoord0;
+                __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
                 }
@@ -310,10 +388,12 @@ public final class EntityShaderAdapter {
                 #define overlayColor vec4(0.0)
                 #endif
                 __VEYRA_NORMAL_INPUT__
+                __VEYRA_LIGHTMAP_INPUT__
                 in vec2 texCoord0;
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
                 }
@@ -331,6 +411,9 @@ public final class EntityShaderAdapter {
                 #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraEntityFragColor;", outputName + ";");
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
+                .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
+                .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
+                        ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_SPHERICAL_DISTANCE__",
                         suppliesSphericalDistance ? "in float sphericalVertexDistance;\n" : "")
                 .replace("__VEYRA_CYLINDRICAL_DISTANCE__",

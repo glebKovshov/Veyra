@@ -2118,10 +2118,12 @@ public final class VeyraRenderer {
                     : !pack.entityPrograms().contains(programName);
             String fragmentSource;
             boolean requiresNormal = false;
+            boolean requiresLightmap = false;
             try {
                 fragmentSource = (hand ? pack.readHandFragment(programName) : pack.readEntityFragment(programName))
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
+                requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             } catch (IOException exception) {
                 if (!fallback) {
@@ -2137,7 +2139,7 @@ public final class VeyraRenderer {
             if (entityPipeline == null) {
                 try {
                     entityPipeline = compileEntityPipeline(
-                            original, fragmentSource, sourceHash, requiresNormal, false, programName);
+                            original, fragmentSource, sourceHash, requiresNormal, requiresLightmap, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2164,6 +2166,7 @@ public final class VeyraRenderer {
         String fragmentSource = pack.readShadowFragment(programName)
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
         boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
+        boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
         fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
         String sourceHash = sha256(programName + '\n' + fragmentSource);
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
@@ -2184,9 +2187,10 @@ public final class VeyraRenderer {
                                 + original.getLocation().getPath().replace('/', '_'));
                 Identifier vertexShader = original.getVertexShader();
                 String adaptedVertex = null;
-                if (requiresNormal) {
+                if (requiresNormal || requiresLightmap) {
                     adaptedVertex = EntityShaderAdapter.adaptVertexShader(
-                            shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName);
+                            shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName,
+                            requiresNormal, requiresLightmap);
                     vertexShader = entityNormalVertexShader(original, sourceHash, true);
                 }
                 Identifier selectedVertexShader = vertexShader;
@@ -2230,10 +2234,12 @@ public final class VeyraRenderer {
             boolean fallback = !pack.blockPrograms().contains(programName);
             String fragmentSource;
             boolean requiresNormal = false;
+            boolean requiresLightmap = false;
             try {
                 fragmentSource = pack.readBlockFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
+                requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             } catch (IOException exception) {
                 if (!fallback) {
@@ -2249,7 +2255,7 @@ public final class VeyraRenderer {
             if (blockPipeline == null) {
                 try {
                     blockPipeline = compileEntityPipeline(
-                            original, fragmentSource, sourceHash, requiresNormal, false, programName);
+                            original, fragmentSource, sourceHash, requiresNormal, requiresLightmap, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2279,9 +2285,11 @@ public final class VeyraRenderer {
                 .filter(VeyraRenderer::isSignTextPipeline)
                 .toList();
         String fragmentSource;
+        boolean requiresLightmap;
         try {
             fragmentSource = pack.readBlockFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+            requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
             fragmentSource = EntityShaderAdapter.adaptTextFragment(fragmentSource, programName);
         } catch (IOException exception) {
             VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
@@ -2294,7 +2302,8 @@ public final class VeyraRenderer {
             RenderPipeline textPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (textPipeline == null) {
                 try {
-                    textPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                    textPipeline = compileEntityPipeline(
+                            original, fragmentSource, sourceHash, false, requiresLightmap, false, programName);
                 } catch (IOException exception) {
                     VeyraClient.LOGGER.warn("Skipping sign text pipeline {} for {}: {}",
                             original.getLocation(), programName, exception.getMessage());
@@ -2403,20 +2412,22 @@ public final class VeyraRenderer {
 
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash) throws IOException {
-        return compileEntityPipeline(original, fragmentSource, sourceHash, false, false, "gbuffers_entities");
+        return compileEntityPipeline(original, fragmentSource, sourceHash,
+                false, false, false, "gbuffers_entities");
     }
 
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash,
-            boolean requiresNormal, boolean shadowPass, String programName) throws IOException {
+            boolean requiresNormal, boolean requiresLightmap, boolean shadowPass, String programName) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/entities/" + sourceHash);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
-        if (requiresNormal) {
+        if (requiresNormal || requiresLightmap) {
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
-                    shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName);
+                    shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName,
+                    requiresNormal, requiresLightmap);
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         }
         Identifier selectedVertexShader = vertexShader;
