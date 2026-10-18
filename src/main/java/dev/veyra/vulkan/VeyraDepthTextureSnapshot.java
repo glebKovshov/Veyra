@@ -13,10 +13,15 @@ import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 
-/** A depth target matching VulkanMod's main depth format, filled before translucent terrain rendering. */
+/** A depth-only render target matching VulkanMod's main depth format. */
 public final class VeyraDepthTextureSnapshot implements AutoCloseable {
+    private final String name;
     private TextureTarget target;
     private VeyraDepthTextureView sampledView;
+
+    public VeyraDepthTextureSnapshot(String name) {
+        this.name = name;
+    }
 
     public void ensure(int width, int height, int format) {
         if (target != null && target.width == width && target.height == height
@@ -32,7 +37,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
             throw new IllegalStateException("The active GPU device is not VulkanMod's Vulkan device.");
         }
 
-        target = new TextureTarget("Veyra depthtex1 snapshot", width, height, true);
+        target = new TextureTarget("Veyra " + name + " snapshot", width, height, true);
         RenderTargetAccessor accessor = (RenderTargetAccessor) target;
         GpuTexture oldDepth = accessor.veyra$getDepthTexture();
         GpuTextureView oldDepthView = accessor.veyra$getDepthTextureView();
@@ -44,7 +49,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
         }
 
         VulkanImage image = VulkanImage.builder(width, height)
-                .setName("Veyra depthtex1 snapshot")
+                .setName("Veyra " + name + " snapshot")
                 .setFormat(format)
                 .addUsage(VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                 .createVulkanImage();
@@ -57,7 +62,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
 
     public RenderTarget renderTarget() {
         if (target == null) {
-            throw new IllegalStateException("The depthtex1 render target has not been created.");
+            throw new IllegalStateException("The " + name + " render target has not been created.");
         }
         return target;
     }
@@ -69,14 +74,14 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
     public VulkanImage depthImage() {
         GpuTexture depthTexture = depthTexture();
         if (!(depthTexture instanceof VkGpuTexture vulkanTexture) || vulkanTexture.isClosed()) {
-            throw new IllegalStateException("The depthtex1 attachment is unavailable.");
+            throw new IllegalStateException("The " + name + " attachment is unavailable.");
         }
         return vulkanTexture.getVulkanImage();
     }
 
     public GpuTextureView sampledView() {
         if (sampledView == null || sampledView.isClosed()) {
-            throw new IllegalStateException("The depthtex1 snapshot has not been captured yet.");
+            throw new IllegalStateException("The " + name + " snapshot has not been captured yet.");
         }
         return sampledView;
     }
