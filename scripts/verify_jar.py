@@ -9,6 +9,9 @@ import zipfile
 
 def verify(path):
     with zipfile.ZipFile(path) as jar:
+        names = jar.namelist()
+        assert not any(name.startswith("dev/veyra/smoke/") for name in names), "graphics harness leaked into release jar"
+        assert "veyra-graphics-smoke.mixins.json" not in names, "test mixins leaked into release jar"
         metadata = json.loads(jar.read("fabric.mod.json"))
         assert metadata["id"] == "veyra", "wrong mod id"
         assert metadata["depends"]["minecraft"] == "1.21.11", "wrong Minecraft version"

@@ -4,9 +4,9 @@ All results below are **source checks without a GPU**, using default pack settin
 
 | Pack | Version | Options / profiles discovered | Stages preprocessed, Overworld / Nether / End | Confirmed blockers | In-game result |
 | --- | --- | --- | --- | --- | --- |
-| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Geometry color samplers/IDs, arbitrary vertex programs and MRT | Not tested; incompatible pipeline |
-| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Geometry color samplers/IDs, arbitrary vertex programs and MRT | Not tested; incompatible pipeline |
-| BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | Noisetex/gaux2, extra varyings/uniforms and geometry MRT | Not tested; incompatible pipeline |
+| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Geometry color samplers/IDs, arbitrary vertex programs and broader geometry interfaces | Not tested; incompatible pipeline |
+| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | Geometry color samplers/IDs, arbitrary vertex programs and broader geometry interfaces | Not tested; incompatible pipeline |
+| BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | Noisetex/gaux2, extra varyings/uniforms and non-terrain geometry MRT | Not tested; incompatible pipeline |
 | Sildur's Vibrant | 2.02 Extreme | 115 / 0 | 42/42, 42/42, 42/42 | Geometry colortex4 sampler, cloud texture uniform and arbitrary geometry vertex programs | Not tested; incompatible pipeline |
 
 Adapter checks attempted terrain, water, entity/block/hand-family and cloud fragments; other bridges need VulkanMod pipeline-specific inputs. Accepted geometry fragment counts were zero in these default-setting runs. Compute counts inventory available stages, including disabled programs; execution support has not been implemented. Dimension-specific program conditions disable the inventoried compute stages at these default settings. The capability preflight now refuses unsupported active stages before loading a replacement pack; this is an error report, not a compute implementation.
@@ -30,4 +30,4 @@ The profile audit option selects one declared profile. The default matrix and se
 
 ## Remaining release checks
 
-The editing environment exposes no `/dev/dri` device and cannot run a real Vulkan client. Minecraft launch, F6 UI interaction, water/sky/light/transparency, resize, resource reload, world/dimension/pack switching, GPU memory stability and Vulkan validation-layer output are untested. These must be checked after the backend gaps in ARCHITECTURE.md are implemented. A main-branch stable release claiming Iris parity has not been published from this development branch.
+The local editing environment exposes no `/dev/dri` device. GitHub CI now launches a Minecraft client using software Vulkan (Lavapipe), but the MRT integration test still fails; see VALIDATION.md. Minecraft launch, F6 UI interaction, water/sky/light/transparency, resize, resource reload, world/dimension/pack switching, GPU memory stability and Vulkan validation-layer output are untested. These must be checked after the backend gaps in ARCHITECTURE.md are implemented. A main-branch stable release claiming Iris parity has not been published from this development branch.

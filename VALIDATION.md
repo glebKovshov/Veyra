@@ -1,13 +1,13 @@
 # 0.2 development validation status
 
-Full Fabric Loom builds passed for commits `96d6c2e82b998a38d16455f6c20833e348ca0cfb` and `35c3fde204c8050c212bccb1dd4054f96a1b3cdc` ([latest phase integration run](https://github.com/glebKovshov/Veyra/actions/runs/39134690456)). Capability diagnostics, depth-clear fixes and distributable verification also passed [CI run 39135233586](https://github.com/glebKovshov/Veyra/actions/runs/39135233586) at commit `bb08ede5a28d814059a6f0b61fa10bc20f8b1853`. Dimension-qualified program conditions, broken-selection recovery, all 57 tests, shaderc checks, remapping and distributable verification passed [CI run 39135587653](https://github.com/glebKovshov/Veyra/actions/runs/39135587653) at commit `3530144871186e158739718210fd5cfb37033853`. The CI run exposes a development JAR artifact; it is not a stable GitHub Release.
+The native MRT implementation and graph-ordered sampled-image transitions passed the full Fabric Loom build, tests, remapping and distributable verification at commit `00c2054c359eca4bb7dab2c2e142b403b6c1184d` ([build](https://github.com/glebKovshov/Veyra/actions/runs/39144704660)). This is a development artifact, not a stable release.
 
-- 57 local JUnit tests pass with no skips or failures, using production pack/preprocessor/adapter classes on JDK 21.
-- Native shaderc checks preprocess 18 bundled geometry shaders and compile 15 directly to Vulkan SPIR-V; four conditional-include compiler checks pass. This does not validate VulkanMod descriptor interfaces or full post/geometry pipeline execution.
-- Four external packs were source-audited in three dimensions: all inventoried stages preprocess at default settings. Geometry adapters reject the tested pack fragments. See COMPATIBILITY.md for exact results and reproducible input hashes.
-- All 21 declared profiles were source-audited in three dimensions (63 cases, 4,429 preprocessed stage sources). Some Complementary profiles require the unimplemented compute path; geometry adapters still reject all tested external fragments.
-- The distributable verification script checks metadata, compiled mixin classes, refmap, settings screen, license notices and the Fabric-declared nested JCPP dependency. CI now uploads JUnit reports as well as the mod JAR.
-- Runtime lifecycle, UI interaction and visual/GPU validation remain unconfirmed. No full-parity stable release is justified by these checks.
+- 72 JUnit tests pass with no failures or skips, including pinned VulkanMod bytecode contracts, draw-buffer mappings and per-target blend properties.
+- Native shaderc checks preprocess 19 examples and compile 16 directly to SPIR-V. Four conditional-include compiler checks and an unbound-output dataflow compiler check also pass. These checks do not establish descriptor/runtime correctness.
+- Four external packs were source-audited in three dimensions. All inventoried stages preprocess at defaults, but the restricted geometry adapters reject the tested pack fragments. All 21 declared profiles were also audited across those dimensions (63 cases, 4,429 stages). See COMPATIBILITY.md.
+- A new isolated test mod launches Minecraft 1.21.11 with VulkanMod 0.6.8, an original generated flat world, Mesa Lavapipe and the Vulkan validation layer. It compares the fixture's auxiliary MRT color against disabled shaders and uploads images, logs and a machine-readable result. The harness is excluded from the distributed mod.
+- [Graphics run 39144700849](https://github.com/glebKovshov/Veyra/actions/runs/39144700849) loaded the world but **failed**: active/disabled captures were both black and image-layout validation errors remained. The next revision moves readback into the producing graphics submission and waits for its frame fence; its outcome must be checked separately.
+- Physical GPU testing, successful visual MRT output, UI interaction, resize/reload stress and popular-pack visual compatibility remain unconfirmed. No full-parity stable release is justified.
 
 ## Previous 0.1.1 release checks
 
@@ -26,7 +26,7 @@ The mod passes the full GitHub Actions build. It has not been tested in a runnin
 
 ## Validation limits
 
-The local editing sandbox denies Fabric Loom's optional Unix-socket probe, so local checks were initially isolated from the Minecraft integration. The full build was subsequently verified in GitHub Actions. GPU rendering, descriptor bindings at runtime, and visual compatibility still require an in-game check.
+The local editing sandbox denies Fabric Loom's optional Unix-socket probe, so local checks were initially isolated from the Minecraft integration. The full build was subsequently verified in GitHub Actions. Software-Vulkan client testing now runs in CI, but its failing results above do not establish working rendering or descriptor correctness. Physical GPU validation remains necessary.
 
 Verify in Minecraft 1.21.11 with Fabric Loader 0.18.4+ and VulkanMod 0.6.8: pack selection, refresh after edits/removal, disabling, resource reload, window resizing, world changes, depth snapshots, and shadows on the target GPU. Review logs and visual output.
 

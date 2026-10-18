@@ -21,12 +21,17 @@ import java.nio.file.Path;
 public final class GraphicsSmoke {
     private static int ticks, worldTicks, stage, activePixels, baselineAt;
     private static boolean pending, finished, requested, captureActive;
+    private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private GraphicsSmoke() { }
 
     public static void tick(Minecraft client) {
         if (!Boolean.getBoolean("veyra.graphicsSmoke") || finished) return;
         try {
+            if (completion != null) {
+                Runnable ready = completion; completion = null; ready.run();
+                if (finished) return;
+            }
             if (++ticks > 2400) throw new IllegalStateException("Timed out waiting for the validation world/readback; screen=" + client.screen);
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
@@ -112,7 +117,7 @@ public final class GraphicsSmoke {
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
             }
             int count = colored;
-            client.execute(() -> {
+            completion = () -> {
                 if (active) {
                     activePixels = count;
                     VeyraRenderer.disable();
@@ -124,8 +129,8 @@ public final class GraphicsSmoke {
                             ? new IllegalStateException("Auxiliary MRT signal absent or unchanged: active=" + activePixels + ", disabled=" + count) : null;
                     finish(client, failure, count);
                 }
-            });
-        } catch (Throwable failure) { client.execute(() -> finish(client, failure, -1)); }
+            };
+        } catch (Throwable failure) { completion = () -> finish(client, failure, -1); }
     }
 
     private static void finish(Minecraft client, Throwable failure, int baseline) {
