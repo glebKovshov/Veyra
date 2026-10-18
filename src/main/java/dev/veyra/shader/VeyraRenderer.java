@@ -332,7 +332,7 @@ public final class VeyraRenderer {
             }
         });
         renderingEnabled = packRepository.getSelected()
-                .filter(ShaderPack::hasPostProcessing)
+                .filter(ShaderPack::supportsShaderPrograms)
                 .isPresent();
         terrainPipelineDirty = packRepository.getSelected()
                 .map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment())
@@ -857,6 +857,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderType routeBlockEntityRenderType(RenderType originalType) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return originalType;
         if (originalType == null || BLOCK_ENTITY_SUBMISSION_DEPTH.get() == 0) {
             return originalType;
         }
@@ -884,6 +885,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getSignTextPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (!isSignTextPipeline(original)) {
             return null;
         }
@@ -936,6 +938,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getTerrainPipeline(TerrainRenderType terrainRenderType) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (VeyraShadowRenderer.isRendering()) {
             if (pack == null || !pack.hasShadowFragment()) {
@@ -981,6 +984,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getCloudsPipeline() {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasCloudFragment()) {
             return null;
@@ -1002,6 +1006,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getEntityPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (VeyraShadowRenderer.isRendering()) {
             return getShadowEntityPipeline(original, false);
         }
@@ -1084,6 +1089,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getHandPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (!isHandRendering() || pack == null || !pack.supportsHandPipeline()
                 || !isEntityRenderPipeline(original)) {
@@ -1112,6 +1118,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getDamagedBlockPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasDamagedBlockPipeline() || !isDamagedBlockPipeline(original)) {
             return null;
@@ -1141,6 +1148,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getBeaconBeamPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (VeyraShadowRenderer.isRendering()) {
             return getShadowBeaconBeamPipeline(original);
         }
@@ -1197,6 +1205,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getParticlePipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasParticleFragment() || !isParticlePipeline(original)) {
             return null;
@@ -1218,6 +1227,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getWeatherPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasWeatherFragment() || !isWeatherPipeline(original)) {
             return null;
@@ -1239,6 +1249,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getLightningPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasLightningFragment() || !isLightningPipeline(original)) {
             return null;
@@ -1260,6 +1271,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getBasicPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasBasicFragment() || !isLeashPipeline(original)) {
             return null;
@@ -1281,6 +1293,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getLinePipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasLineFragment() || pack.hasBasicFragment()) || !isLinePipeline(original)) {
             return null;
@@ -1302,6 +1315,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getGlintPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasGlintFragment() || pack.hasTexturedFragment()) || !isGlintPipeline(original)) {
             return null;
@@ -1324,6 +1338,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getSkyBasicPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasSkyBasicFragment() || pack.hasBasicFragment()) || !isSkyBasicPipeline(original)) {
             return null;
@@ -1346,6 +1361,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getSkyTexturedPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasSkyTexturedFragment() || pack.hasTexturedFragment()) || !isSkyTexturedPipeline(original)) {
             return null;
@@ -1368,6 +1384,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getWorldBorderPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasTexturedFragment() || !isWorldBorderPipeline(original)) {
             return null;
@@ -1982,8 +1999,15 @@ public final class VeyraRenderer {
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
         for (String name : pack.terrainPrograms()) {
             var fragment = pack.readTerrainFragment(name);
-            if (fragment.isPresent()) FragmentOutputs.parse(fragment.get()).targets().stream()
-                    .filter(index -> index > 0).forEach(colorTargetIndices::add);
+            if (fragment.isPresent()) {
+                for (int index : FragmentOutputs.parse(fragment.get()).targets()) {
+                    if (index == 0) continue;
+                    colorTargetIndices.add(index);
+                    ColorTargetSettings settings = colorTargetSettings.getOrDefault(index, ColorTargetSettings.defaults(index, width, height));
+                    if (settings.width() != width || settings.height() != height)
+                        throw new IOException("Geometry colortex" + index + " must match the scene resolution; reduced-size geometry targets are not implemented.");
+                }
+            }
         }
         for (ShaderPack.Program source : sources) {
             List<PipelineProgram> outputs = new ArrayList<>();
@@ -4444,6 +4468,7 @@ public final class VeyraRenderer {
         ColorTargetPair pair = colorTargets.get(index);
         if (pair == null) throw new IllegalStateException("Geometry colortex" + index + " has not been allocated.");
         Identifier side = currentColorTargets.get(index);
+        if (side == null) throw new IllegalStateException("Geometry color buffers have not been initialized for this frame.");
         RenderTarget target = colorTargetAId(index).equals(side) ? pair.targetA() : pair.targetB();
         return ((VkGpuTexture) target.getColorTexture()).getVulkanImage();
     }

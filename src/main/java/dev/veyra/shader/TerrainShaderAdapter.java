@@ -242,19 +242,17 @@ public final class TerrainShaderAdapter {
         String outputName = fragmentOutputs.variables().getOrDefault(0, "veyraFragColor");
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
-        int outputCount = 0;
         while (outputMatcher.find()) {
-            outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
         outputMatcher.appendTail(withoutOutputs);
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_terrain supports one vec4 fragment output.");
+            throw new IOException("gbuffers_terrain requires vec4 fragment outputs with supported locations.");
         }
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_terrain uses entity metadata, view-space positions, tangents, or multiple outputs that are not provided by Veyra's terrain bridge yet.");
+            throw new IOException("gbuffers_terrain uses entity metadata, view-space positions, or tangents that are not provided by Veyra's terrain bridge yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException("gbuffers_terrain uses a texture sampling function that Veyra's terrain bridge does not support yet.");
