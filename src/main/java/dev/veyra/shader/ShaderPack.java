@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,8 +33,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasHandFragment, boolean hasHandWaterFragment,
                          boolean hasDamagedBlockFragment, Set<String> blockPrograms, String issue) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
-    private static final int MAX_EXPANDED_SHADER_CHARS = 4 * 1024 * 1024;
-    private static final int MAX_INCLUDE_DEPTH = 32;
     private static final int MAX_PASS_SUFFIX = 99;
     private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
     private static final List<String> SHADOW_PROGRAMS = List.of(
@@ -61,8 +58,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final String HAND_WATER_PROGRAM = "gbuffers_hand_water";
     private static final String DAMAGED_BLOCK_PROGRAM = "gbuffers_damagedblock";
     private static final int MAX_COLOR_TARGET_INDEX = 15;
-    private static final Pattern INCLUDE_DIRECTIVE = Pattern.compile(
-            "(?m)^[\\t ]*#include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>)[\\t ]*(?:\\r?\\n|$)");
     private static final Pattern GLSL_COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern COLOR_TARGET_CLEAR = Pattern.compile(
             "(?m)\\bconst\\s+bool\\s+colortex(\\d+)Clear\\s*=\\s*(true|false)\\s*;");
@@ -188,7 +183,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return hasShadowFragment() ? Optional.of(DEFAULT_SHADOW_FRAGMENT) : Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public boolean hasShadowWaterFragment() {
@@ -232,7 +227,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     if (source.isPresent()) {
                         Optional<String> vertexSource = readExpandedVertexProgram(programName, availableFiles);
                         programs.add(new Program(programName, expandIncludes(
-                                fileName, source.get(), new LinkedHashSet<>(), 0), vertexSource));
+                                fileName, source.get()), vertexSource));
                     }
                 }
             }
@@ -241,7 +236,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             Optional<String> source = readShader("final.fsh");
             if (source.isPresent()) {
                 programs.add(new Program("final", expandIncludes(
-                        "final.fsh", source.get(), new LinkedHashSet<>(), 0),
+                        "final.fsh", source.get()),
                         readExpandedVertexProgram("final", availableFiles)));
             }
         }
@@ -262,7 +257,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Map<Integer, ColorTargetSettings> readColorTargetSettings(
@@ -276,7 +271,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (source.isEmpty()) {
                 continue;
             }
-            String expanded = expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0);
+            String expanded = expandIncludes(fileName, source.get());
             parseColorTargetSettings(GLSL_COMMENTS.matcher(expanded).replaceAll(""), parsed, fileName);
             parseCommentedColorTargetFormats(expanded, parsed, fileName);
         }
@@ -572,7 +567,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Optional<String> readCloudFragment() throws IOException {
@@ -584,7 +579,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public boolean hasEntityFragment() {
@@ -616,7 +611,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Optional<String> readHandFragment(String programName) throws IOException {
@@ -630,7 +625,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Optional<String> readEntityFragment(String programName) throws IOException {
@@ -643,7 +638,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public boolean hasParticleFragment() {
@@ -660,7 +655,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public boolean hasWeatherFragment() {
@@ -677,7 +672,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Optional<String> readBeaconBeamFragment() throws IOException {
@@ -689,7 +684,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Optional<String> readLightningFragment() throws IOException {
@@ -701,7 +696,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public Optional<String> readBasicFragment() throws IOException {
@@ -748,7 +743,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+        return Optional.of(expandIncludes(fileName, source.get()));
     }
 
     private Set<String> listShaderFiles() throws IOException {
@@ -852,75 +847,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return Optional.of(new String(bytes, StandardCharsets.UTF_8));
     }
 
-    private String expandIncludes(String fileName, String source, Set<String> includeStack, int depth)
+    private String expandIncludes(String fileName, String source)
             throws IOException {
-        if (depth > MAX_INCLUDE_DEPTH) {
-            throw new IOException("Shader includes exceed the maximum nesting depth of " + MAX_INCLUDE_DEPTH + ".");
-        }
-        if (!includeStack.add(fileName)) {
-            throw new IOException("Shader include cycle detected at " + fileName + ".");
-        }
-
-        try {
-            Matcher matcher = INCLUDE_DIRECTIVE.matcher(source);
-            StringBuilder expanded = new StringBuilder(source.length());
-            int copiedThrough = 0;
-            while (matcher.find()) {
-                expanded.append(source, copiedThrough, matcher.start());
-                String requestedPath = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
-                String includePath = resolveIncludePath(fileName, requestedPath);
-                String includeSource = readShader(includePath)
-                        .orElseThrow(() -> new IOException("Shader include was not found: " + includePath));
-                String expandedInclude = expandIncludes(includePath, includeSource, includeStack, depth + 1);
-                expanded.append(expandedInclude);
-                if (matcher.group().endsWith("\n") && !expandedInclude.endsWith("\n")) {
-                    expanded.append('\n');
-                }
-                copiedThrough = matcher.end();
-                if (expanded.length() > MAX_EXPANDED_SHADER_CHARS) {
-                    throw new IOException("Expanded shader exceeds the 4 MiB size limit.");
-                }
-            }
-            expanded.append(source, copiedThrough, source.length());
-            if (expanded.length() > MAX_EXPANDED_SHADER_CHARS) {
-                throw new IOException("Expanded shader exceeds the 4 MiB size limit.");
-            }
-            return expanded.toString();
-        } finally {
-            includeStack.remove(fileName);
-        }
-    }
-
-    private static String resolveIncludePath(String includingFile, String requestedPath) throws IOException {
-        String portablePath = requestedPath.replace('\\', '/');
-        boolean rootRelative = portablePath.startsWith("/");
-        List<String> segments = new ArrayList<>();
-        if (!rootRelative) {
-            String parent = includingFile.contains("/")
-                    ? includingFile.substring(0, includingFile.lastIndexOf('/')) : "";
-            for (String segment : parent.split("/")) {
-                if (!segment.isEmpty()) {
-                    segments.add(segment);
-                }
-            }
-        }
-        for (String segment : portablePath.split("/")) {
-            if (segment.isEmpty() || segment.equals(".")) {
-                continue;
-            }
-            if (segment.equals("..")) {
-                if (segments.isEmpty()) {
-                    throw new IOException("Shader include escapes the shaders directory: " + requestedPath);
-                }
-                segments.remove(segments.size() - 1);
-            } else {
-                segments.add(segment);
-            }
-        }
-        if (segments.isEmpty()) {
-            throw new IOException("Shader include path is empty: " + requestedPath);
-        }
-        return String.join("/", segments);
+        return ShaderIncludes.expand(fileName, source, this::readShader);
     }
 
     private static Inspection inspectDirectory(Path path) throws IOException {

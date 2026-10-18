@@ -1349,8 +1349,30 @@ public final class VeyraRenderer {
         return lastError;
     }
 
+    public static String refreshPacks() {
+        ShaderPack previous = selectedPack().orElse(null);
+        try {
+            repository.refresh();
+        } catch (IOException exception) {
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not refresh shader packs.", exception);
+            return "Could not refresh packs: " + lastError;
+        }
+        if (previous == null) {
+            return "Shader pack list refreshed.";
+        }
+        ShaderPack refreshed = repository.findAvailable(previous.path()).orElse(null);
+        if (refreshed == null) {
+            return "The active pack is no longer available. " + disable();
+        }
+        // select() compiles before committing the selection, retaining the old pipelines on failure.
+        return select(refreshed);
+    }
+
     public static void onClientShutdown() {
         restoreUniqueOpaqueLayer();
+        replacePipelineSet(null);
+        replaceTerrainPipelines(null);
         replaceEntityPipelines(null);
         replaceBlockEntityPipelines(null);
         replaceHandPipelines(null);
@@ -1366,6 +1388,8 @@ public final class VeyraRenderer {
         replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
+        releaseColorTargets();
+        releaseSwapTargets();
         VeyraShadowRenderer.release();
     }
 
@@ -1602,51 +1626,58 @@ public final class VeyraRenderer {
     }
 
     public static String disable() {
+        IOException saveFailure = null;
         try {
             repository.select(null);
-            VeyraShadowRenderer.configure(ShadowSettings.DEFAULT);
-            updateTerrainLayerMode(null);
-            renderingEnabled = false;
-            pipelinesDirty = false;
-            terrainPipelineDirty = false;
-            entityPipelineDirty = false;
-            blockEntityPipelineDirty = false;
-            handPipelineDirty = false;
-            particlePipelineDirty = false;
-            weatherPipelineDirty = false;
-            lightningPipelineDirty = false;
-            basicPipelineDirty = false;
-            linePipelineDirty = false;
-            glintPipelineDirty = false;
-            skyBasicPipelineDirty = false;
-            skyTexturedPipelineDirty = false;
-            texturedPipelineDirty = false;
-            damagedBlockPipelineDirty = false;
-            beaconBeamPipelineDirty = false;
-            replacePipelineSet(null);
-            replaceTerrainPipelines(null);
-            replaceEntityPipelines(null);
-            replaceBlockEntityPipelines(null);
-            replaceHandPipelines(null);
-            replaceParticlePipelines(null);
-            replaceWeatherPipelines(null);
-            replaceLightningPipelines(null);
-            replaceBasicPipelines(null);
-            replaceLinePipelines(null);
-            replaceGlintPipelines(null);
-            replaceSkyBasicPipelines(null);
-            replaceSkyTexturedPipelines(null);
-            replaceWorldBorderPipelines(null);
-            replaceDamagedBlockPipelines(null);
-            replaceBeaconBeamPipelines(null);
-            replaceCloudPipeline(null);
-            VeyraShadowRenderer.clearBinding();
-            lastError = "";
-            return "Shader pack disabled.";
         } catch (IOException exception) {
-            lastError = shortError(exception);
-            return "Could not save the setting: " + lastError;
+            saveFailure = exception;
+            VeyraClient.LOGGER.error("Disabled shaders, but could not save the selection.", exception);
         }
+        // Disabling must remain possible even when the configuration directory is read-only.
+        repository.clearSelection();
+        VeyraShadowRenderer.configure(ShadowSettings.DEFAULT);
+        updateTerrainLayerMode(null);
+        renderingEnabled = false;
+        pipelinesDirty = false;
+        terrainPipelineDirty = false;
+        entityPipelineDirty = false;
+        blockEntityPipelineDirty = false;
+        handPipelineDirty = false;
+        particlePipelineDirty = false;
+        weatherPipelineDirty = false;
+        lightningPipelineDirty = false;
+        basicPipelineDirty = false;
+        linePipelineDirty = false;
+        glintPipelineDirty = false;
+        skyBasicPipelineDirty = false;
+        skyTexturedPipelineDirty = false;
+        texturedPipelineDirty = false;
+        damagedBlockPipelineDirty = false;
+        beaconBeamPipelineDirty = false;
+        cloudPipelineDirty = false;
+        replacePipelineSet(null);
+        replaceTerrainPipelines(null);
+        replaceEntityPipelines(null);
+        replaceBlockEntityPipelines(null);
+        replaceHandPipelines(null);
+        replaceParticlePipelines(null);
+        replaceWeatherPipelines(null);
+        replaceLightningPipelines(null);
+        replaceBasicPipelines(null);
+        replaceLinePipelines(null);
+        replaceGlintPipelines(null);
+        replaceSkyBasicPipelines(null);
+        replaceSkyTexturedPipelines(null);
+        replaceWorldBorderPipelines(null);
+        replaceDamagedBlockPipelines(null);
+        replaceBeaconBeamPipelines(null);
+        replaceCloudPipeline(null);
+        releaseColorTargets();
+        releaseSwapTargets();
+        VeyraShadowRenderer.release();
+        lastError = saveFailure == null ? "" : shortError(saveFailure);
+        return saveFailure == null ? "Shader pack disabled."
+                : "Shaders disabled for this session. Could not save the setting: " + lastError;
     }
 
     public static void invalidatePipelines() {
@@ -4182,6 +4213,27 @@ public final class VeyraRenderer {
         } else if (swapTargetB.width != width || swapTargetB.height != height) {
             swapTargetB.resize(width, height);
         }
+    }
+
+    private static void releaseSwapTargets() {
+        if (swapTargetA != null) {
+            swapTargetA.destroyBuffers();
+            swapTargetA = null;
+        }
+        if (swapTargetB != null) {
+            swapTargetB.destroyBuffers();
+            swapTargetB = null;
+        }
+    }
+
+    private static void releaseColorTargets() {
+        colorTargets.values().forEach(pair -> {
+            pair.targetA().destroyBuffers();
+            pair.targetB().destroyBuffers();
+        });
+        colorTargets.clear();
+        initializedColorTargets.clear();
+        currentColorTargets.clear();
     }
 
     private static void ensureColorTargets(int width, int height, Set<Integer> indices,

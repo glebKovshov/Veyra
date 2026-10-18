@@ -25,7 +25,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build mod
-        run: ./gradlew --no-daemon build
+        run: ./gradlew --no-daemon build validateShaders
 
       - name: Upload mod jar
         uses: actions/upload-artifact@v4

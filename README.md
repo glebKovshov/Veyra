@@ -5,7 +5,7 @@ Veyra is a client-side shader mod for Minecraft 1.21.11 on Fabric with VulkanMod
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11.
-2. Put the Veyra jar in the instance's `mods` folder.
+2. Download the mod jar from [Releases](https://github.com/glebKovshov/Veyra/releases) (not the `-sources.jar`). Put the Veyra jar in the instance's `mods` folder.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
 
@@ -70,7 +70,21 @@ Requirements: Java 21 and the included Gradle wrapper.
 .\gradlew.bat build
 ```
 
+On Linux/macOS, run `./gradlew build`. `build` runs the regression tests as well as compiling and remapping the mod. Run `./gradlew validateShaders` for CPU shaderc checks; CI and releases run both tasks. The build uses Fabric Loom 1.14.10.
+
 The jar is written to `build/libs/`. GitHub Actions builds on pushes and pull requests and uploads the jar as a workflow artifact.
+
+## Reloading and troubleshooting
+
+Press F6 to choose a pack. **Refresh list** also recompiles the active pack from disk. A compilation failure keeps the previous pipelines installed; removing or invalidating the active pack disables shaders. **Disable shaders** works for the current session even when the selection cannot be saved (the menu reports that error).
+
+VulkanMod **0.6.8** is required. Other versions need explicit compatibility testing because Veyra hooks internal VulkanMod classes. The mod declares Java 21 as a runtime dependency.
+
+Include expansion ignores commented-out directives and preserves comments used for render-target settings. Missing includes and recursive includes become GLSL `#error` directives at the original conditional location: the shader compiler rejects active errors and ignores inactive branches and guarded recursion. This is not a full GLSL preprocessor before interface adaptation; unsupported declarations inside conditional branches may still be rejected by the adapters. File traversal, source size, and expansion size restrictions remain enforced.
+
+Run `./gradlew packageExamplePacks` to package the example folders. Extract `build/distributions/veyra-example-packs-*.zip` into `shaderpacks/`. Start with `grayscale` or `animated` to check post-processing, then test the geometry and depth examples on your GPU.
+
+To publish, push a tag matching `v` plus `mod_version`, for example `v0.1.1+mc1.21.11`. The Release workflow builds and tests that exact commit before uploading the mod, sources, examples, and SHA-256 checksums. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the scope and validation limitations of this version.
 
 ## License
 

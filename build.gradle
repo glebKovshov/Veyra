@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.14-SNAPSHOT'
+    id 'fabric-loom' version '1.14.10'
     id 'maven-publish'
 }
 
@@ -25,6 +25,13 @@ dependencies {
     modCompileOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
     compileOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
     annotationProcessor 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 loom {
@@ -56,4 +63,41 @@ jar {
     from('LICENSE') {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
+}
+
+// Extract this archive into shaderpacks/ to install the self-contained example folders.
+tasks.register('packageExamplePacks', Zip) {
+    archiveBaseName = 'veyra-example-packs'
+    archiveVersion = project.version
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from('examples')
+}
+
+// CPU-only shader compiler checks, isolated from Minecraft's LWJGL dependency versions.
+sourceSets {
+    shaderSmoke {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+def smokeOs = System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT)
+def smokeArch = System.getProperty('os.arch').toLowerCase(java.util.Locale.ROOT)
+def smokeNatives = 'natives-' + (smokeOs.contains('win') ? 'windows' : smokeOs.contains('mac') ? 'macos' : 'linux')
+if (smokeArch in ['aarch64', 'arm64']) {
+    smokeNatives += '-arm64'
+}
+
+dependencies {
+    shaderSmokeImplementation 'org.lwjgl:lwjgl-shaderc:3.3.3'
+    shaderSmokeRuntimeOnly "org.lwjgl:lwjgl:3.3.3:${smokeNatives}"
+    shaderSmokeRuntimeOnly "org.lwjgl:lwjgl-shaderc:3.3.3:${smokeNatives}"
+}
+
+tasks.register('validateShaders', JavaExec) {
+    group = 'verification'
+    description = 'Validate example shaders and include guards with shaderc on the CPU (no GPU required).'
+    dependsOn tasks.named('shaderSmokeClasses')
+    classpath = sourceSets.shaderSmoke.runtimeClasspath
+    mainClass = 'dev.veyra.shader.ShaderCompileSmoke'
 }
