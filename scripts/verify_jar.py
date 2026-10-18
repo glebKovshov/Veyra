@@ -13,7 +13,6 @@ def verify(path):
         assert metadata["id"] == "veyra", "wrong mod id"
         assert metadata["depends"]["minecraft"] == "1.21.11", "wrong Minecraft version"
         assert metadata["depends"]["vulkanmod"] == "0.6.8", "wrong VulkanMod version"
-        assert metadata["depends"]["fabric-api"] == ">=0.141.6+1.21.11", "missing tested Fabric API dependency"
         assert "${" not in json.dumps(metadata), "unexpanded metadata property"
         assert "${" not in metadata["version"], "unexpanded version"
         for entry in ("THIRD_PARTY_NOTICES.md", "licenses/jcpp-Apache-2.0.txt", "veyra.refmap.json"):

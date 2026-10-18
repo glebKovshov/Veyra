@@ -76,7 +76,7 @@ def main():
     config = root / "veyra"
     config.mkdir(parents=True, exist_ok=True)
     (config / "selected-pack.txt").write_text("geometry-mrt", encoding="utf-8")
-    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:3\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n", encoding="utf-8")
+    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n", encoding="utf-8")
     print("Prepared original Minecraft 1.21.11 flat world and MRT fixture")
 
 

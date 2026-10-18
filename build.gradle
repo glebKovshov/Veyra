@@ -24,7 +24,10 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modCompileOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
     modRuntimeOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
-    modRuntimeOnly "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    modRuntimeOnly "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    runtimeOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
+    runtimeOnly 'org.lwjgl:lwjgl-vma:3.3.3'
+    runtimeOnly 'org.lwjgl:lwjgl-shaderc:3.3.3'
     compileOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
     annotationProcessor 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
     implementation('org.anarres:jcpp:1.4.14') { transitive = false }
@@ -49,9 +52,8 @@ loom {
 
 processResources {
     inputs.property 'version', project.version
-    inputs.property 'fabric_api_version', project.fabric_api_version
     filesMatching('fabric.mod.json') {
-        expand version: project.version, fabric_api_version: project.fabric_api_version
+        expand version: project.version
     }
 }
 
@@ -97,6 +99,9 @@ if (smokeArch in ['aarch64', 'arm64']) {
 }
 
 dependencies {
+    runtimeOnly "org.lwjgl:lwjgl-vma:3.3.3:${smokeNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-shaderc:3.3.3:${smokeNatives}"
+    if (smokeOs.contains('mac')) runtimeOnly "org.lwjgl:lwjgl-vulkan:3.3.3:${smokeNatives}"
     shaderSmokeImplementation 'org.lwjgl:lwjgl-shaderc:3.3.3'
     shaderSmokeImplementation('org.anarres:jcpp:1.4.14') { transitive = false }
     shaderSmokeRuntimeOnly 'org.slf4j:slf4j-api:2.0.17'
