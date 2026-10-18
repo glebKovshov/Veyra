@@ -4,6 +4,7 @@ import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkTextureView;
 import net.vulkanmod.vulkan.Vulkan;
+import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.vulkan.VK10;
 
@@ -71,7 +72,10 @@ public final class VeyraDepthTextureView extends VkTextureView {
 
         private void closeDepthImageView() {
             if (depthImageView != 0L) {
-                VK10.vkDestroyImageView(Vulkan.getVkDevice(), depthImageView, null);
+                // Submitted descriptors can still reference this borrowed depth view after a
+                // pack switch/resize. Retire it at VulkanMod's frame fence, like native images.
+                var device = Vulkan.getVkDevice();
+                MemoryManager.getInstance().addFrameOp(() -> VK10.vkDestroyImageView(device, depthImageView, null));
             }
             VkGlTexture.setVulkanImage(textureId, null);
             VkGlTexture.glDeleteTextures(textureId);

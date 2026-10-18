@@ -12,6 +12,7 @@
 - Initialized first-frame depth history with a real Vulkan transfer clear, including usage/format checks and layout transitions. VulkanMod's unbound `clearDepthTexture` only queues a later attachment clear and is insufficient for immediate sampling.
 - Added source/configuration caches scoped to a pack load. Reload creates fresh snapshots; changing options recompiles only when values change.
 - Retired unused synthetic native pipelines through VulkanMod's frame cleanup queue and pruned Veyra shader-source caches. Reset lazy shadow and depth-copy pipeline state on reload/disable.
+- Deferred sampled depth-view destruction through the frame cleanup queue instead of destroying an image view while submitted descriptors may still reference it.
 - Added explicit errors for unsupported required Iris features and active compute, geometry, tessellation or begin stages.
 - Added a read-only external shaderpack source audit, 22 new regression tests (57 total), embedded JCPP license notices, distributable checks and CI test-report artifacts.
 - Remaining release blockers: arbitrary geometry vertex inputs, geometry MRT, unsupported samplers/custom uniforms, compute/tessellation execution, and real client/Vulkan validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
