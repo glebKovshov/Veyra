@@ -51,7 +51,7 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex0'.",
       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler 'colortex0'.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes uses unsupported sampler 'colortex0'.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'.",
+      "gbuffers_terrain.fsh adapter: A geometry output location is missing its draw-buffer mapping.",
       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'."
     ],
     "visualValidation": false
@@ -80,7 +80,7 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex0'.",
       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler 'colortex0'.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes uses unsupported sampler 'colortex0'.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'.",
+      "gbuffers_terrain.fsh adapter: A geometry output location is missing its draw-buffer mapping.",
       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'."
     ],
     "visualValidation": false
@@ -161,7 +161,7 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex0'.",
       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler 'colortex0'.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes uses unsupported sampler 'colortex0'.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'.",
+      "gbuffers_terrain.fsh adapter: A geometry output location is missing its draw-buffer mapping.",
       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'."
     ],
     "visualValidation": false
@@ -190,7 +190,7 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex0'.",
       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler 'colortex0'.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes uses unsupported sampler 'colortex0'.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'.",
+      "gbuffers_terrain.fsh adapter: A geometry output location is missing its draw-buffer mapping.",
       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'."
     ],
     "visualValidation": false
@@ -271,7 +271,7 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex0'.",
       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler 'colortex0'.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes uses unsupported sampler 'colortex0'.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'.",
+      "gbuffers_terrain.fsh adapter: A geometry output location is missing its draw-buffer mapping.",
       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'."
     ],
     "visualValidation": false
@@ -300,7 +300,7 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex0'.",
       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler 'colortex0'.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes uses unsupported sampler 'colortex0'.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'.",
+      "gbuffers_terrain.fsh adapter: A geometry output location is missing its draw-buffer mapping.",
       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler 'colortex0'."
     ],
     "visualValidation": false

@@ -30,7 +30,8 @@
     "RendererGeometryTargetsMixin",
     "accessor.PipelineStateAccessor",
     "accessor.RendererFramebufferAccessor",
-    "accessor.NativePipelineRegistryAccessor"
+    "accessor.NativePipelineRegistryAccessor",
+    "SwapChainMixin"
   ],
   "injectors": {
     "defaultRequire": 1

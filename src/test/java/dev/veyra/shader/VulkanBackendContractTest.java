@@ -45,4 +45,10 @@ class VulkanBackendContractTest {
         assertTrue(read("net/vulkanmod/vulkan/Renderer").fields.stream().anyMatch(field ->
                 field.name.equals("boundFramebuffer") && field.desc.equals("Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;")));
     }
+    @Test void swapchainUsageHooksMatchPinnedBackend() throws IOException {
+        requiresCall("net/vulkanmod/vulkan/framebuffer/SwapChain", "createSwapChain", "org/lwjgl/vulkan/VkSwapchainCreateInfoKHR", "imageUsage",
+                "(I)Lorg/lwjgl/vulkan/VkSwapchainCreateInfoKHR;");
+        requiresCall("net/vulkanmod/vulkan/framebuffer/SwapChain", "createSwapChain", "net/vulkanmod/vulkan/texture/VulkanImage", "<init>",
+                "(Ljava/lang/String;JIIIIIIJ)V");
+    }
 }

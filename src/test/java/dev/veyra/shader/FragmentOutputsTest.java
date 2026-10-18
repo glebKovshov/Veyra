@@ -39,9 +39,17 @@ class FragmentOutputsTest {
         for (String source : List.of(
                 "/* RENDERTARGETS:0,0 */\nvoid main(){gl_FragData[0]=vec4(1);}",
                 "/* RENDERTARGETS:16 */\nvoid main(){gl_FragColor=vec4(1);}",
-                "/* DRAWBUFFERS:0 */\nvoid main(){gl_FragData[1]=vec4(1);}",
                 "void main(){int i=1;gl_FragData[i]=vec4(1);}",
                 "layout(location=0) out vec4 color;\nvoid main(){gl_FragData[0]=vec4(1);}"))
             assertThrows(IOException.class, () -> FragmentOutputs.parse(source), source);
+    }
+    @Test void preservesDataflowForOutputsNotBoundByDrawBuffers() throws IOException {
+        String source = "/* DRAWBUFFERS:0 */\nvoid main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}";
+        var outputs = FragmentOutputs.parse(source);
+        assertTrue(outputs.sceneOnly());
+        assertTrue(outputs.declarations().contains("vec4 veyraFragData1;"));
+        assertFalse(outputs.declarations().contains("layout(location = 1)"));
+        String adapted = TerrainShaderAdapter.adaptFragment(source);
+        assertTrue(adapted.contains("veyraFragData0=veyraFragData1"));
     }
 }

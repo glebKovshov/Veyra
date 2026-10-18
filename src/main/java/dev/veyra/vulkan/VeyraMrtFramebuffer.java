@@ -31,9 +31,12 @@ public final class VeyraMrtFramebuffer extends Framebuffer implements AutoClosea
         height = colors.getFirst().height;
         format = colors.getFirst().format;
         depthFormat = depth == null ? VK_FORMAT_UNDEFINED : depth.format;
-        for (VulkanImage image : colors) {
-            if (image.width != width || image.height != height || (image.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) == 0)
-                throw new IllegalArgumentException("Geometry MRT attachments must have equal dimensions and color-attachment usage.");
+        for (int i = 0; i < colors.size(); i++) {
+            VulkanImage image = colors.get(i);
+            if (image.width != width || image.height != height)
+                throw new IllegalArgumentException("Geometry color slot " + i + " is " + image.width + "x" + image.height + "; expected " + width + "x" + height + ".");
+            if ((image.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) == 0)
+                throw new IllegalArgumentException("Geometry color slot " + i + " lacks color-attachment usage (reported flags " + image.usage + ").");
         }
         if (depth != null && (depth.width != width || depth.height != height))
             throw new IllegalArgumentException("Geometry MRT depth dimensions differ from its color attachments.");

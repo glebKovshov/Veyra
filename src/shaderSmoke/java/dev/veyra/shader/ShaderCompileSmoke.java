@@ -50,7 +50,11 @@ public class ShaderCompileSmoke {
             compile(compiler, options, "#version 450\n" + guarded + "layout(location=0) out vec4 color;\nvoid main(){color=vec4(1);}\n", "guarded-recursion", true);
             String recursive = ShaderIncludes.expand("loop.glsl", "#include \"loop.glsl\"\n", p -> Optional.of("#include \"loop.glsl\"\n"));
             compile(compiler, options, "#version 450\n" + recursive + "void main(){}\n", "unguarded-recursion", false);
+            compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
+                    + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
+                    "unbound-fragment-output-dataflow", true);
             System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include compiler checks passed.");
+            System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
             shaderc_compiler_release(compiler);

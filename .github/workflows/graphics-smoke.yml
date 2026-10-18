@@ -29,13 +29,15 @@ jobs:
       - name: Install software Vulkan and validation layers
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools vulkan-validationlayers xvfb libglfw3
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools vulkan-validationlayers xvfb libglfw3 libflite1
       - name: Prepare original validation world
         run: python3 scripts/prepare_graphics_smoke.py
       - name: Launch Minecraft with software Vulkan
         shell: bash
         env:
           LP_NUM_THREADS: '2'
+          XDG_SESSION_TYPE: x11
+          ALSOFT_DRIVERS: 'null'
           VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
         run: |
           set -o pipefail

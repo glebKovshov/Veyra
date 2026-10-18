@@ -35,7 +35,8 @@ public final class VeyraGeometryTargets {
     public static void register(GraphicsPipeline pipeline, FragmentOutputs layout, GeometryBlendSettings blend) {
         if (layout.targets().size() > VeyraDeviceFeatures.maxColorAttachments)
             throw new IllegalStateException("This geometry program exceeds the Vulkan device's color attachment limit.");
-        if (!VeyraDeviceFeatures.independentBlendEnabled && layout.variables().size() != layout.targets().size())
+        if (!VeyraDeviceFeatures.independentBlendEnabled && java.util.stream.IntStream.range(0, layout.targets().size())
+                .filter(layout::writes).count() != layout.targets().size())
             throw new IllegalStateException("Sparse geometry output masks require Vulkan independentBlend support.");
         if (!VeyraDeviceFeatures.independentBlendEnabled && layout.targets().size() > 1 && !blend.targets().isEmpty())
             throw new IllegalStateException("Per-buffer geometry blend properties require Vulkan independentBlend support.");

@@ -22,6 +22,7 @@ public final class GraphicsSmoke {
             if (++ticks > 2400) throw new IllegalStateException("Timed out waiting for the validation world/readback; screen=" + client.screen);
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
+            client.options.hideGui = true;
             client.player.setXRot(35.0F);
             client.player.setYRot(45.0F);
             if (stage == 0 && worldTicks >= 160) {

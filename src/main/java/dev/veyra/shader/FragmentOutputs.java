@@ -59,7 +59,6 @@ public record FragmentOutputs(List<Integer> targets, Map<Integer, String> variab
             variables.putIfAbsent(0, "veyraFragColor");
         int locations = variables.keySet().stream().mapToInt(Integer::intValue).max().orElse(0) + 1;
         if (targets.isEmpty()) for (int i = 0; i < locations; i++) targets.add(i);
-        if (locations > targets.size()) throw new IOException("A geometry output location is missing its draw-buffer mapping.");
         return new FragmentOutputs(targets, variables);
     }
 
@@ -70,9 +69,12 @@ public record FragmentOutputs(List<Integer> targets, Map<Integer, String> variab
 
     public String declarations() {
         StringBuilder result = new StringBuilder();
-        variables.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> result
-                .append("layout(location = ").append(entry.getKey()).append(") out vec4 ")
-                .append(entry.getValue()).append(";\n"));
+        variables.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            if (entry.getKey() < targets.size()) result.append("layout(location = ").append(entry.getKey()).append(") out ");
+            // glDrawBuffers leaves higher output slots unbound (GL_NONE). Keep assignments
+            // and subsequent intra-invocation reads as private variables, without a Vulkan attachment.
+            result.append("vec4 ").append(entry.getValue()).append(";\n");
+        });
         return result.toString();
     }
 

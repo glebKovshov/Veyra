@@ -1934,9 +1934,11 @@ public final class VeyraRenderer {
             FrameUniforms frameUniforms = shaderPackFrameUniforms;
             for (ShaderPass shaderPass : framePlan.shaderPasses()) {
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
+                prepareSampledTargets(graph, targets, shaderPass.sampledTargets());
                 shaderPass.pass().addToFrame(graph, targets, samplerInfo);
             }
             if (framePlan.copyPass() != null) {
+                prepareSampledTargets(graph, targets, Set.of(framePlan.copyInputTarget()));
                 framePlan.copyPass().addToFrame(graph, targets, samplerInfo);
             }
             DepthSamplerState depthSamplerState = null;
@@ -1984,6 +1986,31 @@ public final class VeyraRenderer {
         lastError = "";
         VeyraClient.LOGGER.info("Loaded {} post-processing pass(es) from shader pack '{}'.",
                 pipelineSet.passCount(), pack.name());
+    }
+
+    private static void prepareSampledTargets(FrameGraphBuilder graph,
+            Map<Identifier, ResourceHandle<RenderTarget>> targets, Set<Identifier> sampledTargets) {
+        FramePass transition = graph.addPass("veyra:sampled-image-transitions");
+        List<ResourceHandle<RenderTarget>> images = new ArrayList<>();
+        for (Identifier id : sampledTargets) {
+            ResourceHandle<RenderTarget> input = targets.get(id);
+            if (input == null) throw new IllegalStateException("Missing sampled render target " + id);
+            // A layout transition writes resource state. Advancing its graph version orders
+            // this barrier after the producer and before PostPass consumes the new handle.
+            ResourceHandle<RenderTarget> ready = transition.readsAndWrites(input);
+            targets.put(id, ready);
+            images.add(ready);
+        }
+        transition.executes(() -> {
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                for (ResourceHandle<RenderTarget> handle : images) {
+                    GpuTexture color = handle.get().getColorTexture();
+                    if (!(color instanceof VkGpuTexture texture)) throw new IllegalStateException("Shaderpack input is not a Vulkan image.");
+                    texture.getVulkanImage().transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                }
+            }
+        });
     }
 
     private static PipelineSet compilePipelines(ShaderPack pack, int width, int height) throws IOException {
@@ -3628,6 +3655,8 @@ public final class VeyraRenderer {
 
                 Identifier inputColortex0 = currentTargets.get(0);
                 for (PipelineProgram program : group.outputs()) {
+                    Set<Identifier> sampledTargets = new java.util.LinkedHashSet<>();
+                    sampledTargets.add(inputColortex0);
                     List<PostPass.Input> inputs = new ArrayList<>();
                     inputs.add(new PostPass.TargetInput("In", inputColortex0, false, true));
                     for (int samplerIndex : program.colorSamplers()) {
@@ -3636,6 +3665,7 @@ public final class VeyraRenderer {
                         }
                         inputs.add(new PostPass.TargetInput(
                                 colorTargetInputName(samplerIndex), currentTargets.get(samplerIndex), false, true));
+                        sampledTargets.add(currentTargets.get(samplerIndex));
                     }
                     if (program.usesDepthSampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH_INPUT_NAME));
@@ -3652,7 +3682,7 @@ public final class VeyraRenderer {
                     PostPass pass = new PostPass(program.pipeline(),
                             outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
-                    passes.add(new ShaderPass(pass, program));
+                    passes.add(new ShaderPass(pass, program, Set.copyOf(sampledTargets)));
                     if (usesDynamicUniforms(program)) {
                         makeDynamicUniformBuffer(pass, program, width, height);
                     }
@@ -3671,7 +3701,7 @@ public final class VeyraRenderer {
                     outputColorTargets.put(index, target);
                 }
             });
-            return new FramePlan(List.copyOf(passes), copyPass,
+            return new FramePlan(List.copyOf(passes), copyPass, copyPass == null ? null : finalColortex0,
                     Map.copyOf(initialColorTargets), Map.copyOf(outputColorTargets));
         } catch (RuntimeException exception) {
             passes.forEach(shaderPass -> shaderPass.pass().close());
@@ -4779,7 +4809,7 @@ public final class VeyraRenderer {
     private record OutputMapping(int fragmentOutputIndex, int targetIndex) {
     }
 
-    private record ShaderPass(PostPass pass, PipelineProgram program) {
+    private record ShaderPass(PostPass pass, PipelineProgram program, Set<Identifier> sampledTargets) {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
@@ -4815,7 +4845,7 @@ public final class VeyraRenderer {
                 new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i());
     }
 
-    private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass,
+    private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,
                              Map<Integer, Identifier> initialColorTargets,
                              Map<Integer, Identifier> outputColorTargets) implements AutoCloseable {
         @Override
