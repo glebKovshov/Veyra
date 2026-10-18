@@ -2119,11 +2119,15 @@ public final class VeyraRenderer {
             String fragmentSource;
             boolean requiresNormal = false;
             boolean requiresLightmap = false;
+            boolean requiresViewPosition = false;
+            boolean requiresViewNormal = false;
             try {
                 fragmentSource = (hand ? pack.readHandFragment(programName) : pack.readEntityFragment(programName))
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
+                requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
+                requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             } catch (IOException exception) {
                 if (!fallback) {
@@ -2139,7 +2143,8 @@ public final class VeyraRenderer {
             if (entityPipeline == null) {
                 try {
                     entityPipeline = compileEntityPipeline(
-                            original, fragmentSource, sourceHash, requiresNormal, requiresLightmap, false, programName);
+                            original, fragmentSource, sourceHash, requiresNormal, requiresLightmap,
+                            requiresViewPosition, requiresViewNormal, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2167,6 +2172,8 @@ public final class VeyraRenderer {
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
         boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
         boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
+        boolean requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
+        boolean requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
         fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
         String sourceHash = sha256(programName + '\n' + fragmentSource);
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
@@ -2187,10 +2194,10 @@ public final class VeyraRenderer {
                                 + original.getLocation().getPath().replace('/', '_'));
                 Identifier vertexShader = original.getVertexShader();
                 String adaptedVertex = null;
-                if (requiresNormal || requiresLightmap) {
+                if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal) {
                     adaptedVertex = EntityShaderAdapter.adaptVertexShader(
                             shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName,
-                            requiresNormal, requiresLightmap);
+                            requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
                     vertexShader = entityNormalVertexShader(original, sourceHash, true);
                 }
                 Identifier selectedVertexShader = vertexShader;
@@ -2235,11 +2242,15 @@ public final class VeyraRenderer {
             String fragmentSource;
             boolean requiresNormal = false;
             boolean requiresLightmap = false;
+            boolean requiresViewPosition = false;
+            boolean requiresViewNormal = false;
             try {
                 fragmentSource = pack.readBlockFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
+                requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
+                requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             } catch (IOException exception) {
                 if (!fallback) {
@@ -2255,7 +2266,8 @@ public final class VeyraRenderer {
             if (blockPipeline == null) {
                 try {
                     blockPipeline = compileEntityPipeline(
-                            original, fragmentSource, sourceHash, requiresNormal, requiresLightmap, false, programName);
+                            original, fragmentSource, sourceHash, requiresNormal, requiresLightmap,
+                            requiresViewPosition, requiresViewNormal, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2286,10 +2298,12 @@ public final class VeyraRenderer {
                 .toList();
         String fragmentSource;
         boolean requiresLightmap;
+        boolean requiresViewPosition;
         try {
             fragmentSource = pack.readBlockFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
             requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
+            requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
             fragmentSource = EntityShaderAdapter.adaptTextFragment(fragmentSource, programName);
         } catch (IOException exception) {
             VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
@@ -2303,7 +2317,8 @@ public final class VeyraRenderer {
             if (textPipeline == null) {
                 try {
                     textPipeline = compileEntityPipeline(
-                            original, fragmentSource, sourceHash, false, requiresLightmap, false, programName);
+                            original, fragmentSource, sourceHash, false, requiresLightmap,
+                            requiresViewPosition, false, false, programName);
                 } catch (IOException exception) {
                     VeyraClient.LOGGER.warn("Skipping sign text pipeline {} for {}: {}",
                             original.getLocation(), programName, exception.getMessage());
@@ -2413,21 +2428,23 @@ public final class VeyraRenderer {
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash) throws IOException {
         return compileEntityPipeline(original, fragmentSource, sourceHash,
-                false, false, false, "gbuffers_entities");
+                false, false, false, false, false, "gbuffers_entities");
     }
 
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash,
-            boolean requiresNormal, boolean requiresLightmap, boolean shadowPass, String programName) throws IOException {
+            boolean requiresNormal, boolean requiresLightmap,
+            boolean requiresViewPosition, boolean requiresViewNormal,
+            boolean shadowPass, String programName) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/entities/" + sourceHash);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
-        if (requiresNormal || requiresLightmap) {
+        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal) {
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
                     shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName,
-                    requiresNormal, requiresLightmap);
+                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         }
         Identifier selectedVertexShader = vertexShader;
