@@ -58,6 +58,7 @@ import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.PipelineConfig;
 import net.vulkanmod.vulkan.shader.SPIRVUtils;
+import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.joml.Matrix4f;
@@ -269,6 +270,8 @@ public final class VeyraRenderer {
     private static boolean frameMatricesInitialized;
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
     private static boolean cameraUniformsInitialized;
+    private static volatile FrameUniforms shaderPackFrameUniforms = FrameUniforms.ZERO;
+    private static boolean terrainShaderUniformsRegistered;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
     private static boolean entityPipelineDirty = true;
@@ -308,6 +311,7 @@ public final class VeyraRenderer {
 
     public static void initialize(ShaderPackRepository packRepository) {
         repository = packRepository;
+        registerTerrainShaderUniforms();
         VeyraShadowRenderer.initialize();
         packRepository.getSelected().ifPresent(pack -> {
             try {
@@ -371,6 +375,68 @@ public final class VeyraRenderer {
         updateTerrainLayerMode(packRepository.getSelected().orElse(null));
     }
 
+    private static void registerTerrainShaderUniforms() {
+        if (terrainShaderUniformsRegistered) {
+            return;
+        }
+        for (TerrainShaderAdapter.ShaderUniform uniform : TerrainShaderAdapter.shaderPackUniforms()) {
+            if (uniform.sourceType().equals("float")) {
+                Uniforms.vec1f_uniformMap.put(uniform.name(), () -> terrainShaderFloatUniform(uniform.name()));
+            } else {
+                Uniforms.vec1i_uniformMap.put(uniform.name(), () -> terrainShaderIntUniform(uniform.name()));
+            }
+        }
+        terrainShaderUniformsRegistered = true;
+    }
+
+    private static float terrainShaderFloatUniform(String name) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (name.equals("viewWidth")) {
+            return minecraft.getWindow().getWidth();
+        }
+        if (name.equals("viewHeight")) {
+            return minecraft.getWindow().getHeight();
+        }
+        if (name.equals("aspectRatio")) {
+            int height = minecraft.getWindow().getHeight();
+            return height == 0 ? 0.0F : (float) minecraft.getWindow().getWidth() / height;
+        }
+
+        FrameUniforms frame = shaderPackFrameUniforms;
+        return switch (name) {
+            case "frameTimeCounter" -> frame.frameTimeCounter();
+            case "frameTime" -> frame.frameTime();
+            case "sunAngle" -> frame.sunAngle();
+            case "rainStrength" -> frame.rainStrength();
+            case "wetness" -> frame.wetness();
+            case "thunderStrength" -> frame.thunderStrength();
+            case "eyeAltitude" -> frame.eyeAltitude();
+            case "screenBrightness" -> frame.screenBrightness();
+            case "blindness" -> frame.blindness();
+            case "nightVision" -> frame.nightVision();
+            case "darknessFactor" -> frame.darknessFactor();
+            default -> throw new IllegalArgumentException("Unknown terrain shader pack uniform " + name + ".");
+        };
+    }
+
+    private static int terrainShaderIntUniform(String name) {
+        FrameUniforms frame = shaderPackFrameUniforms;
+        return switch (name) {
+            case "frameCounter" -> frame.frameCounter();
+            case "worldTime" -> frame.worldTime();
+            case "worldDay" -> frame.worldDay();
+            case "isEyeInWater" -> frame.isEyeInWater();
+            case "isSpectator" -> frame.isSpectator() ? 1 : 0;
+            case "is_sneaking" -> frame.isSneaking() ? 1 : 0;
+            case "is_sprinting" -> frame.isSprinting() ? 1 : 0;
+            case "is_on_ground" -> frame.isOnGround() ? 1 : 0;
+            case "is_hurt" -> frame.isHurt() ? 1 : 0;
+            case "is_invisible" -> frame.isInvisible() ? 1 : 0;
+            case "is_burning" -> frame.isBurning() ? 1 : 0;
+            default -> throw new IllegalArgumentException("Unknown terrain shader pack uniform " + name + ".");
+        };
+    }
+
     public static Optional<ShaderPack> selectedPack() {
         return repository == null ? Optional.empty() : repository.getSelected();
     }
@@ -404,6 +470,10 @@ public final class VeyraRenderer {
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition());
         cameraUniformsInitialized = true;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level != null && minecraft.player != null) {
+            shaderPackFrameUniforms = updateFrameUniforms(minecraft);
+        }
     }
 
     public static void captureDepthTex1() {
@@ -1507,7 +1577,7 @@ public final class VeyraRenderer {
             }
 
             var samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
-            FrameUniforms frameUniforms = updateFrameUniforms(minecraft);
+            FrameUniforms frameUniforms = shaderPackFrameUniforms;
             for (ShaderPass shaderPass : framePlan.shaderPasses()) {
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
                 shaderPass.pass().addToFrame(graph, targets, samplerInfo);
@@ -1878,7 +1948,7 @@ public final class VeyraRenderer {
     }
 
     private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable) {
-        PipelineConfig.UB terrainUniforms = PipelineConfig.UB.builder(
+        PipelineConfig.UB.Builder terrainUniforms = PipelineConfig.UB.builder(
                         1, org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_ALL_GRAPHICS)
                 .addUniform("vec4", "FogColor")
                 .addUniform("float", "FogEnvironmentalStart")
@@ -1892,11 +1962,14 @@ public final class VeyraRenderer {
                 .addUniform("vec2", "TexelSize")
                 .addUniform("int", "UseRgss")
                 .addUniform("mat4", "shadowModelView")
-                .addUniform("mat4", "shadowProjection")
-                .build();
+                .addUniform("mat4", "shadowProjection");
+        for (TerrainShaderAdapter.ShaderUniform uniform : TerrainShaderAdapter.shaderPackUniforms()) {
+            terrainUniforms.addUniform(uniform.bufferType(), uniform.name());
+        }
+        PipelineConfig.UB terrainUniformBuffer = terrainUniforms.build();
         PipelineConfig.Builder config = PipelineConfig.builder()
                 .addUB(PipelineConfigs.TERRAIN_UB0)
-                .addUB(terrainUniforms)
+                .addUB(terrainUniformBuffer)
                 .addUB(PipelineConfigs.TERRAIN_UB2)
                 .setPushConstants(PipelineConfigs.TERRAIN_PC)
                 .addImageDescriptor(3, "sampler2D", "Sampler0", 0)

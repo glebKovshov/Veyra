@@ -16,6 +16,8 @@ public final class TerrainShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?float\\s+alphaTestRef\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SHADOW_MATRIX_UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+mat4\\s+(?:shadowModelView|shadowProjection)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern SHADERPACK_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
@@ -41,6 +43,32 @@ public final class TerrainShaderAdapter {
             Map.entry("gl_Color", new Varying("vec4", 0)),
             Map.entry("shadowPos", new Varying("vec4", 6)),
             Map.entry("shadowCoord", new Varying("vec4", 6)));
+    private static final List<ShaderUniform> SHADERPACK_UNIFORMS = List.of(
+            new ShaderUniform("viewWidth", "float", false),
+            new ShaderUniform("viewHeight", "float", false),
+            new ShaderUniform("aspectRatio", "float", false),
+            new ShaderUniform("frameTimeCounter", "float", false),
+            new ShaderUniform("frameTime", "float", false),
+            new ShaderUniform("frameCounter", "int", false),
+            new ShaderUniform("sunAngle", "float", false),
+            new ShaderUniform("rainStrength", "float", false),
+            new ShaderUniform("wetness", "float", false),
+            new ShaderUniform("thunderStrength", "float", false),
+            new ShaderUniform("worldTime", "int", false),
+            new ShaderUniform("worldDay", "int", false),
+            new ShaderUniform("eyeAltitude", "float", false),
+            new ShaderUniform("screenBrightness", "float", false),
+            new ShaderUniform("blindness", "float", false),
+            new ShaderUniform("nightVision", "float", false),
+            new ShaderUniform("darknessFactor", "float", false),
+            new ShaderUniform("isEyeInWater", "int", false),
+            new ShaderUniform("isSpectator", "bool", true),
+            new ShaderUniform("is_sneaking", "bool", true),
+            new ShaderUniform("is_sprinting", "bool", true),
+            new ShaderUniform("is_on_ground", "bool", true),
+            new ShaderUniform("is_hurt", "bool", true),
+            new ShaderUniform("is_invisible", "bool", true),
+            new ShaderUniform("is_burning", "bool", true));
 
     private static final String FRAGMENT_BRIDGE = """
             layout(binding = 1) uniform VeyraTerrainUniformBuffer {
@@ -57,6 +85,7 @@ public final class TerrainShaderAdapter {
                 int UseRgss;
                 mat4 shadowModelView;
                 mat4 shadowProjection;
+                __VEYRA_SHADERPACK_UNIFORMS__
             };
             layout(binding = 3) uniform sampler2D Sampler0;
             layout(binding = 4) uniform sampler2D LightTexture;
@@ -135,8 +164,28 @@ public final class TerrainShaderAdapter {
         }
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
+        Matcher uniformMatcher = SHADERPACK_UNIFORM_DECLARATION.matcher(adapted);
+        StringBuffer withoutShaderPackUniforms = new StringBuffer();
+        java.util.Map<String, String> declaredUniforms = new java.util.HashMap<>();
+        while (uniformMatcher.find()) {
+            String type = uniformMatcher.group(1);
+            String name = uniformMatcher.group(2);
+            ShaderUniform uniform = shaderPackUniform(name);
+            if (uniform == null) {
+                throw new IOException("gbuffers_terrain custom uniform '" + name + "' is not supported yet.");
+            }
+            if (!uniform.accepts(type)) {
+                throw new IOException("gbuffers_terrain uniform '" + name + "' must use " + uniform.sourceTypeDescription() + ".");
+            }
+            if (declaredUniforms.putIfAbsent(name, type) != null) {
+                throw new IOException("gbuffers_terrain declares uniform '" + name + "' more than once.");
+            }
+            uniformMatcher.appendReplacement(withoutShaderPackUniforms, "");
+        }
+        uniformMatcher.appendTail(withoutShaderPackUniforms);
+        adapted = withoutShaderPackUniforms.toString();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_terrain custom uniforms are not supported yet; alphaTestRef and the built-in samplers are available.");
+            throw new IOException("gbuffers_terrain has an unsupported uniform declaration; supported Iris scalar uniforms and the built-in samplers are available.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
@@ -201,7 +250,9 @@ public final class TerrainShaderAdapter {
         for (String extension : extensions) {
             result.append(extension).append('\n');
         }
-        String bridge = FRAGMENT_BRIDGE;
+        String bridge = FRAGMENT_BRIDGE
+                .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
+                .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms) + "#define texture Sampler0");
         if (!shadowSamplerAvailable) {
             bridge = bridge.replace("            layout(binding = 5) uniform sampler2D VeyraShadowSampler;\n", "")
                     .replace("            #define shadowtex0 VeyraShadowSampler\n", "")
@@ -211,6 +262,42 @@ public final class TerrainShaderAdapter {
                 .replace("veyraFragColor;", outputName + ";")
                 .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName));
         return result.append(adapted).toString();
+    }
+
+    public static List<ShaderUniform> shaderPackUniforms() {
+        return SHADERPACK_UNIFORMS;
+    }
+
+    private static ShaderUniform shaderPackUniform(String name) {
+        return SHADERPACK_UNIFORMS.stream()
+                .filter(uniform -> uniform.name().equals(name))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static String shaderPackUniformFields() {
+        StringBuilder fields = new StringBuilder();
+        for (ShaderUniform uniform : SHADERPACK_UNIFORMS) {
+            fields.append("    ").append(uniform.bufferType()).append(' ')
+                    .append(uniform.blockMemberName()).append(";\n");
+        }
+        return fields.toString().stripTrailing();
+    }
+
+    private static String shaderPackUniformMacros(Map<String, String> declaredUniforms) {
+        StringBuilder macros = new StringBuilder();
+        for (ShaderUniform uniform : SHADERPACK_UNIFORMS) {
+            if (uniform.booleanField()) {
+                macros.append("#define ").append(uniform.name()).append(' ');
+                if ("int".equals(declaredUniforms.get(uniform.name()))) {
+                    macros.append(uniform.blockMemberName());
+                } else {
+                    macros.append('(').append(uniform.blockMemberName()).append(" != 0)");
+                }
+                macros.append('\n');
+            }
+        }
+        return macros.toString();
     }
 
     public static String adaptVertex(String source) throws IOException {
@@ -247,5 +334,23 @@ public final class TerrainShaderAdapter {
     }
 
     private record Varying(String type, int location) {
+    }
+
+    public record ShaderUniform(String name, String sourceType, boolean booleanField) {
+        public String bufferType() {
+            return booleanField ? "int" : sourceType;
+        }
+
+        public String blockMemberName() {
+            return booleanField ? "veyra_" + name : name;
+        }
+
+        public boolean accepts(String type) {
+            return booleanField ? type.equals("bool") || type.equals("int") : type.equals(sourceType);
+        }
+
+        public String sourceTypeDescription() {
+            return booleanField ? "bool or int" : sourceType;
+        }
     }
 }
