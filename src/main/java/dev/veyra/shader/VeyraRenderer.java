@@ -19,11 +19,13 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.RenderSetupAccessor;
+import dev.veyra.mixin.accessor.RenderTargetAccessor;
 import dev.veyra.mixin.accessor.RenderTypeAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
@@ -44,12 +46,14 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.gl.VkGlTexture;
+import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.shader.PipelineConfigs;
 import net.vulkanmod.render.shader.PipelineManager;
 import net.vulkanmod.render.shader.ShaderLoadUtil;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.PipelineConfig;
@@ -61,6 +65,7 @@ import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkFormatProperties;
 import org.lwjgl.vulkan.VK10;
 
 import java.io.IOException;
@@ -121,6 +126,8 @@ public final class VeyraRenderer {
     private static final Pattern GL_FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]");
     private static final Pattern RENDERTARGETS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
     private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
+    private static final Pattern COLOR_TARGET_FORMAT_DECLARATION = Pattern.compile(
+            "(?m)\\bconst\\s+int\\s+colortex\\d+Format\\s*=\\s*[A-Za-z_][A-Za-z0-9_]*\\s*;");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
     private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
@@ -1237,7 +1244,8 @@ public final class VeyraRenderer {
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
             ensureSwapTargets(mainTarget.width, mainTarget.height);
-            ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices());
+            ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
+                    pipelineSet.colorTargetSettings());
             clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
             FramePlan framePlan = pipelineSet.framePlan(currentColorTargets);
 
@@ -1314,7 +1322,8 @@ public final class VeyraRenderer {
 
     private static PipelineSet compilePipelines(ShaderPack pack, int width, int height) throws IOException {
         List<ShaderPack.Program> sources = pack.readPrograms();
-        Map<Integer, ColorTargetSettings> colorTargetSettings = pack.readColorTargetSettings();
+        Map<Integer, ColorTargetSettings> colorTargetSettings = new HashMap<>(pack.readColorTargetSettings(
+                width, height, RenderSystem.getDevice().getMaxTextureSize()));
         List<ProgramGroup> programs = new ArrayList<>(sources.size());
         boolean usesDepthSampler = false;
         boolean usesDepth1Sampler = false;
@@ -1335,6 +1344,11 @@ public final class VeyraRenderer {
             }
             programs.add(new ProgramGroup(List.copyOf(outputs)));
         }
+
+        for (int index : colorTargetIndices) {
+            colorTargetSettings.putIfAbsent(index, ColorTargetSettings.defaults(index, width, height));
+        }
+        validateColorTargetFormats(colorTargetIndices, colorTargetSettings);
 
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
@@ -1366,6 +1380,27 @@ public final class VeyraRenderer {
                 secondPlan.close();
             }
             throw exception;
+        }
+    }
+
+    private static void validateColorTargetFormats(Set<Integer> indices,
+                                                   Map<Integer, ColorTargetSettings> settings) throws IOException {
+        if (DeviceManager.physicalDevice == null) {
+            throw new IOException("VulkanMod has not selected a Vulkan device yet.");
+        }
+        int requiredFeatures = VK10.VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+                | VK10.VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
+                | VK10.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkFormatProperties properties = VkFormatProperties.calloc(stack);
+            for (int index : indices) {
+                ColorTargetSettings target = settings.get(index);
+                VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, target.format(), properties);
+                if ((properties.optimalTilingFeatures() & requiredFeatures) != requiredFeatures) {
+                    throw new IOException("colortex" + index + " format " + ColorTargetSettings.formatName(target.format())
+                            + " does not support sampled, linearly-filtered color attachments on this Vulkan device.");
+                }
+            }
         }
     }
 
@@ -2519,7 +2554,8 @@ public final class VeyraRenderer {
             throw new IOException("Fragment shader exceeds the 1 MiB size limit.");
         }
         String original = source.replace("\uFEFF", "");
-        String body = RENDERTARGETS_DIRECTIVE.matcher(original).replaceAll("");
+        String body = COLOR_TARGET_FORMAT_DECLARATION.matcher(original).replaceAll("");
+        body = RENDERTARGETS_DIRECTIVE.matcher(body).replaceAll("");
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
 
@@ -3045,23 +3081,32 @@ public final class VeyraRenderer {
         }
     }
 
-    private static void ensureColorTargets(int width, int height, Set<Integer> indices) {
+    private static void ensureColorTargets(int width, int height, Set<Integer> indices,
+                                          Map<Integer, ColorTargetSettings> settings) {
         boolean resized = false;
         for (int index : indices) {
+            ColorTargetSettings targetSettings = settings.getOrDefault(
+                    index, ColorTargetSettings.defaults(index, width, height));
             ColorTargetPair pair = colorTargets.get(index);
+            boolean changed = false;
             if (pair == null) {
                 pair = new ColorTargetPair(
-                        new TextureTarget("Veyra shader pack colortex" + index + " A", width, height, false),
-                        new TextureTarget("Veyra shader pack colortex" + index + " B", width, height, false));
+                        new TextureTarget("Veyra shader pack colortex" + index + " A",
+                                targetSettings.width(), targetSettings.height(), false),
+                        new TextureTarget("Veyra shader pack colortex" + index + " B",
+                                targetSettings.width(), targetSettings.height(), false));
                 colorTargets.put(index, pair);
                 initializedColorTargets.remove(index);
-                resized = true;
-            } else if (pair.targetA().width != width || pair.targetA().height != height
-                    || pair.targetB().width != width || pair.targetB().height != height) {
-                pair.targetA().resize(width, height);
-                pair.targetB().resize(width, height);
+                changed = true;
+            }
+            changed |= ensureColorTarget(pair.targetA(), index, "A", targetSettings);
+            changed |= ensureColorTarget(pair.targetB(), index, "B", targetSettings);
+            if (changed) {
                 initializedColorTargets.remove(index);
                 resized = true;
+                VeyraClient.LOGGER.info("Configured colortex{} {}x{} {}.", index,
+                        targetSettings.width(), targetSettings.height(),
+                        ColorTargetSettings.formatName(targetSettings.format()));
             }
         }
         if (resized) {
@@ -3072,10 +3117,86 @@ public final class VeyraRenderer {
         }
     }
 
+    private static boolean ensureColorTarget(RenderTarget target, int index, String side,
+                                             ColorTargetSettings settings) {
+        boolean changed = false;
+        if (target.width != settings.width() || target.height != settings.height()) {
+            target.resize(settings.width(), settings.height());
+            changed = true;
+        }
+        GpuTexture colorTexture = target.getColorTexture();
+        if (!(colorTexture instanceof VkGpuTexture vulkanTexture)) {
+            throw new IllegalStateException("VulkanMod did not create a Vulkan texture for colortex" + index + ".");
+        }
+        if (vulkanTexture.getVulkanImage().format != settings.format()) {
+            replaceColorTargetTexture(target, "Veyra shader pack colortex" + index + " " + side,
+                    settings.format());
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static void replaceColorTargetTexture(RenderTarget target, String name, int format) {
+        if (!(RenderSystem.getDevice() instanceof VkGpuDevice device)) {
+            throw new IllegalStateException("The active GPU device is not VulkanMod's Vulkan device.");
+        }
+        RenderTargetAccessor accessor = (RenderTargetAccessor) target;
+        GpuTexture oldTexture = accessor.veyra$getColorTexture();
+        GpuTextureView oldView = accessor.veyra$getColorTextureView();
+        int usage = oldTexture == null
+                ? GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING
+                : oldTexture.usage();
+        // Keep Minecraft's texture metadata on a supported format; the Vulkan image below carries the actual format.
+        GpuTexture replacement = device.createTexture(name, usage, TextureFormat.RGBA8,
+                target.width, target.height, 1, 1);
+        if (!(replacement instanceof VkGpuTexture vulkanTexture)) {
+            replacement.close();
+            throw new IllegalStateException("VulkanMod did not create a Vulkan texture for " + name + ".");
+        }
+
+        VulkanImage defaultImage = vulkanTexture.getVulkanImage();
+        VulkanImage colorImage = null;
+        GpuTextureView replacementView = null;
+        boolean installed = false;
+        try {
+            colorImage = VulkanImage.builder(target.width, target.height)
+                    .setName(name)
+                    .setFormat(format)
+                    .addUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                    .createVulkanImage();
+            VkGlTexture.setVulkanImage(vulkanTexture.glId(), colorImage);
+            installed = true;
+            defaultImage.free();
+            replacementView = device.createTextureView(replacement);
+        } catch (RuntimeException | Error exception) {
+            if (replacementView != null && !replacementView.isClosed()) {
+                replacementView.close();
+            }
+            if (!installed && colorImage != null) {
+                colorImage.free();
+            }
+            if (!replacement.isClosed()) {
+                replacement.close();
+            }
+            throw exception;
+        }
+
+        accessor.veyra$setColorTexture(replacement);
+        accessor.veyra$setColorTextureView(replacementView);
+        if (oldView != null && !oldView.isClosed()) {
+            oldView.close();
+        }
+        if (oldTexture != null && !oldTexture.isClosed()) {
+            oldTexture.close();
+        }
+    }
+
     private static void clearColorTargetBuffers(Set<Integer> indices,
                                                 Map<Integer, ColorTargetSettings> settings) {
         boolean hasTargetsToClear = indices.stream().anyMatch(index -> {
-            ColorTargetSettings targetSettings = settings.getOrDefault(index, ColorTargetSettings.defaults(index));
+            ColorTargetPair pair = colorTargets.get(index);
+            ColorTargetSettings targetSettings = settings.getOrDefault(index,
+                    ColorTargetSettings.defaults(index, pair.targetA().width, pair.targetA().height));
             return !initializedColorTargets.contains(index) || targetSettings.clearEachFrame();
         });
         if (!hasTargetsToClear) {
@@ -3088,11 +3209,12 @@ public final class VeyraRenderer {
         }
         var commandEncoder = RenderSystem.getDevice().createCommandEncoder();
         for (int index : indices) {
-            ColorTargetSettings targetSettings = settings.getOrDefault(index, ColorTargetSettings.defaults(index));
+            ColorTargetPair pair = colorTargets.get(index);
+            ColorTargetSettings targetSettings = settings.getOrDefault(index,
+                    ColorTargetSettings.defaults(index, pair.targetA().width, pair.targetA().height));
             if (initializedColorTargets.contains(index) && !targetSettings.clearEachFrame()) {
                 continue;
             }
-            ColorTargetPair pair = colorTargets.get(index);
             commandEncoder.clearColorTexture(pair.targetA().getColorTexture(), targetSettings.clearColor());
             commandEncoder.clearColorTexture(pair.targetB().getColorTexture(), targetSettings.clearColor());
             initializedColorTargets.add(index);

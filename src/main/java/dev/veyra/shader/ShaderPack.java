@@ -2,6 +2,7 @@ package dev.veyra.shader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,9 +15,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.lwjgl.vulkan.VK10;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -63,6 +66,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "(?m)\\bconst\\s+bool\\s+colortex(\\d+)Clear\\s*=\\s*(true|false)\\s*;");
     private static final Pattern COLOR_TARGET_CLEAR_COLOR = Pattern.compile(
             "(?is)\\bconst\\s+vec4\\s+colortex(\\d+)ClearColor\\s*=\\s*vec4\\s*\\(([^)]*)\\)\\s*;");
+    private static final Pattern COLOR_TARGET_FORMAT = Pattern.compile(
+            "(?m)\\bconst\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
+    private static final Pattern COLOR_TARGET_FORMAT_BLOCK_COMMENT = Pattern.compile(
+            "(?is)/\\*\\s*const\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;\\s*\\*/");
+    private static final Pattern COLOR_TARGET_SIZE_PROPERTY = Pattern.compile("^size\\.buffer\\.colortex(\\d+)$");
+    private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.of(
+            "R8", VK10.VK_FORMAT_R8_UNORM,
+            "RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM,
+            "R16F", VK10.VK_FORMAT_R16_SFLOAT,
+            "RGBA16F", VK10.VK_FORMAT_R16G16B16A16_SFLOAT,
+            "R32F", VK10.VK_FORMAT_R32_SFLOAT);
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
 
@@ -191,7 +205,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return List.copyOf(programs);
     }
 
-    public Map<Integer, ColorTargetSettings> readColorTargetSettings() throws IOException {
+    public Map<Integer, ColorTargetSettings> readColorTargetSettings(
+            int viewportWidth, int viewportHeight, int maxTextureSize) throws IOException {
         Map<Integer, MutableColorTargetSettings> parsed = new HashMap<>();
         for (String fileName : listShaderFiles().stream().sorted().toList()) {
             if (!isGlslSource(fileName)) {
@@ -203,15 +218,53 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
             String expanded = expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0);
             parseColorTargetSettings(GLSL_COMMENTS.matcher(expanded).replaceAll(""), parsed, fileName);
+            parseCommentedColorTargetFormats(expanded, parsed, fileName);
+        }
+
+        Optional<String> propertiesSource = readShader("shaders.properties");
+        if (propertiesSource.isPresent()) {
+            Properties properties = new Properties();
+            try (StringReader reader = new StringReader(propertiesSource.get())) {
+                properties.load(reader);
+            } catch (IllegalArgumentException exception) {
+                throw new IOException("Could not parse shaders.properties: " + exception.getMessage(), exception);
+            }
+            for (String key : properties.stringPropertyNames()) {
+                Matcher sizeMatcher = COLOR_TARGET_SIZE_PROPERTY.matcher(key.trim());
+                if (!sizeMatcher.matches()) {
+                    continue;
+                }
+                int index = Integer.parseInt(sizeMatcher.group(1));
+                if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
+                    continue;
+                }
+                int[] size = parseColorTargetSize(properties.getProperty(key), index,
+                        viewportWidth, viewportHeight, maxTextureSize);
+                MutableColorTargetSettings target = parsed.computeIfAbsent(index,
+                        ignored -> new MutableColorTargetSettings());
+                target.width = size[0];
+                target.height = size[1];
+            }
         }
 
         Map<Integer, ColorTargetSettings> settings = new HashMap<>();
         parsed.forEach((index, value) -> {
-            ColorTargetSettings defaults = ColorTargetSettings.defaults(index);
+            ColorTargetSettings defaults = ColorTargetSettings.defaults(index, viewportWidth, viewportHeight);
             settings.put(index, new ColorTargetSettings(
                     value.clearEachFrame == null || value.clearEachFrame,
-                    value.clearColor == null ? defaults.clearColor() : value.clearColor));
+                    value.clearColor == null ? defaults.clearColor() : value.clearColor,
+                    value.width == null ? defaults.width() : value.width,
+                    value.height == null ? defaults.height() : value.height,
+                    value.format == null ? defaults.format() : value.format));
         });
+        for (Map.Entry<Integer, ColorTargetSettings> entry : settings.entrySet()) {
+            ColorTargetSettings target = entry.getValue();
+            long byteSize = (long) target.width() * target.height() * ColorTargetSettings.formatSize(target.format());
+            if (byteSize > Integer.MAX_VALUE) {
+                throw new IOException("colortex" + entry.getKey()
+                        + " is too large for VulkanMod's texture allocation limits.");
+            }
+        }
         return Map.copyOf(settings);
     }
 
@@ -248,6 +301,72 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                         + sourceFile + ".");
             }
             target.clearColor = color;
+        }
+
+        Matcher formatMatcher = COLOR_TARGET_FORMAT.matcher(source);
+        while (formatMatcher.find()) {
+            setColorTargetFormat(settings, Integer.parseInt(formatMatcher.group(1)),
+                    formatMatcher.group(2), sourceFile);
+        }
+    }
+
+    private static void parseCommentedColorTargetFormats(String source,
+                                                        Map<Integer, MutableColorTargetSettings> settings,
+                                                        String sourceFile) throws IOException {
+        String withoutLineComments = source.replaceAll("(?m)//[^\\r\\n]*", "");
+        Matcher matcher = COLOR_TARGET_FORMAT_BLOCK_COMMENT.matcher(withoutLineComments);
+        while (matcher.find()) {
+            setColorTargetFormat(settings, Integer.parseInt(matcher.group(1)), matcher.group(2), sourceFile);
+        }
+    }
+
+    private static void setColorTargetFormat(Map<Integer, MutableColorTargetSettings> settings,
+                                             int index, String declaredFormat, String sourceFile) throws IOException {
+        if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
+            return;
+        }
+        String formatName = declaredFormat.toUpperCase(java.util.Locale.ROOT);
+        Integer format = COLOR_TARGET_FORMATS.get(formatName);
+        if (format == null) {
+            throw new IOException("Unsupported colortex" + index + "Format '" + formatName
+                    + "' in " + sourceFile + ". Supported formats: "
+                    + String.join(", ", COLOR_TARGET_FORMATS.keySet().stream().sorted().toList()) + ".");
+        }
+        MutableColorTargetSettings target = settings.computeIfAbsent(index,
+                ignored -> new MutableColorTargetSettings());
+        if (target.format != null && target.format != format) {
+            throw new IOException("Shader pack declares conflicting colortex" + index + "Format values in "
+                    + sourceFile + ".");
+        }
+        target.format = format;
+    }
+
+    private static int[] parseColorTargetSize(String value, int index, int viewportWidth,
+                                              int viewportHeight, int maxTextureSize) throws IOException {
+        String[] dimensions = value.trim().split("\\s+");
+        if (dimensions.length != 2) {
+            throw new IOException("size.buffer.colortex" + index + " in shaders.properties must contain width and height.");
+        }
+        return new int[]{
+                parseColorTargetDimension(dimensions[0], viewportWidth, maxTextureSize, index, "width"),
+                parseColorTargetDimension(dimensions[1], viewportHeight, maxTextureSize, index, "height")};
+    }
+
+    private static int parseColorTargetDimension(String value, int viewportDimension, int maxTextureSize,
+                                                 int index, String axis) throws IOException {
+        try {
+            boolean relative = value.contains(".") || value.contains("e") || value.contains("E");
+            double dimension = relative
+                    ? Math.max(1L, Math.round(Double.parseDouble(value) * viewportDimension))
+                    : Long.parseLong(value);
+            if (!Double.isFinite(dimension) || dimension < 1 || dimension > maxTextureSize) {
+                throw new IOException("size.buffer.colortex" + index + " " + axis
+                        + " must resolve to a positive value no larger than " + maxTextureSize + ".");
+            }
+            return (int) dimension;
+        } catch (NumberFormatException exception) {
+            throw new IOException("size.buffer.colortex" + index + " has an invalid " + axis + " value '" + value + "'.",
+                    exception);
         }
     }
 
@@ -289,6 +408,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final class MutableColorTargetSettings {
         private Boolean clearEachFrame;
         private Integer clearColor;
+        private Integer width;
+        private Integer height;
+        private Integer format;
     }
 
     public Optional<String> readTerrainFragment() throws IOException {

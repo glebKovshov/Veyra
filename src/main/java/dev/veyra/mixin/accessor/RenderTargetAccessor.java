@@ -8,6 +8,18 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(RenderTarget.class)
 public interface RenderTargetAccessor {
+    @Accessor("colorTexture")
+    GpuTexture veyra$getColorTexture();
+
+    @Accessor("colorTexture")
+    void veyra$setColorTexture(GpuTexture texture);
+
+    @Accessor("colorTextureView")
+    GpuTextureView veyra$getColorTextureView();
+
+    @Accessor("colorTextureView")
+    void veyra$setColorTextureView(GpuTextureView view);
+
     @Accessor("depthTexture")
     GpuTexture veyra$getDepthTexture();
 
