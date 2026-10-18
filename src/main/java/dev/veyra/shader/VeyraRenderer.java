@@ -40,11 +40,13 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.client.renderer.UniformValue;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.LightLayer;
 import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
@@ -64,6 +66,7 @@ import net.vulkanmod.vulkan.texture.VulkanImage;
 import net.vulkanmod.vulkan.util.MappedBuffer;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Vector2i;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.system.MemoryStack;
@@ -271,6 +274,7 @@ public final class VeyraRenderer {
     private static boolean frameMatricesInitialized;
     private static final Map<String, MappedBuffer> SHADER_PACK_MATRIX_BUFFERS = new HashMap<>();
     private static final Map<String, MappedBuffer> SHADER_PACK_VECTOR_BUFFERS = new HashMap<>();
+    private static final Map<String, MappedBuffer> SHADER_PACK_INTEGER_VECTOR2_BUFFERS = new HashMap<>();
     private static final Map<String, MappedBuffer> SHADER_PACK_INTEGER_VECTOR_BUFFERS = new HashMap<>();
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
     private static boolean cameraUniformsInitialized;
@@ -388,6 +392,8 @@ public final class VeyraRenderer {
                 Uniforms.vec1f_uniformMap.put(uniform.name(), () -> shaderPackFloatUniform(uniform.name()));
             } else if (uniform.sourceType().equals("vec3")) {
                 registerShaderPackVectorUniform(uniform.name());
+            } else if (uniform.sourceType().equals("ivec2")) {
+                registerShaderPackIntegerVector2Uniform(uniform.name());
             } else if (uniform.sourceType().equals("ivec3")) {
                 registerShaderPackIntegerVectorUniform(uniform.name());
             } else if (uniform.sourceType().equals("mat4")) {
@@ -431,6 +437,30 @@ public final class VeyraRenderer {
         MappedBuffer buffer = new MappedBuffer(4 * Integer.BYTES);
         SHADER_PACK_INTEGER_VECTOR_BUFFERS.put(name, buffer);
         updateShaderPackIntegerVectorUniform(name, buffer, cameraUniforms);
+    }
+
+    private static void registerShaderPackIntegerVector2Uniform(String name) {
+        MappedBuffer buffer = new MappedBuffer(2 * Integer.BYTES);
+        SHADER_PACK_INTEGER_VECTOR2_BUFFERS.put(name, buffer);
+        updateShaderPackIntegerVector2Uniform(name, buffer, cameraUniforms);
+    }
+
+    private static void updateShaderPackIntegerVector2Uniforms(CameraUniforms uniforms) {
+        SHADER_PACK_INTEGER_VECTOR2_BUFFERS.forEach((name, buffer) ->
+                updateShaderPackIntegerVector2Uniform(name, buffer, uniforms));
+    }
+
+    private static void updateShaderPackIntegerVector2Uniform(String name, MappedBuffer buffer, CameraUniforms uniforms) {
+        if (!name.equals("eyeBrightness")) {
+            throw new IllegalArgumentException("Unknown shader pack integer vector uniform " + name + ".");
+        }
+        Vector2i value = uniforms.eyeBrightness();
+        buffer.putInt(0, value.x);
+        buffer.putInt(Integer.BYTES, value.y);
+    }
+
+    public static MappedBuffer shaderPackIntegerVector2Uniform(String name) {
+        return SHADER_PACK_INTEGER_VECTOR2_BUFFERS.get(name);
     }
 
     private static void updateShaderPackIntegerVectorUniforms(CameraUniforms uniforms) {
@@ -566,9 +596,11 @@ public final class VeyraRenderer {
                 : currentCameraPosition;
         cameraUniforms = new CameraUniforms(
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
-                previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition());
+                previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition(),
+                eyeBrightness(Minecraft.getInstance(), cameraPosition));
         cameraUniformsInitialized = true;
         updateShaderPackVectorUniforms(cameraUniforms);
+        updateShaderPackIntegerVector2Uniforms(cameraUniforms);
         updateShaderPackIntegerVectorUniforms(cameraUniforms);
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level != null && minecraft.player != null) {
@@ -731,6 +763,17 @@ public final class VeyraRenderer {
                 new Vector3f((float) x, (float) y, (float) z),
                 new Vector3i(integerX, integerY, integerZ),
                 new Vector3f((float) (x - integerX), (float) (y - integerY), (float) (z - integerZ)));
+    }
+
+    private static Vector2i eyeBrightness(Minecraft minecraft, Vec3 cameraPosition) {
+        ClientLevel level = minecraft.level;
+        if (level == null) {
+            return new Vector2i();
+        }
+        BlockPos position = BlockPos.containing(cameraPosition);
+        return new Vector2i(
+                level.getBrightness(LightLayer.BLOCK, position) * 16,
+                level.getBrightness(LightLayer.SKY, position) * 16);
     }
 
     public static boolean isRenderingEnabled() {
@@ -4476,10 +4519,10 @@ public final class VeyraRenderer {
 
     private record CameraUniforms(Vector3f cameraPosition, Vector3i cameraPositionInt, Vector3f cameraPositionFract,
                                   Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
-                                  Vector3f previousCameraPositionFract) {
+                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness) {
         private static final CameraUniforms ZERO = new CameraUniforms(
                 new Vector3f(), new Vector3i(), new Vector3f(),
-                new Vector3f(), new Vector3i(), new Vector3f());
+                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i());
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass,

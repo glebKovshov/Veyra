@@ -15,6 +15,13 @@ public abstract class VeyraUniformsMixin {
     @Inject(method = "getUniformSupplier", at = @At("HEAD"), cancellable = true, remap = false)
     private static void veyra$provideCameraIntegerVectors(
             String type, String name, CallbackInfoReturnable<Supplier<MappedBuffer>> callback) {
+        if (type.equals("ivec2")) {
+            MappedBuffer buffer = VeyraRenderer.shaderPackIntegerVector2Uniform(name);
+            if (buffer != null) {
+                callback.setReturnValue(() -> buffer);
+            }
+            return;
+        }
         if (!type.equals("ivec3")) {
             return;
         }
