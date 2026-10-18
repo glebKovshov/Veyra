@@ -755,7 +755,16 @@ public final class VeyraRenderer {
                     "veyra:" + targetName + "-target", snapshot.renderTarget()));
             GpuBufferSlice samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
             capturePass.addToFrame(graph, targets, samplerInfo);
-            graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            if (Boolean.getBoolean("veyra.graphicsSmoke")) {
+                graph.execute(GraphicsResourceAllocator.UNPOOLED, new FrameGraphBuilder.Inspector() {
+                    @Override public void acquireResource(String name) { }
+                    @Override public void releaseResource(String name) { }
+                    @Override public void beforeExecutePass(String name) { VeyraClient.LOGGER.info("Frame graph pass begins: {}", name); }
+                    @Override public void afterExecutePass(String name) { VeyraClient.LOGGER.info("Frame graph pass ends: {}", name); }
+                });
+            } else {
+                graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            }
         } finally {
             if (Renderer.getInstance().getBoundRenderPass() != null) {
                 Renderer.getInstance().endRenderPass();
