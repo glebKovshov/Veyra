@@ -2007,7 +2007,16 @@ public final class VeyraRenderer {
                 for (ResourceHandle<RenderTarget> handle : images) {
                     GpuTexture color = handle.get().getColorTexture();
                     if (!(color instanceof VkGpuTexture texture)) throw new IllegalStateException("Shaderpack input is not a Vulkan image.");
-                    texture.getVulkanImage().transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    var image = texture.getVulkanImage();
+                    if (Boolean.getBoolean("veyra.graphicsSmoke")) {
+                        VeyraClient.LOGGER.info("Sample transition: {} image={} layout-before={}",
+                                handle.get().getColorTexture().getLabel(), Long.toHexString(image.getId()), image.getCurrentLayout());
+                    }
+                    image.transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    if (Boolean.getBoolean("veyra.graphicsSmoke")) {
+                        VeyraClient.LOGGER.info("Sample transition complete: image={} layout-after={}",
+                                Long.toHexString(image.getId()), image.getCurrentLayout());
+                    }
                 }
             }
         });
