@@ -121,8 +121,11 @@ public final class VeyraRenderer {
             """;
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^\\s*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^\\s*#extension[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern OUTPUT_DECLARATION = Pattern.compile("(?m)(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;");
-    private static final Pattern EXPLICIT_OUTPUT_LOCATION = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*out\\s+vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;");
+    private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*$");
+    private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
+    private static final Pattern OUTPUT_COLOR_INDEX = Pattern.compile("outColor([0-9]+)");
     private static final Pattern GL_FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]");
     private static final Pattern RENDERTARGETS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
     private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
@@ -2580,27 +2583,22 @@ public final class VeyraRenderer {
         List<String> uniforms = SUPPORTED_UNIFORMS.stream()
                 .filter(uniform -> containsIdentifier(uniformSource, uniform))
                 .toList();
-        List<OutputMapping> outputMappings = outputMappings(original, body);
+        if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(body).find()) {
+            throw new IOException("Veyra only supports vec4 fragment output declarations.");
+        }
+        List<ExplicitOutput> explicitOutputs = explicitOutputs(body);
+        List<OutputMapping> outputMappings = outputMappings(original, body, explicitOutputs);
         boolean usesFragData = body.contains("gl_FragData");
         if (usesFragData && body.matches("(?s).*\\bgl_FragColor\\b.*")) {
             throw new IOException("A pass cannot mix gl_FragData and gl_FragColor outputs.");
         }
-
-        Matcher outputMatcher = OUTPUT_DECLARATION.matcher(body);
-        int outputDeclarationCount = 0;
-        String outputName = "outColor";
-        while (outputMatcher.find()) {
-            outputDeclarationCount++;
-            if (outputDeclarationCount == 1) {
-                outputName = outputMatcher.group(1);
-            }
-        }
-        if (outputDeclarationCount > 1) {
-            throw new IOException("Multiple explicit GLSL outputs are not supported; use gl_FragData with DRAWBUFFERS or RENDERTARGETS.");
-        }
-        if (usesFragData && outputDeclarationCount != 0) {
+        if (usesFragData && !explicitOutputs.isEmpty()) {
             throw new IOException("A pass cannot mix gl_FragData with explicit out variables.");
         }
+        if (explicitOutputs.size() > 1 && body.matches("(?s).*\\bgl_FragColor\\b.*")) {
+            throw new IOException("A pass cannot mix gl_FragColor with multiple explicit out variables.");
+        }
+        String outputName = explicitOutputs.isEmpty() ? "outColor" : explicitOutputs.getFirst().name();
 
         body = VERSION_DIRECTIVE.matcher(body).replaceAll("");
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(body);
@@ -2623,10 +2621,12 @@ public final class VeyraRenderer {
         List<AdaptedShader> adaptedShaders = new ArrayList<>(outputMappings.size());
         for (OutputMapping output : outputMappings) {
             String outputBody = usesFragData
-                    ? lowerFragData(body, output.fragmentOutputIndex()) : body;
+                    ? lowerFragData(body, output.fragmentOutputIndex())
+                    : explicitOutputs.size() > 1
+                    ? lowerExplicitOutputs(body, explicitOutputs, output.fragmentOutputIndex()) : body;
             StringBuilder adapted = new StringBuilder("#version 450\n").append(extensions)
                     .append("in vec2 texCoord;\n");
-            if (outputDeclarationCount == 0) {
+            if (explicitOutputs.isEmpty()) {
                 adapted.append("out vec4 outColor;\n");
             }
             if (usesFragData) {
@@ -2692,7 +2692,43 @@ public final class VeyraRenderer {
         return List.copyOf(adaptedShaders);
     }
 
-    private static List<OutputMapping> outputMappings(String original, String body) throws IOException {
+    private static List<ExplicitOutput> explicitOutputs(String body) throws IOException {
+        List<ExplicitOutput> outputs = new ArrayList<>();
+        Matcher matcher = OUTPUT_DECLARATION.matcher(body);
+        while (matcher.find()) {
+            String name = matcher.group(2);
+            int location;
+            if (matcher.group(1) != null) {
+                try {
+                    location = Integer.parseInt(matcher.group(1));
+                } catch (NumberFormatException exception) {
+                    throw new IOException("Fragment output location is outside the supported integer range.", exception);
+                }
+            } else {
+                Matcher colorIndex = OUTPUT_COLOR_INDEX.matcher(name);
+                if (colorIndex.matches()) {
+                    try {
+                        location = Integer.parseInt(colorIndex.group(1));
+                    } catch (NumberFormatException exception) {
+                        throw new IOException("Fragment output location is outside the supported integer range.", exception);
+                    }
+                } else if (outputs.isEmpty()) {
+                    location = 0;
+                } else {
+                    throw new IOException("Multiple fragment outputs need layout(location = N) or the Iris outColorN names.");
+                }
+            }
+            if (outputs.stream().anyMatch(output -> output.location() == location)) {
+                throw new IOException("Fragment output locations must be unique.");
+            }
+            outputs.add(new ExplicitOutput(location, name));
+        }
+        outputs.sort(java.util.Comparator.comparingInt(ExplicitOutput::location));
+        return List.copyOf(outputs);
+    }
+
+    private static List<OutputMapping> outputMappings(String original, String body,
+                                                      List<ExplicitOutput> explicitOutputs) throws IOException {
         List<Integer> declaredTargets = declaredColorTargets(original);
         Set<Integer> fragmentOutputs = new java.util.TreeSet<>();
         Matcher fragmentData = GL_FRAG_DATA_INDEX.matcher(body);
@@ -2703,9 +2739,34 @@ public final class VeyraRenderer {
         if (usesFragData && fragmentOutputs.isEmpty()) {
             throw new IOException("gl_FragData must use constant output indices.");
         }
+        if (usesFragData && !explicitOutputs.isEmpty()) {
+            throw new IOException("A pass cannot mix gl_FragData with explicit out variables.");
+        }
 
         List<OutputMapping> mappings = new ArrayList<>();
-        if (declaredTargets != null) {
+        if (!explicitOutputs.isEmpty()) {
+            Set<Integer> declaredLocations = new java.util.HashSet<>();
+            for (ExplicitOutput output : explicitOutputs) {
+                int targetIndex = output.location();
+                if (declaredTargets != null) {
+                    if (output.location() >= declaredTargets.size()) {
+                        throw new IOException("Explicit fragment output location " + output.location()
+                                + " is missing from RENDERTARGETS/DRAWBUFFERS.");
+                    }
+                    targetIndex = declaredTargets.get(output.location());
+                }
+                declaredLocations.add(output.location());
+                mappings.add(new OutputMapping(output.location(), targetIndex));
+            }
+            if (declaredTargets != null) {
+                for (int location = 0; location < declaredTargets.size(); location++) {
+                    if (!declaredLocations.contains(location)) {
+                        throw new IOException("RENDERTARGETS/DRAWBUFFERS declares output location " + location
+                                + " but the shader has no matching explicit out variable.");
+                    }
+                }
+            }
+        } else if (declaredTargets != null) {
             if (usesFragData) {
                 for (int output = 0; output < declaredTargets.size(); output++) {
                     if (!fragmentOutputs.contains(output)) {
@@ -2728,12 +2789,7 @@ public final class VeyraRenderer {
                 mappings.add(new OutputMapping(output, output));
             }
         } else {
-            int target = 0;
-            Matcher explicitLocation = EXPLICIT_OUTPUT_LOCATION.matcher(body);
-            if (explicitLocation.find()) {
-                target = Integer.parseInt(explicitLocation.group(1));
-            }
-            mappings.add(new OutputMapping(-1, target));
+            mappings.add(new OutputMapping(-1, 0));
         }
 
         Set<Integer> uniqueTargets = new java.util.HashSet<>();
@@ -2798,6 +2854,30 @@ public final class VeyraRenderer {
         }
         lowered.append(source, copiedThrough, source.length());
         return lowered.toString();
+    }
+
+    private static String lowerExplicitOutputs(String source, List<ExplicitOutput> outputs, int selectedLocation) {
+        ExplicitOutput selected = outputs.stream()
+                .filter(output -> output.location() == selectedLocation)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No explicit output for location " + selectedLocation + "."));
+        String lowered = source;
+        for (ExplicitOutput output : outputs) {
+            Pattern declaration = Pattern.compile("(?m)^[\\t ]*out\\s+vec4\\s+"
+                    + Pattern.quote(output.name()) + "\\s*;[\\t ]*$");
+            Matcher matcher = declaration.matcher(lowered);
+            if (!matcher.find()) {
+                throw new IllegalArgumentException("Could not find explicit output declaration " + output.name() + ".");
+            }
+            String replacement = output.location() == selectedLocation
+                    ? "out vec4 outColor;" : "vec4 " + output.name() + ";";
+            lowered = matcher.replaceFirst(Matcher.quoteReplacement(replacement));
+        }
+        if (!selected.name().equals("outColor")) {
+            lowered = Pattern.compile("\\b" + Pattern.quote(selected.name()) + "\\b")
+                    .matcher(lowered).replaceAll(Matcher.quoteReplacement("outColor"));
+        }
+        return lowered;
     }
 
     private static DepthSamplerState prepareDepthSampler() {
@@ -3330,6 +3410,9 @@ public final class VeyraRenderer {
     private record AdaptedShader(String source, List<String> uniforms,
                                  boolean usesDepthSampler, boolean usesDepth1Sampler,
                                  Set<Integer> colorSamplers, int outputTarget) {
+    }
+
+    private record ExplicitOutput(int location, String name) {
     }
 
     private record DepthSamplerState(VulkanImage sourceImage, VulkanImage sampledImage) {
