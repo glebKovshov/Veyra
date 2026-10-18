@@ -175,6 +175,7 @@ public final class TerrainShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = SHADOW_MATRIX_UNIFORM.matcher(adapted).replaceAll("");
+        adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         boolean noiseSamplerAvailable = usesNoiseSampler(adapted);
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);

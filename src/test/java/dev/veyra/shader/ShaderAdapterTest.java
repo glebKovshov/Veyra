@@ -119,6 +119,35 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void removesUnusedShaderPackSamplerDeclarationsFromGeometryStages() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                uniform sampler2D colortex0;
+                uniform sampler2D shadowtex1;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = vec4(texcoord, 0.0, 1.0); }
+                """);
+        assertFalse(terrain.contains("colortex0"));
+        assertFalse(terrain.contains("shadowtex1"));
+
+        String entity = EntityShaderAdapter.adaptFragment("""
+                uniform sampler2D colortex0;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = vec4(texcoord, 0.0, 1.0); }
+                """);
+        assertFalse(entity.contains("colortex0"));
+    }
+
+    @Test
+    void stillRejectsUnsupportedSamplerWhenShaderStageReadsIt() {
+        IOException error = assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment("""
+                uniform sampler2D colortex0;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(colortex0, texcoord); }
+                """));
+        assertTrue(error.getMessage().contains("colortex0"));
+    }
+
+    @Test
     void ignoresNoisetexMentionsInsideComments() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 // sampler2D noisetex is only mentioned in this comment
