@@ -1,16 +1,17 @@
 package dev.veyra.shader;
 
-/** Iris shadow directives that affect Veyra's terrain shadow pass. */
+/** Iris shadow directives that affect Veyra's shadow passes. */
 public record ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation,
-                             float distanceRenderMultiplier) {
+                             float distanceRenderMultiplier, float entityShadowDistanceMultiplier) {
     public static final int DEFAULT_RESOLUTION = 1024;
     public static final float DEFAULT_DISTANCE = 128.0F;
     public static final float DEFAULT_INTERVAL_SIZE = 2.0F;
     public static final float DEFAULT_SUN_PATH_ROTATION = 0.0F;
     public static final float DEFAULT_DISTANCE_RENDER_MULTIPLIER = -1.0F;
+    public static final float DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER = 1.0F;
     public static final ShadowSettings DEFAULT = new ShadowSettings(
             DEFAULT_RESOLUTION, DEFAULT_DISTANCE, DEFAULT_INTERVAL_SIZE, DEFAULT_SUN_PATH_ROTATION,
-            DEFAULT_DISTANCE_RENDER_MULTIPLIER);
+            DEFAULT_DISTANCE_RENDER_MULTIPLIER, DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER);
 
     public ShadowSettings {
         if (resolution < 1 || resolution > 8192) {
@@ -28,6 +29,9 @@ public record ShadowSettings(int resolution, float distance, float intervalSize,
         if (!Float.isFinite(distanceRenderMultiplier)) {
             throw new IllegalArgumentException("shadowDistanceRenderMul must be finite.");
         }
+        if (!Float.isFinite(entityShadowDistanceMultiplier)) {
+            throw new IllegalArgumentException("entityShadowDistanceMul must be finite.");
+        }
     }
 
     public boolean hasDistanceRenderLimit() {
@@ -36,5 +40,19 @@ public record ShadowSettings(int resolution, float distance, float intervalSize,
 
     public double distanceRenderLimit() {
         return (double) distance * distanceRenderMultiplier;
+    }
+
+    public boolean usesTerrainEntityShadowFrustum() {
+        return entityShadowDistanceMultiplier == 1.0F || entityShadowDistanceMultiplier < 0.0F;
+    }
+
+    public boolean hasEntityDistanceRenderLimit() {
+        return !usesTerrainEntityShadowFrustum()
+                && distanceRenderMultiplier > 0.0F
+                && entityShadowDistanceMultiplier > 0.0F;
+    }
+
+    public double entityDistanceRenderLimit() {
+        return (double) distance * distanceRenderMultiplier * entityShadowDistanceMultiplier;
     }
 }

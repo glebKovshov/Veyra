@@ -100,9 +100,10 @@ public final class VeyraShadowRenderer {
             release();
         }
         if (!shadowSettings.equals(settings)) {
-            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}.",
+            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}, entityShadowDistanceMul={}.",
                     settings.resolution(), settings.resolution(), settings.distance(),
-                    settings.intervalSize(), settings.sunPathRotation(), settings.distanceRenderMultiplier());
+                    settings.intervalSize(), settings.sunPathRotation(), settings.distanceRenderMultiplier(),
+                    settings.entityShadowDistanceMultiplier());
         }
         shadowSettings = settings;
     }
@@ -154,6 +155,9 @@ public final class VeyraShadowRenderer {
                             shadowSettings.distanceRenderLimit())
                     : new Frustum(shadowModelView, shadowProjection);
             shadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+            Frustum entityShadowFrustum = createEntityShadowFrustum(
+                    shadowFrustum, shadowModelView, shadowProjection, cameraPosition);
+            entityShadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             ((CameraAccessor) (Object) camera).veyra$setRotation(shadowView.yaw(), shadowView.pitch());
             cameraRotationChanged = true;
             worldRenderer.setupRenderer(camera, shadowFrustum, false, spectator);
@@ -170,7 +174,7 @@ public final class VeyraShadowRenderer {
             renderer.endRenderPass();
             shadowRenderPassStarted = false;
             renderEntityAndBlockEntityGeometry(camera, deltaTracker, levelRenderState,
-                    shadowFrustum, cameraPosition, shadowModelView, shadowProjection,
+                    entityShadowFrustum, cameraPosition, shadowModelView, shadowProjection,
                     mainModelView, mainProjection, worldRenderer);
         } catch (Exception exception) {
             VeyraClient.LOGGER.error("Could not render the shader pack shadow map.", exception);
@@ -246,7 +250,7 @@ public final class VeyraShadowRenderer {
 
     private static void renderEntityAndBlockEntityGeometry(
             Camera camera, DeltaTracker deltaTracker, LevelRenderState levelRenderState,
-            Frustum shadowFrustum, Vec3 cameraPosition, Matrix4f modelView, Matrix4f projection,
+            Frustum entityShadowFrustum, Vec3 cameraPosition, Matrix4f modelView, Matrix4f projection,
             Matrix4f mainModelView, Matrix4f mainProjection, WorldRenderer worldRenderer) {
         Minecraft minecraft = Minecraft.getInstance();
         RenderBuffers buffers = minecraft.renderBuffers();
@@ -266,7 +270,7 @@ public final class VeyraShadowRenderer {
             var entityDispatcher = minecraft.getEntityRenderDispatcher();
             entityDispatcher.prepare(camera, minecraft.crosshairPickEntity);
             for (var entity : minecraft.level.entitiesForRendering()) {
-                if (!entityDispatcher.shouldRender(entity, shadowFrustum,
+                if (!entityDispatcher.shouldRender(entity, entityShadowFrustum,
                         cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
                     continue;
                 }
@@ -279,7 +283,7 @@ public final class VeyraShadowRenderer {
 
             var player = minecraft.player;
             if (player != null && submittedEntities.add(player)
-                    && entityDispatcher.shouldRender(player, shadowFrustum,
+                    && entityDispatcher.shouldRender(player, entityShadowFrustum,
                     cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
                 EntityRenderState state = entityDispatcher.extractEntity(player, tickDelta);
                 entityDispatcher.submit(state, levelRenderState.cameraRenderState,
@@ -359,6 +363,18 @@ public final class VeyraShadowRenderer {
         double dz = z - shadowCameraPosition.z;
         double limit = shadowSettings.distanceRenderLimit();
         return dx * dx + dy * dy + dz * dz <= limit * limit;
+    }
+
+    private static Frustum createEntityShadowFrustum(Frustum terrainFrustum, Matrix4f modelView,
+                                                      Matrix4f projection, Vec3 cameraPosition) {
+        if (shadowSettings.usesTerrainEntityShadowFrustum()) {
+            return terrainFrustum;
+        }
+        if (shadowSettings.hasEntityDistanceRenderLimit()) {
+            return new DistanceLimitedFrustum(modelView, projection, cameraPosition,
+                    shadowSettings.entityDistanceRenderLimit());
+        }
+        return new Frustum(modelView, projection);
     }
 
     private static final class DistanceLimitedFrustum extends Frustum {
