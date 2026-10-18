@@ -13,9 +13,13 @@
 - Added source/configuration caches scoped to a pack load. Reload creates fresh snapshots; changing options recompiles only when values change.
 - Retired unused synthetic native pipelines through VulkanMod's frame cleanup queue and pruned Veyra shader-source caches. Reset lazy shadow and depth-copy pipeline state on reload/disable.
 - Deferred sampled depth-view destruction through the frame cleanup queue instead of destroying an image view while submitted descriptors may still reference it.
+- Added native terrain MRT, output-location/colortex mapping, per-program and per-buffer blend properties, device capability checks, and a two-output fixture. Unbound GLSL outputs retain private dataflow without allocating nonexistent attachments.
+- Preserved viewport/scissor across geometry target switches and retired cached pipeline variants for removed native passes at completed-frame fences.
+- Corrected swapchain image usage metadata and requested transfer-source usage only where the surface supports it. Ordered sampled color-image transitions in the main frame graph after their producers.
+- Added a development-only real Minecraft world/readback harness using software Vulkan in CI. Runtime results remain separate from unit/build success.
 - Added explicit errors for unsupported required Iris features and active compute, geometry, tessellation or begin stages.
-- Added a read-only external shaderpack source audit, 22 new regression tests (57 total), embedded JCPP license notices, distributable checks and CI test-report artifacts.
-- Remaining release blockers: arbitrary geometry vertex inputs, geometry MRT, unsupported samplers/custom uniforms, compute/tessellation execution, and real client/Vulkan validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
+- Added a read-only external shaderpack source audit, 37 new regression tests (72 total), embedded JCPP license notices, distributable checks and CI test-report artifacts.
+- Remaining release blockers: arbitrary geometry vertex inputs, MRT for the other geometry bridges, unsupported samplers/custom uniforms, compute/tessellation execution, and real client/Vulkan validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
 
 ## 0.1.1
 

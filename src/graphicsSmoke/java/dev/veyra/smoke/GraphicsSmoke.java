@@ -3,7 +3,15 @@ package dev.veyra.smoke;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.veyra.shader.VeyraRenderer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
+import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.memory.MemoryManager;
+import net.vulkanmod.vulkan.memory.MemoryTypes;
+import net.vulkanmod.vulkan.memory.buffer.Buffer;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.vulkan.VkBufferImageCopy;
+import org.lwjgl.vulkan.VkMemoryBarrier;
+import static org.lwjgl.vulkan.VK10.*;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
@@ -12,7 +20,7 @@ import java.nio.file.Path;
 /** Exercise a real client/world and measure the fixture's auxiliary color output against a baseline. */
 public final class GraphicsSmoke {
     private static int ticks, worldTicks, stage, activePixels, baselineAt;
-    private static boolean pending, finished;
+    private static boolean pending, finished, requested, captureActive;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private GraphicsSmoke() { }
 
@@ -29,12 +37,68 @@ public final class GraphicsSmoke {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
                 pending = true;
-                Screenshot.takeScreenshot(client.getMainRenderTarget(), image -> capture(client, image, true));
+                requested = true; captureActive = true;
             } else if (stage == 1 && worldTicks >= baselineAt) {
                 pending = true;
-                Screenshot.takeScreenshot(client.getMainRenderTarget(), image -> capture(client, image, false));
+                requested = true; captureActive = false;
             }
         } catch (Throwable failure) { finish(client, failure, -1); }
+    }
+
+    /** Record after drawing, before present; consume mapped bytes only after this frame's fence. */
+    public static void renderedFrame() {
+        if (!requested || finished) return;
+        requested = false;
+        Minecraft client = Minecraft.getInstance();
+        Buffer readback = null;
+        try {
+            Renderer renderer = Renderer.getInstance();
+            renderer.endRenderPass();
+            var source = renderer.getMainPass().getMainFramebuffer().getColorAttachment();
+            if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
+                throw new IllegalStateException("Surface image does not support frame readback");
+            int width = source.width, height = source.height, format = source.format;
+            if (format != VK_FORMAT_B8G8R8A8_UNORM && format != VK_FORMAT_B8G8R8A8_SRGB
+                    && format != VK_FORMAT_R8G8B8A8_UNORM && format != VK_FORMAT_R8G8B8A8_SRGB)
+                throw new IllegalStateException("Unsupported readback format " + format);
+            readback = new Buffer("Veyra graphics evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
+            readback.createBuffer((long) width * height * 4);
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                var commands = Renderer.getCommandBuffer();
+                int layout = source.getCurrentLayout();
+                source.transitionImageLayout(stack, commands, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                var region = VkBufferImageCopy.calloc(1, stack);
+                region.imageSubresource().aspectMask(VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+                region.imageExtent().set(width, height, 1);
+                vkCmdCopyImageToBuffer(commands, source.getId(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.getId(), region);
+                var barrier = VkMemoryBarrier.calloc(1, stack).sType$Default()
+                        .srcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT).dstAccessMask(VK_ACCESS_HOST_READ_BIT);
+                vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                        0, barrier, null, null);
+                source.transitionImageLayout(stack, commands, layout);
+            }
+            Buffer completed = readback;
+            boolean active = captureActive;
+            MemoryManager.getInstance().addFrameOp(() -> {
+                try {
+                    var bytes = MemoryUtil.memByteBuffer(completed.getDataPtr(), width * height * 4);
+                    NativeImage image = new NativeImage(width, height, false);
+                    boolean bgra = format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_B8G8R8A8_SRGB;
+                    for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                        int offset = (y * width + x) * 4;
+                        int first = bytes.get(offset) & 255, green = bytes.get(offset + 1) & 255;
+                        int third = bytes.get(offset + 2) & 255, alpha = bytes.get(offset + 3) & 255;
+                        image.setPixel(x, y, (alpha << 24) | ((bgra ? third : first) << 16)
+                                | (green << 8) | (bgra ? first : third));
+                    }
+                    capture(client, image, active);
+                } catch (Throwable failure) { finish(client, failure, -1); }
+                finally { completed.scheduleFree(); }
+            });
+        } catch (Throwable failure) {
+            if (readback != null) readback.scheduleFree();
+            finish(client, failure, -1);
+        }
     }
 
     private static void capture(Minecraft client, NativeImage image, boolean active) {

@@ -10,7 +10,7 @@ The analysis used Iris commit `bff1e69cb6c5519d8745784aa9c8b92984de67e7`, Vulkan
 
 `VkGpuDevice.compilePipeline` converts Minecraft shader interfaces, reflects SPIR-V, creates native pipelines and maps uniform/sampler bindings to descriptors. `ExtendedRenderPipeline` holds the native `GraphicsPipeline` and emulated `EGlProgram`. The inspected `GraphicsPipeline` builds vertex/fragment stages and one color blend attachment. `Framebuffer` explicitly rejects more than one color attachment. `DefaultMainPass` and the chunk `WorldRenderer` manage rebinding the main scene target. `Pipeline.scheduleCleanUp` retires GPU objects through the frame operation queue.
 
-Consequently, simultaneous geometry MRT requires changes to framebuffer creation, render passes, attachment views, pipeline attachment formats/blend state, draw routing and barriers. Splitting fullscreen post outputs into separate draws, as Veyra currently does, does not implement geometry MRT or image-store/atomic semantics.
+Consequently, adding simultaneous geometry MRT required changes to framebuffer creation, render passes, attachment views, pipeline attachment formats/blend state, draw routing and barriers. Veyra now supplies borrowed multi-attachment framebuffers, native render passes/dynamic-rendering descriptions, attachment-aware pipeline state, and terrain draw routing. Fullscreen post outputs still use separate draws; those do not implement image-store/atomic semantics.
 
 ## Veyra
 
@@ -18,13 +18,15 @@ Consequently, simultaneous geometry MRT requires changes to framebuffer creation
 
 `VeyraRenderer` compiles existing post/geometry adapters into Minecraft/VulkanMod pipelines. Its frame plans preserve auxiliary buffer sides across prepare/deferred/composite boundaries and alternate plans for temporal ping-pong. Geometry adapters synthesize supported vertex interfaces from VulkanMod's actual formats. Depth snapshots expose depth-only sampled views; new history images are cleared through `vkCmdClearDepthStencilImage` outside a render pass and transitioned to sampling. `VeyraShadowRenderer` supplies the existing shadow path. `VeyraPipelineResources` retains live synthetic objects and schedules native destruction; source-cache pruning uses mixins confined to Veyra shader identifiers.
 
+The terrain path maps shader output locations to physical colortex indices, retains the current ping-pong side, inherits VulkanMod draw state and applies pack blend overrides per target. Sparse write masks and per-target blending require the enabled independentBlend device feature. Target sizes must match the scene. Retired framebuffer passes and their cached native pipeline variants are destroyed at frame completion. Sampled post inputs receive graph-ordered image barriers on the main command buffer rather than upload-queue transitions before their producing draws. Swapchain wrappers now preserve actual native usage flags; transfer-source usage is requested only when supported by the surface.
+
 ## Known gaps
 
 | Component | Current state | Needed for broad pack compatibility |
 | --- | --- | --- |
 | Pack discovery/options | ZIP/folder, dimensions, macros, profiles, screens, persistence | Wider option syntax/localization coverage and client UI testing |
 | Geometry vertex stage | Existing synthesized interfaces | Execute arbitrary pack vertex GLSL, required attributes, IDs and varyings |
-| Geometry color outputs | Single scene target | Native simultaneous MRT, per-target blending/clear/flip/state |
+| Geometry color outputs | Native terrain MRT with per-target blend overrides; other geometry remains single-output | Entity/hand/block/cloud/shadow MRT, wider format/state semantics and runtime verification |
 | Post outputs | Separate fullscreen draws per output | Genuine MRT where simultaneous execution or side effects matter |
 | Textures/uniforms | Existing restricted sampler and uniform sets | Noise/custom textures/images, extra depth/shadow/color inputs, custom expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
