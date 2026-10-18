@@ -43,12 +43,14 @@ class ShaderPackTest {
 
     @Test
     void readsEyeBrightnessHalfLifeFromAnyGlslFileAndUsesIrisDefault() throws IOException {
-        Path shaders = Files.createDirectories(directory.resolve("smooth/shaders/lib"));
+        Path shaderRoot = Files.createDirectories(directory.resolve("smooth/shaders"));
+        Path shaders = Files.createDirectories(shaderRoot.resolve("lib"));
+        Files.writeString(shaderRoot.resolve("final.fsh"), "void main() {}\n");
         Files.writeString(shaders.resolve("lighting.glsl"), """
                 // const float eyeBrightnessHalflife = 99.0;
                 const float eyeBrightnessHalflife = 5.0;
                 """);
-        Path packPath = shaders.getParent().getParent();
+        Path packPath = shaderRoot.getParent();
         assertEquals(5.0F, ShaderPack.inspect(packPath).readEyeBrightnessHalflife());
 
         Files.delete(shaders.resolve("lighting.glsl"));
