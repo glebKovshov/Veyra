@@ -78,6 +78,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
     private static final Pattern SHADOW_SETTING = Pattern.compile(
             "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
+    private static final Pattern NOISE_TEXTURE_RESOLUTION = Pattern.compile(
+            "\\bconst\\s+int\\s+noiseTextureResolution\\s*=\\s*([+-]?\\d+)\\s*;");
     private static final Pattern INTEGER_LITERAL = Pattern.compile("[+-]?\\d+");
     private static final String DEFAULT_SHADOW_FRAGMENT = """
             #version 120
@@ -355,6 +357,25 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         } catch (IllegalArgumentException exception) {
             throw new IOException("Invalid Iris shadow setting: " + exception.getMessage(), exception);
         }
+    }
+
+    /** Iris defaults noisetex to 256 square pixels and exposes this shader-pack directive. */
+    public int readNoiseTextureResolution() throws IOException {
+        String properties = readShader("shaders.properties").orElse("");
+        Matcher matcher = NOISE_TEXTURE_RESOLUTION.matcher(GLSL_COMMENTS.matcher(properties).replaceAll(""));
+        if (!matcher.find()) {
+            return 256;
+        }
+        int resolution;
+        try {
+            resolution = Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException exception) {
+            throw new IOException("noiseTextureResolution is outside the supported integer range.", exception);
+        }
+        if (resolution < 1 || resolution > 4096) {
+            throw new IOException("noiseTextureResolution must be between 1 and 4096 for VulkanMod.");
+        }
+        return resolution;
     }
 
     private boolean readBooleanProperty(String propertyName, boolean defaultValue) throws IOException {

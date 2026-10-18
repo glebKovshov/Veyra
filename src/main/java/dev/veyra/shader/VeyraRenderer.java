@@ -33,6 +33,7 @@ import dev.veyra.mixin.accessor.VkGpuTextureAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
 import dev.veyra.vulkan.VeyraDepthTextureSnapshot;
+import dev.veyra.vulkan.VeyraNoiseTexture;
 import net.vulkanmod.Initializer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -181,6 +182,9 @@ public final class VeyraRenderer {
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern DEPTH2_SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex2\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern NOISETEX_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+noisetex\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     // PostPass appends "Sampler" to every input name when binding it to the render pass.
     private static final String DEPTH_INPUT_NAME = "Sampler1";
     private static final String DEPTH_INPUT_SAMPLER = DEPTH_INPUT_NAME + "Sampler";
@@ -190,6 +194,7 @@ public final class VeyraRenderer {
     private static final String DEPTH2_INPUT_SAMPLER = DEPTH2_INPUT_NAME + "Sampler";
     private static final String SHADOW_DEPTH_INPUT_NAME = "VeyraShadowDepth";
     private static final String SHADOW_DEPTH_INPUT_SAMPLER = SHADOW_DEPTH_INPUT_NAME + "Sampler";
+    private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
@@ -1550,6 +1555,7 @@ public final class VeyraRenderer {
         resetShadowPipelineState();
         releaseDepthCapturePasses();
         purgeUnusedPipelines();
+        VeyraNoiseTexture.close();
     }
 
     public static String select(ShaderPack pack) {
@@ -2077,6 +2083,9 @@ public final class VeyraRenderer {
             }
         }
         for (ShaderPack.Program source : sources) {
+            if (TerrainShaderAdapter.usesNoiseSampler(source.source())) {
+                VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            }
             List<PipelineProgram> outputs = new ArrayList<>();
             List<String> vertexUniforms = source.vertexSource()
                     .map(shader -> readPostVertexUniforms(shader, source.name()))
@@ -2368,18 +2377,21 @@ public final class VeyraRenderer {
                 }
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 FragmentOutputs outputLayout = FragmentOutputs.parse(fragmentSource);
                 fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable);
 
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable));
+                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler));
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
                 pipelines.put(programName, pipeline);
                 VeyraGeometryTargets.register(pipeline, outputLayout, pack.readGeometryBlendSettings(programName));
                 setShadowSamplerLayout(pipeline, shadowSamplerAvailable);
+                setNoiseSamplerLayout(pipeline);
                 for (UBO ubo : pipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
                 }
@@ -2390,13 +2402,16 @@ public final class VeyraRenderer {
                             .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
                     if (!FragmentOutputs.parse(fragmentSource).sceneOnly())
                         throw new IOException("Multiple shadow color attachments are not implemented yet.");
+                    boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                    builder.applyConfig(terrainPipelineConfig(false));
+                    builder.applyConfig(terrainPipelineConfig(false, usesNoiseSampler));
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                     GraphicsPipeline shadowPipeline = builder.createGraphicsPipeline();
+                    setNoiseSamplerLayout(shadowPipeline);
                     for (UBO ubo : shadowPipeline.getBuffers()) {
                         ubo.setUseGlobalBuffer(true);
                     }
@@ -2412,7 +2427,7 @@ public final class VeyraRenderer {
         }
     }
 
-    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable) {
+    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable) {
         PipelineConfig.UB.Builder terrainUniforms = PipelineConfig.UB.builder(
                         1, org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_ALL_GRAPHICS)
                 .addUniform("vec4", "FogColor")
@@ -2442,7 +2457,15 @@ public final class VeyraRenderer {
         if (shadowSamplerAvailable) {
             config.addImageDescriptor(5, "sampler2D", "VeyraShadowSampler", 3);
         }
+        if (noiseSamplerAvailable) {
+            config.addImageDescriptor(6, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4);
+        }
         return config.build();
+    }
+
+    private static void setNoiseSamplerLayout(GraphicsPipeline pipeline) {
+        var noiseSampler = pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME);
+        if (noiseSampler != null) noiseSampler.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
     private static void setShadowSamplerLayout(GraphicsPipeline pipeline, boolean shadowSamplerAvailable) {
@@ -2553,6 +2576,9 @@ public final class VeyraRenderer {
             try {
                 fragmentSource = (hand ? pack.readHandFragment(programName) : pack.readEntityFragment(programName))
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                    VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                }
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
@@ -2599,6 +2625,9 @@ public final class VeyraRenderer {
     private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack, String programName) throws IOException {
         String fragmentSource = pack.readShadowFragment(programName)
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+        if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+            VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+        }
         boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
         boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
         boolean requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
@@ -2641,7 +2670,8 @@ public final class VeyraRenderer {
                     }
                     return shaderManager.getShader(identifier, type);
                 };
-                shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader);
+                shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader,
+                        adaptedFragment.contains("uniform sampler2D VeyraNoiseSampler;"));
                 VeyraPipelineResources.track(shadowPipeline);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
@@ -2677,6 +2707,9 @@ public final class VeyraRenderer {
             try {
                 fragmentSource = pack.readBlockFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                    VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                }
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
@@ -2732,6 +2765,9 @@ public final class VeyraRenderer {
         try {
             fragmentSource = pack.readBlockFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+            if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            }
             requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
             requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
             fragmentSource = EntityShaderAdapter.adaptTextFragment(fragmentSource, programName);
@@ -2879,9 +2915,10 @@ public final class VeyraRenderer {
         }
         Identifier selectedVertexShader = vertexShader;
         String selectedVertexSource = adaptedVertex;
-        RenderPipeline pipeline = selectedVertexSource == null
-                ? copyPipelineWithFragment(original, fragmentShader)
-                : copyPipelineWithShaders(original, selectedVertexShader, fragmentShader);
+        boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;");
+        RenderPipeline pipeline = copyPipelineWithShaders(original,
+                selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
+                fragmentShader, usesNoiseSampler);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
                 return fragmentSource;
@@ -3543,6 +3580,11 @@ public final class VeyraRenderer {
 
     private static RenderPipeline copyPipelineWithShaders(
             RenderPipeline original, Identifier vertexShader, Identifier fragmentShader) {
+        return copyPipelineWithShaders(original, vertexShader, fragmentShader, false);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader, boolean useNoiseSampler) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(original.getLocation())
                 .withVertexShader(vertexShader)
@@ -3569,6 +3611,9 @@ public final class VeyraRenderer {
         });
         defines.flags().forEach(builder::withShaderDefine);
         original.getSamplers().forEach(builder::withSampler);
+        if (useNoiseSampler && !original.getSamplers().contains(VeyraNoiseTexture.SAMPLER_NAME)) {
+            builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
+        }
         for (RenderPipeline.UniformDescription uniform : original.getUniforms()) {
             if (uniform.type() == UniformType.TEXEL_BUFFER) {
                 builder.withUniform(uniform.name(), uniform.type(), uniform.textureFormat());
@@ -3586,6 +3631,12 @@ public final class VeyraRenderer {
 
     private static RenderPipeline copyShadowPipelineWithShaders(
             RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader) {
+        return copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader, false);
+    }
+
+    private static RenderPipeline copyShadowPipelineWithShaders(
+            RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(location)
                 .withVertexShader(vertexShader)
@@ -3608,6 +3659,9 @@ public final class VeyraRenderer {
         });
         defines.flags().forEach(builder::withShaderDefine);
         original.getSamplers().forEach(builder::withSampler);
+        if (useNoiseSampler && !original.getSamplers().contains(VeyraNoiseTexture.SAMPLER_NAME)) {
+            builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
+        }
         for (RenderPipeline.UniformDescription uniform : original.getUniforms()) {
             if (uniform.type() == UniformType.TEXEL_BUFFER) {
                 builder.withUniform(uniform.name(), uniform.type(), uniform.textureFormat());
@@ -3719,6 +3773,10 @@ public final class VeyraRenderer {
                     if (program.usesShadowSampler()) {
                         inputs.add(new ExternalTextureInput(SHADOW_DEPTH_INPUT_NAME));
                     }
+                    if (program.fragmentSource().contains("uniform sampler2D "
+                            + VeyraNoiseTexture.SAMPLER_NAME + ";")) {
+                        inputs.add(new ExternalTextureInput(NOISE_INPUT_NAME));
+                    }
                     PostPass pass = new PostPass(program.pipeline(),
                             outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
@@ -3789,6 +3847,8 @@ public final class VeyraRenderer {
                     ? BLIT_VERTEX_ID
                     : Identifier.fromNamespaceAndPath("veyra", "shaderpack_vertex/" + suffix);
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
+            boolean usesNoiseSampler = shader.source().contains("uniform sampler2D "
+                    + VeyraNoiseTexture.SAMPLER_NAME + ";");
             return new PipelineProgram(shaderId, shader.source(), vertexShaderId, vertexSource, shader.uniforms(),
                     shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
                     shader.usesShadowSampler(),
@@ -3796,6 +3856,7 @@ public final class VeyraRenderer {
                     createPipeline(pipelineId, shaderId, vertexShaderId, shader.uniforms(),
                             shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
                             shader.usesShadowSampler(),
+                            usesNoiseSampler,
                             shader.colorSamplers()));
         });
     }
@@ -3829,6 +3890,7 @@ public final class VeyraRenderer {
             Identifier pipeline, Identifier fragmentShader, Identifier vertexShader, List<String> uniforms,
             boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
             boolean usesShadowSampler,
+            boolean usesNoiseSampler,
             Set<Integer> colorSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                 .withFragmentShader(fragmentShader)
@@ -3847,6 +3909,9 @@ public final class VeyraRenderer {
         }
         if (usesShadowSampler) {
             builder.withSampler(SHADOW_DEPTH_INPUT_SAMPLER);
+        }
+        if (usesNoiseSampler) {
+            builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
         }
         for (int colorSampler : colorSamplers) {
             if (colorSampler > 0) {
@@ -3872,6 +3937,7 @@ public final class VeyraRenderer {
         body = RENDERTARGETS_DIRECTIVE.matcher(body).replaceAll("");
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
+        boolean usesNoiseSampler = NOISETEX_REFERENCE.matcher(body).find();
 
         Matcher unsupportedDepthSampler = UNSUPPORTED_DEPTH_SAMPLER.matcher(body);
         if (unsupportedDepthSampler.find()) {
@@ -3901,6 +3967,16 @@ public final class VeyraRenderer {
         }
         shadowSamplerDeclaration.appendTail(bodyWithoutShadowSampler);
         body = bodyWithoutShadowSampler.toString();
+        Matcher noiseSamplerDeclaration = NOISETEX_UNIFORM_DECLARATION.matcher(body);
+        StringBuffer bodyWithoutNoiseSampler = new StringBuffer();
+        while (noiseSamplerDeclaration.find()) {
+            if (!noiseSamplerDeclaration.group(1).equals("sampler2D")) {
+                throw new IOException("noisetex must be declared as sampler2D.");
+            }
+            noiseSamplerDeclaration.appendReplacement(bodyWithoutNoiseSampler, "");
+        }
+        noiseSamplerDeclaration.appendTail(bodyWithoutNoiseSampler);
+        body = bodyWithoutNoiseSampler.toString();
         Matcher depthSampler = DEPTH_SAMPLER.matcher(body);
         boolean usesDepthSampler = depthSampler.find();
         Matcher depth1Sampler = DEPTH1_SAMPLER.matcher(body);
@@ -4034,6 +4110,10 @@ public final class VeyraRenderer {
                 adapted.append("uniform sampler2D ").append(SHADOW_DEPTH_INPUT_SAMPLER).append(";\n")
                         .append("#define shadowtex0 ").append(SHADOW_DEPTH_INPUT_SAMPLER).append('\n')
                         .append("#define shadow2D(shadowSampler, coord) veyraSample(shadowSampler, coord)\n");
+            }
+            if (usesNoiseSampler) {
+                adapted.append("uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
+                        .append("#define noisetex ").append(VeyraNoiseTexture.SAMPLER_NAME).append('\n');
             }
             adapted.append(outputBody);
             adaptedShaders.add(new AdaptedShader(adapted.toString(), uniforms,
@@ -4995,6 +5075,9 @@ public final class VeyraRenderer {
 
         @Override
         public GpuTextureView texture(Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            if (samplerName.equals(NOISE_INPUT_NAME)) {
+                return VeyraNoiseTexture.view();
+            }
             if (samplerName.equals(DEPTH1_INPUT_NAME)) {
                 return depthTex1Snapshot.sampledView();
             }

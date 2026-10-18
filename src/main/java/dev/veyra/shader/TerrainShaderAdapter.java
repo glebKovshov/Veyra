@@ -31,6 +31,7 @@ public final class TerrainShaderAdapter {
             "\\b(?:gl_FragData|mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+    private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2", 1)),
@@ -109,6 +110,7 @@ public final class TerrainShaderAdapter {
             layout(binding = 3) uniform sampler2D Sampler0;
             layout(binding = 4) uniform sampler2D LightTexture;
             layout(binding = 5) uniform sampler2D VeyraShadowSampler;
+            layout(binding = 6) uniform sampler2D VeyraNoiseSampler;
             layout(location = 0) in vec4 veyraVertexColor;
             layout(location = 1) in vec2 veyraTexCoord;
             layout(location = 5) in vec2 veyraLightmapCoord;
@@ -134,6 +136,7 @@ public final class TerrainShaderAdapter {
             #define gtexture Sampler0
             #define lightmap LightTexture
             #define shadowtex0 VeyraShadowSampler
+            #define noisetex VeyraNoiseSampler
             #define shadowPos veyraShadowPos
             #define shadowCoord veyraShadowPos
             #define shadow2D(sampler, coord) veyraSample(sampler, coord)
@@ -171,12 +174,14 @@ public final class TerrainShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = SHADOW_MATRIX_UNIFORM.matcher(adapted).replaceAll("");
+        boolean noiseSamplerAvailable = usesNoiseSampler(adapted);
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
+                    && !sampler.equals("noisetex")
                     && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
@@ -286,9 +291,15 @@ public final class TerrainShaderAdapter {
                     """);
         }
         if (!shadowSamplerAvailable) {
-            bridge = bridge.replace("            layout(binding = 5) uniform sampler2D VeyraShadowSampler;\n", "")
-                    .replace("            #define shadowtex0 VeyraShadowSampler\n", "")
-                    .replace("            #define shadow2D(sampler, coord) veyraSample(sampler, coord)\n", "");
+            bridge = bridge.replaceAll(
+                    "(?m)^[\\t ]*layout\\(binding = 5\\) uniform sampler2D VeyraShadowSampler;[\\t ]*\\R", "")
+                    .replaceAll("(?m)^[\\t ]*#define shadowtex0 VeyraShadowSampler[\\t ]*\\R", "")
+                    .replaceAll("(?m)^[\\t ]*#define shadow2D\\(sampler, coord\\) veyraSample\\(sampler, coord\\)[\\t ]*\\R", "");
+        }
+        if (!noiseSamplerAvailable) {
+            bridge = bridge.replaceAll(
+                    "(?m)^[\\t ]*layout\\(binding = 6\\) uniform sampler2D VeyraNoiseSampler;[\\t ]*\\R", "")
+                    .replaceAll("(?m)^[\\t ]*#define noisetex VeyraNoiseSampler[\\t ]*\\R", "");
         }
         result.append(bridge
                 .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())
@@ -298,6 +309,11 @@ public final class TerrainShaderAdapter {
 
     public static List<ShaderUniform> shaderPackUniforms() {
         return SHADERPACK_UNIFORMS;
+    }
+
+    public static boolean usesNoiseSampler(String source) {
+        return NOISETEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
+                .find();
     }
 
     private static ShaderUniform shaderPackUniform(String name) {

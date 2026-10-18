@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.vulkan.VeyraNoiseTexture;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
 import net.vulkanmod.render.engine.VkRenderPass;
 import net.vulkanmod.render.engine.VkTextureView;
@@ -16,6 +17,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = VkRenderPass.class, remap = false)
 public abstract class VkRenderPassMixin {
+    @Inject(method = "setPipeline", at = @At("RETURN"), remap = false)
+    private void veyra$bindNoiseSampler(RenderPipeline ignored, CallbackInfo ci) {
+        VkRenderPass pass = (VkRenderPass) (Object) this;
+        RenderPipeline active = pass.getPipeline();
+        if (active == null) return;
+        var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
+        if (pipeline != null && pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME) != null) {
+            VeyraNoiseTexture.bind(pass);
+        }
+    }
+
+    @Inject(method = "bindTexture", at = @At("HEAD"), cancellable = true, remap = false)
+    private void veyra$forceNoiseRepeatSampler(
+            String name, GpuTextureView view, GpuSampler sampler, CallbackInfo ci) {
+        if (!name.equals(VeyraNoiseTexture.SAMPLER_NAME) || !VeyraNoiseTexture.hasTexture()) return;
+        GpuSampler repeatSampler = VeyraNoiseTexture.sampler();
+        if (sampler != repeatSampler) {
+            ((VkRenderPass) (Object) this).bindTexture(name, view, repeatSampler);
+            ci.cancel();
+        }
+    }
+
     @Inject(method = "bindTexture", at = @At("RETURN"), remap = false)
     private void veyra$bindDepthSnapshots(String name, GpuTextureView view, GpuSampler sampler, CallbackInfo ci) {
         if (!name.equals("VeyraDepthTex1Sampler") && !name.equals("VeyraDepthTex2Sampler")) {

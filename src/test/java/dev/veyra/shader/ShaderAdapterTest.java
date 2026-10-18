@@ -76,6 +76,49 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsIrisNoiseTextureForTerrainAndEntityPrograms() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                uniform sampler2D noisetex;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(noisetex, texcoord); }
+                """);
+        assertTrue(terrain.contains("layout(binding = 6) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(terrain.contains("#define noisetex VeyraNoiseSampler"));
+        assertTrue(terrain.contains("veyraSample(noisetex, texcoord)"));
+
+        String entity = EntityShaderAdapter.adaptFragment("""
+                #version 120
+                uniform sampler2D noisetex;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(noisetex, texcoord); }
+                """);
+        assertTrue(entity.contains("uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(entity.contains("#define noisetex VeyraNoiseSampler"));
+        assertTrue(entity.contains("veyraEntitySample(noisetex, texCoord0)"));
+    }
+
+    @Test
+    void ignoresNoisetexMentionsInsideComments() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                // sampler2D noisetex is only mentioned in this comment
+                varying vec2 texcoord;
+                void main() { gl_FragColor = vec4(texcoord, 0.0, 1.0); }
+                """);
+        assertFalse(terrain.contains("VeyraNoiseSampler"));
+    }
+
+    @Test
+    void removesUnavailableTerrainSamplersFromBridge() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                varying vec2 texcoord;
+                void main() { gl_FragColor = vec4(texcoord, 0.0, 1.0); }
+                """, false);
+        assertFalse(adapted.contains("VeyraNoiseSampler"));
+        assertFalse(adapted.contains("VeyraShadowSampler"));
+    }
+
+    @Test
     void rejectsCloudTextureInputs() {
         assertThrows(IOException.class, () -> CloudShaderAdapter.adaptFragment(
                 "uniform sampler2D texture;\nvarying vec2 texcoord;\nvoid main() { gl_FragColor = texture2D(texture, texcoord); }\n"));

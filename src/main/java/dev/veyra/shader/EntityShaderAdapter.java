@@ -37,6 +37,7 @@ public final class EntityShaderAdapter {
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+    private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
     private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
@@ -334,6 +335,7 @@ public final class EntityShaderAdapter {
         }
 
         String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
+        boolean usesNoiseSampler = usesNoiseSampler(adapted);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
         while (extensionMatcher.find()) {
@@ -349,7 +351,7 @@ public final class EntityShaderAdapter {
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
-                    && !sampler.equals("lightmap")) {
+                    && !sampler.equals("lightmap") && !sampler.equals("noisetex")) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             if (!samplerMatcher.group(1).equals("sampler2D")) {
@@ -512,6 +514,7 @@ public final class EntityShaderAdapter {
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_NOISE_SAMPLER__
                 __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -559,6 +562,7 @@ public final class EntityShaderAdapter {
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_NOISE_SAMPLER__
                 __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -583,6 +587,8 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
+                .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler
+                        ? "uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n" : "")
                 .replace("__VEYRA_SPHERICAL_DISTANCE__",
                         suppliesSphericalDistance ? "in float sphericalVertexDistance;\n" : "")
                 .replace("__VEYRA_CYLINDRICAL_DISTANCE__",
@@ -599,6 +605,11 @@ public final class EntityShaderAdapter {
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
         return result.append(adapted).toString();
+    }
+
+    public static boolean usesNoiseSampler(String source) {
+        return NOISETEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
+                .find();
     }
 
     private record Varying(String type) {

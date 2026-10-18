@@ -48,6 +48,7 @@ public final class VeyraGeometryTargets {
     public static void unregister(GraphicsPipeline pipeline) { layouts.remove(pipeline); blends.remove(pipeline); }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
+        VeyraNoiseTexture.bind(pipeline);
         Renderer renderer = Renderer.getInstance();
         FragmentOutputs layout = layouts.get(pipeline);
         Framebuffer bound = renderer.getBoundFramebuffer();
