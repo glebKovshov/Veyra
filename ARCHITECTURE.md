@@ -31,9 +31,9 @@ The terrain path maps shader output locations to physical colortex indices, reta
 | Textures/uniforms | Existing restricted sampler and uniform sets | Noise/custom textures/images, extra depth/shadow/color inputs, custom expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
 | Pack properties | Options, target/shadow settings, program conditions | Full state/property semantics, feature flags, custom images/SSBOs |
-| Runtime verification | Full build, unit tests, CPU shaderc/source audits | Minecraft launch, GPU validation, visual scenes, resize/reload/switch stress and memory measurements |
+| Runtime verification | Full build, unit tests, CPU shaderc/source audits; one Lavapipe synthetic terrain-MRT/composite client fixture passes | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
 
-The new pipeline cleanup and phase scheduling compile against the pinned backend but have not run on a Vulkan device. Their runtime correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
+The synthetic client fixture confirms the terrain-MRT to composite path under Lavapipe and reports no runtime validation errors before world shutdown. It also observes 10,031 `VUID-vkDestroyDevice-device-05137` child-object diagnostics during VulkanMod/Minecraft process teardown; ownership is not identified, so process-wide cleanup is not yet validated. The broader shader-pack pipeline, other geometry families, visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
 
 ## Sources and licensing
 
