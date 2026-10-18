@@ -10,7 +10,7 @@ Post programs are scheduled at separate world boundaries: `prepare` after shadow
 
 ## Install and use
 
-1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11.
+1. Install Fabric Loader 0.18.4 or newer, Fabric API 0.141.6+1.21.11 or newer for this Minecraft version, and VulkanMod 0.6.8 for Minecraft 1.21.11. VulkanMod uses Fabric Renderer API at runtime; omitting Fabric API prevents client startup.
 2. Download the mod jar from [Releases](https://github.com/glebKovshov/Veyra/releases) (not the `-sources.jar`). Put the Veyra jar in the instance's `mods` folder.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
