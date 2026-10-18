@@ -30,11 +30,17 @@ public final class EntityShaderAdapter {
     private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_ENTITY_INPUT = Pattern.compile(
-            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|lightMapColor|overlayColor|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+    private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
+    private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+normal\\s*;");
+    private static final Pattern MAIN_FUNCTION = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
+    private static final Pattern NORMAL_REFERENCE = Pattern.compile("\\bnormal\\b");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -45,7 +51,8 @@ public final class EntityShaderAdapter {
             Map.entry("sphericalVertexDistance", new Varying("float")),
             Map.entry("cylindricalVertexDistance", new Varying("float")),
             Map.entry("lightMapColor", new Varying("vec4")),
-            Map.entry("overlayColor", new Varying("vec4")));
+            Map.entry("overlayColor", new Varying("vec4")),
+            Map.entry("normal", new Varying("vec3")));
     private static final Map<String, Varying> SUPPORTED_TEXT_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -69,6 +76,49 @@ public final class EntityShaderAdapter {
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
         return adaptFragment(source, programName, true);
+    }
+
+    public static boolean requiresNormalInput(String source) {
+        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
+        while (matcher.find()) {
+            if (matcher.group(3).equals("normal")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static String adaptVertexShader(String source, boolean shadowPass, String programName) throws IOException {
+        if (source == null || source.isBlank()) {
+            throw new IOException(programName + " requires a normal input, but its VulkanMod vertex shader is empty.");
+        }
+        String uncommented = COMMENTS.matcher(source).replaceAll("");
+        if (NORMAL_VERTEX_OUTPUT.matcher(uncommented).find()) {
+            return source;
+        }
+        if (!NORMAL_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
+            throw new IOException(programName + " requires normals, but VulkanMod's vertex format does not provide them.");
+        }
+        Matcher main = MAIN_FUNCTION.matcher(source);
+        if (!main.find()) {
+            throw new IOException(programName + " requires normals, but its VulkanMod vertex shader has no main function.");
+        }
+
+        String inverseMatrix = shadowPass ? "shadowModelViewInverse" : "gbufferModelViewInverse";
+        Pattern inverseMatrixUniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
+                + Pattern.quote(inverseMatrix) + "\\s*;");
+        String declarations = (inverseMatrixUniform.matcher(uncommented).find()
+                ? "" : "uniform mat4 " + inverseMatrix + ";\n") + "out vec3 normal;\n";
+        String withDeclarations = source.substring(0, main.start()) + declarations + source.substring(main.start());
+        Matcher adaptedMain = MAIN_FUNCTION.matcher(withDeclarations);
+        if (!adaptedMain.find()) {
+            throw new IOException(programName + " requires normals, but its VulkanMod vertex shader could not be adapted.");
+        }
+        String transformedNormal = "normal = normalize(mat3(" + inverseMatrix
+                + ") * transpose(inverse(mat3(ModelViewMat))) * Normal);\n";
+        return withDeclarations.substring(0, adaptedMain.end()) + transformedNormal
+                + withDeclarations.substring(adaptedMain.end());
     }
 
     private static String adaptFragment(String source, String programName, boolean textPipeline) throws IOException {
@@ -112,15 +162,20 @@ public final class EntityShaderAdapter {
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
+        boolean suppliesNormal = false;
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
             Varying varying = (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
             if (varying == null) {
-                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's entity bridge yet.");
+                throw new IOException(programName + " input '" + name + "' is not provided by Veyra's "
+                        + (textPipeline ? "sign-text" : "entity") + " bridge yet.");
             }
             if (!varying.type().equals(type)) {
                 throw new IOException(programName + " input '" + name + "' must use " + varying.type() + ".");
+            }
+            if (name.equals("normal")) {
+                suppliesNormal = true;
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
@@ -156,6 +211,9 @@ public final class EntityShaderAdapter {
         if ((textPipeline ? UNSUPPORTED_TEXT_INPUT : UNSUPPORTED_ENTITY_INPUT).matcher(uncommented).find()) {
             throw new IOException(programName + " uses inputs that Veyra's "
                     + (textPipeline ? "sign-text" : "entity") + " bridge does not provide yet.");
+        }
+        if (!suppliesNormal && !textPipeline && NORMAL_REFERENCE.matcher(uncommented).find()) {
+            throw new IOException(programName + " uses 'normal' without declaring it as a fragment input.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException(programName + " uses a texture sampling function that Veyra's entity bridge does not support yet.");
@@ -238,6 +296,7 @@ public final class EntityShaderAdapter {
                 #else
                 #define overlayColor vec4(0.0)
                 #endif
+                __VEYRA_NORMAL_INPUT__
                 in vec2 texCoord0;
                 out vec4 veyraEntityFragColor;
                 uniform sampler2D Sampler0;
@@ -257,6 +316,7 @@ public final class EntityShaderAdapter {
                 #endif
                 #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraEntityFragColor;", outputName + ";");
+        bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "");
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');

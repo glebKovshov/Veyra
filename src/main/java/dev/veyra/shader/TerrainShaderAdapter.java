@@ -28,7 +28,7 @@ public final class TerrainShaderAdapter {
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
     private static final Pattern UNSUPPORTED_GBUFFER_INPUT = Pattern.compile(
-            "\\b(?:gl_FragData|mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent)\\b");
+            "\\b(?:gl_FragData|mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
@@ -42,7 +42,8 @@ public final class TerrainShaderAdapter {
             Map.entry("glColor", new Varying("vec4", 0)),
             Map.entry("gl_Color", new Varying("vec4", 0)),
             Map.entry("shadowPos", new Varying("vec4", 6)),
-            Map.entry("shadowCoord", new Varying("vec4", 6)));
+            Map.entry("shadowCoord", new Varying("vec4", 6)),
+            Map.entry("normal", new Varying("vec3", 7)));
     private static final List<ShaderUniform> SHADERPACK_UNIFORMS = List.of(
             new ShaderUniform("viewWidth", "float", false),
             new ShaderUniform("viewHeight", "float", false),
@@ -102,6 +103,7 @@ public final class TerrainShaderAdapter {
             layout(location = 1) in vec2 veyraTexCoord;
             layout(location = 5) in vec2 veyraLightmapCoord;
             layout(location = 6) in vec4 veyraShadowPos;
+            layout(location = 7) in vec3 veyraTerrainPosition;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -198,6 +200,7 @@ public final class TerrainShaderAdapter {
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
+        List<String> declaredVaryings = new ArrayList<>();
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -212,6 +215,7 @@ public final class TerrainShaderAdapter {
             if (location != null && Integer.parseInt(location) != varying.location()) {
                 throw new IOException("gbuffers_terrain input '" + name + "' uses an unsupported location.");
             }
+            declaredVaryings.add(name);
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
         varyingMatcher.appendTail(withoutVaryings);
@@ -240,7 +244,7 @@ public final class TerrainShaderAdapter {
         }
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_terrain uses normals, entity data, or multiple outputs that are not provided by Veyra's terrain bridge yet.");
+            throw new IOException("gbuffers_terrain uses entity metadata, view-space positions, tangents, or multiple outputs that are not provided by Veyra's terrain bridge yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException("gbuffers_terrain uses a texture sampling function that Veyra's terrain bridge does not support yet.");
@@ -261,6 +265,16 @@ public final class TerrainShaderAdapter {
         String bridge = FRAGMENT_BRIDGE
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms) + "#define texture Sampler0");
+        if (declaredVaryings.contains("normal")) {
+            bridge = bridge.replace("#define texture Sampler0", """
+                    vec3 veyraTerrainNormal() {
+                        vec3 faceNormal = cross(dFdx(veyraTerrainPosition), dFdy(veyraTerrainPosition));
+                        return normalize(gl_FrontFacing ? faceNormal : -faceNormal);
+                    }
+                    #define normal veyraTerrainNormal()
+                    #define texture Sampler0
+                    """);
+        }
         if (!shadowSamplerAvailable) {
             bridge = bridge.replace("            layout(binding = 5) uniform sampler2D VeyraShadowSampler;\n", "")
                     .replace("            #define shadowtex0 VeyraShadowSampler\n", "")
@@ -315,7 +329,8 @@ public final class TerrainShaderAdapter {
         }
         String adapted = source.replace(outputMarker,
                 outputMarker + "\nlayout (location = 5) out vec2 veyraLightmapCoord;"
-                        + "\nlayout (location = 6) out vec4 veyraShadowPos;");
+                        + "\nlayout (location = 6) out vec4 veyraShadowPos;"
+                        + "\nlayout (location = 7) out vec3 veyraTerrainPosition;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
@@ -338,7 +353,8 @@ public final class TerrainShaderAdapter {
             throw new IOException("VulkanMod's terrain vertex position changed; Veyra cannot calculate shadow coordinates.");
         }
         return adapted.replace(positionMarker,
-                positionMarker + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);");
+                positionMarker + "\n    veyraTerrainPosition = pos;"
+                        + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);");
     }
 
     private record Varying(String type, int location) {

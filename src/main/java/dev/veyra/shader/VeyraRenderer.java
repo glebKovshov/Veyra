@@ -2117,9 +2117,11 @@ public final class VeyraRenderer {
                     || HAND_WATER_PROGRAM.equals(programName) && pack.hasHandWaterFragment())
                     : !pack.entityPrograms().contains(programName);
             String fragmentSource;
+            boolean requiresNormal = false;
             try {
                 fragmentSource = (hand ? pack.readHandFragment(programName) : pack.readEntityFragment(programName))
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             } catch (IOException exception) {
                 if (!fallback) {
@@ -2134,7 +2136,8 @@ public final class VeyraRenderer {
             RenderPipeline entityPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (entityPipeline == null) {
                 try {
-                    entityPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                    entityPipeline = compileEntityPipeline(
+                            original, fragmentSource, sourceHash, requiresNormal, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2160,18 +2163,13 @@ public final class VeyraRenderer {
     private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack, String programName) throws IOException {
         String fragmentSource = pack.readShadowFragment(programName)
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+        boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
         fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
         String sourceHash = sha256(programName + '\n' + fragmentSource);
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/" + programName + "/" + sourceHash);
         String adaptedFragment = fragmentSource;
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
-        ShaderSource source = (identifier, type) -> {
-            if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
-                return adaptedFragment;
-            }
-            return shaderManager.getShader(identifier, type);
-        };
 
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isEntityRenderPipeline)
@@ -2184,7 +2182,26 @@ public final class VeyraRenderer {
                 Identifier location = Identifier.fromNamespaceAndPath("veyra",
                         "pipeline/" + programName + "/" + sourceHash + "/"
                                 + original.getLocation().getPath().replace('/', '_'));
-                shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
+                Identifier vertexShader = original.getVertexShader();
+                String adaptedVertex = null;
+                if (requiresNormal) {
+                    adaptedVertex = EntityShaderAdapter.adaptVertexShader(
+                            shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName);
+                    vertexShader = entityNormalVertexShader(original, sourceHash, true);
+                }
+                Identifier selectedVertexShader = vertexShader;
+                String selectedVertexSource = adaptedVertex;
+                ShaderSource source = (identifier, type) -> {
+                    if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
+                        return adaptedFragment;
+                    }
+                    if (selectedVertexSource != null && identifier.equals(selectedVertexShader)
+                            && type == ShaderType.VERTEX) {
+                        return selectedVertexSource;
+                    }
+                    return shaderManager.getShader(identifier, type);
+                };
+                shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
                     throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2212,9 +2229,11 @@ public final class VeyraRenderer {
             }
             boolean fallback = !pack.blockPrograms().contains(programName);
             String fragmentSource;
+            boolean requiresNormal = false;
             try {
                 fragmentSource = pack.readBlockFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
             } catch (IOException exception) {
                 if (!fallback) {
@@ -2229,7 +2248,8 @@ public final class VeyraRenderer {
             RenderPipeline blockPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (blockPipeline == null) {
                 try {
-                    blockPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                    blockPipeline = compileEntityPipeline(
+                            original, fragmentSource, sourceHash, requiresNormal, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2383,13 +2403,34 @@ public final class VeyraRenderer {
 
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash) throws IOException {
+        return compileEntityPipeline(original, fragmentSource, sourceHash, false, false, "gbuffers_entities");
+    }
+
+    private static RenderPipeline compileEntityPipeline(
+            RenderPipeline original, String fragmentSource, String sourceHash,
+            boolean requiresNormal, boolean shadowPass, String programName) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/entities/" + sourceHash);
-        RenderPipeline pipeline = copyPipelineWithFragment(original, fragmentShader);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+        Identifier vertexShader = original.getVertexShader();
+        String adaptedVertex = null;
+        if (requiresNormal) {
+            adaptedVertex = EntityShaderAdapter.adaptVertexShader(
+                    shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName);
+            vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
+        }
+        Identifier selectedVertexShader = vertexShader;
+        String selectedVertexSource = adaptedVertex;
+        RenderPipeline pipeline = selectedVertexSource == null
+                ? copyPipelineWithFragment(original, fragmentShader)
+                : copyPipelineWithShaders(original, selectedVertexShader, fragmentShader);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
                 return fragmentSource;
+            }
+            if (selectedVertexSource != null && identifier.equals(selectedVertexShader)
+                    && type == ShaderType.VERTEX) {
+                return selectedVertexSource;
             }
             return shaderManager.getShader(identifier, type);
         };
@@ -2399,6 +2440,12 @@ public final class VeyraRenderer {
                     + " with the selected entity shader.");
         }
         return pipeline;
+    }
+
+    private static Identifier entityNormalVertexShader(RenderPipeline original, String sourceHash, boolean shadowPass) {
+        String vertexPath = original.getVertexShader().getPath().replace('/', '_');
+        return Identifier.fromNamespaceAndPath("veyra",
+                "shaderpack/entities_vertex/" + (shadowPass ? "shadow_" : "") + vertexPath + "/" + sourceHash);
     }
 
     private static BeaconBeamPipelineSet compileBeaconBeamPipelines(ShaderPack pack) throws IOException {
@@ -3026,9 +3073,14 @@ public final class VeyraRenderer {
     }
 
     private static RenderPipeline copyPipelineWithFragment(RenderPipeline original, Identifier fragmentShader) {
+        return copyPipelineWithShaders(original, original.getVertexShader(), fragmentShader);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(original.getLocation())
-                .withVertexShader(original.getVertexShader())
+                .withVertexShader(vertexShader)
                 .withFragmentShader(fragmentShader)
                 .withDepthTestFunction(original.getDepthTestFunction())
                 .withPolygonMode(original.getPolygonMode())
@@ -3064,9 +3116,14 @@ public final class VeyraRenderer {
 
     private static RenderPipeline copyShadowPipelineWithFragment(
             RenderPipeline original, Identifier location, Identifier fragmentShader) {
+        return copyShadowPipelineWithShaders(original, location, original.getVertexShader(), fragmentShader);
+    }
+
+    private static RenderPipeline copyShadowPipelineWithShaders(
+            RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(location)
-                .withVertexShader(original.getVertexShader())
+                .withVertexShader(vertexShader)
                 .withFragmentShader(fragmentShader)
                 .withDepthTestFunction(original.getDepthTestFunction())
                 .withPolygonMode(original.getPolygonMode())
