@@ -68,7 +68,15 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("is_on_ground", "bool", true),
             new ShaderUniform("is_hurt", "bool", true),
             new ShaderUniform("is_invisible", "bool", true),
-            new ShaderUniform("is_burning", "bool", true));
+            new ShaderUniform("is_burning", "bool", true),
+            new ShaderUniform("gbufferModelView", "mat4", false),
+            new ShaderUniform("gbufferModelViewInverse", "mat4", false),
+            new ShaderUniform("gbufferProjection", "mat4", false),
+            new ShaderUniform("gbufferProjectionInverse", "mat4", false),
+            new ShaderUniform("gbufferPreviousModelView", "mat4", false),
+            new ShaderUniform("gbufferPreviousProjection", "mat4", false),
+            new ShaderUniform("shadowModelViewInverse", "mat4", false),
+            new ShaderUniform("shadowProjectionInverse", "mat4", false));
 
     private static final String FRAGMENT_BRIDGE = """
             layout(binding = 1) uniform VeyraTerrainUniformBuffer {
@@ -185,7 +193,7 @@ public final class TerrainShaderAdapter {
         uniformMatcher.appendTail(withoutShaderPackUniforms);
         adapted = withoutShaderPackUniforms.toString();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_terrain has an unsupported uniform declaration; supported Iris scalar uniforms and the built-in samplers are available.");
+            throw new IOException("gbuffers_terrain has an unsupported uniform declaration; supported Iris scalar/matrix uniforms and the built-in samplers are available.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);

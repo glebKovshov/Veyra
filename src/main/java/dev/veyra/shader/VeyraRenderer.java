@@ -61,6 +61,7 @@ import net.vulkanmod.vulkan.shader.SPIRVUtils;
 import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import net.vulkanmod.vulkan.texture.VulkanImage;
+import net.vulkanmod.vulkan.util.MappedBuffer;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
@@ -268,6 +269,7 @@ public final class VeyraRenderer {
     private static final VeyraDepthTextureSnapshot depthTex2Snapshot = new VeyraDepthTextureSnapshot("depthtex2");
     private static FrameMatrices frameMatrices = FrameMatrices.IDENTITY;
     private static boolean frameMatricesInitialized;
+    private static final Map<String, MappedBuffer> SHADER_PACK_MATRIX_BUFFERS = new HashMap<>();
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
     private static boolean cameraUniformsInitialized;
     private static volatile FrameUniforms shaderPackFrameUniforms = FrameUniforms.ZERO;
@@ -382,6 +384,8 @@ public final class VeyraRenderer {
         for (TerrainShaderAdapter.ShaderUniform uniform : TerrainShaderAdapter.shaderPackUniforms()) {
             if (uniform.sourceType().equals("float")) {
                 Uniforms.vec1f_uniformMap.put(uniform.name(), () -> shaderPackFloatUniform(uniform.name()));
+            } else if (uniform.sourceType().equals("mat4")) {
+                registerShaderPackMatrixUniform(uniform.name());
             } else {
                 Uniforms.vec1i_uniformMap.put(uniform.name(), () -> shaderPackIntUniform(uniform.name()));
                 if (uniform.booleanField()) {
@@ -391,6 +395,33 @@ public final class VeyraRenderer {
             }
         }
         shaderPackUniformsRegistered = true;
+    }
+
+    private static void registerShaderPackMatrixUniform(String name) {
+        if (name.equals("shadowModelViewInverse") || name.equals("shadowProjectionInverse")) {
+            return;
+        }
+        MappedBuffer buffer = new MappedBuffer(16 * Float.BYTES);
+        shaderPackMatrix(name, frameMatrices).get(buffer.buffer.asFloatBuffer());
+        SHADER_PACK_MATRIX_BUFFERS.put(name, buffer);
+        Uniforms.mat4f_uniformMap.put(name, () -> buffer);
+    }
+
+    private static void updateShaderPackMatrixUniforms(FrameMatrices matrices) {
+        SHADER_PACK_MATRIX_BUFFERS.forEach((name, buffer) ->
+                shaderPackMatrix(name, matrices).get(buffer.buffer.asFloatBuffer()));
+    }
+
+    private static Matrix4f shaderPackMatrix(String name, FrameMatrices matrices) {
+        return switch (name) {
+            case "gbufferModelView" -> matrices.gbufferModelView();
+            case "gbufferModelViewInverse" -> matrices.gbufferModelViewInverse();
+            case "gbufferProjection" -> matrices.gbufferProjection();
+            case "gbufferProjectionInverse" -> matrices.gbufferProjectionInverse();
+            case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
+            case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
+            default -> throw new IllegalArgumentException("Unknown shader pack matrix uniform " + name + ".");
+        };
     }
 
     private static float shaderPackFloatUniform(String name) {
@@ -419,7 +450,7 @@ public final class VeyraRenderer {
             case "blindness" -> frame.blindness();
             case "nightVision" -> frame.nightVision();
             case "darknessFactor" -> frame.darknessFactor();
-            default -> throw new IllegalArgumentException("Unknown terrain shader pack uniform " + name + ".");
+            default -> throw new IllegalArgumentException("Unknown shader pack float uniform " + name + ".");
         };
     }
 
@@ -437,7 +468,7 @@ public final class VeyraRenderer {
             case "is_hurt" -> frame.isHurt() ? 1 : 0;
             case "is_invisible" -> frame.isInvisible() ? 1 : 0;
             case "is_burning" -> frame.isBurning() ? 1 : 0;
-            default -> throw new IllegalArgumentException("Unknown terrain shader pack uniform " + name + ".");
+            default -> throw new IllegalArgumentException("Unknown shader pack integer uniform " + name + ".");
         };
     }
 
@@ -465,6 +496,7 @@ public final class VeyraRenderer {
                 shadowModelView, new Matrix4f(shadowModelView).invert(),
                 shadowProjection, new Matrix4f(shadowProjection).invert());
         frameMatricesInitialized = true;
+        updateShaderPackMatrixUniforms(frameMatrices);
 
         CameraPosition currentCameraPosition = cameraPosition(cameraPosition.x, cameraPosition.y, cameraPosition.z);
         CameraPosition previousCameraPosition = cameraUniformsInitialized

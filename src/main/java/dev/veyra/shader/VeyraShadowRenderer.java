@@ -41,9 +41,13 @@ import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 /** Renders VulkanMod terrain, entity, and block entity geometry into an Iris-compatible shadow map. */
 public final class VeyraShadowRenderer {
     private static final MappedBuffer SHADOW_MODEL_VIEW_BUFFER = new MappedBuffer(16 * Float.BYTES);
+    private static final MappedBuffer SHADOW_MODEL_VIEW_INVERSE_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final MappedBuffer SHADOW_PROJECTION_BUFFER = new MappedBuffer(16 * Float.BYTES);
+    private static final MappedBuffer SHADOW_PROJECTION_INVERSE_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final Matrix4f shadowModelView = new Matrix4f();
+    private static final Matrix4f shadowModelViewInverse = new Matrix4f();
     private static final Matrix4f shadowProjection = new Matrix4f();
+    private static final Matrix4f shadowProjectionInverse = new Matrix4f();
 
     private static TextureTarget target;
     private static Framebuffer framebuffer;
@@ -59,9 +63,10 @@ public final class VeyraShadowRenderer {
 
     static {
         Uniforms.mat4f_uniformMap.put("shadowModelView", () -> SHADOW_MODEL_VIEW_BUFFER);
+        Uniforms.mat4f_uniformMap.put("shadowModelViewInverse", () -> SHADOW_MODEL_VIEW_INVERSE_BUFFER);
         Uniforms.mat4f_uniformMap.put("shadowProjection", () -> SHADOW_PROJECTION_BUFFER);
-        new Matrix4f().get(SHADOW_MODEL_VIEW_BUFFER.buffer.asFloatBuffer());
-        new Matrix4f().get(SHADOW_PROJECTION_BUFFER.buffer.asFloatBuffer());
+        Uniforms.mat4f_uniformMap.put("shadowProjectionInverse", () -> SHADOW_PROJECTION_INVERSE_BUFFER);
+        updateShadowMatrixUniformBuffers();
     }
 
     private VeyraShadowRenderer() {
@@ -121,8 +126,7 @@ public final class VeyraShadowRenderer {
         if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.hasShadowPass()) {
             shadowModelView.identity();
             shadowProjection.identity();
-            writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
-            writeMatrix(shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
+            updateShadowMatrixUniformBuffers();
             return;
         }
 
@@ -147,8 +151,7 @@ public final class VeyraShadowRenderer {
                     shadowDistance * 2.0F, shadowDistance * 2.0F, 0.1F, shadowDistance * 2.0F, true);
             VeyraShadowRenderer.shadowModelView.set(shadowModelView);
             VeyraShadowRenderer.shadowProjection.set(shadowProjection);
-            writeMatrix(VeyraShadowRenderer.shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
-            writeMatrix(VeyraShadowRenderer.shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
+            updateShadowMatrixUniformBuffers();
 
             Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
                     ? new DistanceLimitedFrustum(shadowModelView, shadowProjection, cameraPosition,
@@ -226,8 +229,7 @@ public final class VeyraShadowRenderer {
         releaseFeatureDispatcher();
         shadowModelView.identity();
         shadowProjection.identity();
-        writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
-        writeMatrix(shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
+        updateShadowMatrixUniformBuffers();
     }
 
     public static void clearBinding() {
@@ -415,6 +417,15 @@ public final class VeyraShadowRenderer {
 
     private static void writeMatrix(Matrix4f matrix, ByteBuffer buffer) {
         matrix.get(buffer.asFloatBuffer());
+    }
+
+    private static void updateShadowMatrixUniformBuffers() {
+        shadowModelViewInverse.set(shadowModelView).invert();
+        shadowProjectionInverse.set(shadowProjection).invert();
+        writeMatrix(shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
+        writeMatrix(shadowModelViewInverse, SHADOW_MODEL_VIEW_INVERSE_BUFFER.buffer);
+        writeMatrix(shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
+        writeMatrix(shadowProjectionInverse, SHADOW_PROJECTION_INVERSE_BUFFER.buffer);
     }
 
     private record ShadowView(Matrix4f modelView, float yaw, float pitch) {

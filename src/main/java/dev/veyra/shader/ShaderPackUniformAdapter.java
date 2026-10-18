@@ -8,8 +8,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Moves supported Iris scalar uniforms into VulkanMod's generated global UBO. */
+/** Normalizes supported Iris uniforms for VulkanMod geometry pipelines. */
 public final class ShaderPackUniformAdapter {
+    private static final List<String> MATRIX_UNIFORMS = List.of(
+            "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+            "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
+            "shadowProjection", "shadowProjectionInverse");
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Map<String, TerrainShaderAdapter.ShaderUniform> SUPPORTED_UNIFORMS =
@@ -32,10 +36,11 @@ public final class ShaderPackUniformAdapter {
             String type = matcher.group(1);
             String name = matcher.group(2);
             TerrainShaderAdapter.ShaderUniform uniform = SUPPORTED_UNIFORMS.get(name);
-            if (uniform == null) {
+            boolean matrixUniform = uniform == null && type.equals("mat4") && MATRIX_UNIFORMS.contains(name);
+            if (uniform == null && !matrixUniform) {
                 throw new IOException(programName + " custom uniform '" + name + "' is not supported yet.");
             }
-            if (!uniform.accepts(type)) {
+            if (uniform != null && !uniform.accepts(type)) {
                 throw new IOException(programName + " uniform '" + name + "' must use "
                         + uniform.sourceTypeDescription() + ".");
             }
@@ -43,15 +48,20 @@ public final class ShaderPackUniformAdapter {
                 throw new IOException(programName + " declares uniform '" + name + "' more than once.");
             }
 
-            String bufferName = uniform.booleanField() && type.equals("bool")
-                    ? uniform.blockMemberName()
-                    : name;
-            declarations.append("uniform ").append(uniform.bufferType()).append(' ')
-                    .append(bufferName).append(";\n");
-            fields.add(new UniformField(uniform.bufferType(), bufferName));
-            if (uniform.booleanField() && type.equals("bool")) {
-                macros.append("#define ").append(name).append(" (")
-                        .append(bufferName).append(" != 0)\n");
+            if (matrixUniform) {
+                declarations.append("uniform mat4 ").append(name).append(";\n");
+                fields.add(new UniformField("mat4", name));
+            } else {
+                String bufferName = uniform.booleanField() && type.equals("bool")
+                        ? uniform.blockMemberName()
+                        : name;
+                declarations.append("uniform ").append(uniform.bufferType()).append(' ')
+                        .append(bufferName).append(";\n");
+                fields.add(new UniformField(uniform.bufferType(), bufferName));
+                if (uniform.booleanField() && type.equals("bool")) {
+                    macros.append("#define ").append(name).append(" (")
+                            .append(bufferName).append(" != 0)\n");
+                }
             }
             matcher.appendReplacement(withoutUniforms, "");
         }
@@ -64,5 +74,9 @@ public final class ShaderPackUniformAdapter {
     }
 
     public record UniformField(String type, String name) {
+    }
+
+    public static List<String> matrixUniforms() {
+        return MATRIX_UNIFORMS;
     }
 }
