@@ -50,6 +50,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.attribute.EnvironmentAttributes;
+import net.minecraft.world.level.MoonPhase;
 import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
@@ -4433,7 +4435,9 @@ public final class VeyraRenderer {
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         long dayTime = minecraft.level.getDayTime();
         int worldTime = (int) Math.floorMod(dayTime, 24000L);
-        int moonPhase = minecraft.level.getMoonPhase();
+        MoonPhase moonPhaseValue = minecraft.level.environmentAttributes()
+                .getDimensionValue(EnvironmentAttributes.MOON_PHASE);
+        int moonPhase = moonPhaseValue.index();
         float sunAngle = (worldTime + partialTick) / 24000.0F;
         int worldDay = (int) Math.floorDiv(dayTime, 24000L);
         float rainStrength = minecraft.level.getRainLevel(partialTick);
