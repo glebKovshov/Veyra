@@ -14,6 +14,7 @@
     "WorldRendererMixin",
     "VkRenderPassMixin",
     "VkCommandEncoderMixin",
+    "VeyraUniformsMixin",
     "accessor.MinecraftAccessor",
     "accessor.LevelRendererAccessor",
     "accessor.CameraAccessor",
