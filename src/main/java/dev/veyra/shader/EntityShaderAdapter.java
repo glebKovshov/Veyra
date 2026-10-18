@@ -9,6 +9,8 @@ import java.util.regex.Pattern;
 
 /** Bridges a small Iris entity-fragment interface to Minecraft's entity vertex outputs. */
 public final class EntityShaderAdapter {
+    public static final float MC_HAND_DEPTH = 0.125F;
+
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern PRECISION_DECLARATION = Pattern.compile("(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)");
@@ -54,6 +56,7 @@ public final class EntityShaderAdapter {
     private static final Pattern NORMAL_ASSIGNMENT = Pattern.compile("\\bnormal\\s*=");
     private static final Pattern VIEW_POSITION_ASSIGNMENT = Pattern.compile("\\bviewPos\\s*=");
     private static final Pattern VIEW_NORMAL_ASSIGNMENT = Pattern.compile("\\bviewNormal\\s*=");
+    private static final Pattern GL_POSITION_ASSIGNMENT = Pattern.compile("\\bgl_Position\\s*=");
     private static final Pattern VIEW_POSITION_REFERENCE = Pattern.compile("\\bviewPos\\b");
     private static final Pattern VIEW_NORMAL_REFERENCE = Pattern.compile("\\bviewNormal\\b");
     private static final Pattern LIGHTMAP_REFERENCE = Pattern.compile("\\b(?:lmcoord|lightMapCoord)\\b");
@@ -95,11 +98,15 @@ public final class EntityShaderAdapter {
     }
 
     public static String adaptFragment(String source, String programName) throws IOException {
-        return adaptFragment(source, programName, false);
+        return adaptFragment(source, programName, false, false);
+    }
+
+    public static String adaptFragment(String source, String programName, boolean handPass) throws IOException {
+        return adaptFragment(source, programName, false, handPass);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
-        return adaptFragment(source, programName, true);
+        return adaptFragment(source, programName, true, false);
     }
 
     public static boolean requiresNormalInput(String source) {
@@ -156,17 +163,26 @@ public final class EntityShaderAdapter {
     public static String adaptVertexShader(String source, boolean shadowPass, String programName,
                                           boolean requiresNormal, boolean requiresLightmapCoord,
                                           boolean requiresViewPosition, boolean requiresViewNormal) throws IOException {
+        return adaptVertexShader(source, shadowPass, programName,
+                requiresNormal, requiresLightmapCoord, requiresViewPosition, requiresViewNormal, false);
+    }
+
+    public static String adaptVertexShader(String source, boolean shadowPass, String programName,
+                                          boolean requiresNormal, boolean requiresLightmapCoord,
+                                          boolean requiresViewPosition, boolean requiresViewNormal,
+                                          boolean handPass) throws IOException {
         if (source == null || source.isBlank()) {
             List<String> required = new ArrayList<>();
             if (requiresNormal) required.add("normals");
             if (requiresLightmapCoord) required.add("lightmap coordinates");
             if (requiresViewPosition) required.add("view-space positions");
             if (requiresViewNormal) required.add("view-space normals");
+            if (handPass) required.add("the first-person hand depth transform");
             String requiredInputs = String.join(", ", required);
             throw new IOException(programName + " requires " + requiredInputs
                     + ", but its VulkanMod vertex shader is empty.");
         }
-        if (!requiresNormal && !requiresLightmapCoord && !requiresViewPosition && !requiresViewNormal) {
+        if (!requiresNormal && !requiresLightmapCoord && !requiresViewPosition && !requiresViewNormal && !handPass) {
             return source;
         }
         String uncommented = COMMENTS.matcher(source).replaceAll("");
@@ -201,11 +217,15 @@ public final class EntityShaderAdapter {
         if (!addNormalOutput && !addNormalAssignment && !addLightmapOutput && !addLightmapAssignment
                 && !addViewPositionOutput && !addViewPositionAssignment
                 && !addViewNormalOutput && !addViewNormalAssignment) {
-            return source;
+            if (!handPass) {
+                return source;
+            }
         }
         Matcher main = MAIN_FUNCTION.matcher(source);
         if (!main.find()) {
-            throw new IOException(programName + " requires additional vertex outputs, but its VulkanMod vertex shader has no main function.");
+            throw new IOException(programName + (handPass
+                    ? " requires the first-person hand depth transform, but its VulkanMod vertex shader has no main function."
+                    : " requires additional vertex outputs, but its VulkanMod vertex shader has no main function."));
         }
 
         StringBuilder declarations = new StringBuilder();
@@ -248,11 +268,63 @@ public final class EntityShaderAdapter {
         if (addViewNormalAssignment) {
             vertexAssignments.append("viewNormal = normalize(transpose(inverse(mat3(ModelViewMat))) * Normal);\n");
         }
-        return withDeclarations.substring(0, adaptedMain.end()) + vertexAssignments
+        String adapted = withDeclarations.substring(0, adaptedMain.end()) + vertexAssignments
                 + withDeclarations.substring(adaptedMain.end());
+        return handPass ? applyHandDepth(adapted, programName) : adapted;
     }
 
-    private static String adaptFragment(String source, String programName, boolean textPipeline) throws IOException {
+    private static String applyHandDepth(String source, String programName) throws IOException {
+        String uncommented = maskComments(source);
+        Matcher main = MAIN_FUNCTION.matcher(uncommented);
+        if (!main.find()) {
+            throw new IOException(programName + " cannot apply MC_HAND_DEPTH because VulkanMod's vertex shader has no main function.");
+        }
+        int mainStart = main.end() - 1;
+        int mainEnd = findMainEnd(uncommented, mainStart, programName);
+        Matcher assignment = GL_POSITION_ASSIGNMENT.matcher(uncommented);
+        boolean assignsClipPosition = false;
+        while (assignment.find()) {
+            if (assignment.start() > mainStart && assignment.start() < mainEnd) {
+                assignsClipPosition = true;
+                break;
+            }
+        }
+        if (!assignsClipPosition) {
+            throw new IOException(programName + " cannot apply MC_HAND_DEPTH because VulkanMod's vertex main function does not assign gl_Position.");
+        }
+        String depthScale = "\n    gl_Position.z *= " + Float.toString(MC_HAND_DEPTH) + ";\n";
+        return source.substring(0, mainEnd) + depthScale + source.substring(mainEnd);
+    }
+
+    private static int findMainEnd(String source, int mainStart, String programName) throws IOException {
+        int braceDepth = 0;
+        for (int index = mainStart; index < source.length(); index++) {
+            char character = source.charAt(index);
+            if (character == '{') {
+                braceDepth++;
+            } else if (character == '}' && --braceDepth == 0) {
+                return index;
+            }
+        }
+        throw new IOException(programName + " cannot apply MC_HAND_DEPTH because VulkanMod's vertex main function has unmatched braces.");
+    }
+
+    private static String maskComments(String source) {
+        StringBuilder masked = new StringBuilder(source);
+        Matcher comments = COMMENTS.matcher(source);
+        while (comments.find()) {
+            for (int index = comments.start(); index < comments.end(); index++) {
+                char character = masked.charAt(index);
+                if (character != '\n' && character != '\r') {
+                    masked.setCharAt(index, ' ');
+                }
+            }
+        }
+        return masked.toString();
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline,
+                                        boolean handPass) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -511,6 +583,9 @@ public final class EntityShaderAdapter {
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
+        }
+        if (handPass) {
+            result.append("#define MC_HAND_DEPTH ").append(Float.toString(MC_HAND_DEPTH)).append('\n');
         }
         result.append(bridge);
         result.append(shaderPackUniforms.declarations());

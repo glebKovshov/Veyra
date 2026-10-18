@@ -416,12 +416,18 @@ public final class VeyraRenderer {
         return switch (name) {
             case "gbufferModelView" -> matrices.gbufferModelView();
             case "gbufferModelViewInverse" -> matrices.gbufferModelViewInverse();
-            case "gbufferProjection" -> matrices.gbufferProjection();
-            case "gbufferProjectionInverse" -> matrices.gbufferProjectionInverse();
+            case "gbufferProjection" -> isHandRendering()
+                    ? handAdjustedProjection(matrices.gbufferProjection()) : matrices.gbufferProjection();
+            case "gbufferProjectionInverse" -> isHandRendering()
+                    ? handAdjustedProjection(matrices.gbufferProjection()).invert() : matrices.gbufferProjectionInverse();
             case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
             case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
             default -> throw new IllegalArgumentException("Unknown shader pack matrix uniform " + name + ".");
         };
+    }
+
+    private static Matrix4f handAdjustedProjection(Matrix4f projection) {
+        return new Matrix4f().scale(1.0F, 1.0F, EntityShaderAdapter.MC_HAND_DEPTH).mul(projection);
     }
 
     private static float shaderPackFloatUniform(String name) {
@@ -674,7 +680,11 @@ public final class VeyraRenderer {
     }
 
     public static void beginHandRendering() {
-        HAND_RENDER_DEPTH.set(HAND_RENDER_DEPTH.get() + 1);
+        int depth = HAND_RENDER_DEPTH.get();
+        HAND_RENDER_DEPTH.set(depth + 1);
+        if (depth == 0 && frameMatricesInitialized) {
+            updateShaderPackMatrixUniforms(frameMatrices);
+        }
     }
 
     public static void endHandRendering() {
@@ -683,6 +693,9 @@ public final class VeyraRenderer {
             HAND_RENDER_DEPTH.remove();
         } else {
             HAND_RENDER_DEPTH.set(depth - 1);
+        }
+        if (depth == 1 && frameMatricesInitialized) {
+            updateShaderPackMatrixUniforms(frameMatrices);
         }
     }
 
@@ -2128,7 +2141,7 @@ public final class VeyraRenderer {
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
-                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName, hand);
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -2144,7 +2157,7 @@ public final class VeyraRenderer {
                 try {
                     entityPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, requiresNormal, requiresLightmap,
-                            requiresViewPosition, requiresViewNormal, false, programName);
+                            requiresViewPosition, requiresViewNormal, false, hand, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2267,7 +2280,7 @@ public final class VeyraRenderer {
                 try {
                     blockPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, requiresNormal, requiresLightmap,
-                            requiresViewPosition, requiresViewNormal, false, programName);
+                            requiresViewPosition, requiresViewNormal, false, false, programName);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -2318,7 +2331,7 @@ public final class VeyraRenderer {
                 try {
                     textPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, false, requiresLightmap,
-                            requiresViewPosition, false, false, programName);
+                            requiresViewPosition, false, false, false, programName);
                 } catch (IOException exception) {
                     VeyraClient.LOGGER.warn("Skipping sign text pipeline {} for {}: {}",
                             original.getLocation(), programName, exception.getMessage());
@@ -2428,23 +2441,23 @@ public final class VeyraRenderer {
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash) throws IOException {
         return compileEntityPipeline(original, fragmentSource, sourceHash,
-                false, false, false, false, false, "gbuffers_entities");
+                false, false, false, false, false, false, "gbuffers_entities");
     }
 
     private static RenderPipeline compileEntityPipeline(
             RenderPipeline original, String fragmentSource, String sourceHash,
             boolean requiresNormal, boolean requiresLightmap,
             boolean requiresViewPosition, boolean requiresViewNormal,
-            boolean shadowPass, String programName) throws IOException {
+            boolean shadowPass, boolean handPass, String programName) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/entities/" + sourceHash);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
-        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal) {
+        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass) {
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
                     shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName,
-                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
+                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, handPass);
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         }
         Identifier selectedVertexShader = vertexShader;
