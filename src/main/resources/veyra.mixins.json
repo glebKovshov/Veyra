@@ -28,7 +28,8 @@
     "DeviceManagerMixin",
     "GraphicsPipelineMixin",
     "RendererGeometryTargetsMixin",
-    "accessor.PipelineStateAccessor"
+    "accessor.PipelineStateAccessor",
+    "accessor.RendererFramebufferAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

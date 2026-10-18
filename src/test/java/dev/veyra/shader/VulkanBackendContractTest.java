@@ -38,5 +38,7 @@ class VulkanBackendContractTest {
                 "(Z)Lorg/lwjgl/vulkan/VkPhysicalDeviceFeatures;");
         assertTrue(read("net/vulkanmod/vulkan/shader/PipelineState").fields.stream().anyMatch(field ->
                 field.name.equals("renderPass") && field.desc.equals("Lnet/vulkanmod/vulkan/framebuffer/RenderPass;")));
+        assertTrue(read("net/vulkanmod/vulkan/Renderer").fields.stream().anyMatch(field ->
+                field.name.equals("boundFramebuffer") && field.desc.equals("Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;")));
     }
 }

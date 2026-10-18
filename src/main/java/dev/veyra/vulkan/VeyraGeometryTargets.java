@@ -2,6 +2,8 @@ package dev.veyra.vulkan;
 
 import dev.veyra.shader.FragmentOutputs;
 import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.mixin.accessor.RendererFramebufferAccessor;
+import org.lwjgl.system.MemoryStack;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.framebuffer.RenderPass;
@@ -49,7 +51,7 @@ public final class VeyraGeometryTargets {
         Key key = new Key(List.copyOf(colors), scene.getDepthAttachment());
         VeyraMrtFramebuffer framebuffer = framebuffers.computeIfAbsent(key,
                 ignored -> new VeyraMrtFramebuffer(key.colors(), key.depth()));
-        renderer.beginRenderPass(framebuffer.renderPass(), framebuffer);
+        beginPreservingDynamicState(renderer, framebuffer.renderPass(), framebuffer);
     }
 
     private static void resumeScene(Renderer renderer) {
@@ -62,7 +64,19 @@ public final class VeyraGeometryTargets {
                 builder.getDepthAttachmentInfo().setOps(VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
             return builder.build();
         });
-        renderer.beginRenderPass(pass, scene);
+        beginPreservingDynamicState(renderer, pass, scene);
+    }
+
+    private static void beginPreservingDynamicState(Renderer renderer, RenderPass pass, Framebuffer target) {
+        if (renderer.getBoundFramebuffer() == target) return;
+        // This runs after VkCommandEncoder has applied the draw's viewport/scissor. The normal
+        // beginRenderPass API resets both to the full framebuffer and would erase that state.
+        renderer.endRenderPass();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            target.beginRenderPass(Renderer.getCommandBuffer(), pass, stack);
+        }
+        ((RendererFramebufferAccessor) renderer).veyra$setBoundFramebuffer(target);
+        renderer.setBoundRenderPass(pass);
     }
 
     public static void releaseTargets() {
