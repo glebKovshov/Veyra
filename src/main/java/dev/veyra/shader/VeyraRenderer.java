@@ -163,7 +163,7 @@ public final class VeyraRenderer {
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+eyeBrightnessSmooth\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
@@ -201,7 +201,7 @@ public final class VeyraRenderer {
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase",
-            "eyeAltitude", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
+            "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
@@ -221,7 +221,7 @@ public final class VeyraRenderer {
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
-            "worldTime", "worldDay", "moonPhase", "eyeAltitude", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
+            "worldTime", "worldDay", "moonPhase", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
@@ -4438,6 +4438,7 @@ public final class VeyraRenderer {
                 case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
                 case "moonPhase" -> new UniformValue.IntUniform(frameUniforms.moonPhase());
                 case "eyeAltitude" -> new UniformValue.FloatUniform(frameUniforms.eyeAltitude());
+                case "eyeBrightness" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightness());
                 case "eyeBrightnessSmooth" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightnessSmooth());
                 case "screenBrightness" -> new UniformValue.FloatUniform(frameUniforms.screenBrightness());
                 case "blindness" -> new UniformValue.FloatUniform(frameUniforms.blindness());

@@ -66,14 +66,19 @@ class ShaderAdapterTest {
     void adaptsIrisSmoothedEyeBrightnessForCloudPrograms() throws IOException {
         CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
                 #version 120
+                uniform ivec2 eyeBrightness;
                 uniform ivec2 eyeBrightnessSmooth;
                 varying vec4 color;
-                void main() { gl_FragColor = color * (float(eyeBrightnessSmooth.y) / 240.0); }
+                void main() { gl_FragColor = color * (float(eyeBrightness.y + eyeBrightnessSmooth.y) / 480.0); }
                 """);
 
+        assertTrue(adapted.source().contains("ivec2 eyeBrightness;"));
         assertTrue(adapted.source().contains("ivec2 eyeBrightnessSmooth;"));
         assertTrue(adapted.uniformFields().stream().anyMatch(field ->
                 field.type().equals("ivec2") && field.name().equals("eyeBrightnessSmooth")));
+        assertTrue(adapted.uniformFields().stream().anyMatch(field ->
+                field.type().equals("ivec2") && field.name().equals("eyeBrightness")));
+        assertFalse(adapted.source().contains("uniform ivec2 eyeBrightness;"));
         assertFalse(adapted.source().contains("uniform ivec2 eyeBrightnessSmooth;"));
     }
 
