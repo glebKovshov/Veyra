@@ -36,7 +36,7 @@ public final class EntityShaderAdapter {
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
-            "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+            "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
@@ -351,7 +351,7 @@ public final class EntityShaderAdapter {
         boolean usesLightmapSampler = false;
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
+            if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex")) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
@@ -527,6 +527,7 @@ public final class EntityShaderAdapter {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
                 #define texture Sampler0
+                #define tex Sampler0
                 #define gtexture Sampler0
                 #define veyraEntityColor vertexColor
                 #ifndef ALPHA_CUTOUT
@@ -575,6 +576,7 @@ public final class EntityShaderAdapter {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
                 #define texture Sampler0
+                #define tex Sampler0
                 #define gtexture Sampler0
                 #ifndef ALPHA_CUTOUT
                 #define ALPHA_CUTOUT 0.1

@@ -148,6 +148,33 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void bridgesLegacyTexSamplerAndTextureSizeToTheBlockAtlas() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                uniform sampler2D tex;
+                varying vec2 texcoord;
+                void main() {
+                    float atlasWidth = float(textureSize(tex, 0).x);
+                    gl_FragColor = texture2D(tex, texcoord) / atlasWidth;
+                }
+                """);
+        assertTrue(terrain.contains("#define tex Sampler0"));
+        assertTrue(terrain.contains("textureSize(tex, 0)"));
+        assertTrue(terrain.contains("veyraSample(tex, texcoord)"));
+
+        String entity = EntityShaderAdapter.adaptFragment("""
+                uniform sampler2D tex;
+                varying vec2 texcoord;
+                void main() {
+                    float atlasWidth = float(textureSize(tex, 0).x);
+                    gl_FragColor = texture2D(tex, texcoord) / atlasWidth;
+                }
+                """);
+        assertTrue(entity.contains("#define tex Sampler0"));
+        assertTrue(entity.contains("textureSize(tex, 0)"));
+        assertTrue(entity.contains("veyraEntitySample(tex, texCoord0)"));
+    }
+
+    @Test
     void ignoresNoisetexMentionsInsideComments() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 // sampler2D noisetex is only mentioned in this comment

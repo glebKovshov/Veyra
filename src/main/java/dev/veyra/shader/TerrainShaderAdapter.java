@@ -30,7 +30,7 @@ public final class TerrainShaderAdapter {
     private static final Pattern UNSUPPORTED_GBUFFER_INPUT = Pattern.compile(
             "\\b(?:gl_FragData|mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
-            "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+            "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
@@ -134,6 +134,7 @@ public final class TerrainShaderAdapter {
                 return vec4(visibility);
             }
             #define texture Sampler0
+            #define tex Sampler0
             #define gtexture Sampler0
             #define lightmap LightTexture
             #define shadowtex0 VeyraShadowSampler
@@ -182,7 +183,7 @@ public final class TerrainShaderAdapter {
         StringBuffer withoutSamplers = new StringBuffer();
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
+            if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
                     && !sampler.equals("noisetex")
                     && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
