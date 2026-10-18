@@ -2,7 +2,8 @@ package dev.veyra.shader;
 
 /** Iris shadow directives that affect Veyra's shadow passes. */
 public record ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation,
-                             float distanceRenderMultiplier, float entityShadowDistanceMultiplier) {
+                             float distanceRenderMultiplier, float entityShadowDistanceMultiplier,
+                             boolean shadowTranslucent) {
     public static final int DEFAULT_RESOLUTION = 1024;
     public static final float DEFAULT_DISTANCE = 128.0F;
     public static final float DEFAULT_INTERVAL_SIZE = 2.0F;
@@ -11,7 +12,7 @@ public record ShadowSettings(int resolution, float distance, float intervalSize,
     public static final float DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER = 1.0F;
     public static final ShadowSettings DEFAULT = new ShadowSettings(
             DEFAULT_RESOLUTION, DEFAULT_DISTANCE, DEFAULT_INTERVAL_SIZE, DEFAULT_SUN_PATH_ROTATION,
-            DEFAULT_DISTANCE_RENDER_MULTIPLIER, DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER);
+            DEFAULT_DISTANCE_RENDER_MULTIPLIER, DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER, false);
 
     public ShadowSettings {
         if (resolution < 1 || resolution > 8192) {

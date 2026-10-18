@@ -82,6 +82,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern SHADOW_SETTING = Pattern.compile(
             "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
     private static final Pattern INTEGER_LITERAL = Pattern.compile("[+-]?\\d+");
+    private static final String DEFAULT_SHADOW_FRAGMENT = """
+            #version 120
+            varying vec2 texcoord;
+            varying vec4 glcolor;
+            void main() {
+                float alpha = texture2D(texture, texcoord).a * glcolor.a;
+                if (alpha < alphaTestRef) {
+                    discard;
+                }
+                gl_FragColor = vec4(1.0);
+            }
+            """;
 
     public record Program(String name, String source) {
     }
@@ -143,20 +155,43 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public boolean hasShadowFragment() {
         try {
-            return readShader("shadow.fsh").isPresent();
+            return readShader("shadow.fsh").isPresent() || readShader("shadow_water.fsh").isPresent();
         } catch (IOException exception) {
             return false;
         }
     }
 
     public Optional<String> readShadowFragment() throws IOException {
-        if (!supportsShaderPrograms() || !hasShadowFragment()) {
+        if (!supportsShaderPrograms()) {
             return Optional.empty();
         }
         String fileName = "shadow.fsh";
         Optional<String> source = readShader(fileName);
         if (source.isEmpty()) {
+            return hasShadowWaterFragment() ? Optional.of(DEFAULT_SHADOW_FRAGMENT) : Optional.empty();
+        }
+        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
+    }
+
+    public boolean hasShadowWaterFragment() {
+        try {
+            return readShader("shadow_water.fsh").isPresent();
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    public Optional<String> readShadowWaterFragment() throws IOException {
+        if (!supportsShaderPrograms()) {
             return Optional.empty();
+        }
+        if (!hasShadowWaterFragment()) {
+            return readShadowFragment();
+        }
+        String fileName = "shadow_water.fsh";
+        Optional<String> source = readShader(fileName);
+        if (source.isEmpty()) {
+            return readShadowFragment();
         }
         return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
     }
@@ -295,12 +330,38 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 ShadowSettings.DEFAULT_DISTANCE_RENDER_MULTIPLIER);
         float entityShadowDistanceMultiplier = parseShadowFloat(values, "entityShadowDistanceMul",
                 ShadowSettings.DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER);
+        boolean shadowTranslucent = readBooleanProperty("shadowTranslucent", false);
         try {
             return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation, distanceRenderMultiplier,
-                    entityShadowDistanceMultiplier);
+                    entityShadowDistanceMultiplier, shadowTranslucent);
         } catch (IllegalArgumentException exception) {
             throw new IOException("Invalid Iris shadow setting: " + exception.getMessage(), exception);
         }
+    }
+
+    private boolean readBooleanProperty(String propertyName, boolean defaultValue) throws IOException {
+        Optional<String> source = readShader("shaders.properties");
+        if (source.isEmpty()) {
+            return defaultValue;
+        }
+        Properties properties = new Properties();
+        try (StringReader reader = new StringReader(source.get())) {
+            properties.load(reader);
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("Could not parse shaders.properties: " + exception.getMessage(), exception);
+        }
+        String value = properties.getProperty(propertyName);
+        if (value == null) {
+            return defaultValue;
+        }
+        String normalized = value.trim();
+        if (normalized.equalsIgnoreCase("true")) {
+            return true;
+        }
+        if (normalized.equalsIgnoreCase("false")) {
+            return false;
+        }
+        throw new IOException(propertyName + " in shaders.properties must be true or false.");
     }
 
     private static int parseShadowResolution(String value) throws IOException {
@@ -883,7 +944,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     .filter(ShaderPack::isSupportedWeatherProgramFile)
                     .map(fileName -> fileName.substring(0, fileName.length() - 4))
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
-            return hasPostProcessing || files.contains("shadow.fsh") || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
+            return hasPostProcessing || files.contains("shadow.fsh") || files.contains("shadow_water.fsh")
+                    || !terrainPrograms.isEmpty() || hasCloudFragment || !entityPrograms.isEmpty()
                     || !particlePrograms.isEmpty() || !weatherPrograms.isEmpty() || hasBeaconBeamFragment
                     || hasLightningFragment || hasBasicFragment || hasLineFragment || hasGlintFragment
                     || hasSkyBasicFragment || hasSkyTexturedFragment || hasTexturedFragment || hasTexturedLitFragment
@@ -977,6 +1039,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private static boolean isSupportedProgramFile(String fileName) {
         return fileName.equals("shadow.fsh")
+                || fileName.equals("shadow_water.fsh")
                 || fileName.equals("gbuffers_clouds.fsh")
                 || fileName.equals(BEACON_BEAM_PROGRAM + ".fsh")
                 || fileName.equals(LIGHTNING_PROGRAM + ".fsh")

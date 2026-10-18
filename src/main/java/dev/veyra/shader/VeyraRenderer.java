@@ -662,7 +662,7 @@ public final class VeyraRenderer {
                     return null;
                 }
             }
-            return terrainPipelineSet == null ? null : terrainPipelineSet.shadowPipeline();
+            return terrainPipelineSet == null ? null : terrainPipelineSet.shadowPipeline(terrainRenderType);
         }
         if (pack == null || !pack.hasTerrainFragment() || terrainRenderType == null) {
             return null;
@@ -1567,6 +1567,7 @@ public final class VeyraRenderer {
         vertexSource = TerrainShaderAdapter.adaptVertex(vertexSource);
         Map<String, GraphicsPipeline> pipelines = new HashMap<>();
         GraphicsPipeline shadowPipeline = null;
+        GraphicsPipeline translucentShadowPipeline = null;
         boolean shadowSamplerAvailable = pack.hasShadowFragment();
         try {
             for (String programName : List.of(
@@ -1603,12 +1604,30 @@ public final class VeyraRenderer {
                 for (UBO ubo : shadowPipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
                 }
+
+                if (pack.hasShadowWaterFragment()) {
+                    String waterFragmentSource = pack.readShadowWaterFragment()
+                            .orElseThrow(() -> new IOException("The pack no longer contains shadow_water.fsh."));
+                    waterFragmentSource = TerrainShaderAdapter.adaptFragment(waterFragmentSource, false);
+                    Pipeline.Builder waterBuilder = new Pipeline.Builder(
+                            PipelineManager.getTerrainVertexFormat(), "veyra_shadow_water");
+                    waterBuilder.applyConfig(terrainPipelineConfig(false));
+                    waterBuilder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+                    waterBuilder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, waterFragmentSource);
+                    translucentShadowPipeline = waterBuilder.createGraphicsPipeline();
+                    for (UBO ubo : translucentShadowPipeline.getBuffers()) {
+                        ubo.setUseGlobalBuffer(true);
+                    }
+                }
             }
-            return new TerrainPipelineSet(Map.copyOf(pipelines), shadowPipeline);
+            return new TerrainPipelineSet(Map.copyOf(pipelines), shadowPipeline, translucentShadowPipeline);
         } catch (IOException | RuntimeException exception) {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             if (shadowPipeline != null) {
                 shadowPipeline.scheduleCleanUp();
+            }
+            if (translucentShadowPipeline != null) {
+                translucentShadowPipeline.scheduleCleanUp();
             }
             throw exception;
         }
@@ -3850,12 +3869,22 @@ public final class VeyraRenderer {
     }
 
     private record TerrainPipelineSet(Map<String, GraphicsPipeline> pipelines,
-                                      GraphicsPipeline shadowPipeline) implements AutoCloseable {
+                                      GraphicsPipeline shadowPipeline,
+                                      GraphicsPipeline translucentShadowPipeline) implements AutoCloseable {
+        private GraphicsPipeline shadowPipeline(TerrainRenderType terrainRenderType) {
+            return terrainRenderType == TerrainRenderType.TRANSLUCENT && translucentShadowPipeline != null
+                    ? translucentShadowPipeline
+                    : shadowPipeline;
+        }
+
         @Override
         public void close() {
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             if (shadowPipeline != null) {
                 shadowPipeline.scheduleCleanUp();
+            }
+            if (translucentShadowPipeline != null) {
+                translucentShadowPipeline.scheduleCleanUp();
             }
         }
     }

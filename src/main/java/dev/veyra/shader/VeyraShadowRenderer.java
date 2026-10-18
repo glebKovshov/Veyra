@@ -100,10 +100,10 @@ public final class VeyraShadowRenderer {
             release();
         }
         if (!shadowSettings.equals(settings)) {
-            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}, entityShadowDistanceMul={}.",
+            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}, entityShadowDistanceMul={}, shadowTranslucent={}.",
                     settings.resolution(), settings.resolution(), settings.distance(),
                     settings.intervalSize(), settings.sunPathRotation(), settings.distanceRenderMultiplier(),
-                    settings.entityShadowDistanceMultiplier());
+                    settings.entityShadowDistanceMultiplier(), settings.shadowTranslucent());
         }
         shadowSettings = settings;
     }
@@ -171,6 +171,10 @@ public final class VeyraShadowRenderer {
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
             worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.CUTOUT,
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
+            if (shadowSettings.shadowTranslucent()) {
+                worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT,
+                        cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
+            }
             renderer.endRenderPass();
             shadowRenderPassStarted = false;
             renderEntityAndBlockEntityGeometry(camera, deltaTracker, levelRenderState,
