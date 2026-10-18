@@ -2,6 +2,7 @@
 
 const int shadowMapResolution = 2048;
 const float shadowDistance = 96.0;
+const float shadowDistanceRenderMul = 1.0;
 const float shadowIntervalSize = 2.0;
 const float sunPathRotation = 0.0;
 

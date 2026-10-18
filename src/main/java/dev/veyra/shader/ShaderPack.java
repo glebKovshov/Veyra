@@ -80,7 +80,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
     private static final Pattern SHADOW_SETTING = Pattern.compile(
-            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation)\\s*=\\s*([^;]+);");
+            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul)\\s*=\\s*([^;]+);");
     private static final Pattern INTEGER_LITERAL = Pattern.compile("[+-]?\\d+");
 
     public record Program(String name, String source) {
@@ -291,8 +291,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         float distance = parseShadowFloat(values, "shadowDistance", ShadowSettings.DEFAULT_DISTANCE);
         float intervalSize = parseShadowFloat(values, "shadowIntervalSize", ShadowSettings.DEFAULT_INTERVAL_SIZE);
         float sunPathRotation = parseShadowFloat(values, "sunPathRotation", ShadowSettings.DEFAULT_SUN_PATH_ROTATION);
+        float distanceRenderMultiplier = parseShadowFloat(values, "shadowDistanceRenderMul",
+                ShadowSettings.DEFAULT_DISTANCE_RENDER_MULTIPLIER);
         try {
-            return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation);
+            return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation, distanceRenderMultiplier);
         } catch (IllegalArgumentException exception) {
             throw new IOException("Invalid Iris shadow setting: " + exception.getMessage(), exception);
         }

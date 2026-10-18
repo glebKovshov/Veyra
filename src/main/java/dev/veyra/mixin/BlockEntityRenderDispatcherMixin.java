@@ -2,6 +2,7 @@ package dev.veyra.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.shader.VeyraShadowRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -18,6 +19,10 @@ public abstract class BlockEntityRenderDispatcherMixin {
     private <S extends BlockEntityRenderState> void veyra$submitBlockEntityNodes(
             BlockEntityRenderer<?, S> renderer, S state, PoseStack poseStack,
             SubmitNodeCollector collector, CameraRenderState cameraRenderState) {
+        if (VeyraShadowRenderer.isRendering()
+                && !VeyraShadowRenderer.shouldRenderBlockEntity(state.blockPos)) {
+            return;
+        }
         VeyraRenderer.beginBlockEntitySubmission();
         try {
             renderer.submit(state, poseStack, collector, cameraRenderState);

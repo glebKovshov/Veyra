@@ -1,13 +1,16 @@
 package dev.veyra.shader;
 
 /** Iris shadow directives that affect Veyra's terrain shadow pass. */
-public record ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation) {
+public record ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation,
+                             float distanceRenderMultiplier) {
     public static final int DEFAULT_RESOLUTION = 1024;
     public static final float DEFAULT_DISTANCE = 128.0F;
     public static final float DEFAULT_INTERVAL_SIZE = 2.0F;
     public static final float DEFAULT_SUN_PATH_ROTATION = 0.0F;
+    public static final float DEFAULT_DISTANCE_RENDER_MULTIPLIER = -1.0F;
     public static final ShadowSettings DEFAULT = new ShadowSettings(
-            DEFAULT_RESOLUTION, DEFAULT_DISTANCE, DEFAULT_INTERVAL_SIZE, DEFAULT_SUN_PATH_ROTATION);
+            DEFAULT_RESOLUTION, DEFAULT_DISTANCE, DEFAULT_INTERVAL_SIZE, DEFAULT_SUN_PATH_ROTATION,
+            DEFAULT_DISTANCE_RENDER_MULTIPLIER);
 
     public ShadowSettings {
         if (resolution < 1 || resolution > 8192) {
@@ -22,5 +25,16 @@ public record ShadowSettings(int resolution, float distance, float intervalSize,
         if (!Float.isFinite(sunPathRotation)) {
             throw new IllegalArgumentException("sunPathRotation must be finite.");
         }
+        if (!Float.isFinite(distanceRenderMultiplier)) {
+            throw new IllegalArgumentException("shadowDistanceRenderMul must be finite.");
+        }
+    }
+
+    public boolean hasDistanceRenderLimit() {
+        return distanceRenderMultiplier > 0.0F;
+    }
+
+    public double distanceRenderLimit() {
+        return (double) distance * distanceRenderMultiplier;
     }
 }

@@ -9,12 +9,14 @@ import dev.veyra.mixin.accessor.CameraAccessor;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.state.LevelRenderState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.render.chunk.WorldRenderer;
 import net.vulkanmod.vulkan.Renderer;
@@ -53,6 +55,7 @@ public final class VeyraShadowRenderer {
     private static boolean rendering;
     private static boolean renderingFeatures;
     private static ShadowSettings shadowSettings = ShadowSettings.DEFAULT;
+    private static Vec3 shadowCameraPosition = Vec3.ZERO;
 
     static {
         Uniforms.mat4f_uniformMap.put("shadowModelView", () -> SHADOW_MODEL_VIEW_BUFFER);
@@ -97,11 +100,18 @@ public final class VeyraShadowRenderer {
             release();
         }
         if (!shadowSettings.equals(settings)) {
-            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}.",
+            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}.",
                     settings.resolution(), settings.resolution(), settings.distance(),
-                    settings.intervalSize(), settings.sunPathRotation());
+                    settings.intervalSize(), settings.sunPathRotation(), settings.distanceRenderMultiplier());
         }
         shadowSettings = settings;
+    }
+
+    public static boolean shouldRenderBlockEntity(BlockPos blockPos) {
+        if (!rendering || blockPos == null || !shadowSettings.hasDistanceRenderLimit()) {
+            return true;
+        }
+        return isWithinShadowRenderDistance(blockPos.getX() + 0.5, blockPos.getY() + 0.5, blockPos.getZ() + 0.5);
     }
 
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
@@ -116,6 +126,7 @@ public final class VeyraShadowRenderer {
         }
 
         Vec3 cameraPosition = camera.position();
+        shadowCameraPosition = cameraPosition;
         float originalYaw = camera.yRot();
         float originalPitch = camera.xRot();
         boolean cameraRotationChanged = false;
@@ -138,7 +149,10 @@ public final class VeyraShadowRenderer {
             writeMatrix(VeyraShadowRenderer.shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
             writeMatrix(VeyraShadowRenderer.shadowProjection, SHADOW_PROJECTION_BUFFER.buffer);
 
-            Frustum shadowFrustum = new Frustum(shadowModelView, shadowProjection);
+            Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
+                    ? new DistanceLimitedFrustum(shadowModelView, shadowProjection, cameraPosition,
+                            shadowSettings.distanceRenderLimit())
+                    : new Frustum(shadowModelView, shadowProjection);
             shadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             ((CameraAccessor) (Object) camera).veyra$setRotation(shadowView.yaw(), shadowView.pitch());
             cameraRotationChanged = true;
@@ -337,6 +351,44 @@ public final class VeyraShadowRenderer {
         float yaw = (float) Math.toDegrees(Math.atan2(-viewDirection.x, viewDirection.z));
         float pitch = (float) Math.toDegrees(-Math.asin(viewDirection.y));
         return new ShadowView(modelView, yaw, pitch);
+    }
+
+    private static boolean isWithinShadowRenderDistance(double x, double y, double z) {
+        double dx = x - shadowCameraPosition.x;
+        double dy = y - shadowCameraPosition.y;
+        double dz = z - shadowCameraPosition.z;
+        double limit = shadowSettings.distanceRenderLimit();
+        return dx * dx + dy * dy + dz * dz <= limit * limit;
+    }
+
+    private static final class DistanceLimitedFrustum extends Frustum {
+        private final Vec3 cameraPosition;
+        private final double maxDistanceSquared;
+
+        private DistanceLimitedFrustum(Matrix4f modelView, Matrix4f projection,
+                                       Vec3 cameraPosition, double maxDistance) {
+            super(modelView, projection);
+            this.cameraPosition = cameraPosition;
+            this.maxDistanceSquared = maxDistance * maxDistance;
+        }
+
+        @Override
+        public boolean isVisible(AABB box) {
+            if (!super.isVisible(box)) {
+                return false;
+            }
+            double nearestX = clamp(cameraPosition.x, box.minX, box.maxX);
+            double nearestY = clamp(cameraPosition.y, box.minY, box.maxY);
+            double nearestZ = clamp(cameraPosition.z, box.minZ, box.maxZ);
+            double dx = nearestX - cameraPosition.x;
+            double dy = nearestY - cameraPosition.y;
+            double dz = nearestZ - cameraPosition.z;
+            return dx * dx + dy * dy + dz * dz <= maxDistanceSquared;
+        }
+
+        private static double clamp(double value, double min, double max) {
+            return Math.max(min, Math.min(value, max));
+        }
     }
 
     private static void writeMatrix(Matrix4f matrix, ByteBuffer buffer) {
