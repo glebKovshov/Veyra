@@ -50,6 +50,19 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsIrisMoonPhaseUniformForGeometryPrograms() throws IOException {
+        String adapted = CloudShaderAdapter.adaptFragment("""
+                #version 120
+                uniform int moonPhase;
+                varying vec4 color;
+                void main() { gl_FragColor = color * (float(moonPhase) / 7.0); }
+                """);
+        assertTrue(adapted.contains("int moonPhase;"));
+        assertTrue(adapted.contains("float(moonPhase)"));
+        assertFalse(adapted.contains("uniform int moonPhase;"));
+    }
+
+    @Test
     void rejectsCloudTextureInputs() {
         assertThrows(IOException.class, () -> CloudShaderAdapter.adaptFragment(
                 "uniform sampler2D texture;\nvarying vec2 texcoord;\nvoid main() { gl_FragColor = texture2D(texture, texcoord); }\n"));

@@ -1,6 +1,6 @@
 # Shaderpack compatibility: development 0.2
 
-All results below are **source checks without a GPU**, using default pack settings in Overworld, Nether and End. Discovery or successful preprocessing is not evidence of playable rendering. No listed external pack is currently supported as a complete rendering pipeline.
+All results below are **source checks without a GPU**, using default pack settings in Overworld, Nether and End. Discovery or successful preprocessing is not evidence of playable rendering. These reports are audit snapshots from before Veyra added the built-in `moonPhase` uniform; refresh the counts against the pinned pack inputs before treating them as the current adapter acceptance results. No listed external pack is currently supported as a complete rendering pipeline.
 
 | Pack | Version | Options / profiles discovered | Stages preprocessed, Overworld / Nether / End | Confirmed blockers | In-game result |
 | --- | --- | --- | --- | --- | --- |
@@ -13,7 +13,7 @@ Adapter checks attempted terrain, water, entity/block/hand-family and cloud frag
 
 The exact source URLs and SHA-512 checksums are in [validation/shaderpack-inputs.json](validation/shaderpack-inputs.json). The machine-readable results, including rejection messages and dimensions, are in [validation/shaderpack-source-audit.json](validation/shaderpack-source-audit.json). These files contain metadata only; packs remain under their authors' licenses. The archives are not included in Veyra.
 
-All declared quality profiles were additionally source-audited in each dimension: 24 cases each for Complementary Reimagined/Unbound and 15 for BSL, or 63 cases total. All 4,429 inventoried stage sources preprocessed. No tested geometry fragment passed the adapter checks. Nine cases in each Complementary edition enable the unsupported shadowcomp compute stage. BSL's five quality profiles kept that stage disabled. Sildur's declares no profiles in this input. [Profile audit results](validation/shaderpack-profile-audit.json) record every case. This covers declared profiles, not arbitrary combinations of individual options, and still provides no visual validation.
+All declared quality profiles were additionally source-audited in each dimension: 24 cases each for Complementary Reimagined/Unbound and 15 for BSL, or 63 cases total. All 4,429 inventoried stage sources preprocessed. At that audit snapshot, no inventoried geometry fragment passed the adapter checks. The current `moonPhase` support may change individual results, so the source and profile audits must be rerun before updating their acceptance counts. Nine cases in each Complementary edition enable the unsupported shadowcomp compute stage. BSL's five quality profiles kept that stage disabled. Sildur's declares no profiles in this input. [Profile audit results](validation/shaderpack-profile-audit.json) record every case. This covers declared profiles, not arbitrary combinations of individual options, and still provides no visual validation.
 
 ## Reproduce source checks
 

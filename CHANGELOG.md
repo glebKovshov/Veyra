@@ -8,6 +8,7 @@
 - Fixed dimension-qualified `program.world0/name.enabled` conditions and profile program toggles; disabled stages no longer execute merely because their short name lacks a condition.
 - Kept discovered packs available when restoring a broken active pack fails.
 - Added `world0`, `world-1` and `world1` program overrides and dimension-aware relative includes. Pack/world changes reset temporal matrix and depth history.
+- Added Iris' integer `moonPhase` uniform to the shared geometry and post-pass frame snapshot, using the active dimension's moon phase.
 - Scheduled prepare, deferred and composite/final at separate rendering boundaries, preserving auxiliary ping-pong buffers between phases. Deferred runs after the opaque depth snapshot and before translucent terrain.
 - Initialized first-frame depth history with a real Vulkan transfer clear, including usage/format checks and layout transitions. VulkanMod's unbound `clearDepthTexture` only queues a later attachment clear and is insufficient for immediate sampling.
 - Added source/configuration caches scoped to a pack load. Reload creates fresh snapshots; changing options recompiles only when values change.

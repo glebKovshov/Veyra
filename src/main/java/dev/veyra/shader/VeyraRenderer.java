@@ -158,7 +158,7 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
@@ -191,6 +191,7 @@ public final class VeyraRenderer {
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
+            "moonPhase",
             "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
@@ -207,11 +208,11 @@ public final class VeyraRenderer {
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> INTEGER_UNIFORMS = List.of(
-            "frameCounter", "worldTime", "worldDay", "isEyeInWater", "isSpectator", "is_sneaking",
+            "frameCounter", "worldTime", "worldDay", "moonPhase", "isEyeInWater", "isSpectator", "is_sneaking",
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
-            "worldTime", "worldDay", "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor",
+            "worldTime", "worldDay", "moonPhase", "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
@@ -555,6 +556,7 @@ public final class VeyraRenderer {
             case "frameCounter" -> frame.frameCounter();
             case "worldTime" -> frame.worldTime();
             case "worldDay" -> frame.worldDay();
+            case "moonPhase" -> frame.moonPhase();
             case "isEyeInWater" -> frame.isEyeInWater();
             case "isSpectator" -> frame.isSpectator() ? 1 : 0;
             case "is_sneaking" -> frame.isSneaking() ? 1 : 0;
@@ -4333,6 +4335,7 @@ public final class VeyraRenderer {
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
                 case "worldTime" -> new UniformValue.IntUniform(frameUniforms.worldTime());
                 case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
+                case "moonPhase" -> new UniformValue.IntUniform(frameUniforms.moonPhase());
                 case "eyeAltitude" -> new UniformValue.FloatUniform(frameUniforms.eyeAltitude());
                 case "screenBrightness" -> new UniformValue.FloatUniform(frameUniforms.screenBrightness());
                 case "blindness" -> new UniformValue.FloatUniform(frameUniforms.blindness());
@@ -4430,6 +4433,7 @@ public final class VeyraRenderer {
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         long dayTime = minecraft.level.getDayTime();
         int worldTime = (int) Math.floorMod(dayTime, 24000L);
+        int moonPhase = minecraft.level.getMoonPhase();
         float sunAngle = (worldTime + partialTick) / 24000.0F;
         int worldDay = (int) Math.floorDiv(dayTime, 24000L);
         float rainStrength = minecraft.level.getRainLevel(partialTick);
@@ -4449,7 +4453,7 @@ public final class VeyraRenderer {
         int isEyeInWater = player.isEyeInFluid(FluidTags.WATER) ? 1
                 : player.isEyeInFluid(FluidTags.LAVA) ? 2 : player.isInPowderSnow ? 3 : 0;
         return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength, wetness,
-                thunderStrength, worldTime, worldDay, (float) player.getEyeY(),
+                thunderStrength, worldTime, worldDay, moonPhase, (float) player.getEyeY(),
                 (float) (double) minecraft.options.gamma().get(), blindness, nightVision, darknessFactor,
                 isEyeInWater, player.isSpectator(), player.isCrouching(), player.isSprinting(), player.onGround(),
                 player.hurtTime > 0, player.isInvisible(), player.isOnFire(), frameMatrices, cameraUniforms);
@@ -4864,13 +4868,13 @@ public final class VeyraRenderer {
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
                                  float sunAngle, float rainStrength, float wetness, float thunderStrength,
-                                 int worldTime, int worldDay, float eyeAltitude, float screenBrightness,
+                                 int worldTime, int worldDay, int moonPhase, float eyeAltitude, float screenBrightness,
                                  float blindness, float nightVision, float darknessFactor,
                                  int isEyeInWater, boolean isSpectator, boolean isSneaking, boolean isSprinting,
                                  boolean isOnGround, boolean isHurt, boolean isInvisible, boolean isBurning,
                                  FrameMatrices matrices, CameraUniforms camera) {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
-                0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
+                0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
                 false, false, false, false, false, false, false, FrameMatrices.IDENTITY, CameraUniforms.ZERO);
     }
 
