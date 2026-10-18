@@ -30,6 +30,7 @@
     "RendererGeometryTargetsMixin",
     "accessor.PipelineStateAccessor",
     "accessor.RendererFramebufferAccessor",
+    "accessor.VkGpuTextureAccessor",
     "accessor.NativePipelineRegistryAccessor",
     "SwapChainMixin"
   ],

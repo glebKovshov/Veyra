@@ -29,6 +29,7 @@ import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.RenderSetupAccessor;
 import dev.veyra.mixin.accessor.RenderTargetAccessor;
 import dev.veyra.mixin.accessor.RenderTypeAccessor;
+import dev.veyra.mixin.accessor.VkGpuTextureAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
 import dev.veyra.vulkan.VeyraDepthTextureSnapshot;
@@ -4673,10 +4674,24 @@ public final class VeyraRenderer {
             if (initializedColorTargets.contains(index) && !targetSettings.clearEachFrame()) {
                 continue;
             }
-            commandEncoder.clearColorTexture(pair.targetA().getColorTexture(), targetSettings.clearColor());
-            commandEncoder.clearColorTexture(pair.targetB().getColorTexture(), targetSettings.clearColor());
+            clearColorTarget(commandEncoder, pair.targetA(), targetSettings.clearColor());
+            clearColorTarget(commandEncoder, pair.targetB(), targetSettings.clearColor());
             initializedColorTargets.add(index);
         }
+    }
+
+    private static void clearColorTarget(com.mojang.blaze3d.systems.CommandEncoder commandEncoder,
+                                         RenderTarget target, int clearColor) {
+        GpuTexture texture = target.getColorTexture();
+        commandEncoder.clearColorTexture(texture, clearColor);
+        if (!(texture instanceof VkGpuTexture vulkanTexture)) {
+            throw new IllegalStateException("VulkanMod did not allocate a Vulkan texture for shaderpack color targets.");
+        }
+        // VulkanMod clears immediately here but marks the texture for another deferred clear.
+        // PostPassM would then open it as an attachment and transition it on ImageUploadHelper's
+        // command buffer while the shader pass samples it. The clear already happened, so drop
+        // that stale deferred-clear request.
+        ((VkGpuTextureAccessor) vulkanTexture).veyra$setNeedsClear(false);
     }
 
     private static void replacePipelineSet(PipelineSet next) {
