@@ -1,4 +1,6 @@
-package dev.veyra.smoke;
+package dev.veyra.smoke.mixin;
+
+import dev.veyra.smoke.GraphicsSmoke;
 
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
