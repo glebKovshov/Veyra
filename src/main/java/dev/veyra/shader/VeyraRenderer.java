@@ -277,6 +277,14 @@ public final class VeyraRenderer {
     public static void initialize(ShaderPackRepository packRepository) {
         repository = packRepository;
         VeyraShadowRenderer.initialize();
+        packRepository.getSelected().ifPresent(pack -> {
+            try {
+                VeyraShadowRenderer.configure(pack.readShadowSettings());
+            } catch (IOException exception) {
+                VeyraClient.LOGGER.warn("Could not read Iris shadow settings for '{}'; using defaults.",
+                        pack.name(), exception);
+            }
+        });
         renderingEnabled = packRepository.getSelected()
                 .filter(ShaderPack::hasPostProcessing)
                 .isPresent();
@@ -998,6 +1006,7 @@ public final class VeyraRenderer {
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
         try {
+            ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
             if (pack.hasTerrainFragment() || pack.hasShadowFragment()) {
@@ -1049,6 +1058,7 @@ public final class VeyraRenderer {
                 preparedClouds = compileCloudPipeline(pack);
             }
             repository.select(pack);
+            VeyraShadowRenderer.configure(preparedShadowSettings);
             updateTerrainLayerMode(pack);
             replacePipelineSet(prepared);
             prepared = null;
@@ -1212,6 +1222,7 @@ public final class VeyraRenderer {
     public static String disable() {
         try {
             repository.select(null);
+            VeyraShadowRenderer.configure(ShadowSettings.DEFAULT);
             updateTerrainLayerMode(null);
             renderingEnabled = false;
             pipelinesDirty = false;

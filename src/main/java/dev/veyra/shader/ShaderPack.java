@@ -79,6 +79,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "R32F", VK10.VK_FORMAT_R32_SFLOAT);
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
+    private static final Pattern SHADOW_SETTING = Pattern.compile(
+            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation)\\s*=\\s*([^;]+);");
+    private static final Pattern INTEGER_LITERAL = Pattern.compile("[+-]?\\d+");
 
     public record Program(String name, String source) {
     }
@@ -266,6 +269,61 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
         }
         return Map.copyOf(settings);
+    }
+
+    public ShadowSettings readShadowSettings() throws IOException {
+        Map<String, String> values = new HashMap<>();
+        for (String fileName : listShaderSourceFiles()) {
+            Optional<String> source = readShader(fileName);
+            if (source.isEmpty()) {
+                continue;
+            }
+            String uncommented = GLSL_COMMENTS.matcher(source.get()).replaceAll("");
+            Matcher matcher = SHADOW_SETTING.matcher(uncommented);
+            while (matcher.find()) {
+                values.putIfAbsent(matcher.group(2), matcher.group(3).trim());
+            }
+        }
+
+        int resolution = values.containsKey("shadowMapResolution")
+                ? parseShadowResolution(values.get("shadowMapResolution"))
+                : ShadowSettings.DEFAULT_RESOLUTION;
+        float distance = parseShadowFloat(values, "shadowDistance", ShadowSettings.DEFAULT_DISTANCE);
+        float intervalSize = parseShadowFloat(values, "shadowIntervalSize", ShadowSettings.DEFAULT_INTERVAL_SIZE);
+        float sunPathRotation = parseShadowFloat(values, "sunPathRotation", ShadowSettings.DEFAULT_SUN_PATH_ROTATION);
+        try {
+            return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation);
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("Invalid Iris shadow setting: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static int parseShadowResolution(String value) throws IOException {
+        if (!INTEGER_LITERAL.matcher(value).matches()) {
+            throw new IOException("shadowMapResolution must be an integer literal.");
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            throw new IOException("shadowMapResolution is outside the supported integer range.", exception);
+        }
+    }
+
+    private static float parseShadowFloat(Map<String, String> values, String name, float defaultValue)
+            throws IOException {
+        String value = values.get(name);
+        if (value == null) {
+            return defaultValue;
+        }
+        Matcher matcher = FLOAT_LITERAL.matcher(value);
+        if (!matcher.matches()) {
+            throw new IOException(name + " must be a numeric GLSL literal.");
+        }
+        float parsed = Float.parseFloat(matcher.group(1));
+        if (!Float.isFinite(parsed)) {
+            throw new IOException(name + " must be finite.");
+        }
+        return parsed;
     }
 
     private static void parseColorTargetSettings(String source,
@@ -630,6 +688,37 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
         }
         return Set.copyOf(files);
+    }
+
+    private List<String> listShaderSourceFiles() throws IOException {
+        if (Files.isDirectory(path)) {
+            Path shaders = path.resolve(shaderDirectory);
+            try (var entries = Files.walk(shaders)) {
+                return entries.filter(Files::isRegularFile)
+                        .map(shaders::relativize)
+                        .map(relative -> relative.toString().replace('\\', '/'))
+                        .filter(ShaderPack::isGlslSource)
+                        .sorted()
+                        .toList();
+            }
+        }
+
+        String prefix = shaderDirectory + "/";
+        try (ZipFile zip = new ZipFile(path.toFile())) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            List<String> files = new ArrayList<>();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory() || !entry.getName().startsWith(prefix)) {
+                    continue;
+                }
+                String fileName = entry.getName().substring(prefix.length());
+                if (isGlslSource(fileName)) {
+                    files.add(fileName);
+                }
+            }
+            return files.stream().sorted().toList();
+        }
     }
 
     private Optional<String> readShader(String fileName) throws IOException {

@@ -28,8 +28,6 @@ import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 /** Renders VulkanMod's opaque chunk layers into an Iris-compatible shadow depth map. */
 public final class VeyraShadowRenderer {
-    private static final int SHADOW_RESOLUTION = 1024;
-    private static final float SHADOW_HALF_PLANE = 128.0F;
     private static final MappedBuffer SHADOW_MODEL_VIEW_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final MappedBuffer SHADOW_PROJECTION_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final Matrix4f shadowModelView = new Matrix4f();
@@ -40,6 +38,7 @@ public final class VeyraShadowRenderer {
     private static RenderPass renderPass;
     private static VeyraDepthTextureView depthTextureView;
     private static boolean rendering;
+    private static ShadowSettings shadowSettings = ShadowSettings.DEFAULT;
 
     static {
         Uniforms.mat4f_uniformMap.put("shadowModelView", () -> SHADOW_MODEL_VIEW_BUFFER);
@@ -67,6 +66,18 @@ public final class VeyraShadowRenderer {
         return new Matrix4f(shadowProjection);
     }
 
+    public static void configure(ShadowSettings settings) {
+        if (shadowSettings.resolution() != settings.resolution()) {
+            release();
+        }
+        if (!shadowSettings.equals(settings)) {
+            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}.",
+                    settings.resolution(), settings.resolution(), settings.distance(),
+                    settings.intervalSize(), settings.sunPathRotation());
+        }
+        shadowSettings = settings;
+    }
+
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.hasShadowPass()) {
@@ -90,10 +101,11 @@ public final class VeyraShadowRenderer {
         try {
             ensureResources();
             float sunAngle = (minecraft.level.getDayTime() % 24000L) / 24000.0F * (float) (Math.PI * 2.0);
-            ShadowView shadowView = createShadowView(sunAngle);
+            ShadowView shadowView = createShadowView(sunAngle, cameraPosition);
             Matrix4f shadowModelView = shadowView.modelView();
+            float shadowDistance = shadowSettings.distance();
             Matrix4f shadowProjection = new Matrix4f().setOrthoSymmetric(
-                    SHADOW_HALF_PLANE * 2.0F, SHADOW_HALF_PLANE * 2.0F, 0.1F, SHADOW_HALF_PLANE * 2.0F, true);
+                    shadowDistance * 2.0F, shadowDistance * 2.0F, 0.1F, shadowDistance * 2.0F, true);
             VeyraShadowRenderer.shadowModelView.set(shadowModelView);
             VeyraShadowRenderer.shadowProjection.set(shadowProjection);
             writeMatrix(VeyraShadowRenderer.shadowModelView, SHADOW_MODEL_VIEW_BUFFER.buffer);
@@ -171,7 +183,8 @@ public final class VeyraShadowRenderer {
         if (renderPass != null) {
             return;
         }
-        target = new TextureTarget("Veyra shadow map", SHADOW_RESOLUTION, SHADOW_RESOLUTION, true);
+        target = new TextureTarget("Veyra shadow map", shadowSettings.resolution(),
+                shadowSettings.resolution(), true);
         VkGpuTexture colorTexture = (VkGpuTexture) target.getColorTexture();
         VkGpuTexture depthTexture = (VkGpuTexture) target.getDepthTexture();
         framebuffer = Framebuffer.builder(colorTexture.getVulkanImage(), depthTexture.getVulkanImage()).build();
@@ -184,19 +197,29 @@ public final class VeyraShadowRenderer {
         depthTextureView = new VeyraDepthTextureView(depthTexture);
     }
 
-    private static ShadowView createShadowView(float sunAngle) {
+    private static ShadowView createShadowView(float sunAngle, Vec3 cameraPosition) {
         Vector3f lightDirection = new Vector3f((float) Math.cos(sunAngle), (float) Math.sin(sunAngle), 0.25F);
+        lightDirection.rotateX((float) Math.toRadians(shadowSettings.sunPathRotation()));
         if (lightDirection.y < 0.0F) {
             lightDirection.negate();
         }
         lightDirection.normalize();
 
+        float shadowDistance = shadowSettings.distance();
         Matrix4f modelView = new Matrix4f().setLookAt(
-                lightDirection.x * SHADOW_HALF_PLANE,
-                lightDirection.y * SHADOW_HALF_PLANE,
-                lightDirection.z * SHADOW_HALF_PLANE,
+                lightDirection.x * shadowDistance,
+                lightDirection.y * shadowDistance,
+                lightDirection.z * shadowDistance,
                 0.0F, 0.0F, 0.0F,
                 0.0F, 0.0F, 1.0F);
+        float intervalSize = shadowSettings.intervalSize();
+        if (intervalSize > 0.0F) {
+            float halfInterval = intervalSize / 2.0F;
+            modelView.translate(
+                    (float) cameraPosition.x % intervalSize - halfInterval,
+                    (float) cameraPosition.y % intervalSize - halfInterval,
+                    (float) cameraPosition.z % intervalSize - halfInterval);
+        }
         Vector3f viewDirection = lightDirection.negate(new Vector3f());
         float yaw = (float) Math.toDegrees(Math.atan2(-viewDirection.x, viewDirection.z));
         float pitch = (float) Math.toDegrees(-Math.asin(viewDirection.y));
