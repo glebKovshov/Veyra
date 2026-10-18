@@ -42,8 +42,8 @@ public final class GraphicsSmoke {
             Files.createDirectories(output);
             image.writeToFile(output.resolve(active ? "mrt-active.png" : "shaders-disabled.png"));
             for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
-                int pixel = image.getPixelABGR(x, y);
-                int red = pixel & 255, green = (pixel >>> 8) & 255, blue = (pixel >>> 16) & 255;
+                int pixel = image.getPixel(x, y);
+                int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
             }
             int count = colored;

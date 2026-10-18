@@ -3,7 +3,9 @@ package dev.veyra.vulkan;
 import dev.veyra.shader.FragmentOutputs;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.mixin.accessor.RendererFramebufferAccessor;
+import dev.veyra.mixin.accessor.NativePipelineRegistryAccessor;
 import org.lwjgl.system.MemoryStack;
+import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.framebuffer.RenderPass;
@@ -15,6 +17,8 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
 
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -83,8 +87,17 @@ public final class VeyraGeometryTargets {
         if (framebuffers.isEmpty() && resumePasses.isEmpty()) return;
         Renderer renderer = Renderer.getInstance();
         if (renderer.getBoundFramebuffer() instanceof VeyraMrtFramebuffer) resumeScene(renderer);
+        Set<RenderPass> retired = Collections.newSetFromMap(new IdentityHashMap<>());
+        framebuffers.values().forEach(target -> retired.add(target.renderPass()));
+        retired.addAll(resumePasses.values());
         framebuffers.values().forEach(VeyraMrtFramebuffer::close);
         resumePasses.values().forEach(RenderPass::cleanUp);
+        // Later draws in this same frame can still cache a variant for a retiring resume pass.
+        // Prune at its completion fence, after every submission using that pass has finished.
+        MemoryManager.getInstance().addFrameOp(() -> List.copyOf(NativePipelineRegistryAccessor.veyra$getPipelines())
+                .forEach(pipeline -> {
+                    if (pipeline instanceof VeyraPipelinePassCache cache) cache.veyra$retireRenderPasses(retired);
+                }));
         framebuffers.clear(); resumePasses.clear(); scene = null;
     }
 

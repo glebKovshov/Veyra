@@ -29,7 +29,8 @@
     "GraphicsPipelineMixin",
     "RendererGeometryTargetsMixin",
     "accessor.PipelineStateAccessor",
-    "accessor.RendererFramebufferAccessor"
+    "accessor.RendererFramebufferAccessor",
+    "accessor.NativePipelineRegistryAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -28,6 +28,10 @@ class VulkanBackendContractTest {
     }
     @Test void nativePipelineBlendAndFormatHooksExistExactlyOnce() throws IOException {
         String owner = "net/vulkanmod/vulkan/shader/GraphicsPipeline";
+        assertTrue(read(owner).fields.stream().anyMatch(field -> field.name.equals("graphicsPipelines")
+                && field.desc.equals("Lit/unimi/dsi/fastutil/objects/Object2LongMap;")));
+        assertTrue(read("net/vulkanmod/vulkan/shader/Pipeline").fields.stream().anyMatch(field ->
+                field.name.equals("PIPELINES") && field.desc.equals("Ljava/util/List;")));
         requiresCall(owner, "createGraphicsPipeline", "org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo", "pAttachments",
                 "(Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;");
         requiresCall(owner, "createGraphicsPipeline", "org/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR", "pColorAttachmentFormats",
