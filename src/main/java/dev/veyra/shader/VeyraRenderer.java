@@ -1539,6 +1539,7 @@ public final class VeyraRenderer {
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
         try {
+            pack.validatePipelineCapabilities();
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
@@ -1968,6 +1969,7 @@ public final class VeyraRenderer {
     }
 
     private static PipelineSet compilePipelines(ShaderPack pack, int width, int height) throws IOException {
+        pack.validatePipelineCapabilities();
         List<ShaderPack.Program> sources = pack.readPrograms();
         Map<Integer, ColorTargetSettings> colorTargetSettings = new HashMap<>(pack.readColorTargetSettings(
                 width, height, RenderSystem.getDevice().getMaxTextureSize()));
@@ -2063,8 +2065,7 @@ public final class VeyraRenderer {
     private static void initializeDepthHistory(VeyraDepthTextureSnapshot snapshot, int width, int height, int format) {
         if (snapshot.isReady(width, height, format)) return;
         snapshot.ensure(width, height, format);
-        RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(snapshot.depthTexture(), 1.0);
-        snapshot.transitionToSampling();
+        snapshot.clearToFarDepth();
     }
 
     private static void validateColorTargetFormats(Set<Integer> indices,

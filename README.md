@@ -2,6 +2,12 @@
 
 Veyra is a client-side shader mod for Minecraft 1.21.11 on Fabric with VulkanMod 0.6.8. It runs a supported subset of Iris shader pack programs on VulkanMod.
 
+The `feature/iris-compatibility-0.2` branch is under development. It does **not** provide full Iris compatibility. Complementary Reimagined/Unbound, BSL and Sildur's Vibrant have confirmed source-level incompatibilities; none is certified as playable. See [COMPATIBILITY.md](COMPATIBILITY.md) for the measured results and [ARCHITECTURE.md](ARCHITECTURE.md) for the backend gaps. A successful build does not establish visual correctness.
+
+This branch adds shader options, quality profiles, conditional preprocessing and dimension-specific programs. In the F6 menu, select a pack, open **Configure**, change options or profiles, then press **Apply**. Sliders, nested option screens and reset are supported. Per-pack overrides are saved under `veyra/options/`; shader pack archives and sources are never modified. Applying recompiles before committing the selection, so a failed replacement retains the previous pack. See [CHANGELOG.md](CHANGELOG.md).
+
+Post programs are scheduled at separate world boundaries: `prepare` after shadows, `deferred` before translucent terrain, and `composite`/`final` after world rendering. This integration is compiled and requires in-game Vulkan validation. Geometry still uses Veyra's existing synthesized vertex bridges; arbitrary shaderpack geometry vertex stages and simultaneous geometry MRT are not implemented. Unsupported compute, geometry, tessellation and begin stages produce an explicit load error instead of being silently omitted.
+
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11.

@@ -27,6 +27,20 @@ jobs:
       - name: Build mod
         run: ./gradlew --no-daemon build validateShaders
 
+      - name: Verify distributable contents
+        run: python3 scripts/verify_jar.py
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload mod jar
         uses: actions/upload-artifact@v4
         with:

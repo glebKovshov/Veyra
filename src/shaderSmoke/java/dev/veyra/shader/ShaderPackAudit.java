@@ -11,11 +11,23 @@ public final class ShaderPackAudit {
         return "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "\"";
     }
     public static void main(String[] args) throws Exception {
+        int dimension = 0;
+        String profile = "";
         for (String argument : args) {
-            ShaderPack pack = ShaderPack.inspect(Path.of(argument));
+            if (argument.startsWith("--dimension=")) { dimension = Integer.parseInt(argument.substring(12)); continue; }
+            if (argument.startsWith("--profile=")) { profile = argument.substring(10); continue; }
+            ShaderPack pack = ShaderPack.inspect(Path.of(argument)).configured(Map.of(), dimension);
+            if (!profile.isEmpty()) {
+                var values = pack.readOptions().profiles().get(profile);
+                if (values == null) throw new IllegalArgumentException("Unknown profile '" + profile + "' in " + argument);
+                pack = pack.configured(pack.readOptions().validate(values), dimension);
+            }
             List<String> errors = new ArrayList<>();
+            String capabilityError = "";
             int options = 0, profiles = 0, stages = 0, preprocessed = 0, accepted = 0, rejected = 0, geometryVertices = 0, compute = 0;
             if (pack.supportsShaderPrograms()) {
+                try { pack.validatePipelineCapabilities(); }
+                catch (Exception exception) { capabilityError = exception.getMessage(); }
                 try { var specification = pack.readOptions(); options = specification.options().size(); profiles = specification.profiles().size(); }
                 catch (Exception exception) { errors.add("options: " + exception.getMessage()); }
                 for (String file : pack.stageFiles().stream().sorted().toList()) {
@@ -39,6 +51,7 @@ public final class ShaderPackAudit {
                 }
             } else errors.add(pack.issue());
             System.out.println("{\"pack\":" + quote(pack.path().getFileName().toString()) + ",\"discovered\":" + pack.supportsShaderPrograms()
+                    + ",\"dimension\":" + dimension + ",\"profile\":" + quote(profile) + ",\"capabilityError\":" + quote(capabilityError)
                     + ",\"options\":" + options + ",\"profiles\":" + profiles + ",\"stages\":" + stages + ",\"preprocessed\":" + preprocessed
                     + ",\"geometryFragmentsAccepted\":" + accepted + ",\"geometryFragmentsRejected\":" + rejected + ",\"geometryVertexStages\":" + geometryVertices
                     + ",\"computeStages\":" + compute + ",\"errorCount\":" + errors.size() + ",\"errors\":["

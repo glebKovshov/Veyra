@@ -95,4 +95,20 @@ class ShaderPackOptionsTest {
         assertEquals(4, options.columns("WATER"));
         assertEquals(2, options.columns("SKY"));
     }
+    @Test void unsupportedStagesFailExplicitlyUnlessTheirProgramIsDisabled() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("pack/shaders"));
+        Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.writeString(shader.resolve("composite_a.csh"), "void main(){}\n");
+        IOException error = assertThrows(IOException.class, () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("composite_a.csh"));
+        Files.writeString(shader.resolve("shaders.properties"), "program.composite.enabled=false\n");
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+    }
+    @Test void requiredIrisFeaturesAreNotSilentlyIgnored() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("pack/shaders"));
+        Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "iris.features.required=SSBO CUSTOM_IMAGES\n");
+        IOException error = assertThrows(IOException.class, () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("SSBO CUSTOM_IMAGES"));
+    }
 }

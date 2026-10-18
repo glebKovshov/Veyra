@@ -8,10 +8,15 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.mixin.accessor.RenderTargetAccessor;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
+import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VK11;
+import org.lwjgl.vulkan.VkFormatProperties;
+import org.lwjgl.vulkan.VkClearDepthStencilValue;
+import org.lwjgl.vulkan.VkImageSubresourceRange;
 
 /** A depth-only render target matching VulkanMod's main depth format. */
 public final class VeyraDepthTextureSnapshot implements AutoCloseable {
@@ -57,6 +62,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
                 .setName("Veyra " + name + " snapshot")
                 .setFormat(format)
                 .addUsage(VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                .addUsage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                 .createVulkanImage();
         VkGpuTexture depthTexture = device.gpuTextureFromVulkanImage(image);
         GpuTextureView depthTextureView = device.createTextureView(depthTexture);
@@ -93,6 +99,27 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
 
     public void transitionToAttachment() {
         transition(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    }
+
+    /** Initialize actual image contents before any first-frame history sampling. */
+    public void clearToFarDepth() {
+        if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+        VulkanImage image = depthImage();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkFormatProperties properties = VkFormatProperties.calloc(stack);
+            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, image.format, properties);
+            if ((properties.optimalTilingFeatures() & VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == 0) {
+                throw new IllegalStateException("The depth history format does not support Vulkan transfer clears.");
+            }
+            var commandBuffer = Renderer.getCommandBuffer();
+            image.transitionImageLayout(stack, commandBuffer, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            VkClearDepthStencilValue value = VkClearDepthStencilValue.calloc(stack).depth(1.0F).stencil(0);
+            VkImageSubresourceRange range = VkImageSubresourceRange.calloc(stack)
+                    .aspectMask(image.aspect).baseMipLevel(0).levelCount(1).baseArrayLayer(0).layerCount(1);
+            VK10.vkCmdClearDepthStencilImage(commandBuffer, image.getId(),
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, value, range);
+        }
+        transitionToSampling();
     }
 
     public void transitionToSampling() {

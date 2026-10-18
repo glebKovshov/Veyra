@@ -544,7 +544,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static boolean isGlslSource(String fileName) {
         String lower = fileName.toLowerCase(java.util.Locale.ROOT);
         return lower.endsWith(".fsh") || lower.endsWith(".vsh") || lower.endsWith(".gsh")
-                || lower.endsWith(".glsl") || lower.endsWith(".csh");
+                || lower.endsWith(".glsl") || lower.endsWith(".csh")
+                || lower.endsWith(".tcs") || lower.endsWith(".tes");
     }
 
     private static final class MutableColorTargetSettings {
@@ -846,6 +847,29 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public Set<String> stageFiles() throws IOException {
         return listShaderFiles().stream().filter(name -> name.matches("[A-Za-z0-9_]+\\.(?:fsh|vsh|gsh|tcs|tes|csh)"))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
+    public void validatePipelineCapabilities() throws IOException {
+        Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        String required = properties.getProperty("iris.features.required", "").strip();
+        if (!required.isEmpty()) {
+            throw new IOException("This pack requires Iris features not implemented by Veyra: " + required);
+        }
+        for (String file : stageFiles().stream().sorted().toList()) {
+            int dot = file.lastIndexOf('.');
+            String program = file.substring(0, dot);
+            String extension = file.substring(dot + 1);
+            // Iris allows suffixed compute stages belonging to one parent program.
+            String parent = extension.equals("csh") ? program.replaceFirst("_[a-z]+$", "") : program;
+            if (!isProgramEnabled(parent)) continue;
+            if (Set.of("csh", "gsh", "tcs", "tes").contains(extension)) {
+                throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
+            }
+            if (program.matches("begin\\d*")) {
+                throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
+            }
+        }
     }
 
     public Optional<String> readStage(String fileName) throws IOException {

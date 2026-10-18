@@ -35,6 +35,8 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: ./gradlew --no-daemon build validateShaders packageExamplePacks
+      - name: Verify distributable contents
+        run: python3 scripts/verify_jar.py
       - name: Prepare release assets
         shell: bash
         run: |
