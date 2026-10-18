@@ -52,7 +52,7 @@ Post-processing programs (`prepare`, `deferred`, `composite`, and `final`) can u
 
 ## Geometry camera position uniforms
 
-Geometry fragments accept Iris' `cameraPosition`, `cameraPositionFract`, `previousCameraPosition`, and `previousCameraPositionFract` uniforms as `vec3`. They expose the world-space camera position and its fractional part for the current and previous rendered frame. This works in terrain, entity-family, and cloud shader programs. `examples/geometry-camera-position` combines these values with `gbufferModelViewInverse` and `viewPos` to color entities by world position.
+Geometry fragments accept Iris' `cameraPosition`, `cameraPositionFract`, `previousCameraPosition`, and `previousCameraPositionFract` uniforms as `vec3`, plus `cameraPositionInt` and `previousCameraPositionInt` as `ivec3`. The split integer and fractional values preserve camera precision for large world coordinates. This works in terrain, entity-family, and cloud shader programs. `examples/geometry-camera-position` combines these values with `gbufferModelViewInverse` and `viewPos` to color entities by world position.
 
 ## First-person hand depth
 
