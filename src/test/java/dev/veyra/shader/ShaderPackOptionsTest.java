@@ -70,4 +70,29 @@ class ShaderPackOptionsTest {
         assertTrue(pack.readPrograms().getFirst().source().contains("vec4(0.25)"));
         assertTrue(pack.configured(Map.of(), -1).readPrograms().getFirst().source().contains("vec4(1.0)"));
     }
+    @Test void honorsConditionalProgramsAndRefreshesSourceSnapshots() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("pack/shaders"));
+        Files.writeString(shader.resolve("final.fsh"), source + "void main(){gl_FragColor=vec4(QUALITY);}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "program.final.enabled=QUALITY > 1\n");
+        ShaderPack pack = ShaderPack.inspect(shader.getParent());
+        assertEquals(1, pack.readPrograms().size());
+        assertTrue(pack.configured(Map.of("QUALITY", "0"), 0).readPrograms().isEmpty());
+        Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(0.5);}\n");
+        assertTrue(pack.readPrograms().getFirst().source().contains("vec4(2)"));
+        Files.writeString(shader.resolve("shaders.properties"), "");
+        assertTrue(ShaderPack.inspect(shader.getParent()).readPrograms().getFirst().source().contains("vec4(0.5)"));
+    }
+    @Test void optionReplacementPreservesBlockCommentBoundaries() {
+        String text = "#define QUALITY 2 /* [1 2 3]\n#define HIDDEN 9\n*/\n";
+        String changed = ShaderPackOptions.apply(text, Map.of("QUALITY", "3", "HIDDEN", "0"));
+        assertEquals(text.replace("QUALITY 2", "QUALITY 3"), changed);
+    }
+    @Test void screenColumnsAreBoundedAndInherited() throws IOException {
+        var options = ShaderPackOptions.parse(Map.of("s", source),
+                "screen.columns=3\nscreen.WATER.columns=99\nscreen.SKY.columns=invalid\n", "");
+        assertEquals(3, options.columns(""));
+        assertEquals(3, options.columns("LIGHTING"));
+        assertEquals(4, options.columns("WATER"));
+        assertEquals(2, options.columns("SKY"));
+    }
 }

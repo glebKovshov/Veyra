@@ -38,6 +38,7 @@ public abstract class LevelRendererMixin {
                                         CallbackInfo ci) {
         LevelRenderState state = ((LevelRendererAccessor) (Object) this).veyra$getLevelRenderState();
         VeyraShadowRenderer.render(camera, modelView, projection, deltaTracker, state);
+        VeyraRenderer.renderPrepare(net.minecraft.client.Minecraft.getInstance());
     }
 
     @Inject(method = "renderLevel", at = @At("RETURN"))

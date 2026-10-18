@@ -25,7 +25,6 @@ public final class ShaderOptionsScreen extends Screen {
     private final String section;
     private String status = "Changes take effect when you press Apply.";
     private int page;
-    private int profileIndex = -1;
 
     public ShaderOptionsScreen(Screen parent, ShaderPack pack, ShaderPackOptions options) {
         this(parent, pack, options, new LinkedHashMap<>(pack.configuration().options()), "");
@@ -50,24 +49,32 @@ public final class ShaderOptionsScreen extends Screen {
     @Override protected void init() {
         int totalWidth = Math.max(1, Math.min(400, width - 24));
         int left = (width - totalWidth) / 2;
-        int columnWidth = Math.max(1, (totalWidth - 6) / 2);
+        int columns = options.columns(section);
+        int columnWidth = Math.max(1, (totalWidth - 6 * (columns - 1)) / columns);
         int rows = Math.max(1, (height - 162) / 24);
-        int count = rows * 2;
+        int count = rows * columns;
         List<String> entries = entries();
         int lastPage = Math.max(0, (entries.size() - 1) / count);
         page = Math.min(page, lastPage);
         var profiles = new ArrayList<>(options.profiles().keySet());
+        int profileIndex = -1, matches = -1;
+        for (int i = 0; i < profiles.size(); i++) {
+            Map<String, String> values = options.profiles().get(profiles.get(i));
+            boolean matching = values.entrySet().stream().allMatch(entry -> entry.getValue().equals(changed.getOrDefault(entry.getKey(), options.options().get(entry.getKey()).defaultValue())));
+            if (matching && values.size() > matches) { profileIndex = i; matches = values.size(); }
+        }
+        final int currentProfileIndex = profileIndex;
         String profile = profileIndex >= 0 && profileIndex < profiles.size() ? profiles.get(profileIndex) : "Custom";
         addRenderableWidget(Button.builder(Component.literal("Profile: " + options.label("profile." + profile, profile)), button -> {
             if (profiles.isEmpty()) return;
-            profileIndex = (profileIndex + 1) % profiles.size();
-            changed.putAll(options.profiles().get(profiles.get(profileIndex)));
+            int next = (currentProfileIndex + 1) % profiles.size();
+            changed.putAll(options.profiles().get(profiles.get(next)));
             status = "Profile staged. Press Apply to compile.";
             rebuildWidgets();
         }).bounds(left, 48, totalWidth, 20).build()).active = !profiles.isEmpty();
         for (int i = 0; i < count && page * count + i < entries.size(); i++) {
             String name = entries.get(page * count + i);
-            int x = left + (i % 2) * (columnWidth + 6), y = 78 + (i / 2) * 24;
+            int x = left + (i % columns) * (columnWidth + 6), y = 78 + (i / columns) * 24;
             if (name.equals("<empty>") || name.equals("<profile>")) continue;
             if (name.startsWith("[") && name.endsWith("]")) {
                 String target = name.substring(1, name.length() - 1);
@@ -91,7 +98,6 @@ public final class ShaderOptionsScreen extends Screen {
                 Button button = Button.builder(optionMessage(option), ignored -> {
                     int selected = option.values().indexOf(changed.getOrDefault(name, option.defaultValue()));
                     changed.put(name, option.values().get((selected + 1) % option.values().size()));
-                    profileIndex = -1;
                     rebuildWidgets();
                 }).bounds(x, y, columnWidth, 20).build();
                 button.setTooltip(Tooltip.create(Component.literal(comment)));
@@ -102,7 +108,7 @@ public final class ShaderOptionsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Previous"), button -> { page--; rebuildWidgets(); })
                 .bounds(left, height - 65, small, 20).build()).active = page > 0;
         addRenderableWidget(Button.builder(Component.literal("Reset"), button -> {
-            changed.clear(); profileIndex = -1; status = "Defaults staged. Press Apply to save."; rebuildWidgets();
+            changed.clear(); status = "Defaults staged. Press Apply to save."; rebuildWidgets();
         }).bounds(left + small + 6, height - 65, small, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Back"), button -> onClose())
                 .bounds(left + (small + 6) * 2, height - 65, small, 20).build());
@@ -130,7 +136,6 @@ public final class ShaderOptionsScreen extends Screen {
         @Override protected void applyValue() {
             int selected = (int) Math.round(value * (option.values().size() - 1));
             changed.put(option.name(), option.values().get(selected));
-            profileIndex = -1;
         }
     }
 

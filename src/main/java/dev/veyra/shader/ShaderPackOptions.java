@@ -161,6 +161,11 @@ public final class ShaderPackOptions {
         return definition == null ? name.isEmpty() ? new ArrayList<>(options.keySet()) : List.of()
                 : List.of(definition.strip().split("\\s+"));
     }
+    public int columns(String screen) {
+        String key = screen.isEmpty() ? "screen.columns" : "screen." + screen + ".columns";
+        try { return Math.max(1, Math.min(4, Integer.parseInt(properties.getProperty(key, properties.getProperty("screen.columns", "2"))))); }
+        catch (NumberFormatException exception) { return 2; }
+    }
     public Set<String> sliders() { return Set.copyOf(List.of(properties.getProperty("sliders", "").strip().split("\\s+"))); }
     public Map<String, String> validate(Map<String, String> values) throws IOException {
         Map<String, String> result = new LinkedHashMap<>();

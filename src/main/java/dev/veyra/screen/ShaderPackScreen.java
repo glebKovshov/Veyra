@@ -16,6 +16,7 @@ public final class ShaderPackScreen extends Screen {
 
     public ShaderPackScreen() {
         super(Component.literal("Veyra Shader Packs"));
+        if (!VeyraRenderer.getLastError().isEmpty()) status = VeyraRenderer.getLastError();
     }
 
     @Override
@@ -53,7 +54,8 @@ public final class ShaderPackScreen extends Screen {
                 status = VeyraRenderer.selectWithSavedOptions(pack);
                 rebuildWidgets();
             }).bounds(center - panelWidth / 2, top + 28 + i * 26, panelWidth, 22).build();
-            button.active = pack.supportsShaderPrograms();
+            // Unsupported entries remain clickable so their diagnostic can be read.
+            button.active = true;
             addRenderableWidget(button);
         }
 

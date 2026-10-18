@@ -906,6 +906,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private Optional<String> readUncachedShader(String fileName) throws IOException {
+        String portable = fileName.replace('\\', '/');
+        if (portable.startsWith("/") || java.util.Arrays.asList(portable.split("/")).contains(".."))
+            throw new IOException("Shader source escapes its directory: " + fileName);
         byte[] bytes;
         if (Files.isDirectory(path)) {
             Path packRoot = path.toRealPath();

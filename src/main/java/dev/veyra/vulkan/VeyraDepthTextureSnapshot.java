@@ -18,9 +18,14 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
     private final String name;
     private TextureTarget target;
     private VeyraDepthTextureView sampledView;
+    private boolean ready;
 
     public VeyraDepthTextureSnapshot(String name) {
         this.name = name;
+    }
+
+    public boolean isReady(int width, int height, int format) {
+        return ready && target != null && target.width == width && target.height == height && depthImage().format == format;
     }
 
     public void ensure(int width, int height, int format) {
@@ -99,6 +104,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
             }
         }
         sampledView.sampledImage().setCurrentLayout(image.getCurrentLayout());
+        ready = true;
     }
 
     private void transition(int layout) {
@@ -113,6 +119,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
 
     @Override
     public void close() {
+        ready = false;
         if (sampledView != null && !sampledView.isClosed()) {
             sampledView.close();
         }

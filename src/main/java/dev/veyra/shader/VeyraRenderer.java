@@ -583,6 +583,8 @@ public final class VeyraRenderer {
         cameraUniformsInitialized = false;
         previousFrameNanos = 0L;
         initializedColorTargets.clear();
+        depthTex1Snapshot.close();
+        depthTex2Snapshot.close();
         int dimension = minecraft.level.dimension().equals(net.minecraft.world.level.Level.NETHER) ? -1
                 : minecraft.level.dimension().equals(net.minecraft.world.level.Level.END) ? 1 : 0;
         repository.setDimension(dimension);
@@ -612,6 +614,7 @@ public final class VeyraRenderer {
 
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
+        nextPostPhase = 0;
         Matrix4f currentModelView = new Matrix4f(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
@@ -1410,8 +1413,8 @@ public final class VeyraRenderer {
     private static void purgeUnusedPipelines() {
         Set<RenderPipeline> live = Collections.newSetFromMap(new IdentityHashMap<>());
         if (pipelineSet != null) {
-            pipelineSet.planA().shaderPasses().forEach(pass -> live.add(pass.program().pipeline()));
-            pipelineSet.planB().shaderPasses().forEach(pass -> live.add(pass.program().pipeline()));
+            pipelineSet.plansA().forEach(plan -> plan.shaderPasses().forEach(pass -> live.add(pass.program().pipeline())));
+            pipelineSet.plansB().forEach(plan -> plan.shaderPasses().forEach(pass -> live.add(pass.program().pipeline())));
             PIPELINE_CACHE.values().stream().filter(program -> program.pipeline().getLocation().getPath().contains("/copy_"))
                     .forEach(program -> live.add(program.pipeline()));
         }
@@ -1641,6 +1644,7 @@ public final class VeyraRenderer {
             damagedBlockPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             cloudPipelineDirty = false;
+            nextPostPhase = 0;
             renderingEnabled = pipelineSet.passCount() > 0;
             lastError = "";
             boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
@@ -1811,6 +1815,7 @@ public final class VeyraRenderer {
     }
 
     public static void invalidatePipelines() {
+        nextPostPhase = 0;
         pipelinesDirty = true;
         projectionBuffer = null;
         resetShadowPipelineState();
@@ -1853,7 +1858,20 @@ public final class VeyraRenderer {
         cloudPipelineDirty = selectedPack().map(ShaderPack::hasCloudFragment).orElse(false);
     }
 
-    public static void render(Minecraft minecraft) {
+    private static int nextPostPhase;
+
+    public static void renderPrepare(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.PREPARE); }
+    public static void renderDeferred(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.DEFERRED); }
+    public static void render(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.COMPOSITE); }
+
+    private static void renderThroughPhase(Minecraft minecraft, ShaderPassPhase requested) {
+        while (nextPostPhase <= requested.ordinal() && isRenderingEnabled()) {
+            ShaderPassPhase phase = ShaderPassPhase.values()[nextPostPhase++];
+            renderPhase(minecraft, phase);
+        }
+    }
+
+    private static void renderPhase(Minecraft minecraft, ShaderPassPhase phase) {
         if (!isRenderingEnabled() || minecraft.level == null || minecraft.player == null) {
             return;
         }
@@ -1871,8 +1889,11 @@ public final class VeyraRenderer {
             ensureSwapTargets(mainTarget.width, mainTarget.height);
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
-            clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
-            FramePlan framePlan = pipelineSet.framePlan(currentColorTargets);
+            if (phase == ShaderPassPhase.PREPARE) clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
+            FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
+            if (framePlan.shaderPasses().isEmpty()) return;
+            ensureInitialDepthSnapshots(framePlan, mainTarget.width, mainTarget.height);
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
 
             FrameGraphBuilder graph = new FrameGraphBuilder();
             ResourceHandle<RenderTarget> main = graph.importExternal("main", mainTarget);
@@ -1900,11 +1921,12 @@ public final class VeyraRenderer {
                 framePlan.copyPass().addToFrame(graph, targets, samplerInfo);
             }
             DepthSamplerState depthSamplerState = null;
-            if (pipelineSet.usesDepthSampler()) {
+            if (framePlan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepthSampler())) {
                 depthSampling = true;
                 depthSamplerState = prepareDepthSampler();
             }
             graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
             if (depthSamplerState != null) {
                 restoreDepthSampler(depthSamplerState);
             }
@@ -1977,7 +1999,7 @@ public final class VeyraRenderer {
                     colorTargetIndices.add(adapted.outputTarget());
                 }
             }
-            programs.add(new ProgramGroup(List.copyOf(outputs)));
+            programs.add(new ProgramGroup(ShaderPassPhase.forProgram(source.name()), List.copyOf(outputs)));
         }
 
         for (int index : colorTargetIndices) {
@@ -1992,31 +2014,57 @@ public final class VeyraRenderer {
             compilePipeline(copyProgram);
         }
 
-        FramePlan firstPlan = null;
-        FramePlan secondPlan = null;
+        List<FramePlan> firstPlans = null;
+        List<FramePlan> secondPlans = null;
         try {
             Map<Integer, Identifier> initialColorTargets = new HashMap<>();
-            for (int index : colorTargetIndices) {
-                initialColorTargets.put(index, colorTargetAId(index));
-            }
-            firstPlan = buildFramePlan(programs, copyProgram, width, height, initialColorTargets);
-            Map<Integer, Identifier> secondPlanInputs = firstPlan.outputColorTargets();
-            secondPlan = initialColorTargets.equals(secondPlanInputs)
-                    ? firstPlan
-                    : buildFramePlan(programs, copyProgram, width, height, secondPlanInputs);
-            return new PipelineSet(firstPlan, secondPlan, width, height,
+            for (int index : colorTargetIndices) initialColorTargets.put(index, colorTargetAId(index));
+            firstPlans = buildPhasePlans(programs, copyProgram, width, height, initialColorTargets);
+            Map<Integer, Identifier> secondInputs = firstPlans.getLast().outputColorTargets();
+            secondPlans = initialColorTargets.equals(secondInputs) ? firstPlans
+                    : buildPhasePlans(programs, copyProgram, width, height, secondInputs);
+            return new PipelineSet(firstPlans, secondPlans, width, height,
                     usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler,
-                    Map.copyOf(colorTargetSettings),
-                    Set.copyOf(colorTargetIndices));
+                    Map.copyOf(colorTargetSettings), Set.copyOf(colorTargetIndices));
         } catch (RuntimeException exception) {
-            if (firstPlan != null) {
-                firstPlan.close();
-            }
-            if (secondPlan != null && secondPlan != firstPlan) {
-                secondPlan.close();
-            }
+            if (firstPlans != null) firstPlans.forEach(FramePlan::close);
+            if (secondPlans != null && secondPlans != firstPlans) secondPlans.forEach(FramePlan::close);
             throw exception;
         }
+    }
+
+    private static List<FramePlan> buildPhasePlans(List<ProgramGroup> groups, PipelineProgram copy,
+            int width, int height, Map<Integer, Identifier> initial) {
+        List<FramePlan> plans = new ArrayList<>();
+        Map<Integer, Identifier> current = initial;
+        try {
+            for (ShaderPassPhase phase : ShaderPassPhase.values()) {
+                // Geometry between phases writes the main scene target. Rebase colortex0 to main,
+                // while preserving the physical ping-pong sides of every auxiliary color buffer.
+                FramePlan plan = buildFramePlan(groups.stream().filter(group -> group.phase() == phase).toList(),
+                        copy, width, height, current);
+                plans.add(plan);
+                current = plan.outputColorTargets();
+            }
+            return List.copyOf(plans);
+        } catch (RuntimeException exception) { plans.forEach(FramePlan::close); throw exception; }
+    }
+
+    private static void ensureInitialDepthSnapshots(FramePlan plan, int width, int height) {
+        GpuTexture depth = Renderer.getInstance().getMainPass().getDepthAttachment();
+        if (!(depth instanceof VkGpuTexture vulkanDepth)) return;
+        int format = vulkanDepth.getVulkanImage().format;
+        boolean needs1 = plan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepth1Sampler());
+        boolean needs2 = plan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepth2Sampler());
+        if (needs1) initializeDepthHistory(depthTex1Snapshot, width, height, format);
+        if (needs2) initializeDepthHistory(depthTex2Snapshot, width, height, format);
+    }
+
+    private static void initializeDepthHistory(VeyraDepthTextureSnapshot snapshot, int width, int height, int format) {
+        if (snapshot.isReady(width, height, format)) return;
+        snapshot.ensure(width, height, format);
+        RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(snapshot.depthTexture(), 1.0);
+        snapshot.transitionToSampling();
     }
 
     private static void validateColorTargetFormats(Set<Integer> indices,
@@ -4675,7 +4723,7 @@ public final class VeyraRenderer {
     private record BeaconBeamPipelineKey(RenderPipeline original, String sourceHash) {
     }
 
-    private record ProgramGroup(List<PipelineProgram> outputs) {
+    private record ProgramGroup(ShaderPassPhase phase, List<PipelineProgram> outputs) {
     }
 
     private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {
@@ -4732,31 +4780,20 @@ public final class VeyraRenderer {
         }
     }
 
-    private record PipelineSet(FramePlan planA, FramePlan planB, int width, int height,
+    private record PipelineSet(List<FramePlan> plansA, List<FramePlan> plansB, int width, int height,
                                boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-                               boolean usesShadowSampler,
-                               Map<Integer, ColorTargetSettings> colorTargetSettings,
+                               boolean usesShadowSampler, Map<Integer, ColorTargetSettings> colorTargetSettings,
                                Set<Integer> colorTargetIndices) implements AutoCloseable {
-        private FramePlan framePlan(Map<Integer, Identifier> currentColorTargets) {
-            if (planA.initialColorTargets().equals(currentColorTargets)) {
-                return planA;
-            }
-            if (planB.initialColorTargets().equals(currentColorTargets)) {
-                return planB;
-            }
-            throw new IllegalStateException("The current colortex buffers do not match either compiled frame plan.");
+        private FramePlan framePlan(ShaderPassPhase phase, Map<Integer, Identifier> current) {
+            FramePlan a = plansA.get(phase.ordinal()), b = plansB.get(phase.ordinal());
+            if (a.initialColorTargets().equals(current)) return a;
+            if (b.initialColorTargets().equals(current)) return b;
+            throw new IllegalStateException("The current colortex buffers do not match " + phase + " frame plans.");
         }
-
-        private int passCount() {
-            return planA.shaderPasses().size();
-        }
-
-        @Override
-        public void close() {
-            planA.close();
-            if (planB != planA) {
-                planB.close();
-            }
+        private int passCount() { return plansA.stream().mapToInt(plan -> plan.shaderPasses().size()).sum(); }
+        @Override public void close() {
+            Set<FramePlan> all = Collections.newSetFromMap(new IdentityHashMap<>());
+            all.addAll(plansA); all.addAll(plansB); all.forEach(FramePlan::close);
         }
     }
 
