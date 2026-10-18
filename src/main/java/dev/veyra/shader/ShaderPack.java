@@ -97,7 +97,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
             """;
 
-    public record Program(String name, String source) {
+    public record Program(String name, String source, Optional<String> vertexSource) {
     }
 
     private record Inspection(String shaderDirectory, boolean hasPostProcessing,
@@ -230,8 +230,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 if (availableFiles.contains(fileName)) {
                     Optional<String> source = readShader(fileName);
                     if (source.isPresent()) {
+                        Optional<String> vertexSource = readExpandedVertexProgram(programName, availableFiles);
                         programs.add(new Program(programName, expandIncludes(
-                                fileName, source.get(), new LinkedHashSet<>(), 0)));
+                                fileName, source.get(), new LinkedHashSet<>(), 0), vertexSource));
                     }
                 }
             }
@@ -240,7 +241,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             Optional<String> source = readShader("final.fsh");
             if (source.isPresent()) {
                 programs.add(new Program("final", expandIncludes(
-                        "final.fsh", source.get(), new LinkedHashSet<>(), 0)));
+                        "final.fsh", source.get(), new LinkedHashSet<>(), 0),
+                        readExpandedVertexProgram("final", availableFiles)));
             }
         }
 
@@ -248,6 +250,19 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             throw new IOException("The pack no longer contains a supported fragment pass.");
         }
         return List.copyOf(programs);
+    }
+
+    private Optional<String> readExpandedVertexProgram(String programName, Set<String> availableFiles)
+            throws IOException {
+        String fileName = programName + ".vsh";
+        if (!availableFiles.contains(fileName)) {
+            return Optional.empty();
+        }
+        Optional<String> source = readShader(fileName);
+        if (source.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(expandIncludes(fileName, source.get(), new LinkedHashSet<>(), 0));
     }
 
     public Map<Integer, ColorTargetSettings> readColorTargetSettings(
