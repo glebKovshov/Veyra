@@ -265,6 +265,7 @@ public final class VeyraRenderer {
     private static final ThreadLocal<Integer> BLOCK_ENTITY_SUBMISSION_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static boolean handPipelineRoutingLogged;
     private static boolean blockEntityPipelineRoutingLogged;
+    private static boolean signTextPipelineRoutingLogged;
     private static boolean damagedBlockRoutingLogged;
     private static String lastError = "";
     private static long previousFrameNanos;
@@ -578,21 +579,8 @@ public final class VeyraRenderer {
         if (pack == null || !pack.supportsBlockEntityPipeline() || !isEntityRenderPipeline(original)) {
             return originalType;
         }
-        if (blockEntityPipelineDirty) {
-            blockEntityPipelineDirty = false;
-            try {
-                replaceBlockEntityPipelines(compileBlockEntityPipelines(pack));
-                lastError = "";
-                VeyraClient.LOGGER.info("Loaded {} block entity render pipelines from shader pack '{}'.",
-                        blockEntityPipelineSet.pipelines().size(), pack.name());
-            } catch (Exception exception) {
-                lastError = shortError(exception);
-                VeyraClient.LOGGER.error("Could not load block entity shader programs from shader pack '{}'.", pack.name(), exception);
-                return originalType;
-            }
-        }
-        RenderPipeline replacement = blockEntityPipelineSet == null
-                ? null : blockEntityPipelineSet.pipelines().get(original);
+        EntityPipelineSet pipelines = getBlockEntityPipelineSet(pack);
+        RenderPipeline replacement = pipelines == null ? null : pipelines.pipelines().get(original);
         if (replacement == null) {
             return originalType;
         }
@@ -602,6 +590,42 @@ public final class VeyraRenderer {
             blockEntityPipelineRoutingLogged = true;
         }
         return replaceRenderTypePipeline(originalType, replacement, "_veyra_block");
+    }
+
+    public static RenderPipeline getSignTextPipeline(RenderPipeline original) {
+        if (!isSignTextPipeline(original)) {
+            return null;
+        }
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || !pack.supportsBlockEntityPipeline()) {
+            return null;
+        }
+        EntityPipelineSet pipelines = getBlockEntityPipelineSet(pack);
+        RenderPipeline replacement = pipelines == null ? null : pipelines.pipelines().get(original);
+        if (replacement != null && !signTextPipelineRoutingLogged) {
+            VeyraClient.LOGGER.info("Routing sign text through {} from shader pack '{}'.",
+                    resolveBlockTextProgram(pack), pack.name());
+            signTextPipelineRoutingLogged = true;
+        }
+        return replacement;
+    }
+
+    private static EntityPipelineSet getBlockEntityPipelineSet(ShaderPack pack) {
+        if (blockEntityPipelineDirty) {
+            blockEntityPipelineDirty = false;
+            try {
+                replaceBlockEntityPipelines(compileBlockEntityPipelines(pack));
+                lastError = "";
+                VeyraClient.LOGGER.info("Loaded {} block entity model and sign text pipelines from shader pack '{}'.",
+                        blockEntityPipelineSet.pipelines().size(), pack.name());
+            } catch (Exception exception) {
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not load block entity and sign text shader programs from shader pack '{}'.",
+                        pack.name(), exception);
+                return null;
+            }
+        }
+        return blockEntityPipelineSet;
     }
 
     private static RenderType replaceRenderTypePipeline(RenderType originalType,
@@ -1797,10 +1821,76 @@ public final class VeyraRenderer {
             }
             pipelines.put(original, blockPipeline);
         }
+        compileSignTextPipelines(pack, pipelines);
         if (pipelines.isEmpty() && !pack.blockPrograms().isEmpty()) {
             throw new IOException("Minecraft's block entity render pipelines were not found or do not support this shader interface.");
         }
         return new EntityPipelineSet(pipelines);
+    }
+
+    private static void compileSignTextPipelines(ShaderPack pack,
+                                                 Map<RenderPipeline, RenderPipeline> pipelines) {
+        String programName = resolveBlockTextProgram(pack);
+        if (programName == null) {
+            return;
+        }
+        List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
+                .filter(VeyraRenderer::isSignTextPipeline)
+                .toList();
+        String fragmentSource;
+        try {
+            fragmentSource = pack.readBlockFragment(programName)
+                    .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+            fragmentSource = EntityShaderAdapter.adaptTextFragment(fragmentSource, programName);
+        } catch (IOException exception) {
+            VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
+                    programName, exception.getMessage());
+            return;
+        }
+        String sourceHash = sha256("sign_text_" + programName + '\n' + fragmentSource);
+        for (RenderPipeline original : candidates) {
+            EntityPipelineKey cacheKey = new EntityPipelineKey(original, "sign_text_" + programName, sourceHash);
+            RenderPipeline textPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
+            if (textPipeline == null) {
+                try {
+                    textPipeline = compileEntityPipeline(original, fragmentSource, sourceHash);
+                } catch (IOException exception) {
+                    VeyraClient.LOGGER.warn("Skipping sign text pipeline {} for {}: {}",
+                            original.getLocation(), programName, exception.getMessage());
+                    continue;
+                }
+                ENTITY_PIPELINE_CACHE.put(cacheKey, textPipeline);
+            }
+            pipelines.put(original, textPipeline);
+        }
+    }
+
+    private static String resolveBlockTextProgram(ShaderPack pack) {
+        if (pack.blockPrograms().contains("gbuffers_block")) {
+            return "gbuffers_block";
+        }
+        if (pack.terrainPrograms().contains("gbuffers_terrain")) {
+            return "gbuffers_terrain";
+        }
+        if (pack.hasTexturedLitFragment()) {
+            return "gbuffers_textured_lit";
+        }
+        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
+    }
+
+    private static boolean isSignTextPipeline(RenderPipeline pipeline) {
+        if (pipeline == null) {
+            return false;
+        }
+        String location = pipeline.getLocation().getPath();
+        String fragment = pipeline.getFragmentShader().getPath();
+        return switch (location) {
+            case "pipeline/text", "pipeline/text_polygon_offset" -> fragment.equals("core/rendertype_text");
+            case "pipeline/text_see_through" -> fragment.equals("core/rendertype_text_see_through");
+            case "pipeline/text_intensity" -> fragment.equals("core/rendertype_text_intensity");
+            case "pipeline/text_intensity_see_through" -> fragment.equals("core/rendertype_text_intensity_see_through");
+            default -> false;
+        };
     }
 
     private static String resolveBlockEntityProgram(ShaderPack pack, RenderPipeline pipeline) {

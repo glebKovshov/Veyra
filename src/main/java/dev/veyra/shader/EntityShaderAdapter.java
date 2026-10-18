@@ -31,6 +31,8 @@ public final class EntityShaderAdapter {
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_ENTITY_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
+    private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewPos|viewNormal|tangent|at_tangent|lmcoord|lightmap|lightMapColor|overlayColor|gl_Fog\\w*|fogColor|fogStart|fogEnd)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
@@ -44,6 +46,15 @@ public final class EntityShaderAdapter {
             Map.entry("cylindricalVertexDistance", new Varying("float")),
             Map.entry("lightMapColor", new Varying("vec4")),
             Map.entry("overlayColor", new Varying("vec4")));
+    private static final Map<String, Varying> SUPPORTED_TEXT_VARYINGS = Map.ofEntries(
+            Map.entry("texcoord", new Varying("vec2")),
+            Map.entry("texCoord", new Varying("vec2")),
+            Map.entry("texCoord0", new Varying("vec2")),
+            Map.entry("glcolor", new Varying("vec4")),
+            Map.entry("glColor", new Varying("vec4")),
+            Map.entry("gl_Color", new Varying("vec4")),
+            Map.entry("sphericalVertexDistance", new Varying("float")),
+            Map.entry("cylindricalVertexDistance", new Varying("float")));
 
     private EntityShaderAdapter() {
     }
@@ -53,6 +64,14 @@ public final class EntityShaderAdapter {
     }
 
     public static String adaptFragment(String source, String programName) throws IOException {
+        return adaptFragment(source, programName, false);
+    }
+
+    public static String adaptTextFragment(String source, String programName) throws IOException {
+        return adaptFragment(source, programName, true);
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -93,7 +112,7 @@ public final class EntityShaderAdapter {
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
-            Varying varying = SUPPORTED_VARYINGS.get(name);
+            Varying varying = (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
             if (varying == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's entity bridge yet.");
             }
@@ -131,8 +150,9 @@ public final class EntityShaderAdapter {
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
-        if (UNSUPPORTED_ENTITY_INPUT.matcher(uncommented).find()) {
-            throw new IOException(programName + " uses normals, lightmap coordinates, or fog inputs that Veyra's entity bridge does not provide yet.");
+        if ((textPipeline ? UNSUPPORTED_TEXT_INPUT : UNSUPPORTED_ENTITY_INPUT).matcher(uncommented).find()) {
+            throw new IOException(programName + " uses inputs that Veyra's "
+                    + (textPipeline ? "sign-text" : "entity") + " bridge does not provide yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException(programName + " uses a texture sampling function that Veyra's entity bridge does not support yet.");
@@ -171,7 +191,30 @@ public final class EntityShaderAdapter {
                 .replaceAll("\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "veyraEntityColor");
 
-        String bridge = """
+        String bridge = textPipeline ? """
+                in float sphericalVertexDistance;
+                in float cylindricalVertexDistance;
+                in vec4 vertexColor;
+                in vec2 texCoord0;
+                out vec4 veyraEntityFragColor;
+                uniform sampler2D Sampler0;
+                vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
+                    return texture(sourceSampler, sourceUv);
+                }
+                vec4 veyraEntitySampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
+                    return textureLod(sourceSampler, sourceUv, lod);
+                }
+                vec4 veyraEntitySampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
+                    return textureGrad(sourceSampler, sourceUv, dx, dy);
+                }
+                #define texture Sampler0
+                #define gtexture Sampler0
+                #define veyraEntityColor vertexColor
+                #ifndef ALPHA_CUTOUT
+                #define ALPHA_CUTOUT 0.1
+                #endif
+                #define alphaTestRef ALPHA_CUTOUT
+                """.replace("veyraEntityFragColor;", outputName + ";") : """
                 in float sphericalVertexDistance;
                 in float cylindricalVertexDistance;
                 #ifdef PER_FACE_LIGHTING

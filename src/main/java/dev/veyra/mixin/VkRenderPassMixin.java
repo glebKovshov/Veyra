@@ -38,6 +38,9 @@ public abstract class VkRenderPassMixin {
     private RenderPipeline veyra$routeEntityPipeline(RenderPipeline original) {
         RenderPipeline replacement = VeyraRenderer.getHandPipeline(original);
         if (replacement == null) {
+            replacement = VeyraRenderer.getSignTextPipeline(original);
+        }
+        if (replacement == null) {
             replacement = VeyraRenderer.getEntityPipeline(original);
         }
         if (replacement == null) {
