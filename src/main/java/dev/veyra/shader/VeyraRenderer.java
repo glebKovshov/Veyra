@@ -23,6 +23,7 @@ import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
 import dev.veyra.vulkan.VeyraPipelineResources;
+import dev.veyra.vulkan.VeyraGeometryTargets;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.RenderSetupAccessor;
@@ -1646,7 +1647,7 @@ public final class VeyraRenderer {
             beaconBeamPipelineDirty = false;
             cloudPipelineDirty = false;
             nextPostPhase = 0;
-            renderingEnabled = pipelineSet.passCount() > 0;
+            renderingEnabled = pack.supportsShaderPrograms();
             lastError = "";
             boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
             int terrainProgramCount = hasTerrainPipelines ? terrainPipelineSet.pipelines().size() : 0;
@@ -1962,7 +1963,7 @@ public final class VeyraRenderer {
         PipelineSet prepared = compilePipelines(pack, width, height);
         replacePipelineSet(prepared);
         pipelinesDirty = false;
-        renderingEnabled = pipelineSet.passCount() > 0;
+        renderingEnabled = pack.supportsShaderPrograms();
         lastError = "";
         VeyraClient.LOGGER.info("Loaded {} post-processing pass(es) from shader pack '{}'.",
                 pipelineSet.passCount(), pack.name());
@@ -1979,6 +1980,11 @@ public final class VeyraRenderer {
         boolean usesDepth2Sampler = false;
         boolean usesShadowSampler = false;
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
+        for (String name : pack.terrainPrograms()) {
+            var fragment = pack.readTerrainFragment(name);
+            if (fragment.isPresent()) FragmentOutputs.parse(fragment.get()).targets().stream()
+                    .filter(index -> index > 0).forEach(colorTargetIndices::add);
+        }
         for (ShaderPack.Program source : sources) {
             List<PipelineProgram> outputs = new ArrayList<>();
             List<String> vertexUniforms = source.vertexSource()
@@ -2271,6 +2277,7 @@ public final class VeyraRenderer {
                 }
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                FragmentOutputs outputLayout = FragmentOutputs.parse(fragmentSource);
                 fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable);
 
                 Pipeline.Builder builder = new Pipeline.Builder(
@@ -2279,16 +2286,19 @@ public final class VeyraRenderer {
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
+                pipelines.put(programName, pipeline);
+                VeyraGeometryTargets.register(pipeline, outputLayout);
                 setShadowSamplerLayout(pipeline, shadowSamplerAvailable);
                 for (UBO ubo : pipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
                 }
-                pipelines.put(programName, pipeline);
             }
             if (shadowSamplerAvailable) {
                 for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
                     String fragmentSource = pack.readShadowFragment(programName)
                             .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+                    if (!FragmentOutputs.parse(fragmentSource).sceneOnly())
+                        throw new IOException("Multiple shadow color attachments are not implemented yet.");
                     fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
@@ -2304,6 +2314,7 @@ public final class VeyraRenderer {
             }
             return new TerrainPipelineSet(Map.copyOf(pipelines), Map.copyOf(shadowPipelines));
         } catch (IOException | RuntimeException exception) {
+            pipelines.values().forEach(VeyraGeometryTargets::unregister);
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             throw exception;
@@ -4419,6 +4430,7 @@ public final class VeyraRenderer {
     }
 
     private static void releaseColorTargets() {
+        VeyraGeometryTargets.releaseTargets();
         colorTargets.values().forEach(pair -> {
             pair.targetA().destroyBuffers();
             pair.targetB().destroyBuffers();
@@ -4426,6 +4438,14 @@ public final class VeyraRenderer {
         colorTargets.clear();
         initializedColorTargets.clear();
         currentColorTargets.clear();
+    }
+
+    public static net.vulkanmod.vulkan.texture.VulkanImage geometryColorAttachment(int index) {
+        ColorTargetPair pair = colorTargets.get(index);
+        if (pair == null) throw new IllegalStateException("Geometry colortex" + index + " has not been allocated.");
+        Identifier side = currentColorTargets.get(index);
+        RenderTarget target = colorTargetAId(index).equals(side) ? pair.targetA() : pair.targetB();
+        return ((VkGpuTexture) target.getColorTexture()).getVulkanImage();
     }
 
     private static void ensureColorTargets(int width, int height, Set<Integer> indices,
@@ -4449,6 +4469,7 @@ public final class VeyraRenderer {
             changed |= ensureColorTarget(pair.targetA(), index, "A", targetSettings);
             changed |= ensureColorTarget(pair.targetB(), index, "B", targetSettings);
             if (changed) {
+                VeyraGeometryTargets.releaseTargets();
                 initializedColorTargets.remove(index);
                 resized = true;
                 VeyraClient.LOGGER.info("Configured colortex{} {}x{} {}.", index,
@@ -4818,6 +4839,7 @@ public final class VeyraRenderer {
 
         @Override
         public void close() {
+            pipelines.values().forEach(VeyraGeometryTargets::unregister);
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
         }

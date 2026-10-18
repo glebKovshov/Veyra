@@ -158,6 +158,8 @@ public final class TerrainShaderAdapter {
     }
 
     public static String adaptFragment(String source, boolean shadowSamplerAvailable) throws IOException {
+        FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
+        source = fragmentOutputs.rewriteLegacy(source);
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
@@ -237,23 +239,15 @@ public final class TerrainShaderAdapter {
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
 
-        String outputName = "veyraFragColor";
+        String outputName = fragmentOutputs.variables().getOrDefault(0, "veyraFragColor");
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
         int outputCount = 0;
         while (outputMatcher.find()) {
-            String location = outputMatcher.group(1);
-            if (location != null && !location.equals("0")) {
-                throw new IOException("gbuffers_terrain can write only color attachment 0.");
-            }
-            outputName = outputMatcher.group(2);
             outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
         outputMatcher.appendTail(withoutOutputs);
-        if (outputCount > 1) {
-            throw new IOException("gbuffers_terrain can declare only one fragment output.");
-        }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
             throw new IOException("gbuffers_terrain supports one vec4 fragment output.");
@@ -298,7 +292,7 @@ public final class TerrainShaderAdapter {
                     .replace("            #define shadow2D(sampler, coord) veyraSample(sampler, coord)\n", "");
         }
         result.append(bridge
-                .replace("veyraFragColor;", outputName + ";")
+                .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())
                 .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName));
         return result.append(adapted).toString();
     }

@@ -24,7 +24,11 @@
     "accessor.RenderTypeAccessor",
     "accessor.RenderTargetAccessor",
     "VkGpuDeviceMixin",
-    "accessor.ShaderCompilationKeyAccessor"
+    "accessor.ShaderCompilationKeyAccessor",
+    "DeviceManagerMixin",
+    "GraphicsPipelineMixin",
+    "RendererGeometryTargetsMixin",
+    "accessor.PipelineStateAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
