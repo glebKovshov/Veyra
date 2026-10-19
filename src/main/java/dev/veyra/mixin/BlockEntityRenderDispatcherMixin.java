@@ -23,7 +23,7 @@ public abstract class BlockEntityRenderDispatcherMixin {
                 && !VeyraShadowRenderer.shouldRenderBlockEntity(state.blockPos)) {
             return;
         }
-        VeyraRenderer.beginBlockEntitySubmission();
+        VeyraRenderer.beginBlockEntitySubmission(state.blockState);
         try {
             renderer.submit(state, poseStack, collector, cameraRenderState);
         } finally {

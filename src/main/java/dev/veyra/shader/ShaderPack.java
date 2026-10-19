@@ -363,12 +363,26 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     /** Reads item.properties ids, preprocessed with the pack options like shaders.properties. */
     public ItemIdMap readItemIds() throws IOException {
-        Optional<String> source = readRawShader(programPath("item.properties"));
+        return ItemIdMap.parse(readIdProperties("item.properties"));
+    }
+
+    /** Reads entity.properties using the same shader-pack option environment as Iris. */
+    public EntityIdMap readEntityIds() throws IOException {
+        return EntityIdMap.parse(readIdProperties("entity.properties"));
+    }
+
+    /** Reads block.properties using the same shader-pack option environment as Iris. */
+    public BlockIdMap readBlockIds() throws IOException {
+        return BlockIdMap.parse(readIdProperties("block.properties"));
+    }
+
+    private String readIdProperties(String fileName) throws IOException {
+        Optional<String> source = readRawShader(programPath(fileName));
         if (source.isEmpty()) {
-            return ItemIdMap.EMPTY;
+            return "";
         }
-        return ItemIdMap.parse(GlslPreprocessor.properties(source.get(),
-                readOptions().effective(configuration.options())));
+        return GlslPreprocessor.properties(source.get(),
+                readOptions().effective(configuration.options()));
     }
 
     /** Reads uniform./variable. definitions from the preprocessed shaders.properties. */
@@ -1049,7 +1063,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 }
             }
         }
-        return Optional.of(new String(bytes, StandardCharsets.UTF_8));
+        String basename = portable.substring(portable.lastIndexOf('/') + 1);
+        boolean idProperties = basename.equals("item.properties")
+                || basename.equals("entity.properties") || basename.equals("block.properties");
+        return Optional.of(new String(bytes,
+                idProperties ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8));
     }
 
     private String expandIncludes(String fileName, String source)

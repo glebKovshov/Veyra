@@ -23,9 +23,18 @@ class EntityIdentifierUniformTest {
     }
 
     @Test
-    void entityAttributeProgramsStillRequirePerDrawIdentifiers() {
-        IOException error = assertThrows(IOException.class, () -> EntityShaderAdapter.adaptFragment(SOURCE));
-        assertTrue(error.getMessage().contains("EntityId"), error.getMessage());
+    void entityAttributeProgramsReceivePerDrawIdentifierConstants() throws IOException {
+        String unmapped = EntityShaderAdapter.adaptFragment(SOURCE);
+        assertTrue(unmapped.contains("const int blockEntityId = -1;"), unmapped);
+        assertTrue(unmapped.contains("const int entityId = -1;"), unmapped);
+        assertFalse(unmapped.contains("uniform int blockEntityId"), unmapped);
+
+        String mapped = EntityShaderAdapter.adaptFragment(
+                SOURCE, "gbuffers_entities", false, false, 12, 83);
+        assertTrue(mapped.contains("const int entityId = 12;"), mapped);
+        assertTrue(mapped.contains("const int blockEntityId = 83;"), mapped);
+        assertTrue(EntityShaderAdapter.usesEntityIdentifier(SOURCE, "gbuffers_entities", "entityId"));
+        assertTrue(EntityShaderAdapter.usesEntityIdentifier(SOURCE, "gbuffers_block", "blockEntityId"));
         assertFalse(ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_block", "int", "blockEntityId"));
         assertFalse(ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_hand_water", "int", "entityId"));
         assertTrue(ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_basic", "int", "entityId"));

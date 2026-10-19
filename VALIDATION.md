@@ -179,3 +179,9 @@ PR #4 at commit `566e059c433bd64a14184a5d0e6dd66d394bff7d` passed the GitHub Bui
 The merged beta.3 candidate passed the final PR Build, shaderpack source audit, and all 12 Lavapipe graphics smoke fixtures. The tag release workflow also passed its source/graphics gates, `./gradlew build validateShaders packageExamplePacks`, and `scripts/verify_jar.py` (release run [39295725182](https://github.com/glebKovshov/Veyra/actions/runs/39295725182)). Downloaded [veyra-0.2.0-beta.3+mc1.21.11.jar](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.3%2Bmc1.21.11/veyra-0.2.0-beta.3%2Bmc1.21.11.jar) is 510,727 bytes and has SHA-256 `5a397886d9781d1bdf10a22484a97f320614147abbbe57a3833d0e1a00b62552`, matching the published `SHA256SUMS.txt`.
 
 These graphics checks use software Vulkan/Lavapipe and synthetic fixtures. They do not establish real shaderpack visual compatibility on a physical GPU; pinned pack-source results continue to mark every case `visualValidation=false`.
+
+### Beta.4 candidate local verification — 2026-10-19
+
+On `feature/iris-entity-identifiers`, `test --rerun-tasks validateShaders build packageExamplePacks` passed with JDK 21. JUnit reports 166 tests, 0 failures, 0 errors, and 0 skips. Shader validation processed 39 example shaders, compiled 36 directly to Vulkan SPIR-V, and passed the entity-ID, entity-shadow, cloud-fog, four conditional-include, and unbound-output dataflow checks.
+
+The local candidate `veyra-0.2.0-beta.4+mc1.21.11.jar` is 527,755 bytes, SHA-256 `deb6de3b242bd8ae71536c6b778fc3e9a0c731f22ba73a94f39b18ab74bde436`. A ZIP/JAR inspection confirmed `fabric.mod.json`, the entity/block ID-map classes, `EntityRenderDispatcherMixin`, nested `jcpp-1.4.14.jar` with its preprocessor class, and no shader-smoke harness classes. The official `scripts/verify_jar.py`, source audit, and Lavapipe smoke are pending on GitHub CI. This local hash is for the Windows build and is not the future published artifact checksum.

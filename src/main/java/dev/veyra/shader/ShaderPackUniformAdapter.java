@@ -96,6 +96,13 @@ public final class ShaderPackUniformAdapter {
                 && !ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
     }
 
+    /** True when Iris binds this identifier from an entity or block-entity render. */
+    public static boolean isBoundEntityIdentifier(String programName, String type, String name) {
+        return type.equals(UNBOUND_ENTITY_VALUES.get(name))
+                && (name.equals("entityId") || name.equals("blockEntityId"))
+                && ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
+    }
+
     /** A zero-valued constant replacing an Iris-unbound entity uniform, or null when Iris binds it. */
     public static String unboundEntityDeclaration(String programName, String type, String name) {
         if (!isUnboundEntityIdentifier(programName, type, name)) {

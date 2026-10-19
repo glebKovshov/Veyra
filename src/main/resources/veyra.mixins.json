@@ -8,6 +8,7 @@
     "LightTextureMixin",
     "GameRendererMixin",
     "BlockEntityRenderDispatcherMixin",
+    "EntityRenderDispatcherMixin",
     "SubmitNodeCollectionMixin",
     "GuiRendererMixin",
     "ShaderManagerMixin",
