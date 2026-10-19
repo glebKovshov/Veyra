@@ -8,19 +8,29 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.mixin.accessor.RenderTargetAccessor;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
+import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VK11;
+import org.lwjgl.vulkan.VkFormatProperties;
+import org.lwjgl.vulkan.VkClearDepthStencilValue;
+import org.lwjgl.vulkan.VkImageSubresourceRange;
 
 /** A depth-only render target matching VulkanMod's main depth format. */
 public final class VeyraDepthTextureSnapshot implements AutoCloseable {
     private final String name;
     private TextureTarget target;
     private VeyraDepthTextureView sampledView;
+    private boolean ready;
 
     public VeyraDepthTextureSnapshot(String name) {
         this.name = name;
+    }
+
+    public boolean isReady(int width, int height, int format) {
+        return ready && target != null && target.width == width && target.height == height && depthImage().format == format;
     }
 
     public void ensure(int width, int height, int format) {
@@ -52,6 +62,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
                 .setName("Veyra " + name + " snapshot")
                 .setFormat(format)
                 .addUsage(VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                .addUsage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                 .createVulkanImage();
         VkGpuTexture depthTexture = device.gpuTextureFromVulkanImage(image);
         GpuTextureView depthTextureView = device.createTextureView(depthTexture);
@@ -90,6 +101,56 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
         transition(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     }
 
+    /** Copy a completed offscreen depth attachment on the graphics queue. */
+    public void capture(VulkanImage source) {
+        if ((source.usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
+            throw new IllegalStateException("The source depth image does not support transfer reads.");
+        if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+        ensure(source.width, source.height, source.format);
+        VulkanImage destination = depthImage();
+        if (source.getId() == destination.getId()) throw new IllegalStateException("Depth snapshot aliases its source.");
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkFormatProperties properties = VkFormatProperties.calloc(stack);
+            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, source.format, properties);
+            if ((properties.optimalTilingFeatures() & (VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
+                    != (VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
+                throw new IllegalStateException("The shadow depth format does not support image copies.");
+            var commands = Renderer.getCommandBuffer();
+            int previous = source.getCurrentLayout();
+            source.transitionImageLayout(stack, commands, VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            destination.transitionImageLayout(stack, commands, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            var region = org.lwjgl.vulkan.VkImageCopy.calloc(1, stack);
+            region.srcSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT).layerCount(1);
+            region.dstSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT).layerCount(1);
+            region.extent().set(source.width, source.height, 1);
+            VK10.vkCmdCopyImage(commands, source.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    destination.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region);
+            source.transitionImageLayout(stack, commands, previous);
+        }
+        transitionToSampling();
+    }
+
+    /** Initialize actual image contents before any first-frame history sampling. */
+    public void clearToFarDepth() {
+        if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+        VulkanImage image = depthImage();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkFormatProperties properties = VkFormatProperties.calloc(stack);
+            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, image.format, properties);
+            if ((properties.optimalTilingFeatures() & VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == 0) {
+                throw new IllegalStateException("The depth history format does not support Vulkan transfer clears.");
+            }
+            var commandBuffer = Renderer.getCommandBuffer();
+            image.transitionImageLayout(stack, commandBuffer, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            VkClearDepthStencilValue value = VkClearDepthStencilValue.calloc(stack).depth(1.0F).stencil(0);
+            VkImageSubresourceRange range = VkImageSubresourceRange.calloc(stack)
+                    .aspectMask(image.aspect).baseMipLevel(0).levelCount(1).baseArrayLayer(0).layerCount(1);
+            VK10.vkCmdClearDepthStencilImage(commandBuffer, image.getId(),
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, value, range);
+        }
+        transitionToSampling();
+    }
+
     public void transitionToSampling() {
         VulkanImage image = depthImage();
         if (image.getCurrentLayout() != VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
@@ -99,6 +160,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
             }
         }
         sampledView.sampledImage().setCurrentLayout(image.getCurrentLayout());
+        ready = true;
     }
 
     private void transition(int layout) {
@@ -113,6 +175,7 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
 
     @Override
     public void close() {
+        ready = false;
         if (sampledView != null && !sampledView.isClosed()) {
             sampledView.close();
         }

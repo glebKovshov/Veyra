@@ -36,7 +36,9 @@ public final class EntityShaderAdapter {
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
-            "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+            "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
+    private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
+    private static final Pattern SHADOWTEX_REFERENCE = Pattern.compile("\\bshadowtex0\\b");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
     private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
@@ -65,6 +67,7 @@ public final class EntityShaderAdapter {
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
             Map.entry("texCoord0", new Varying("vec2")),
+            Map.entry("color", new Varying("vec4")),
             Map.entry("glcolor", new Varying("vec4")),
             Map.entry("glColor", new Varying("vec4")),
             Map.entry("gl_Color", new Varying("vec4")),
@@ -98,15 +101,25 @@ public final class EntityShaderAdapter {
     }
 
     public static String adaptFragment(String source, String programName) throws IOException {
-        return adaptFragment(source, programName, false, false);
+        return adaptFragment(source, programName, false, false, false);
     }
 
     public static String adaptFragment(String source, String programName, boolean handPass) throws IOException {
-        return adaptFragment(source, programName, false, handPass);
+        return adaptFragment(source, programName, handPass, false);
+    }
+
+    public static String adaptFragment(String source, String programName, boolean handPass,
+                                       boolean shadowSamplerAvailable) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
-        return adaptFragment(source, programName, true, false);
+        return adaptTextFragment(source, programName, false);
+    }
+
+    public static String adaptTextFragment(String source, String programName,
+                                          boolean shadowSamplerAvailable) throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable);
     }
 
     public static boolean requiresNormalInput(String source) {
@@ -324,7 +337,7 @@ public final class EntityShaderAdapter {
     }
 
     private static String adaptFragment(String source, String programName, boolean textPipeline,
-                                        boolean handPass) throws IOException {
+                                        boolean handPass, boolean shadowSamplerAvailable) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -333,6 +346,7 @@ public final class EntityShaderAdapter {
         }
 
         String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
+        boolean usesNoiseSampler = usesNoiseSampler(adapted);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
         while (extensionMatcher.find()) {
@@ -341,17 +355,28 @@ public final class EntityShaderAdapter {
         adapted = extensionMatcher.replaceAll("");
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
+        adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        boolean usesShadowSampler = usesShadowSampler(adapted);
+        ShadowColorSampler.validate(source, shadowSamplerAvailable, 0);
+        ShadowDepthSampler.validate(source, shadowSamplerAvailable, 0);
+        if (usesShadowSampler && !shadowSamplerAvailable) {
+            throw new IOException(programName + " samples shadowtex0, but this shader pack has no supported shadow pass.");
+        }
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
         boolean usesLightmapSampler = false;
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
-                    && !sampler.equals("lightmap")) {
+            if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
+                    && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
-            if (!samplerMatcher.group(1).equals("sampler2D")) {
+            String samplerType = samplerMatcher.group(1);
+            if (!samplerType.equals("sampler2D")
+                    && !((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) && shadowSamplerAvailable
+                    && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
             if (sampler.equals("lightmap")) {
@@ -360,7 +385,9 @@ public final class EntityShaderAdapter {
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
-        adapted = withoutSamplers.toString();
+        // VulkanMod exposes its bound shadow depth image through texture slot 3.
+        // Lower comparison sampler parameters to raw depth reads and perform the compare here.
+        adapted = withoutSamplers.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D");
         if (!usesLightmapSampler) {
             usesLightmapSampler = Pattern.compile("\\blightmap\\b")
                     .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
@@ -377,6 +404,7 @@ public final class EntityShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
         boolean suppliesNormal = false;
+        boolean suppliesLegacyColor = false;
         boolean suppliesViewPosition = false;
         boolean suppliesViewNormal = false;
         boolean suppliesSphericalDistance = false;
@@ -395,6 +423,9 @@ public final class EntityShaderAdapter {
             }
             if (name.equals("normal")) {
                 suppliesNormal = true;
+            }
+            if (name.equals("color")) {
+                suppliesLegacyColor = true;
             }
             if (name.equals("viewPos")) {
                 suppliesViewPosition = true;
@@ -488,6 +519,8 @@ public final class EntityShaderAdapter {
                 .replaceAll("\\btextureLod\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraEntitySampleGrad(")
                 .replaceAll("\\btextureGrad\\s*\\(", "veyraEntitySampleGrad(")
+                .replaceAll("\\btexture2DShadow\\s*\\(", "veyraEntityShadowCompare(")
+                .replaceAll("\\bshadow2D\\s*\\(", "veyraEntityShadowSample(")
                 .replaceAll("\\btexture2D\\s*\\(", "veyraEntitySample(")
                 .replaceAll("\\btexture\\s*\\(", "veyraEntitySample(")
                 .replaceAll("\\bgl_FragColor\\b", outputName)
@@ -499,6 +532,7 @@ public final class EntityShaderAdapter {
         String bridge = textPipeline ? """
                 in vec4 vertexColor;
                 in vec2 texCoord0;
+                __VEYRA_COLOR_ALIAS__
                 __VEYRA_VIEW_POSITION_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_SPHERICAL_DISTANCE__
@@ -506,6 +540,8 @@ public final class EntityShaderAdapter {
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_SHADOW_SAMPLER__
+                __VEYRA_NOISE_SAMPLER__
                 __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -516,7 +552,9 @@ public final class EntityShaderAdapter {
                 vec4 veyraEntitySampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
+                __VEYRA_SHADOW_FUNCTIONS__
                 #define texture Sampler0
+                #define tex Sampler0
                 #define gtexture Sampler0
                 #define veyraEntityColor vertexColor
                 #ifndef ALPHA_CUTOUT
@@ -535,6 +573,7 @@ public final class EntityShaderAdapter {
                 in vec4 vertexColor;
                 #define veyraEntityColor vertexColor
                 #endif
+                __VEYRA_COLOR_ALIAS__
                 #ifndef EMISSIVE
                 in vec4 lightMapColor;
                 #else
@@ -552,6 +591,8 @@ public final class EntityShaderAdapter {
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_SHADOW_SAMPLER__
+                __VEYRA_NOISE_SAMPLER__
                 __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -562,7 +603,9 @@ public final class EntityShaderAdapter {
                 vec4 veyraEntitySampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
+                __VEYRA_SHADOW_FUNCTIONS__
                 #define texture Sampler0
+                #define tex Sampler0
                 #define gtexture Sampler0
                 #ifndef ALPHA_CUTOUT
                 #define ALPHA_CUTOUT 0.1
@@ -570,16 +613,38 @@ public final class EntityShaderAdapter {
                 #define alphaTestRef ALPHA_CUTOUT
                 """.replace("veyraEntityFragColor;", outputName + ";");
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
+                .replace("__VEYRA_COLOR_ALIAS__", suppliesLegacyColor ? "#define color veyraEntityColor\n" : "")
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
                 .replace("__VEYRA_VIEW_NORMAL_INPUT__", suppliesViewNormal ? "in vec3 viewNormal;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
+                .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler
+                        ? "uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n" : "")
+                .replace("__VEYRA_SHADOW_SAMPLER__", usesShadowSampler
+                        ? "uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n" : "")
+                .replace("__VEYRA_SHADOW_FUNCTIONS__", usesShadowSampler || ShadowDepthSampler.used(source) ? """
+                        float veyraEntityShadowCompare(sampler2D sourceSampler, vec3 sourceCoord) {
+                            return step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                        }
+                        vec4 veyraEntityShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                            return vec4(veyraEntityShadowCompare(sourceSampler, sourceCoord));
+                        }
+                        """ : "")
                 .replace("__VEYRA_SPHERICAL_DISTANCE__",
                         suppliesSphericalDistance ? "in float sphericalVertexDistance;\n" : "")
                 .replace("__VEYRA_CYLINDRICAL_DISTANCE__",
                         suppliesCylindricalDistance ? "in float cylindricalVertexDistance;\n" : "")
                 .replace("__VEYRA_FOG_BRIDGE__", fogUniforms.bridge());
+        if (TerrainShaderAdapter.usesSpecularSampler(source)) {
+            bridge = "uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n" + bridge;
+        }
+        if (ShadowDepthSampler.used(source)) {
+            bridge = "uniform sampler2D " + ShadowDepthSampler.NAME + ";\n#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
+        }
+        if (ShadowColorSampler.used(source)) {
+            bridge = "uniform sampler2D " + ShadowColorSampler.NAME + ";\n#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
+        }
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
@@ -591,6 +656,16 @@ public final class EntityShaderAdapter {
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
         return result.append(adapted).toString();
+    }
+
+    public static boolean usesNoiseSampler(String source) {
+        return NOISETEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
+                .find();
+    }
+
+    public static boolean usesShadowSampler(String source) {
+        return SHADOWTEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
+                .find();
     }
 
     private record Varying(String type) {

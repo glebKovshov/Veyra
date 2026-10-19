@@ -2,6 +2,9 @@ package dev.veyra.shader;
 
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.veyra.VeyraClient;
@@ -23,15 +26,19 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.framebuffer.RenderPass;
+import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import net.vulkanmod.vulkan.util.MappedBuffer;
+import net.vulkanmod.render.engine.VkGpuDevice;
+import net.vulkanmod.render.engine.VkRenderPass;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 
 import java.nio.ByteBuffer;
 import java.util.HashSet;
+import java.util.OptionalDouble;
 import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -52,7 +59,12 @@ public final class VeyraShadowRenderer {
     private static TextureTarget target;
     private static Framebuffer framebuffer;
     private static RenderPass renderPass;
+    private static RenderPass translucentRenderPass;
+    private static final dev.veyra.vulkan.VeyraDepthTextureSnapshot opaqueDepth = new dev.veyra.vulkan.VeyraDepthTextureSnapshot("shadowtex1");
+    private static GpuTextureView opaqueBinding;
     private static GpuTextureView depthTextureView;
+    private static GpuTextureView colorBinding;
+    private static GpuSampler shadowSampler;
     private static RenderBuffers shadowRenderBuffers;
     private static SubmitNodeStorage shadowSubmitNodeStorage;
     private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
@@ -92,6 +104,81 @@ public final class VeyraShadowRenderer {
         return target == null ? null : target.getDepthTextureView();
     }
 
+    public static GpuTextureView opaqueShadowDepthTextureView() {
+        return opaqueDepth.sampledView();
+    }
+
+    public static void bindTerrainShadowColor(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
+        if (descriptor == null) return;
+        var view = shadowColorTextureView();
+        if (rendering || view == null || view.isClosed())
+            throw new IllegalStateException("shadowcolor0 requires the completed shadow color attachment.");
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false; // The producing render pass owns the transition.
+        colorBinding = view;
+        ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage()
+                .setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
+        VTextureSelector.bindTexture(descriptor.imageIdx,
+                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+    }
+
+    public static void bindEntityShadowColor(VkRenderPass pass, GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
+        if (descriptor == null) return;
+        var view = shadowColorTextureView();
+        if (rendering || view == null || view.isClosed())
+            throw new IllegalStateException("shadowcolor0 requires the completed shadow color attachment.");
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false;
+        pass.bindTexture(ShadowColorSampler.NAME, view, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+        VTextureSelector.bindTexture(descriptor.imageIdx,
+                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+    }
+
+    public static void bindTerrainOpaqueDepth(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(ShadowDepthSampler.NAME);
+        if (descriptor == null) return;
+        if (rendering) throw new IllegalStateException("Shadow depth attachment feedback is unsupported.");
+        var view = opaqueDepth.sampledView();
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false;
+        opaqueBinding = view;
+        var image = ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage();
+        image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
+        VTextureSelector.bindTexture(descriptor.imageIdx, image);
+    }
+
+    public static void bindEntityOpaqueDepth(VkRenderPass pass, GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(ShadowDepthSampler.NAME);
+        if (descriptor == null) return;
+        if (rendering) throw new IllegalStateException("Shadow depth attachment feedback is unsupported.");
+        ensureShadowSampler();
+        var view = opaqueDepth.sampledView();
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false;
+        pass.bindTexture(ShadowDepthSampler.NAME, view, shadowSampler);
+        VTextureSelector.bindTexture(descriptor.imageIdx,
+                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+    }
+
+    /** Binds the generated raw depth map to Iris entity programs using VulkanMod's reserved sampler slot 3. */
+    public static void bindEntityShadowSampler(VkRenderPass renderPass, GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor("Sampler3");
+        GpuTextureView depthView = shadowDepthTextureView();
+        if (descriptor == null || depthView == null || depthView.isClosed()) {
+            return;
+        }
+        ensureShadowSampler();
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        // The shadow render pass owns the transition; do not let this secondary sampler view
+        // transition the same image from a stale per-wrapper layout value.
+        descriptor.isReadOnlyLayout = false;
+        renderPass.bindTexture("Sampler3", depthView, shadowSampler);
+    }
+
     public static Matrix4f shadowModelView() {
         return new Matrix4f(shadowModelView);
     }
@@ -123,7 +210,7 @@ public final class VeyraShadowRenderer {
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
                               DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.hasShadowPass()) {
+        if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.hasShadowPass()) {
             shadowModelView.identity();
             shadowProjection.identity();
             updateShadowMatrixUniformBuffers();
@@ -176,23 +263,40 @@ public final class VeyraShadowRenderer {
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
             worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRIPWIRE,
                     cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
-            if (shadowSettings.shadowTranslucent()) {
-                worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT,
-                        cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
-            }
             renderer.endRenderPass();
             shadowRenderPassStarted = false;
             renderEntityAndBlockEntityGeometry(camera, deltaTracker, levelRenderState,
                     entityShadowFrustum, cameraPosition, shadowModelView, shadowProjection,
                     mainModelView, mainProjection, worldRenderer);
+            renderer.endRenderPass();
+            opaqueDepth.capture(((net.vulkanmod.render.engine.VkGpuTexture) target.getDepthTexture()).getVulkanImage());
+            if (shadowSettings.shadowTranslucent()) {
+                renderer.beginRenderPass(translucentRenderPass, framebuffer);
+                shadowRenderPassStarted = true;
+                VRenderSystem.applyMVP(shadowModelView, shadowProjection);
+                worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT,
+                        cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
+                renderer.endRenderPass();
+                shadowRenderPassStarted = false;
+            }
+            // Entity feature passes can leave depth in attachment layout when translucency
+            // is disabled. Complete the producer transitions on this graphics command buffer.
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                ((net.vulkanmod.render.engine.VkGpuTexture) target.getDepthTexture()).getVulkanImage()
+                        .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                ((net.vulkanmod.render.engine.VkGpuTexture) target.getColorTexture()).getVulkanImage()
+                        .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
         } catch (Exception exception) {
             VeyraClient.LOGGER.error("Could not render the shader pack shadow map.", exception);
+            VeyraRenderer.shadowInputFailed(exception);
         } finally {
             renderingFeatures = false;
             rendering = false;
             if (shadowRenderPassStarted) {
                 renderer.endRenderPass();
             }
+            VRenderSystem.applyMVP(mainModelView, mainProjection);
             if (cameraRotationChanged) {
                 ((CameraAccessor) (Object) camera).veyra$setRotation(originalYaw, originalPitch);
                 try {
@@ -213,11 +317,40 @@ public final class VeyraShadowRenderer {
             rendering = false;
         }
         VRenderSystem.setShaderTexture(3, null);
+        if (colorBinding != null) {
+            if (VRenderSystem.getShaderTexture(ShadowColorSampler.TERRAIN_SLOT) == colorBinding)
+                VRenderSystem.setShaderTexture(ShadowColorSampler.TERRAIN_SLOT, null);
+            var image = ((net.vulkanmod.render.engine.VkGpuTexture) colorBinding.texture()).getVulkanImage();
+            if (VTextureSelector.getImage(ShadowColorSampler.TERRAIN_SLOT) == image)
+                VTextureSelector.bindTexture(ShadowColorSampler.TERRAIN_SLOT, VTextureSelector.getWhiteTexture());
+            colorBinding = null;
+        }
         depthTextureView = null;
+        if (shadowSampler != null) {
+            shadowSampler.close();
+            shadowSampler = null;
+        }
         if (framebuffer != null) {
             framebuffer.cleanUp(false);
             framebuffer = null;
         }
+        if (opaqueBinding != null) {
+            if (VRenderSystem.getShaderTexture(ShadowDepthSampler.TERRAIN_SLOT) == opaqueBinding)
+                VRenderSystem.setShaderTexture(ShadowDepthSampler.TERRAIN_SLOT, null);
+            var image = ((net.vulkanmod.render.engine.VkGpuTexture) opaqueBinding.texture()).getVulkanImage();
+            if (VTextureSelector.getImage(ShadowDepthSampler.TERRAIN_SLOT) == image)
+                VTextureSelector.bindTexture(ShadowDepthSampler.TERRAIN_SLOT, VTextureSelector.getWhiteTexture());
+            opaqueBinding = null;
+        }
+        opaqueDepth.close();
+        Set<RenderPass> retiredPasses = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        if (renderPass != null) retiredPasses.add(renderPass);
+        if (translucentRenderPass != null) retiredPasses.add(translucentRenderPass);
+        if (!retiredPasses.isEmpty()) net.vulkanmod.vulkan.memory.MemoryManager.getInstance().addFrameOp(() ->
+                java.util.List.copyOf(dev.veyra.mixin.accessor.NativePipelineRegistryAccessor.veyra$getPipelines()).forEach(pipeline -> {
+                    if (pipeline instanceof dev.veyra.vulkan.VeyraPipelinePassCache cache) cache.veyra$retireRenderPasses(retiredPasses);
+                }));
+        if (translucentRenderPass != null) { translucentRenderPass.cleanUp(); translucentRenderPass = null; }
         if (renderPass != null) {
             renderPass.cleanUp();
             renderPass = null;
@@ -251,9 +384,26 @@ public final class VeyraShadowRenderer {
                 .setOps(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE)
                 .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         renderPass = passBuilder.build();
+        var resumeBuilder = RenderPass.builder(framebuffer);
+        resumeBuilder.getColorAttachmentInfo().setOps(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE)
+                .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        resumeBuilder.getDepthAttachmentInfo().setOps(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE)
+                .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        translucentRenderPass = resumeBuilder.build();
         // The target owns this view. Sampling its native depth view avoids creating a second
         // Vulkan view object for the same image, which can upset VulkanMod's descriptor binding.
         depthTextureView = target.getDepthTextureView();
+    }
+
+    private static void ensureShadowSampler() {
+        if (shadowSampler != null) {
+            return;
+        }
+        if (!(RenderSystem.getDevice() instanceof VkGpuDevice device)) {
+            throw new IllegalStateException("The Iris shadow sampler requires VulkanMod's Vulkan device.");
+        }
+        shadowSampler = device.createSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                FilterMode.NEAREST, FilterMode.NEAREST, 1, OptionalDouble.empty());
     }
 
     private static void renderEntityAndBlockEntityGeometry(

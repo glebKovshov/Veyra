@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 final class ShaderIncludes {
     private static final int MAX_DEPTH = 32;
     private static final int MAX_CHARS = 4 * 1024 * 1024;
+    private static final int MAX_EXPANSIONS = 4096;
     private static final Pattern INCLUDE = Pattern.compile(
             "(?m)^[\\t ]*(#[\\t ]*include[\\t ]+(?:\"([^\"]+)\"|<([^>]+)>))[\\t ]*(?=\\r?$)");
 
@@ -22,11 +23,19 @@ final class ShaderIncludes {
     }
 
     static String expand(String file, String source, Reader reader) throws IOException {
-        return expand(file, source, reader, 0);
+        return expand(file, source, reader, 0, new int[1]);
     }
 
-    private static String expand(String file, String source, Reader reader, int depth)
+    private static String expand(String file, String source, Reader reader, int depth, int[] expansions)
             throws IOException {
+        // Bound total work across sibling branches as well as recursion depth. In particular,
+        // branching recursive guards are expanded before the compiler evaluates their guards.
+        if (++expansions[0] > MAX_EXPANSIONS) {
+            throw new IOException("Shader includes exceed the maximum expansion count of " + MAX_EXPANSIONS + ".");
+        }
+        if (source.length() > MAX_CHARS) {
+            throw new IOException("Expanded shader exceeds the 4 MiB size limit.");
+        }
         // Retain the nested file's own guards. Replacing it at the first repeated path would
         // turn a legal #ifndef-guarded recursion into an unconditional #error.
         if (depth > MAX_DEPTH) {
@@ -42,7 +51,7 @@ final class ShaderIncludes {
             String path = resolve(file, requested);
             Optional<String> included = reader.read(path);
             String replacement = included.isPresent()
-                    ? expand(path, included.get(), reader, depth + 1)
+                    ? expand(path, included.get(), reader, depth + 1, expansions)
                     : error("Shader include was not found: " + path);
             append(expanded, replacement);
             if (!replacement.endsWith("\n")) {

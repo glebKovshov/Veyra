@@ -23,10 +23,20 @@ dependencies {
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modCompileOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
+    modRuntimeOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
+    modRuntimeOnly "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    runtimeOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
+    runtimeOnly 'org.lwjgl:lwjgl-vma:3.3.3'
+    runtimeOnly 'org.lwjgl:lwjgl-shaderc:3.3.3'
     compileOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
     annotationProcessor 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
+    implementation('org.anarres:jcpp:1.4.14') { transitive = false }
+    include('org.anarres:jcpp:1.4.14') { transitive = false }
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.lwjgl:lwjgl-vulkan:3.3.3'
+    testImplementation 'org.ow2.asm:asm-tree:9.7.1'
+    testRuntimeOnly 'maven.modrinth:JYQhtZtO:hWKRTXbQ'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -60,6 +70,7 @@ java {
 }
 
 jar {
+    from('THIRD_PARTY_NOTICES.md')
     from('LICENSE') {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
@@ -89,7 +100,12 @@ if (smokeArch in ['aarch64', 'arm64']) {
 }
 
 dependencies {
+    runtimeOnly "org.lwjgl:lwjgl-vma:3.3.3:${smokeNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-shaderc:3.3.3:${smokeNatives}"
+    if (smokeOs.contains('mac')) runtimeOnly "org.lwjgl:lwjgl-vulkan:3.3.3:${smokeNatives}"
     shaderSmokeImplementation 'org.lwjgl:lwjgl-shaderc:3.3.3'
+    shaderSmokeImplementation('org.anarres:jcpp:1.4.14') { transitive = false }
+    shaderSmokeRuntimeOnly 'org.slf4j:slf4j-api:2.0.17'
     shaderSmokeRuntimeOnly "org.lwjgl:lwjgl:3.3.3:${smokeNatives}"
     shaderSmokeRuntimeOnly "org.lwjgl:lwjgl-shaderc:3.3.3:${smokeNatives}"
 }
@@ -100,4 +116,44 @@ tasks.register('validateShaders', JavaExec) {
     dependsOn tasks.named('shaderSmokeClasses')
     classpath = sourceSets.shaderSmoke.runtimeClasspath
     mainClass = 'dev.veyra.shader.ShaderCompileSmoke'
+}
+
+tasks.register('auditShaderPacks', JavaExec) {
+    group = 'verification'
+    description = 'Read-only source audit of external pack paths supplied with -PshaderPacks=path1,path2.'
+    dependsOn tasks.named('shaderSmokeClasses')
+    classpath = sourceSets.shaderSmoke.runtimeClasspath
+    mainClass = 'dev.veyra.shader.ShaderPackAudit'
+    if (project.hasProperty('shaderPackAuditArguments')) {
+        def auditArguments = new groovy.json.JsonSlurper().parse(file(project.property('shaderPackAuditArguments')))
+        if (!(auditArguments instanceof List) || !auditArguments.every { it instanceof String }) {
+            throw new GradleException('Shaderpack audit arguments must be a JSON array of strings.')
+        }
+        args auditArguments
+    }
+    if (project.hasProperty('shaderPacks')) args project.property('shaderPacks').toString().split(',')
+}
+
+// Development-only client integration harness; never included in the distributable mod.
+sourceSets {
+    graphicsSmoke {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+loom {
+    mods {
+        veyra { sourceSet sourceSets.main }
+        veyra_graphics_smoke { sourceSet sourceSets.graphicsSmoke }
+    }
+    runs {
+        graphicsSmoke {
+            client()
+            source = sourceSets.graphicsSmoke
+            runDir = 'run-graphics-smoke'
+            vmArgs '-Xmx3G', '-Dveyra.graphicsSmoke=true',
+                    "-Dveyra.graphicsSmoke.output=${layout.buildDirectory.dir('reports/graphics-smoke').get().asFile.absolutePath}"
+            programArgs '--quickPlaySingleplayer', 'VeyraValidation', '--width', '640', '--height', '360'
+        }
+    }
 }

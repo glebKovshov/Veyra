@@ -20,7 +20,7 @@ public final class TerrainShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
+    private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
@@ -30,7 +30,8 @@ public final class TerrainShaderAdapter {
     private static final Pattern UNSUPPORTED_GBUFFER_INPUT = Pattern.compile(
             "\\b(?:gl_FragData|mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
-            "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+            "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
+    private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2", 1)),
@@ -59,8 +60,13 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("thunderStrength", "float", false),
             new ShaderUniform("worldTime", "int", false),
             new ShaderUniform("worldDay", "int", false),
+            new ShaderUniform("moonPhase", "int", false),
+            new ShaderUniform("bedrockLevel", "int", false),
+            new ShaderUniform("cloudHeight", "float", false),
+            new ShaderUniform("endFlashIntensity", "float", false),
             new ShaderUniform("eyeAltitude", "float", false),
             new ShaderUniform("eyeBrightness", "ivec2", false),
+            new ShaderUniform("eyeBrightnessSmooth", "ivec2", false),
             new ShaderUniform("cameraPosition", "vec3", false),
             new ShaderUniform("cameraPositionInt", "ivec3", false),
             new ShaderUniform("cameraPositionFract", "vec3", false),
@@ -108,6 +114,7 @@ public final class TerrainShaderAdapter {
             layout(binding = 3) uniform sampler2D Sampler0;
             layout(binding = 4) uniform sampler2D LightTexture;
             layout(binding = 5) uniform sampler2D VeyraShadowSampler;
+            layout(binding = 6) uniform sampler2D VeyraNoiseSampler;
             layout(location = 0) in vec4 veyraVertexColor;
             layout(location = 1) in vec2 veyraTexCoord;
             layout(location = 5) in vec2 veyraLightmapCoord;
@@ -130,9 +137,11 @@ public final class TerrainShaderAdapter {
                 return vec4(visibility);
             }
             #define texture Sampler0
+            #define tex Sampler0
             #define gtexture Sampler0
             #define lightmap LightTexture
             #define shadowtex0 VeyraShadowSampler
+            #define noisetex VeyraNoiseSampler
             #define shadowPos veyraShadowPos
             #define shadowCoord veyraShadowPos
             #define shadow2D(sampler, coord) veyraSample(sampler, coord)
@@ -158,6 +167,14 @@ public final class TerrainShaderAdapter {
     }
 
     public static String adaptFragment(String source, boolean shadowSamplerAvailable) throws IOException {
+        return adaptFragment(source, shadowSamplerAvailable, false);
+    }
+
+    /** Water inputs are available after the opaque copy and deferred phase. */
+    public static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable) throws IOException {
+        Map<String, Integer> colorInputs = waterInputsAvailable ? GeometryColorSamplers.read(source) : Map.of();
+        FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
+        source = fragmentOutputs.rewriteLegacy(source);
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
@@ -168,25 +185,38 @@ public final class TerrainShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = SHADOW_MATRIX_UNIFORM.matcher(adapted).replaceAll("");
+        adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        boolean noiseSamplerAvailable = usesNoiseSampler(adapted);
+        ShadowColorSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
+        ShadowDepthSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
-                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
+            if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
+                    && !sampler.equals("noisetex")
+                    && !sampler.equals("specular")
+                    && !colorInputs.containsKey(sampler)
+                    && !(sampler.equals("depthtex1") && waterInputsAvailable)
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
             if (!samplerType.equals("sampler2D")
-                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable
+                    && !((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) && shadowSamplerAvailable
                     && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException("gbuffers_terrain sampler '" + sampler + "' must use sampler2D.");
             }
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
-        adapted = withoutSamplers.toString();
+        // The Vulkan bridge samples the depth image as sampler2D and emulates the
+        // shadow comparison in veyraSample(..., vec3). Lower helper-function
+        // parameters too; otherwise Iris/OptiFine helpers such as
+        // texture2DShadow(sampler2DShadow depthMap, ...) retain an incompatible
+        // comparison-sampler type after the uniform declaration is removed.
+        adapted = withoutSamplers.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D");
         IrisFogUniformAdapter.AdaptedShader fogUniforms =
                 IrisFogUniformAdapter.extract(adapted, "gbuffers_terrain", true);
         adapted = fogUniforms.source();
@@ -237,30 +267,20 @@ public final class TerrainShaderAdapter {
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
 
-        String outputName = "veyraFragColor";
+        String outputName = fragmentOutputs.variables().getOrDefault(0, "veyraFragColor");
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
-        int outputCount = 0;
         while (outputMatcher.find()) {
-            String location = outputMatcher.group(1);
-            if (location != null && !location.equals("0")) {
-                throw new IOException("gbuffers_terrain can write only color attachment 0.");
-            }
-            outputName = outputMatcher.group(2);
-            outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
         outputMatcher.appendTail(withoutOutputs);
-        if (outputCount > 1) {
-            throw new IOException("gbuffers_terrain can declare only one fragment output.");
-        }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_terrain supports one vec4 fragment output.");
+            throw new IOException("gbuffers_terrain requires vec4 fragment outputs with supported locations.");
         }
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_terrain uses entity metadata, view-space positions, tangents, or multiple outputs that are not provided by Veyra's terrain bridge yet.");
+            throw new IOException("gbuffers_terrain uses entity metadata, view-space positions, or tangents that are not provided by Veyra's terrain bridge yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException("gbuffers_terrain uses a texture sampling function that Veyra's terrain bridge does not support yet.");
@@ -282,6 +302,33 @@ public final class TerrainShaderAdapter {
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
                         + fogUniforms.bridge() + "#define texture Sampler0");
+        boolean usesDepth = waterInputsAvailable && usesOpaqueDepthSampler(source);
+        if (usesDepth) {
+            int depthBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0);
+            bridge = "layout(binding = " + depthBinding + ") uniform sampler2D VeyraDepthTex1Sampler;\n"
+                    + "#define depthtex1 VeyraDepthTex1Sampler\n" + bridge;
+        }
+        int colorBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0) + (usesDepth ? 1 : 0);
+        if (usesSpecularSampler(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D VeyraSpecularSampler;\n"
+                    + "#define specular VeyraSpecularSampler\n" + bridge;
+        }
+        if (ShadowDepthSampler.used(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowDepthSampler.NAME + ";\n"
+                    + "#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
+        }
+        if (ShadowColorSampler.used(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowColorSampler.NAME + ";\n"
+                    + "#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
+        }
+        StringBuilder colorBridge = new StringBuilder();
+        for (int index : GeometryColorSamplers.indices(colorInputs)) {
+            colorBridge.append("layout(binding = ").append(colorBinding++).append(") uniform sampler2D ")
+                    .append(GeometryColorSamplers.samplerName(index)).append(";\n");
+        }
+        colorInputs.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(input -> colorBridge
+                .append("#define ").append(input.getKey()).append(' ').append(GeometryColorSamplers.samplerName(input.getValue())).append('\n'));
+        bridge = colorBridge + bridge;
         if (declaredVaryings.contains("normal")) {
             bridge = bridge.replace("#define texture Sampler0", """
                     vec3 veyraTerrainNormal() {
@@ -293,18 +340,45 @@ public final class TerrainShaderAdapter {
                     """);
         }
         if (!shadowSamplerAvailable) {
-            bridge = bridge.replace("            layout(binding = 5) uniform sampler2D VeyraShadowSampler;\n", "")
-                    .replace("            #define shadowtex0 VeyraShadowSampler\n", "")
-                    .replace("            #define shadow2D(sampler, coord) veyraSample(sampler, coord)\n", "");
+            bridge = bridge.replaceAll(
+                    "(?m)^[\\t ]*layout\\(binding = 5\\) uniform sampler2D VeyraShadowSampler;[\\t ]*\\R", "")
+                    .replaceAll("(?m)^[\\t ]*#define shadowtex0 VeyraShadowSampler[\\t ]*\\R", "")
+                    .replaceAll("(?m)^[\\t ]*#define shadow2D\\(sampler, coord\\) veyraSample\\(sampler, coord\\)[\\t ]*\\R", "");
+        }
+        if (!noiseSamplerAvailable) {
+            bridge = bridge.replaceAll(
+                    "(?m)^[\\t ]*layout\\(binding = 6\\) uniform sampler2D VeyraNoiseSampler;[\\t ]*\\R", "")
+                    .replaceAll("(?m)^[\\t ]*#define noisetex VeyraNoiseSampler[\\t ]*\\R", "");
+        } else if (!shadowSamplerAvailable) {
+            // VulkanMod 0.6.8 indexes its layout array by binding, so optional images
+            // must remain contiguous after the three UBOs and two base terrain samplers.
+            bridge = bridge.replace("layout(binding = 6) uniform sampler2D VeyraNoiseSampler;",
+                    "layout(binding = 5) uniform sampler2D VeyraNoiseSampler;");
         }
         result.append(bridge
-                .replace("veyraFragColor;", outputName + ";")
+                .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())
                 .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName));
         return result.append(adapted).toString();
     }
 
     public static List<ShaderUniform> shaderPackUniforms() {
         return SHADERPACK_UNIFORMS;
+    }
+
+    public static boolean usesOpaqueDepthSampler(String source) {
+        return Pattern.compile("\\bdepthtex1\\b").matcher(
+                UnusedSamplerDeclarations.removeUnused(COMMENTS.matcher(source).replaceAll(""))).find();
+    }
+
+    public static boolean usesSpecularSampler(String source) {
+        return Pattern.compile("\\bspecular\\b").matcher(UnusedSamplerDeclarations.removeUnused(
+                ShaderSource.maskBlockAndLineComments(source))).find();
+    }
+
+    public static boolean usesNoiseSampler(String source) {
+        return NOISETEX_REFERENCE.matcher(UnusedSamplerDeclarations.removeUnused(
+                        COMMENTS.matcher(source == null ? "" : source).replaceAll("")))
+                .find();
     }
 
     private static ShaderUniform shaderPackUniform(String name) {

@@ -1,0 +1,107 @@
+name: Graphics smoke
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/main/**'
+      - 'src/graphicsSmoke/**'
+      - 'build.gradle'
+      - '.github/workflows/graphics-smoke.yml'
+  push:
+    branches: ['feature/iris-compatibility-0.2']
+    paths:
+      - '.github/workflows/graphics-smoke.yml'
+      - 'src/graphicsSmoke/**'
+      - 'scripts/prepare_graphics_smoke.py'
+      - 'src/main/**'
+      - 'examples/geometry-mrt/**'
+      - 'examples/water-opaque-depth/**'
+      - 'examples/water-color-inputs/**'
+      - 'examples/specular-*/**'
+      - 'examples/shadow-color-*/**'
+      - 'examples/water-shadow-depth-*/**'
+      - 'examples/water-post-shadow-inputs/**'
+      - 'build.gradle'
+
+permissions:
+  contents: read
+
+jobs:
+  lavapipe-client:
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [geometry-mrt, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, vanilla-baseline]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+      - name: Install software Vulkan and validation layers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools vulkan-validationlayers xvfb libglfw3 libflite1
+      - name: Prepare original validation world
+        run: python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
+      - name: Launch Minecraft with software Vulkan
+        shell: bash
+        env:
+          LP_NUM_THREADS: '2'
+          XDG_SESSION_TYPE: x11
+          ALSOFT_DRIVERS: 'null'
+          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+        run: |
+          set -o pipefail
+          export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
+          test -n "$VK_ICD_FILENAMES"
+          vulkaninfo --summary > vulkan-device.txt 2>&1
+          timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke 2>&1 | tee graphics-client.log
+      - name: Verify real frame readback and validation output
+        run: |
+          python3 - <<'PY'
+          import json,pathlib,re
+          result=json.loads(pathlib.Path('build/reports/graphics-smoke/result.json').read_text())
+          print(json.dumps(result,indent=2))
+          text=pathlib.Path('graphics-client.log').read_text(errors='replace')
+          errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
+          # Minecraft/VulkanMod 0.6.8 reports its still-live process-wide Vulkan objects only
+          # after disconnecting the test player and entering vkDestroyDevice. Keep those
+          # teardown diagnostics in the artifact, but gate runtime rendering separately.
+          marker='Stopping singleplayer server as player logged out'
+          shutdown=text.find(marker)
+          assert shutdown >= 0, 'The smoke client did not shut down its validation world cleanly'
+          runtime_errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text[:shutdown])
+          teardown_errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text[shutdown:])
+          pathlib.Path('build/reports/graphics-smoke/validation-errors.txt').write_text('\n'.join(errors))
+          pathlib.Path('build/reports/graphics-smoke/runtime-validation-errors.txt').write_text('\n'.join(runtime_errors))
+          pathlib.Path('build/reports/graphics-smoke/teardown-validation-errors.txt').write_text('\n'.join(teardown_errors))
+          print(f'Runtime validation errors: {len(runtime_errors)}')
+          print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
+          assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
+          assert result['status']=='passed', result
+          for phase in ['before-backend-cleanup','before-allocator-destruction']:
+              snapshot=json.loads(pathlib.Path(f'build/reports/graphics-smoke/shutdown-{phase}.json').read_text())
+              assert snapshot['phase']==phase
+              print(f"Shutdown {phase}: buffers={len(snapshot['buffers'])}, images={len(snapshot['images'])}, pipelines={len(snapshot['pipelines'])}")
+          PY
+      - name: Upload graphics evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: graphics-smoke-evidence-${{ matrix.fixture }}
+          path: |
+            build/reports/graphics-smoke/
+            run-graphics-smoke/logs/
+            run-graphics-smoke/crash-reports/
+            graphics-client.log
+            vulkan-device.txt
+          if-no-files-found: warn
+          retention-days: 14

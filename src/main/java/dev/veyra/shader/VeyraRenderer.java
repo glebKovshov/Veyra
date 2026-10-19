@@ -22,14 +22,19 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
+import dev.veyra.vulkan.VeyraPipelineResources;
+import dev.veyra.vulkan.VeyraGeometryTargets;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.RenderSetupAccessor;
 import dev.veyra.mixin.accessor.RenderTargetAccessor;
 import dev.veyra.mixin.accessor.RenderTypeAccessor;
+import dev.veyra.mixin.accessor.VkGpuTextureAccessor;
 import dev.veyra.mixin.accessor.ShaderManagerAccessor;
 import dev.veyra.vulkan.VeyraDepthTextureView;
 import dev.veyra.vulkan.VeyraDepthTextureSnapshot;
+import dev.veyra.vulkan.VeyraNoiseTexture;
+import dev.veyra.vulkan.VeyraSpecularTextures;
 import net.vulkanmod.Initializer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -47,6 +52,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.attribute.EnvironmentAttributes;
+import net.minecraft.world.level.MoonPhase;
 import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
@@ -55,6 +62,7 @@ import net.vulkanmod.render.shader.PipelineManager;
 import net.vulkanmod.render.shader.ShaderLoadUtil;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
@@ -126,8 +134,8 @@ public final class VeyraRenderer {
                 outColor = texture(InSampler, texCoord);
             }
             """;
-    private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^\\s*#version[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^\\s*#extension[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*$");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
@@ -140,7 +148,7 @@ public final class VeyraRenderer {
             "(?m)\\bconst\\s+int\\s+colortex\\d+Format\\s*=\\s*[A-Za-z_][A-Za-z0-9_]*\\s*;");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
-    private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
+    private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^[\\t ]*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern POST_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|out)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_INPUT_DECLARATION = Pattern.compile(
@@ -149,33 +157,33 @@ public final class VeyraRenderer {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|out)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
+    private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern POST_VERTEX_MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
     private static final Pattern POST_VERTEX_LEGACY_ATTRIBUTES = Pattern.compile(
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
-    private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
+    private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![012]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
     private static final Pattern DEPTH1_SAMPLER = Pattern.compile("\\bdepthtex1\\b");
     private static final Pattern DEPTH2_SAMPLER = Pattern.compile("\\bdepthtex2\\b");
-    private static final Pattern UNSUPPORTED_SHADOW_SAMPLER = Pattern.compile(
-            "\\b(?:shadowtex(?!0\\b)[A-Za-z0-9_]*|shadowcolor[A-Za-z0-9_]*)\\b");
-    private static final Pattern SHADOW_DEPTH_SAMPLER = Pattern.compile("\\bshadowtex0\\b");
-    private static final Pattern SHADOW_DEPTH_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+shadowtex0\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern DEPTH_SAMPLER_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+(?:depthtex0|DepthSampler)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+(?:depthtex0|DepthSampler)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern DEPTH1_SAMPLER_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern DEPTH2_SAMPLER_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex2\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex2\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern NOISETEX_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+noisetex\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     // PostPass appends "Sampler" to every input name when binding it to the render pass.
     private static final String DEPTH_INPUT_NAME = "Sampler1";
     private static final String DEPTH_INPUT_SAMPLER = DEPTH_INPUT_NAME + "Sampler";
@@ -183,12 +191,12 @@ public final class VeyraRenderer {
     private static final String DEPTH1_INPUT_SAMPLER = DEPTH1_INPUT_NAME + "Sampler";
     private static final String DEPTH2_INPUT_NAME = "VeyraDepthTex2";
     private static final String DEPTH2_INPUT_SAMPLER = DEPTH2_INPUT_NAME + "Sampler";
-    private static final String SHADOW_DEPTH_INPUT_NAME = "VeyraShadowDepth";
-    private static final String SHADOW_DEPTH_INPUT_SAMPLER = SHADOW_DEPTH_INPUT_NAME + "Sampler";
+    private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
-            "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
+            "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
+            "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
@@ -204,11 +212,11 @@ public final class VeyraRenderer {
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> INTEGER_UNIFORMS = List.of(
-            "frameCounter", "worldTime", "worldDay", "isEyeInWater", "isSpectator", "is_sneaking",
+            "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
-            "worldTime", "worldDay", "eyeAltitude", "screenBrightness", "blindness", "nightVision", "darknessFactor",
+            "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
@@ -233,6 +241,7 @@ public final class VeyraRenderer {
     private static RenderTarget swapTargetB;
     private static final Map<Integer, ColorTargetPair> colorTargets = new HashMap<>();
     private static final Map<Integer, Identifier> currentColorTargets = new HashMap<>();
+    private static final Map<Integer, GeometryColorBinding> geometryColorBindings = new HashMap<>();
     private static final Set<Integer> initializedColorTargets = new java.util.HashSet<>();
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
@@ -313,6 +322,10 @@ public final class VeyraRenderer {
     private static ClientLevel wetnessLevel;
     private static boolean wetnessInitialized;
     private static float smoothedWetness;
+    private static final EyeBrightnessSmoother eyeBrightnessSmoother = new EyeBrightnessSmoother();
+    private static ClientLevel eyeBrightnessSmoothLevel;
+    private static ShaderPack eyeBrightnessHalfLifePack;
+    private static float eyeBrightnessHalfLifeTicks = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
 
     private VeyraRenderer() {
     }
@@ -330,7 +343,7 @@ public final class VeyraRenderer {
             }
         });
         renderingEnabled = packRepository.getSelected()
-                .filter(ShaderPack::hasPostProcessing)
+                .filter(ShaderPack::supportsShaderPrograms)
                 .isPresent();
         terrainPipelineDirty = packRepository.getSelected()
                 .map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment())
@@ -451,10 +464,11 @@ public final class VeyraRenderer {
     }
 
     private static void updateShaderPackIntegerVector2Uniform(String name, MappedBuffer buffer, CameraUniforms uniforms) {
-        if (!name.equals("eyeBrightness")) {
-            throw new IllegalArgumentException("Unknown shader pack integer vector uniform " + name + ".");
-        }
-        Vector2i value = uniforms.eyeBrightness();
+        Vector2i value = switch (name) {
+            case "eyeBrightness" -> uniforms.eyeBrightness();
+            case "eyeBrightnessSmooth" -> uniforms.eyeBrightnessSmooth();
+            default -> throw new IllegalArgumentException("Unknown shader pack integer vector uniform " + name + ".");
+        };
         buffer.putInt(0, value.x);
         buffer.putInt(Integer.BYTES, value.y);
     }
@@ -537,6 +551,8 @@ public final class VeyraRenderer {
             case "rainStrength" -> frame.rainStrength();
             case "wetness" -> frame.wetness();
             case "thunderStrength" -> frame.thunderStrength();
+            case "cloudHeight" -> frame.cloudHeight();
+            case "endFlashIntensity" -> frame.endFlashIntensity();
             case "eyeAltitude" -> frame.eyeAltitude();
             case "screenBrightness" -> frame.screenBrightness();
             case "blindness" -> frame.blindness();
@@ -552,6 +568,8 @@ public final class VeyraRenderer {
             case "frameCounter" -> frame.frameCounter();
             case "worldTime" -> frame.worldTime();
             case "worldDay" -> frame.worldDay();
+            case "moonPhase" -> frame.moonPhase();
+            case "bedrockLevel" -> frame.bedrockLevel();
             case "isEyeInWater" -> frame.isEyeInWater();
             case "isSpectator" -> frame.isSpectator() ? 1 : 0;
             case "is_sneaking" -> frame.isSneaking() ? 1 : 0;
@@ -572,7 +590,52 @@ public final class VeyraRenderer {
         return selectedPack().map(ShaderPack::hasShadowFragment).orElse(false);
     }
 
+    private static Object pipelineLevel;
+
+    private static void synchronizeWorld() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (repository == null || minecraft.level == null || pipelineLevel == minecraft.level) return;
+        pipelineLevel = minecraft.level;
+        frameMatricesInitialized = false;
+        cameraUniformsInitialized = false;
+        previousFrameNanos = 0L;
+        frameTime = 0.0F;
+        eyeBrightnessSmoothLevel = minecraft.level;
+        eyeBrightnessSmoother.reset();
+        initializedColorTargets.clear();
+        closeOpaqueDepthSnapshot();
+        depthTex2Snapshot.close();
+        int dimension = minecraft.level.dimension().equals(net.minecraft.world.level.Level.NETHER) ? -1
+                : minecraft.level.dimension().equals(net.minecraft.world.level.Level.END) ? 1 : 0;
+        repository.setDimension(dimension);
+        ShaderPack active = selectedPack().orElse(null);
+        if (active != null && active.configuration().dimension() != dimension) {
+            try {
+                repository.refresh();
+                ShaderPack candidate = active.configured(active.configuration().options(), dimension);
+                if (!candidate.supportsShaderPrograms()) {
+                    disable();
+                    lastError = "This shader pack has no supported programs for world" + dimension;
+                } else {
+                    String result = select(candidate);
+                    // Old-dimension pipelines must never remain installed after a failed transition.
+                    if (selectedPack().map(pack -> pack.configuration().dimension() != dimension).orElse(false)) {
+                        disable();
+                        lastError = result;
+                    }
+                }
+            } catch (IOException exception) {
+                disable();
+                lastError = shortError(exception);
+                VeyraClient.LOGGER.error("Could not switch shader dimension", exception);
+            }
+        }
+    }
+
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
+        synchronizeWorld();
+        updateFrameClock();
+        nextPostPhase = 0;
         Matrix4f currentModelView = new Matrix4f(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
@@ -594,15 +657,22 @@ public final class VeyraRenderer {
         CameraPosition previousCameraPosition = cameraUniformsInitialized
                 ? new CameraPosition(cameraUniforms.cameraPosition(), cameraUniforms.cameraPositionInt(), cameraUniforms.cameraPositionFract())
                 : currentCameraPosition;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (eyeBrightnessSmoothLevel != minecraft.level) {
+            eyeBrightnessSmoothLevel = minecraft.level;
+            eyeBrightnessSmoother.reset();
+        }
+        Vector2i brightness = eyeBrightness(minecraft, cameraPosition);
+        Vector2i smoothedBrightness = eyeBrightnessSmoother.update(
+                brightness.x, brightness.y, frameTime, selectedEyeBrightnessHalfLifeTicks());
         cameraUniforms = new CameraUniforms(
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition(),
-                eyeBrightness(Minecraft.getInstance(), cameraPosition));
+                brightness, smoothedBrightness);
         cameraUniformsInitialized = true;
         updateShaderPackVectorUniforms(cameraUniforms);
         updateShaderPackIntegerVector2Uniforms(cameraUniforms);
         updateShaderPackIntegerVectorUniforms(cameraUniforms);
-        Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level != null && minecraft.player != null) {
             shaderPackFrameUniforms = updateFrameUniforms(minecraft);
         }
@@ -635,6 +705,7 @@ public final class VeyraRenderer {
     }
 
     private static boolean selectedPackUsesDepth1Sampler() {
+        if (terrainUsesOpaqueDepthSampler()) return true;
         if (!pipelinesDirty && pipelineSet != null) {
             return pipelineSet.usesDepth1Sampler();
         }
@@ -643,6 +714,8 @@ public final class VeyraRenderer {
             return false;
         }
         try {
+            if (pack.terrainPrograms().contains("gbuffers_water") && TerrainShaderAdapter.usesOpaqueDepthSampler(
+                    pack.readTerrainFragment("gbuffers_water").orElse(""))) return true;
             return pack.readPrograms().stream().anyMatch(program -> DEPTH1_SAMPLER.matcher(
                     COMMENTS.matcher(program.source()).replaceAll("")).find());
         } catch (IOException exception) {
@@ -712,7 +785,16 @@ public final class VeyraRenderer {
                     "veyra:" + targetName + "-target", snapshot.renderTarget()));
             GpuBufferSlice samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
             capturePass.addToFrame(graph, targets, samplerInfo);
-            graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            if (Boolean.getBoolean("veyra.graphicsSmoke")) {
+                graph.execute(GraphicsResourceAllocator.UNPOOLED, new FrameGraphBuilder.Inspector() {
+                    @Override public void acquireResource(String name) { }
+                    @Override public void releaseResource(String name) { }
+                    @Override public void beforeExecutePass(String name) { VeyraClient.LOGGER.info("Frame graph pass begins: {}", name); }
+                    @Override public void afterExecutePass(String name) { VeyraClient.LOGGER.info("Frame graph pass ends: {}", name); }
+                });
+            } else {
+                graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            }
         } finally {
             if (Renderer.getInstance().getBoundRenderPass() != null) {
                 Renderer.getInstance().endRenderPass();
@@ -749,7 +831,7 @@ public final class VeyraRenderer {
                 .build();
         PipelineProgram program = new PipelineProgram(DEPTH1_CAPTURE_SHADER_ID,
                 DEPTH1_CAPTURE_FRAGMENT_SOURCE, BLIT_VERTEX_ID, null,
-                List.of(), true, false, false, false, Set.of(), 0, pipeline);
+                List.of(), true, false, false, false, Set.of(), Set.of(), 0, pipeline);
         compilePipeline(program);
         depthTex1CaptureProgram = program;
         return program;
@@ -814,6 +896,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderType routeBlockEntityRenderType(RenderType originalType) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return originalType;
         if (originalType == null || BLOCK_ENTITY_SUBMISSION_DEPTH.get() == 0) {
             return originalType;
         }
@@ -841,6 +924,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getSignTextPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (!isSignTextPipeline(original)) {
             return null;
         }
@@ -893,6 +977,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getTerrainPipeline(TerrainRenderType terrainRenderType) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (VeyraShadowRenderer.isRendering()) {
             if (pack == null || !pack.hasShadowFragment()) {
@@ -938,6 +1023,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getCloudsPipeline() {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasCloudFragment()) {
             return null;
@@ -959,6 +1045,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getEntityPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (VeyraShadowRenderer.isRendering()) {
             return getShadowEntityPipeline(original, false);
         }
@@ -1041,6 +1128,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getHandPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (!isHandRendering() || pack == null || !pack.supportsHandPipeline()
                 || !isEntityRenderPipeline(original)) {
@@ -1069,6 +1157,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getDamagedBlockPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasDamagedBlockPipeline() || !isDamagedBlockPipeline(original)) {
             return null;
@@ -1098,6 +1187,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getBeaconBeamPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (VeyraShadowRenderer.isRendering()) {
             return getShadowBeaconBeamPipeline(original);
         }
@@ -1154,6 +1244,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getParticlePipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasParticleFragment() || !isParticlePipeline(original)) {
             return null;
@@ -1175,6 +1266,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getWeatherPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasWeatherFragment() || !isWeatherPipeline(original)) {
             return null;
@@ -1196,6 +1288,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getLightningPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasLightningFragment() || !isLightningPipeline(original)) {
             return null;
@@ -1217,6 +1310,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getBasicPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasBasicFragment() || !isLeashPipeline(original)) {
             return null;
@@ -1238,6 +1332,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getLinePipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasLineFragment() || pack.hasBasicFragment()) || !isLinePipeline(original)) {
             return null;
@@ -1259,6 +1354,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getGlintPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasGlintFragment() || pack.hasTexturedFragment()) || !isGlintPipeline(original)) {
             return null;
@@ -1281,6 +1377,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getSkyBasicPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasSkyBasicFragment() || pack.hasBasicFragment()) || !isSkyBasicPipeline(original)) {
             return null;
@@ -1303,6 +1400,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getSkyTexturedPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !(pack.hasSkyTexturedFragment() || pack.hasTexturedFragment()) || !isSkyTexturedPipeline(original)) {
             return null;
@@ -1325,6 +1423,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderPipeline getWorldBorderPipeline(RenderPipeline original) {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasTexturedFragment() || !isWorldBorderPipeline(original)) {
             return null;
@@ -1349,6 +1448,88 @@ public final class VeyraRenderer {
         return lastError;
     }
 
+    private static void resetShadowPipelineState() {
+        shadowEntityPipelinePack = null;
+        shadowEntityPipelineSet = null;
+        shadowBlockEntityPipelineSet = null;
+        shadowEntityPipelineAttempted = false;
+        shadowBlockEntityPipelineAttempted = false;
+        shadowBeaconBeamPipelinePack = null;
+        shadowBeaconBeamPipelineSet = null;
+        shadowBeaconBeamPipelineAttempted = false;
+    }
+
+    private static void releaseDepthCapturePasses() {
+        if (depthTex1CapturePass != null) depthTex1CapturePass.close();
+        if (depthTex2CapturePass != null) depthTex2CapturePass.close();
+        depthTex1CapturePass = null;
+        depthTex2CapturePass = null;
+        depthTex1CaptureProgram = null;
+    }
+
+    private static void purgeUnusedPipelines() {
+        Set<RenderPipeline> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (pipelineSet != null) {
+            pipelineSet.plansA().forEach(plan -> plan.shaderPasses().forEach(pass -> live.add(pass.program().pipeline())));
+            pipelineSet.plansB().forEach(plan -> plan.shaderPasses().forEach(pass -> live.add(pass.program().pipeline())));
+            PIPELINE_CACHE.values().stream().filter(program -> program.pipeline().getLocation().getPath().contains("/copy_"))
+                    .forEach(program -> live.add(program.pipeline()));
+        }
+        if (depthTex1CaptureProgram != null) live.add(depthTex1CaptureProgram.pipeline());
+        if (entityPipelineSet != null) live.addAll(entityPipelineSet.pipelines().values());
+        if (shadowEntityPipelineSet != null) live.addAll(shadowEntityPipelineSet.pipelines().values());
+        if (shadowBlockEntityPipelineSet != null) live.addAll(shadowBlockEntityPipelineSet.pipelines().values());
+        if (blockEntityPipelineSet != null) live.addAll(blockEntityPipelineSet.pipelines().values());
+        if (handPipelineSet != null) live.addAll(handPipelineSet.pipelines().values());
+        if (particlePipelineSet != null) live.addAll(particlePipelineSet.pipelines().values());
+        if (weatherPipelineSet != null) live.addAll(weatherPipelineSet.pipelines().values());
+        if (lightningPipelineSet != null) live.addAll(lightningPipelineSet.pipelines().values());
+        if (basicPipelineSet != null) live.addAll(basicPipelineSet.pipelines().values());
+        if (linePipelineSet != null) live.addAll(linePipelineSet.pipelines().values());
+        if (glintPipelineSet != null) live.addAll(glintPipelineSet.pipelines().values());
+        if (skyBasicPipelineSet != null) live.addAll(skyBasicPipelineSet.pipelines().values());
+        if (skyTexturedPipelineSet != null) live.addAll(skyTexturedPipelineSet.pipelines().values());
+        if (worldBorderPipelineSet != null) live.addAll(worldBorderPipelineSet.pipelines().values());
+        if (damagedBlockPipelineSet != null) live.addAll(damagedBlockPipelineSet.pipelines().values());
+        if (beaconBeamPipelineSet != null) live.addAll(beaconBeamPipelineSet.pipelines().values());
+        if (shadowBeaconBeamPipelineSet != null) live.addAll(shadowBeaconBeamPipelineSet.pipelines().values());
+        ENTITY_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        PARTICLE_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        WEATHER_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        LIGHTNING_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        COLOR_DISTANCE_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        GLINT_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        SKY_BASIC_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        SKY_TEXTURED_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        TEXTURED_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        BEACON_BEAM_PIPELINE_CACHE.values().removeIf(pipeline -> !live.contains(pipeline));
+        PIPELINE_CACHE.values().removeIf(program -> !live.contains(program.pipeline()));
+        COMPILED_PIPELINES.removeIf(program -> !live.contains(program.pipeline()));
+        VeyraPipelineResources.retain(live);
+    }
+
+    public static String selectWithSavedOptions(ShaderPack pack) {
+        try { return select(repository.loadConfiguration(pack)); }
+        catch (IOException exception) {
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not read shader options for {}", pack.name(), exception);
+            return "Could not load options: " + lastError;
+        }
+    }
+
+    public static String applyOptions(ShaderPack pack, Map<String, String> changed) {
+        ShaderPack active = selectedPack().orElse(null);
+        if (active == null || !active.path().equals(pack.path())) return "Select this shader pack before applying its options.";
+        try {
+            Map<String, String> validated = pack.readOptions().validate(changed);
+            if (validated.equals(active.configuration().options())) return "Shader options unchanged.";
+            return select(active.configured(validated, active.configuration().dimension()));
+        } catch (IOException exception) {
+            lastError = shortError(exception);
+            return "Could not apply options: " + lastError;
+        }
+    }
+
     public static String refreshPacks() {
         ShaderPack previous = selectedPack().orElse(null);
         try {
@@ -1366,10 +1547,11 @@ public final class VeyraRenderer {
             return "The active pack is no longer available. " + disable();
         }
         // select() compiles before committing the selection, retaining the old pipelines on failure.
-        return select(refreshed);
+        return selectWithSavedOptions(refreshed);
     }
 
     public static void onClientShutdown() {
+        VeyraSpecularTextures.invalidate();
         restoreUniqueOpaqueLayer();
         replacePipelineSet(null);
         replaceTerrainPipelines(null);
@@ -1391,6 +1573,10 @@ public final class VeyraRenderer {
         releaseColorTargets();
         releaseSwapTargets();
         VeyraShadowRenderer.release();
+        resetShadowPipelineState();
+        releaseDepthCapturePasses();
+        purgeUnusedPipelines();
+        VeyraNoiseTexture.close();
     }
 
     public static String select(ShaderPack pack) {
@@ -1412,6 +1598,7 @@ public final class VeyraRenderer {
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
         try {
+            pack.validatePipelineCapabilities();
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
@@ -1517,7 +1704,8 @@ public final class VeyraRenderer {
             damagedBlockPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             cloudPipelineDirty = false;
-            renderingEnabled = pipelineSet.passCount() > 0;
+            nextPostPhase = 0;
+            renderingEnabled = pack.supportsShaderPrograms();
             lastError = "";
             boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
             int terrainProgramCount = hasTerrainPipelines ? terrainPipelineSet.pipelines().size() : 0;
@@ -1595,6 +1783,8 @@ public final class VeyraRenderer {
             if (beaconBeamPipelineCount > 0) {
                 features.add(beaconBeamPipelineCount + " beacon beam pipelines");
             }
+            resetShadowPipelineState();
+            purgeUnusedPipelines();
             return "Enabled " + pack.name() + " (" + String.join(", ", features) + ").";
         } catch (Exception exception) {
             if (prepared != null) {
@@ -1619,6 +1809,7 @@ public final class VeyraRenderer {
             if (preparedClouds != null) {
                 preparedClouds.scheduleCleanUp();
             }
+            purgeUnusedPipelines();
             lastError = shortError(exception);
             VeyraClient.LOGGER.error("Could not enable shader pack '{}'.", pack.name(), exception);
             return "Shader compile failed: " + lastError;
@@ -1626,6 +1817,7 @@ public final class VeyraRenderer {
     }
 
     public static String disable() {
+        VeyraSpecularTextures.invalidate();
         IOException saveFailure = null;
         try {
             repository.select(null);
@@ -1675,14 +1867,21 @@ public final class VeyraRenderer {
         releaseColorTargets();
         releaseSwapTargets();
         VeyraShadowRenderer.release();
+        resetShadowPipelineState();
+        releaseDepthCapturePasses();
+        purgeUnusedPipelines();
         lastError = saveFailure == null ? "" : shortError(saveFailure);
         return saveFailure == null ? "Shader pack disabled."
                 : "Shaders disabled for this session. Could not save the setting: " + lastError;
     }
 
     public static void invalidatePipelines() {
+        VeyraSpecularTextures.invalidate();
+        nextPostPhase = 0;
         pipelinesDirty = true;
         projectionBuffer = null;
+        resetShadowPipelineState();
+        releaseDepthCapturePasses();
         PIPELINE_CACHE.clear();
         COMPILED_PIPELINES.clear();
         replacePipelineSet(null);
@@ -1702,6 +1901,7 @@ public final class VeyraRenderer {
         replaceDamagedBlockPipelines(null);
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
+        purgeUnusedPipelines();
         terrainPipelineDirty = selectedPack().map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment()).orElse(false);
         entityPipelineDirty = selectedPack().map(ShaderPack::hasEntityFragment).orElse(false);
         blockEntityPipelineDirty = selectedPack().map(ShaderPack::supportsBlockEntityPipeline).orElse(false);
@@ -1720,7 +1920,20 @@ public final class VeyraRenderer {
         cloudPipelineDirty = selectedPack().map(ShaderPack::hasCloudFragment).orElse(false);
     }
 
-    public static void render(Minecraft minecraft) {
+    private static int nextPostPhase;
+
+    public static void renderPrepare(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.PREPARE); }
+    public static void renderDeferred(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.DEFERRED); }
+    public static void render(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.COMPOSITE); }
+
+    private static void renderThroughPhase(Minecraft minecraft, ShaderPassPhase requested) {
+        while (nextPostPhase <= requested.ordinal() && isRenderingEnabled()) {
+            ShaderPassPhase phase = ShaderPassPhase.values()[nextPostPhase++];
+            renderPhase(minecraft, phase);
+        }
+    }
+
+    private static void renderPhase(Minecraft minecraft, ShaderPassPhase phase) {
         if (!isRenderingEnabled() || minecraft.level == null || minecraft.player == null) {
             return;
         }
@@ -1733,13 +1946,16 @@ public final class VeyraRenderer {
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
             if (pipelineSet.usesShadowSampler() && VeyraShadowRenderer.shadowDepthTextureView() == null) {
-                throw new IllegalStateException("The shader pack samples shadowtex0, but VulkanMod did not produce a shadow map.");
+                throw new IllegalStateException("The post program requires shadow inputs, but VulkanMod did not produce a shadow map.");
             }
             ensureSwapTargets(mainTarget.width, mainTarget.height);
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
-            clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
-            FramePlan framePlan = pipelineSet.framePlan(currentColorTargets);
+            if (phase == ShaderPassPhase.PREPARE) clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
+            FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
+            if (framePlan.shaderPasses().isEmpty()) return;
+            ensureInitialDepthSnapshots(framePlan, mainTarget.width, mainTarget.height);
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
 
             FrameGraphBuilder graph = new FrameGraphBuilder();
             ResourceHandle<RenderTarget> main = graph.importExternal("main", mainTarget);
@@ -1761,17 +1977,35 @@ public final class VeyraRenderer {
             FrameUniforms frameUniforms = shaderPackFrameUniforms;
             for (ShaderPass shaderPass : framePlan.shaderPasses()) {
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
+                prepareSampledTargets(graph, targets, shaderPass.sampledTargets());
                 shaderPass.pass().addToFrame(graph, targets, samplerInfo);
             }
             if (framePlan.copyPass() != null) {
+                prepareSampledTargets(graph, targets, Set.of(framePlan.copyInputTarget()));
                 framePlan.copyPass().addToFrame(graph, targets, samplerInfo);
             }
             DepthSamplerState depthSamplerState = null;
-            if (pipelineSet.usesDepthSampler()) {
+            if (framePlan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepthSampler())) {
                 depthSampling = true;
                 depthSamplerState = prepareDepthSampler();
             }
-            graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            if (Boolean.getBoolean("veyra.graphicsSmoke") && graphTraceRuns < 6) {
+                int traceRun = ++graphTraceRuns;
+                VeyraClient.LOGGER.info("Tracing shader frame graph run {} for phase {}", traceRun, phase);
+                graph.execute(GraphicsResourceAllocator.UNPOOLED, new FrameGraphBuilder.Inspector() {
+                    @Override public void acquireResource(String name) { }
+                    @Override public void releaseResource(String name) { }
+                    @Override public void beforeExecutePass(String name) {
+                        VeyraClient.LOGGER.info("Frame graph run {} pass begins: {}", traceRun, name);
+                    }
+                    @Override public void afterExecutePass(String name) {
+                        VeyraClient.LOGGER.info("Frame graph run {} pass ends: {}", traceRun, name);
+                    }
+                });
+            } else {
+                graph.execute(GraphicsResourceAllocator.UNPOOLED);
+            }
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
             if (depthSamplerState != null) {
                 restoreDepthSampler(depthSamplerState);
             }
@@ -1793,6 +2027,8 @@ public final class VeyraRenderer {
         }
     }
 
+    private static int graphTraceRuns;
+
     private static void ensurePipelines(int width, int height) throws IOException {
         if (!pipelinesDirty && pipelineSet != null && pipelineSet.width() == width && pipelineSet.height() == height) {
             return;
@@ -1806,13 +2042,48 @@ public final class VeyraRenderer {
         PipelineSet prepared = compilePipelines(pack, width, height);
         replacePipelineSet(prepared);
         pipelinesDirty = false;
-        renderingEnabled = pipelineSet.passCount() > 0;
+        renderingEnabled = pack.supportsShaderPrograms();
         lastError = "";
         VeyraClient.LOGGER.info("Loaded {} post-processing pass(es) from shader pack '{}'.",
                 pipelineSet.passCount(), pack.name());
     }
 
+    private static void prepareSampledTargets(FrameGraphBuilder graph,
+            Map<Identifier, ResourceHandle<RenderTarget>> targets, Set<Identifier> sampledTargets) {
+        FramePass transition = graph.addPass("veyra:sampled-image-transitions");
+        List<ResourceHandle<RenderTarget>> images = new ArrayList<>();
+        for (Identifier id : sampledTargets) {
+            ResourceHandle<RenderTarget> input = targets.get(id);
+            if (input == null) throw new IllegalStateException("Missing sampled render target " + id);
+            // A layout transition writes resource state. Advancing its graph version orders
+            // this barrier after the producer and before PostPass consumes the new handle.
+            ResourceHandle<RenderTarget> ready = transition.readsAndWrites(input);
+            targets.put(id, ready);
+            images.add(ready);
+        }
+        transition.executes(() -> {
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                for (ResourceHandle<RenderTarget> handle : images) {
+                    GpuTexture color = handle.get().getColorTexture();
+                    if (!(color instanceof VkGpuTexture texture)) throw new IllegalStateException("Shaderpack input is not a Vulkan image.");
+                    var image = texture.getVulkanImage();
+                    if (Boolean.getBoolean("veyra.graphicsSmoke")) {
+                        VeyraClient.LOGGER.info("Sample transition: {} image={} layout-before={} command={}",
+                                handle.get().getColorTexture().getLabel(), Long.toHexString(image.getId()), image.getCurrentLayout(), Long.toHexString(Renderer.getCommandBuffer().address()));
+                    }
+                    image.transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    if (Boolean.getBoolean("veyra.graphicsSmoke")) {
+                        VeyraClient.LOGGER.info("Sample transition complete: image={} layout-after={} command={}",
+                                Long.toHexString(image.getId()), image.getCurrentLayout(), Long.toHexString(Renderer.getCommandBuffer().address()));
+                    }
+                }
+            }
+        });
+    }
+
     private static PipelineSet compilePipelines(ShaderPack pack, int width, int height) throws IOException {
+        pack.validatePipelineCapabilities();
         List<ShaderPack.Program> sources = pack.readPrograms();
         Map<Integer, ColorTargetSettings> colorTargetSettings = new HashMap<>(pack.readColorTargetSettings(
                 width, height, RenderSystem.getDevice().getMaxTextureSize()));
@@ -1822,7 +2093,24 @@ public final class VeyraRenderer {
         boolean usesDepth2Sampler = false;
         boolean usesShadowSampler = false;
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
+        for (String name : pack.terrainPrograms()) {
+            var fragment = pack.readTerrainFragment(name);
+            if (fragment.isPresent()) {
+                if (name.equals("gbuffers_water"))
+                    colorTargetIndices.addAll(GeometryColorSamplers.indices(GeometryColorSamplers.read(fragment.get())));
+                for (int index : FragmentOutputs.parse(fragment.get()).targets()) {
+                    if (index == 0) continue;
+                    colorTargetIndices.add(index);
+                    ColorTargetSettings settings = colorTargetSettings.getOrDefault(index, ColorTargetSettings.defaults(index, width, height));
+                    if (settings.width() != width || settings.height() != height)
+                        throw new IOException("Geometry colortex" + index + " must match the scene resolution; reduced-size geometry targets are not implemented.");
+                }
+            }
+        }
         for (ShaderPack.Program source : sources) {
+            if (TerrainShaderAdapter.usesNoiseSampler(source.source())) {
+                VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            }
             List<PipelineProgram> outputs = new ArrayList<>();
             List<String> vertexUniforms = source.vertexSource()
                     .map(shader -> readPostVertexUniforms(shader, source.name()))
@@ -1844,7 +2132,7 @@ public final class VeyraRenderer {
                     colorTargetIndices.add(adapted.outputTarget());
                 }
             }
-            programs.add(new ProgramGroup(List.copyOf(outputs)));
+            programs.add(new ProgramGroup(ShaderPassPhase.forProgram(source.name()), List.copyOf(outputs)));
         }
 
         for (int index : colorTargetIndices) {
@@ -1855,35 +2143,60 @@ public final class VeyraRenderer {
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
             copyProgram = pipelineProgram("copy",
-                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, false, false, Set.of(), 0), null);
+                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, false, false, Set.of(), Set.of(), 0), null);
             compilePipeline(copyProgram);
         }
 
-        FramePlan firstPlan = null;
-        FramePlan secondPlan = null;
+        List<FramePlan> firstPlans = null;
+        List<FramePlan> secondPlans = null;
         try {
             Map<Integer, Identifier> initialColorTargets = new HashMap<>();
-            for (int index : colorTargetIndices) {
-                initialColorTargets.put(index, colorTargetAId(index));
-            }
-            firstPlan = buildFramePlan(programs, copyProgram, width, height, initialColorTargets);
-            Map<Integer, Identifier> secondPlanInputs = firstPlan.outputColorTargets();
-            secondPlan = initialColorTargets.equals(secondPlanInputs)
-                    ? firstPlan
-                    : buildFramePlan(programs, copyProgram, width, height, secondPlanInputs);
-            return new PipelineSet(firstPlan, secondPlan, width, height,
+            for (int index : colorTargetIndices) initialColorTargets.put(index, colorTargetAId(index));
+            firstPlans = buildPhasePlans(programs, copyProgram, width, height, initialColorTargets);
+            Map<Integer, Identifier> secondInputs = firstPlans.getLast().outputColorTargets();
+            secondPlans = initialColorTargets.equals(secondInputs) ? firstPlans
+                    : buildPhasePlans(programs, copyProgram, width, height, secondInputs);
+            return new PipelineSet(firstPlans, secondPlans, width, height,
                     usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler,
-                    Map.copyOf(colorTargetSettings),
-                    Set.copyOf(colorTargetIndices));
+                    Map.copyOf(colorTargetSettings), Set.copyOf(colorTargetIndices));
         } catch (RuntimeException exception) {
-            if (firstPlan != null) {
-                firstPlan.close();
-            }
-            if (secondPlan != null && secondPlan != firstPlan) {
-                secondPlan.close();
-            }
+            if (firstPlans != null) firstPlans.forEach(FramePlan::close);
+            if (secondPlans != null && secondPlans != firstPlans) secondPlans.forEach(FramePlan::close);
             throw exception;
         }
+    }
+
+    private static List<FramePlan> buildPhasePlans(List<ProgramGroup> groups, PipelineProgram copy,
+            int width, int height, Map<Integer, Identifier> initial) {
+        List<FramePlan> plans = new ArrayList<>();
+        Map<Integer, Identifier> current = initial;
+        try {
+            for (ShaderPassPhase phase : ShaderPassPhase.values()) {
+                // Geometry between phases writes the main scene target. Rebase colortex0 to main,
+                // while preserving the physical ping-pong sides of every auxiliary color buffer.
+                FramePlan plan = buildFramePlan(groups.stream().filter(group -> group.phase() == phase).toList(),
+                        copy, width, height, current);
+                plans.add(plan);
+                current = plan.outputColorTargets();
+            }
+            return List.copyOf(plans);
+        } catch (RuntimeException exception) { plans.forEach(FramePlan::close); throw exception; }
+    }
+
+    private static void ensureInitialDepthSnapshots(FramePlan plan, int width, int height) {
+        GpuTexture depth = Renderer.getInstance().getMainPass().getDepthAttachment();
+        if (!(depth instanceof VkGpuTexture vulkanDepth)) return;
+        int format = vulkanDepth.getVulkanImage().format;
+        boolean needs1 = plan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepth1Sampler());
+        boolean needs2 = plan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepth2Sampler());
+        if (needs1) initializeDepthHistory(depthTex1Snapshot, width, height, format);
+        if (needs2) initializeDepthHistory(depthTex2Snapshot, width, height, format);
+    }
+
+    private static void initializeDepthHistory(VeyraDepthTextureSnapshot snapshot, int width, int height, int format) {
+        if (snapshot.isReady(width, height, format)) return;
+        snapshot.ensure(width, height, format);
+        snapshot.clearToFarDepth();
     }
 
     private static void validateColorTargetFormats(Set<Integer> indices,
@@ -2089,31 +2402,64 @@ public final class VeyraRenderer {
                 }
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable);
+                boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
+                boolean usesShadowColor = ShadowColorSampler.used(fragmentSource);
+                boolean usesOpaqueShadow = ShadowDepthSampler.used(fragmentSource);
+                if (usesSpecularSampler) VeyraSpecularTextures.prepareTerrain();
+                boolean usesOpaqueDepthSampler = programName.equals("gbuffers_water")
+                        && TerrainShaderAdapter.usesOpaqueDepthSampler(fragmentSource);
+                Set<Integer> colorInputs = programName.equals("gbuffers_water")
+                        ? GeometryColorSamplers.indices(GeometryColorSamplers.read(fragmentSource)) : Set.of();
+                if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                FragmentOutputs outputLayout = FragmentOutputs.parse(fragmentSource);
+                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
+                        programName.equals("gbuffers_water"));
 
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable));
+                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler, usesOpaqueDepthSampler, usesSpecularSampler, usesShadowColor, usesOpaqueShadow, colorInputs));
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
+                pipelines.put(programName, pipeline);
+                VeyraGeometryTargets.register(pipeline, outputLayout, pack.readGeometryBlendSettings(programName));
                 setShadowSamplerLayout(pipeline, shadowSamplerAvailable);
+                setNoiseSamplerLayout(pipeline);
+                if (usesSpecularSampler) pipeline.getImageDescriptor(VeyraSpecularTextures.SAMPLER).setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                var opaqueDepth = pipeline.getImageDescriptor("VeyraDepthTex1Sampler");
+                if (opaqueDepth != null) {
+                    opaqueDepth.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    opaqueDepth.isReadOnlyLayout = false;
+                }
+                for (int index : colorInputs) {
+                    var descriptor = pipeline.getImageDescriptor(GeometryColorSamplers.samplerName(index));
+                    descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    descriptor.isReadOnlyLayout = false;
+                }
                 for (UBO ubo : pipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
                 }
-                pipelines.put(programName, pipeline);
             }
             if (shadowSamplerAvailable) {
                 for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
                     String fragmentSource = pack.readShadowFragment(programName)
                             .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+                    if (!FragmentOutputs.parse(fragmentSource).sceneOnly())
+                        throw new IOException("Multiple shadow color attachments are not implemented yet.");
+                    boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                    boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
+                    if (usesSpecularSampler) VeyraSpecularTextures.prepareTerrain();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                    builder.applyConfig(terrainPipelineConfig(false));
+                    builder.applyConfig(terrainPipelineConfig(false, usesNoiseSampler, false, usesSpecularSampler, false, false, Set.of()));
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                     GraphicsPipeline shadowPipeline = builder.createGraphicsPipeline();
+                    setNoiseSamplerLayout(shadowPipeline);
+                    if (usesSpecularSampler) shadowPipeline.getImageDescriptor(VeyraSpecularTextures.SAMPLER).setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                     for (UBO ubo : shadowPipeline.getBuffers()) {
                         ubo.setUseGlobalBuffer(true);
                     }
@@ -2122,13 +2468,19 @@ public final class VeyraRenderer {
             }
             return new TerrainPipelineSet(Map.copyOf(pipelines), Map.copyOf(shadowPipelines));
         } catch (IOException | RuntimeException exception) {
+            pipelines.values().forEach(VeyraGeometryTargets::unregister);
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             throw exception;
         }
     }
 
-    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable) {
+    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable) {
+        return terrainPipelineConfig(shadowSamplerAvailable, noiseSamplerAvailable, false, false, false, false, Set.of());
+    }
+
+    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable,
+                                                       boolean opaqueDepthSamplerAvailable, boolean specularSamplerAvailable, boolean shadowColorAvailable, boolean opaqueShadowAvailable, Set<Integer> colorInputs) {
         PipelineConfig.UB.Builder terrainUniforms = PipelineConfig.UB.builder(
                         1, org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_ALL_GRAPHICS)
                 .addUniform("vec4", "FogColor")
@@ -2155,10 +2507,66 @@ public final class VeyraRenderer {
                 .setPushConstants(PipelineConfigs.TERRAIN_PC)
                 .addImageDescriptor(3, "sampler2D", "Sampler0", 0)
                 .addImageDescriptor(4, "sampler2D", "LightTexture", 2);
+        int nextBinding = 5;
         if (shadowSamplerAvailable) {
-            config.addImageDescriptor(5, "sampler2D", "VeyraShadowSampler", 3);
+            config.addImageDescriptor(nextBinding++, "sampler2D", "VeyraShadowSampler", 3);
+        }
+        if (noiseSamplerAvailable) {
+            config.addImageDescriptor(nextBinding++, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4);
+        }
+        if (opaqueDepthSamplerAvailable) {
+            config.addImageDescriptor(nextBinding++, "sampler2D", "VeyraDepthTex1Sampler", 5);
+        }
+        if (specularSamplerAvailable) config.addImageDescriptor(nextBinding++, "sampler2D", VeyraSpecularTextures.SAMPLER, 1);
+        if (opaqueShadowAvailable) config.addImageDescriptor(nextBinding++, "sampler2D", ShadowDepthSampler.NAME, ShadowDepthSampler.TERRAIN_SLOT);
+        if (shadowColorAvailable) config.addImageDescriptor(nextBinding++, "sampler2D", ShadowColorSampler.NAME, ShadowColorSampler.TERRAIN_SLOT);
+        int imageSlot = GeometryColorSamplers.FIRST_IMAGE_SLOT;
+        for (int index : new java.util.TreeSet<>(colorInputs)) {
+            if (opaqueShadowAvailable && imageSlot == ShadowDepthSampler.TERRAIN_SLOT) imageSlot++;
+            if (shadowColorAvailable && imageSlot == ShadowColorSampler.TERRAIN_SLOT) imageSlot++;
+            config.addImageDescriptor(nextBinding++, "sampler2D", GeometryColorSamplers.samplerName(index), imageSlot++);
         }
         return config.build();
+    }
+
+    /** The capture hook runs before water draws; bind the depth-only borrowed view, never scene depth. */
+    public static void bindTerrainOpaqueDepth(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor("VeyraDepthTex1Sampler");
+        if (descriptor == null) return;
+        var view = (net.vulkanmod.render.engine.VkTextureView) depthTex1Snapshot.sampledView();
+        view.texture().getVulkanImage().setSampler(
+                net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+        // WorldRenderer refreshes the indexed native table from VRenderSystem after pipeline bind.
+        // Keep both tables on the same live view, including after a resize or previous post draw.
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
+        net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx,
+                view.texture().getVulkanImage());
+    }
+
+    private static boolean terrainUsesOpaqueDepthSampler() {
+        return terrainPipelineSet != null && terrainPipelineSet.pipelines().values().stream()
+                .anyMatch(pipeline -> pipeline.getImageDescriptor("VeyraDepthTex1Sampler") != null);
+    }
+
+    public static void shadowInputFailed(Exception failure) {
+        renderingEnabled = false;
+        lastError = shortError(failure);
+    }
+
+    public static void materialInputFailed(Exception failure) {
+        renderingEnabled = false;
+        lastError = shortError(failure);
+        VeyraClient.LOGGER.error("Disabled shader rendering after a material texture failure.", failure);
+    }
+
+    private static void closeOpaqueDepthSnapshot() {
+        VRenderSystem.setShaderTexture(5, null);
+        depthTex1Snapshot.close();
+    }
+
+    private static void setNoiseSamplerLayout(GraphicsPipeline pipeline) {
+        var noiseSampler = pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME);
+        if (noiseSampler != null) noiseSampler.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
     private static void setShadowSamplerLayout(GraphicsPipeline pipeline, boolean shadowSamplerAvailable) {
@@ -2269,11 +2677,15 @@ public final class VeyraRenderer {
             try {
                 fragmentSource = (hand ? pack.readHandFragment(programName) : pack.readEntityFragment(programName))
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                    VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                }
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
-                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName, hand);
+                fragmentSource = EntityShaderAdapter.adaptFragment(
+                        fragmentSource, programName, hand, pack.hasShadowFragment());
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -2315,6 +2727,9 @@ public final class VeyraRenderer {
     private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack, String programName) throws IOException {
         String fragmentSource = pack.readShadowFragment(programName)
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+        if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+            VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+        }
         boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
         boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
         boolean requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
@@ -2357,7 +2772,9 @@ public final class VeyraRenderer {
                     }
                     return shaderManager.getShader(identifier, type);
                 };
-                shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader);
+                shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader,
+                        adaptedFragment.contains("uniform sampler2D VeyraNoiseSampler;"));
+                VeyraPipelineResources.track(shadowPipeline);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
                     throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2392,11 +2809,15 @@ public final class VeyraRenderer {
             try {
                 fragmentSource = pack.readBlockFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                    VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                }
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
-                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+                fragmentSource = EntityShaderAdapter.adaptFragment(
+                        fragmentSource, programName, false, pack.hasShadowFragment());
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -2447,9 +2868,13 @@ public final class VeyraRenderer {
         try {
             fragmentSource = pack.readBlockFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+            if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            }
             requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
             requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
-            fragmentSource = EntityShaderAdapter.adaptTextFragment(fragmentSource, programName);
+            fragmentSource = EntityShaderAdapter.adaptTextFragment(
+                    fragmentSource, programName, pack.hasShadowFragment());
         } catch (IOException exception) {
             VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
                     programName, exception.getMessage());
@@ -2594,9 +3019,11 @@ public final class VeyraRenderer {
         }
         Identifier selectedVertexShader = vertexShader;
         String selectedVertexSource = adaptedVertex;
-        RenderPipeline pipeline = selectedVertexSource == null
-                ? copyPipelineWithFragment(original, fragmentShader)
-                : copyPipelineWithShaders(original, selectedVertexShader, fragmentShader);
+        boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;");
+        boolean usesShadowSampler = fragmentSource.contains("uniform sampler2D Sampler3;");
+        RenderPipeline pipeline = copyPipelineWithShaders(original,
+                selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
+                fragmentShader, usesNoiseSampler, usesShadowSampler, TerrainShaderAdapter.usesSpecularSampler(fragmentSource), ShadowColorSampler.used(fragmentSource), ShadowDepthSampler.used(fragmentSource));
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
                 return fragmentSource;
@@ -2607,6 +3034,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2673,6 +3101,7 @@ public final class VeyraRenderer {
                         "pipeline/shadow_entities_beacon/" + sourceHash + "/"
                                 + original.getLocation().getPath().replace('/', '_'));
                 shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
+                VeyraPipelineResources.track(shadowPipeline);
                 CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
                     throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2706,6 +3135,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2798,6 +3228,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2871,6 +3302,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -2924,6 +3356,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -3004,6 +3437,7 @@ public final class VeyraRenderer {
             }
             return shaderManager.getShader(identifier, type);
         };
+        VeyraPipelineResources.track(pipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
@@ -3251,6 +3685,23 @@ public final class VeyraRenderer {
 
     private static RenderPipeline copyPipelineWithShaders(
             RenderPipeline original, Identifier vertexShader, Identifier fragmentShader) {
+        return copyPipelineWithShaders(original, vertexShader, fragmentShader, false);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader, boolean useNoiseSampler) {
+        return copyPipelineWithShaders(original, vertexShader, fragmentShader, useNoiseSampler, false);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler, boolean useShadowSampler) {
+        return copyPipelineWithShaders(original, vertexShader, fragmentShader, useNoiseSampler, useShadowSampler, false, false, false);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler, boolean useShadowSampler, boolean useSpecularSampler, boolean useShadowColor, boolean useOpaqueShadow) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(original.getLocation())
                 .withVertexShader(vertexShader)
@@ -3277,6 +3728,16 @@ public final class VeyraRenderer {
         });
         defines.flags().forEach(builder::withShaderDefine);
         original.getSamplers().forEach(builder::withSampler);
+        if (useNoiseSampler && !original.getSamplers().contains(VeyraNoiseTexture.SAMPLER_NAME)) {
+            builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
+        }
+        if (useShadowSampler && !original.getSamplers().contains("Sampler3")) {
+            builder.withSampler("Sampler3");
+        }
+        if (useSpecularSampler && !original.getSamplers().contains(VeyraSpecularTextures.SAMPLER))
+            builder.withSampler(VeyraSpecularTextures.SAMPLER);
+        if (useOpaqueShadow && !original.getSamplers().contains(ShadowDepthSampler.NAME)) builder.withSampler(ShadowDepthSampler.NAME);
+        if (useShadowColor && !original.getSamplers().contains(ShadowColorSampler.NAME)) builder.withSampler(ShadowColorSampler.NAME);
         for (RenderPipeline.UniformDescription uniform : original.getUniforms()) {
             if (uniform.type() == UniformType.TEXEL_BUFFER) {
                 builder.withUniform(uniform.name(), uniform.type(), uniform.textureFormat());
@@ -3294,6 +3755,12 @@ public final class VeyraRenderer {
 
     private static RenderPipeline copyShadowPipelineWithShaders(
             RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader) {
+        return copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader, false);
+    }
+
+    private static RenderPipeline copyShadowPipelineWithShaders(
+            RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(location)
                 .withVertexShader(vertexShader)
@@ -3316,6 +3783,9 @@ public final class VeyraRenderer {
         });
         defines.flags().forEach(builder::withShaderDefine);
         original.getSamplers().forEach(builder::withSampler);
+        if (useNoiseSampler && !original.getSamplers().contains(VeyraNoiseTexture.SAMPLER_NAME)) {
+            builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
+        }
         for (RenderPipeline.UniformDescription uniform : original.getUniforms()) {
             if (uniform.type() == UniformType.TEXEL_BUFFER) {
                 builder.withUniform(uniform.name(), uniform.type(), uniform.textureFormat());
@@ -3403,6 +3873,8 @@ public final class VeyraRenderer {
 
                 Identifier inputColortex0 = currentTargets.get(0);
                 for (PipelineProgram program : group.outputs()) {
+                    Set<Identifier> sampledTargets = new java.util.LinkedHashSet<>();
+                    sampledTargets.add(inputColortex0);
                     List<PostPass.Input> inputs = new ArrayList<>();
                     inputs.add(new PostPass.TargetInput("In", inputColortex0, false, true));
                     for (int samplerIndex : program.colorSamplers()) {
@@ -3411,6 +3883,7 @@ public final class VeyraRenderer {
                         }
                         inputs.add(new PostPass.TargetInput(
                                 colorTargetInputName(samplerIndex), currentTargets.get(samplerIndex), false, true));
+                        sampledTargets.add(currentTargets.get(samplerIndex));
                     }
                     if (program.usesDepthSampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH_INPUT_NAME));
@@ -3421,13 +3894,16 @@ public final class VeyraRenderer {
                     if (program.usesDepth2Sampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH2_INPUT_NAME));
                     }
-                    if (program.usesShadowSampler()) {
-                        inputs.add(new ExternalTextureInput(SHADOW_DEPTH_INPUT_NAME));
+                    for (PostShadowSamplers.Input input : PostShadowSamplers.Input.values())
+                        if (program.shadowInputs().contains(input)) inputs.add(new ExternalTextureInput(input.inputName()));
+                    if (program.fragmentSource().contains("uniform sampler2D "
+                            + VeyraNoiseTexture.SAMPLER_NAME + ";")) {
+                        inputs.add(new ExternalTextureInput(NOISE_INPUT_NAME));
                     }
                     PostPass pass = new PostPass(program.pipeline(),
                             outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
-                    passes.add(new ShaderPass(pass, program));
+                    passes.add(new ShaderPass(pass, program, Set.copyOf(sampledTargets)));
                     if (usesDynamicUniforms(program)) {
                         makeDynamicUniformBuffer(pass, program, width, height);
                     }
@@ -3446,7 +3922,7 @@ public final class VeyraRenderer {
                     outputColorTargets.put(index, target);
                 }
             });
-            return new FramePlan(List.copyOf(passes), copyPass,
+            return new FramePlan(List.copyOf(passes), copyPass, copyPass == null ? null : finalColortex0,
                     Map.copyOf(initialColorTargets), Map.copyOf(outputColorTargets));
         } catch (RuntimeException exception) {
             passes.forEach(shaderPass -> shaderPass.pass().close());
@@ -3494,13 +3970,16 @@ public final class VeyraRenderer {
                     ? BLIT_VERTEX_ID
                     : Identifier.fromNamespaceAndPath("veyra", "shaderpack_vertex/" + suffix);
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
+            boolean usesNoiseSampler = shader.source().contains("uniform sampler2D "
+                    + VeyraNoiseTexture.SAMPLER_NAME + ";");
             return new PipelineProgram(shaderId, shader.source(), vertexShaderId, vertexSource, shader.uniforms(),
                     shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
-                    shader.usesShadowSampler(),
+                    shader.usesShadowSampler(), shader.shadowInputs(),
                     shader.colorSamplers(), shader.outputTarget(),
                     createPipeline(pipelineId, shaderId, vertexShaderId, shader.uniforms(),
                             shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
-                            shader.usesShadowSampler(),
+                            shader.shadowInputs(),
+                            usesNoiseSampler,
                             shader.colorSamplers()));
         });
     }
@@ -3521,6 +4000,8 @@ public final class VeyraRenderer {
             return shaderManager.getShader(identifier, type);
         };
 
+        VeyraPipelineResources.track(program.pipeline());
+
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(program.pipeline(), source);
         if (!compiled.isValid()) {
             throw new IllegalStateException("VulkanMod could not compile pipeline " + program.pipeline().getLocation() + ".");
@@ -3531,7 +4012,8 @@ public final class VeyraRenderer {
     private static RenderPipeline createPipeline(
             Identifier pipeline, Identifier fragmentShader, Identifier vertexShader, List<String> uniforms,
             boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-            boolean usesShadowSampler,
+            Set<PostShadowSamplers.Input> shadowInputs,
+            boolean usesNoiseSampler,
             Set<Integer> colorSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                 .withFragmentShader(fragmentShader)
@@ -3548,8 +4030,10 @@ public final class VeyraRenderer {
         if (usesDepth2Sampler) {
             builder.withSampler(DEPTH2_INPUT_SAMPLER);
         }
-        if (usesShadowSampler) {
-            builder.withSampler(SHADOW_DEPTH_INPUT_SAMPLER);
+        for (PostShadowSamplers.Input input : PostShadowSamplers.Input.values())
+            if (shadowInputs.contains(input)) builder.withSampler(input.samplerName());
+        if (usesNoiseSampler) {
+            builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
         }
         for (int colorSampler : colorSamplers) {
             if (colorSampler > 0) {
@@ -3580,30 +4064,20 @@ public final class VeyraRenderer {
         if (unsupportedDepthSampler.find()) {
             throw new IOException("Veyra supports depthtex0, depthtex1, and depthtex2 for depth texture sampling on VulkanMod.");
         }
-        Matcher unsupportedShadowSampler = UNSUPPORTED_SHADOW_SAMPLER.matcher(body);
-        if (unsupportedShadowSampler.find()) {
-            throw new IOException("Veyra currently supports only the shadowtex0 depth sampler in post-processing programs.");
-        }
-        boolean usesShadowSampler = SHADOW_DEPTH_SAMPLER.matcher(body).find();
-        if (usesShadowSampler && !shadowPassAvailable) {
-            throw new IOException("The post-processing program samples shadowtex0, but the shader pack has no shadow pass.");
-        }
-        Matcher shadowSamplerDeclaration = SHADOW_DEPTH_UNIFORM_DECLARATION.matcher(body);
-        StringBuffer bodyWithoutShadowSampler = new StringBuffer();
-        boolean declaredShadowSampler = false;
-        while (shadowSamplerDeclaration.find()) {
-            String samplerType = shadowSamplerDeclaration.group(1);
-            if (!samplerType.equals("sampler2D") && !samplerType.equals("sampler2DShadow")) {
-                throw new IOException("shadowtex0 must be declared as sampler2D or sampler2DShadow.");
+        PostShadowSamplers.Adapted shadows = PostShadowSamplers.adapt(body, shadowPassAvailable);
+        body = shadows.source();
+        boolean usesNoiseSampler = NOISETEX_REFERENCE.matcher(body).find();
+        boolean usesShadowSampler = !shadows.inputs().isEmpty();
+        Matcher noiseSamplerDeclaration = NOISETEX_UNIFORM_DECLARATION.matcher(body);
+        StringBuffer bodyWithoutNoiseSampler = new StringBuffer();
+        while (noiseSamplerDeclaration.find()) {
+            if (!noiseSamplerDeclaration.group(1).equals("sampler2D")) {
+                throw new IOException("noisetex must be declared as sampler2D.");
             }
-            if (declaredShadowSampler) {
-                throw new IOException("shadowtex0 is declared more than once.");
-            }
-            declaredShadowSampler = true;
-            shadowSamplerDeclaration.appendReplacement(bodyWithoutShadowSampler, "");
+            noiseSamplerDeclaration.appendReplacement(bodyWithoutNoiseSampler, "");
         }
-        shadowSamplerDeclaration.appendTail(bodyWithoutShadowSampler);
-        body = bodyWithoutShadowSampler.toString();
+        noiseSamplerDeclaration.appendTail(bodyWithoutNoiseSampler);
+        body = bodyWithoutNoiseSampler.toString();
         Matcher depthSampler = DEPTH_SAMPLER.matcher(body);
         boolean usesDepthSampler = depthSampler.find();
         Matcher depth1Sampler = DEPTH1_SAMPLER.matcher(body);
@@ -3619,6 +4093,9 @@ public final class VeyraRenderer {
             }
             colorSamplers.add(index);
         }
+        PostShadowSamplers.validateBudget(shadows.inputs(), 1 + (usesDepthSampler ? 1 : 0)
+                + (usesDepth1Sampler ? 1 : 0) + (usesDepth2Sampler ? 1 : 0) + (usesNoiseSampler ? 1 : 0)
+                + (int) colorSamplers.stream().filter(index -> index > 0).count());
         String uniformSource = body;
         List<String> uniforms = SUPPORTED_UNIFORMS.stream()
                 .filter(uniform -> containsIdentifier(uniformSource, uniform) || additionalUniforms.contains(uniform))
@@ -3654,12 +4131,10 @@ public final class VeyraRenderer {
         body = DEPTH1_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH2_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
+        body = SUPPORTED_IVEC2_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
-        if (usesShadowSampler) {
-            body = body.replaceAll("\\b(?:texture2D|texture)\\s*\\(\\s*shadowtex0\\s*,", "veyraSample(shadowtex0,");
-        }
         body = body.replaceAll("\\btexture2D\\s*\\(", "texture(");
 
         List<AdaptedShader> adaptedShaders = new ArrayList<>(outputMappings.size());
@@ -3687,25 +4162,7 @@ public final class VeyraRenderer {
                 }
             }
             appendShaderPackUniformBlock(adapted, uniforms);
-            if (usesShadowSampler) {
-                adapted.append("""
-                        vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
-                            return texture(sourceSampler, sourceUv);
-                        }
-                        vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv, float lodBias) {
-                            return texture(sourceSampler, sourceUv, lodBias);
-                        }
-                        vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
-                            float visibility = step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
-                            return vec4(visibility);
-                        }
-                        vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord, float lodBias) {
-                            float visibility = step(sourceCoord.z - 0.0005,
-                                    textureLod(sourceSampler, sourceCoord.xy, lodBias).r);
-                            return vec4(visibility);
-                        }
-                        """);
-            }
+            adapted.append(PostShadowSamplers.bridge(shadows.inputs()));
             adapted.append("uniform sampler2D InSampler;\n")
                     .append("#define colortex0 InSampler\n")
                     .append("#define Sampler0 InSampler\n")
@@ -3733,14 +4190,13 @@ public final class VeyraRenderer {
                 adapted.append("uniform sampler2D ").append(DEPTH2_INPUT_SAMPLER).append(";\n")
                         .append("#define depthtex2 ").append(DEPTH2_INPUT_SAMPLER).append('\n');
             }
-            if (usesShadowSampler) {
-                adapted.append("uniform sampler2D ").append(SHADOW_DEPTH_INPUT_SAMPLER).append(";\n")
-                        .append("#define shadowtex0 ").append(SHADOW_DEPTH_INPUT_SAMPLER).append('\n')
-                        .append("#define shadow2D(shadowSampler, coord) veyraSample(shadowSampler, coord)\n");
+            if (usesNoiseSampler) {
+                adapted.append("uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
+                        .append("#define noisetex ").append(VeyraNoiseTexture.SAMPLER_NAME).append('\n');
             }
             adapted.append(outputBody);
             adaptedShaders.add(new AdaptedShader(adapted.toString(), uniforms,
-                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler,
+                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler, shadows.inputs(),
                     Set.copyOf(colorSamplers), output.targetIndex()));
         }
         return List.copyOf(adaptedShaders);
@@ -4040,7 +4496,13 @@ public final class VeyraRenderer {
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
                 case "worldTime" -> new UniformValue.IntUniform(frameUniforms.worldTime());
                 case "worldDay" -> new UniformValue.IntUniform(frameUniforms.worldDay());
+                case "moonPhase" -> new UniformValue.IntUniform(frameUniforms.moonPhase());
+                case "bedrockLevel" -> new UniformValue.IntUniform(frameUniforms.bedrockLevel());
+                case "cloudHeight" -> new UniformValue.FloatUniform(frameUniforms.cloudHeight());
+                case "endFlashIntensity" -> new UniformValue.FloatUniform(frameUniforms.endFlashIntensity());
                 case "eyeAltitude" -> new UniformValue.FloatUniform(frameUniforms.eyeAltitude());
+                case "eyeBrightness" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightness());
+                case "eyeBrightnessSmooth" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightnessSmooth());
                 case "screenBrightness" -> new UniformValue.FloatUniform(frameUniforms.screenBrightness());
                 case "blindness" -> new UniformValue.FloatUniform(frameUniforms.blindness());
                 case "nightVision" -> new UniformValue.FloatUniform(frameUniforms.nightVision());
@@ -4128,17 +4590,19 @@ public final class VeyraRenderer {
     }
 
     private static FrameUniforms updateFrameUniforms(Minecraft minecraft) {
-        long now = System.nanoTime();
-        frameTime = previousFrameNanos == 0L ? 0.0F : (now - previousFrameNanos) / 1_000_000_000.0F;
-        previousFrameNanos = now;
-        frameTimeCounter = (frameTimeCounter + frameTime) % 3600.0F;
-        frameCounter = frameCounter >= 720719 ? 0 : frameCounter + 1;
-
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         long dayTime = minecraft.level.getDayTime();
         int worldTime = (int) Math.floorMod(dayTime, 24000L);
+        MoonPhase moonPhaseValue = minecraft.level.environmentAttributes()
+                .getDimensionValue(EnvironmentAttributes.MOON_PHASE);
+        int moonPhase = moonPhaseValue.index();
+        float cloudHeight = minecraft.level.environmentAttributes()
+                .getDimensionValue(EnvironmentAttributes.CLOUD_HEIGHT);
+        var endFlashState = minecraft.level.endFlashState();
+        float endFlashIntensity = endFlashState == null ? 0.0F : endFlashState.getIntensity(partialTick);
         float sunAngle = (worldTime + partialTick) / 24000.0F;
         int worldDay = (int) Math.floorDiv(dayTime, 24000L);
+        int bedrockLevel = minecraft.level.getMinY();
         float rainStrength = minecraft.level.getRainLevel(partialTick);
         float thunderStrength = minecraft.level.getThunderLevel(partialTick);
         if (wetnessLevel != minecraft.level) {
@@ -4156,10 +4620,39 @@ public final class VeyraRenderer {
         int isEyeInWater = player.isEyeInFluid(FluidTags.WATER) ? 1
                 : player.isEyeInFluid(FluidTags.LAVA) ? 2 : player.isInPowderSnow ? 3 : 0;
         return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength, wetness,
-                thunderStrength, worldTime, worldDay, (float) player.getEyeY(),
+                thunderStrength, worldTime, worldDay, moonPhase, bedrockLevel, cloudHeight, endFlashIntensity,
+                (float) player.getEyeY(),
                 (float) (double) minecraft.options.gamma().get(), blindness, nightVision, darknessFactor,
                 isEyeInWater, player.isSpectator(), player.isCrouching(), player.isSprinting(), player.onGround(),
                 player.hurtTime > 0, player.isInvisible(), player.isOnFire(), frameMatrices, cameraUniforms);
+    }
+
+    private static void updateFrameClock() {
+        long now = System.nanoTime();
+        frameTime = previousFrameNanos == 0L ? 0.0F
+                : Math.max(0.0F, (now - previousFrameNanos) / 1_000_000_000.0F);
+        previousFrameNanos = now;
+        frameTimeCounter = (frameTimeCounter + frameTime) % 3600.0F;
+        frameCounter = frameCounter >= 720719 ? 0 : frameCounter + 1;
+    }
+
+    private static float selectedEyeBrightnessHalfLifeTicks() {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == eyeBrightnessHalfLifePack) {
+            return eyeBrightnessHalfLifeTicks;
+        }
+        eyeBrightnessHalfLifePack = pack;
+        if (pack == null) {
+            eyeBrightnessHalfLifeTicks = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
+            return eyeBrightnessHalfLifeTicks;
+        }
+        try {
+            eyeBrightnessHalfLifeTicks = pack.readEyeBrightnessHalflife();
+        } catch (IOException exception) {
+            eyeBrightnessHalfLifeTicks = EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS;
+            VeyraClient.LOGGER.warn("Could not read eyeBrightnessHalflife; using Iris' default of ten ticks.", exception);
+        }
+        return eyeBrightnessHalfLifeTicks;
     }
 
     private static boolean containsIdentifier(String source, String identifier) {
@@ -4227,6 +4720,13 @@ public final class VeyraRenderer {
     }
 
     private static void releaseColorTargets() {
+        VeyraGeometryTargets.releaseTargets();
+        geometryColorBindings.forEach((slot, binding) -> {
+            if (VRenderSystem.getShaderTexture(slot) == binding.view()) VRenderSystem.setShaderTexture(slot, null);
+            if (net.vulkanmod.vulkan.texture.VTextureSelector.getImage(slot) == binding.image())
+                net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(slot, null);
+        });
+        geometryColorBindings.clear();
         colorTargets.values().forEach(pair -> {
             pair.targetA().destroyBuffers();
             pair.targetB().destroyBuffers();
@@ -4234,6 +4734,44 @@ public final class VeyraRenderer {
         colorTargets.clear();
         initializedColorTargets.clear();
         currentColorTargets.clear();
+    }
+
+    public static net.vulkanmod.vulkan.texture.VulkanImage geometryColorAttachment(int index) {
+        return ((VkGpuTexture) geometryColorTarget(index).getColorTexture()).getVulkanImage();
+    }
+
+    private static RenderTarget geometryColorTarget(int index) {
+        ColorTargetPair pair = colorTargets.get(index);
+        if (pair == null) throw new IllegalStateException("Geometry colortex" + index + " has not been allocated.");
+        Identifier side = currentColorTargets.get(index);
+        if (side == null) throw new IllegalStateException("Geometry color buffers have not been initialized for this frame.");
+        return colorTargetAId(index).equals(side) ? pair.targetA() : pair.targetB();
+    }
+
+    /** End attachment writes before sampling the current color-buffer sides in water geometry. */
+    public static boolean prepareTerrainColorSamplers(GraphicsPipeline pipeline) {
+        Renderer renderer = Renderer.getInstance();
+        boolean endedPass = false;
+        for (int index = 1; index <= MAX_COLORTEX_INDEX; index++) {
+            var descriptor = pipeline.getImageDescriptor(GeometryColorSamplers.samplerName(index));
+            if (descriptor == null) continue;
+            var target = geometryColorTarget(index);
+            var image = ((VkGpuTexture) target.getColorTexture()).getVulkanImage();
+            if (image.getCurrentLayout() != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+                if (renderer.getBoundRenderPass() != null) {
+                    renderer.endRenderPass();
+                    endedPass = true;
+                }
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    image.transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                }
+            }
+            image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+            VRenderSystem.setShaderTexture(descriptor.imageIdx, target.getColorTextureView());
+            net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx, image);
+            geometryColorBindings.put(descriptor.imageIdx, new GeometryColorBinding(target.getColorTextureView(), image));
+        }
+        return endedPass;
     }
 
     private static void ensureColorTargets(int width, int height, Set<Integer> indices,
@@ -4257,6 +4795,7 @@ public final class VeyraRenderer {
             changed |= ensureColorTarget(pair.targetA(), index, "A", targetSettings);
             changed |= ensureColorTarget(pair.targetB(), index, "B", targetSettings);
             if (changed) {
+                VeyraGeometryTargets.releaseTargets();
                 initializedColorTargets.remove(index);
                 resized = true;
                 VeyraClient.LOGGER.info("Configured colortex{} {}x{} {}.", index,
@@ -4370,10 +4909,24 @@ public final class VeyraRenderer {
             if (initializedColorTargets.contains(index) && !targetSettings.clearEachFrame()) {
                 continue;
             }
-            commandEncoder.clearColorTexture(pair.targetA().getColorTexture(), targetSettings.clearColor());
-            commandEncoder.clearColorTexture(pair.targetB().getColorTexture(), targetSettings.clearColor());
+            clearColorTarget(commandEncoder, pair.targetA(), targetSettings.clearColor());
+            clearColorTarget(commandEncoder, pair.targetB(), targetSettings.clearColor());
             initializedColorTargets.add(index);
         }
+    }
+
+    private static void clearColorTarget(com.mojang.blaze3d.systems.CommandEncoder commandEncoder,
+                                         RenderTarget target, int clearColor) {
+        GpuTexture texture = target.getColorTexture();
+        commandEncoder.clearColorTexture(texture, clearColor);
+        if (!(texture instanceof VkGpuTexture vulkanTexture)) {
+            throw new IllegalStateException("VulkanMod did not allocate a Vulkan texture for shaderpack color targets.");
+        }
+        // VulkanMod clears immediately here but marks the texture for another deferred clear.
+        // PostPassM would then open it as an attachment and transition it on ImageUploadHelper's
+        // command buffer while the shader pass samples it. The clear already happened, so drop
+        // that stale deferred-clear request.
+        ((VkGpuTextureAccessor) vulkanTexture).veyra$setNeedsClear(false);
     }
 
     private static void replacePipelineSet(PipelineSet next) {
@@ -4397,8 +4950,8 @@ public final class VeyraRenderer {
             sampledDepthTextureView = null;
             sampledDepthTexture = null;
         }
-        if (next == null || !next.usesDepth1Sampler()) {
-            depthTex1Snapshot.close();
+        if ((next == null || !next.usesDepth1Sampler()) && !terrainUsesOpaqueDepthSampler()) {
+            closeOpaqueDepthSnapshot();
         }
         if (next == null || !next.usesDepth2Sampler()) {
             depthTex2Snapshot.close();
@@ -4410,6 +4963,9 @@ public final class VeyraRenderer {
         terrainPipelineSet = next;
         if (old != null && old != next) {
             old.close();
+        }
+        if (!terrainUsesOpaqueDepthSampler() && (pipelineSet == null || !pipelineSet.usesDepth1Sampler())) {
+            closeOpaqueDepthSnapshot();
         }
     }
 
@@ -4487,7 +5043,7 @@ public final class VeyraRenderer {
 
     private record AdaptedShader(String source, List<String> uniforms,
                                  boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-                                 boolean usesShadowSampler,
+                                 boolean usesShadowSampler, Set<PostShadowSamplers.Input> shadowInputs,
                                  Set<Integer> colorSamplers, int outputTarget) {
     }
 
@@ -4500,7 +5056,7 @@ public final class VeyraRenderer {
     private record PipelineProgram(Identifier shaderId, String fragmentSource,
                                    Identifier vertexShaderId, String vertexSource, List<String> uniforms,
                                    boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-                                   boolean usesShadowSampler,
+                                   boolean usesShadowSampler, Set<PostShadowSamplers.Input> shadowInputs,
                                    Set<Integer> colorSamplers,
                                    int outputTarget, RenderPipeline pipeline) {
     }
@@ -4532,27 +5088,31 @@ public final class VeyraRenderer {
     private record BeaconBeamPipelineKey(RenderPipeline original, String sourceHash) {
     }
 
-    private record ProgramGroup(List<PipelineProgram> outputs) {
+    private record ProgramGroup(ShaderPassPhase phase, List<PipelineProgram> outputs) {
     }
 
     private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {
     }
 
+    private record GeometryColorBinding(GpuTextureView view, VulkanImage image) { }
+
     private record OutputMapping(int fragmentOutputIndex, int targetIndex) {
     }
 
-    private record ShaderPass(PostPass pass, PipelineProgram program) {
+    private record ShaderPass(PostPass pass, PipelineProgram program, Set<Identifier> sampledTargets) {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
                                  float sunAngle, float rainStrength, float wetness, float thunderStrength,
-                                 int worldTime, int worldDay, float eyeAltitude, float screenBrightness,
+                                 int worldTime, int worldDay, int moonPhase, int bedrockLevel,
+                                 float cloudHeight, float endFlashIntensity,
+                                 float eyeAltitude, float screenBrightness,
                                  float blindness, float nightVision, float darknessFactor,
                                  int isEyeInWater, boolean isSpectator, boolean isSneaking, boolean isSprinting,
                                  boolean isOnGround, boolean isHurt, boolean isInvisible, boolean isBurning,
                                  FrameMatrices matrices, CameraUniforms camera) {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
-                0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
+                0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
                 false, false, false, false, false, false, false, FrameMatrices.IDENTITY, CameraUniforms.ZERO);
     }
 
@@ -4571,13 +5131,13 @@ public final class VeyraRenderer {
 
     private record CameraUniforms(Vector3f cameraPosition, Vector3i cameraPositionInt, Vector3f cameraPositionFract,
                                   Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
-                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness) {
+                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness, Vector2i eyeBrightnessSmooth) {
         private static final CameraUniforms ZERO = new CameraUniforms(
                 new Vector3f(), new Vector3i(), new Vector3f(),
-                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i());
+                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i(), new Vector2i());
     }
 
-    private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass,
+    private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,
                              Map<Integer, Identifier> initialColorTargets,
                              Map<Integer, Identifier> outputColorTargets) implements AutoCloseable {
         @Override
@@ -4589,31 +5149,20 @@ public final class VeyraRenderer {
         }
     }
 
-    private record PipelineSet(FramePlan planA, FramePlan planB, int width, int height,
+    private record PipelineSet(List<FramePlan> plansA, List<FramePlan> plansB, int width, int height,
                                boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-                               boolean usesShadowSampler,
-                               Map<Integer, ColorTargetSettings> colorTargetSettings,
+                               boolean usesShadowSampler, Map<Integer, ColorTargetSettings> colorTargetSettings,
                                Set<Integer> colorTargetIndices) implements AutoCloseable {
-        private FramePlan framePlan(Map<Integer, Identifier> currentColorTargets) {
-            if (planA.initialColorTargets().equals(currentColorTargets)) {
-                return planA;
-            }
-            if (planB.initialColorTargets().equals(currentColorTargets)) {
-                return planB;
-            }
-            throw new IllegalStateException("The current colortex buffers do not match either compiled frame plan.");
+        private FramePlan framePlan(ShaderPassPhase phase, Map<Integer, Identifier> current) {
+            FramePlan a = plansA.get(phase.ordinal()), b = plansB.get(phase.ordinal());
+            if (a.initialColorTargets().equals(current)) return a;
+            if (b.initialColorTargets().equals(current)) return b;
+            throw new IllegalStateException("The current colortex buffers do not match " + phase + " frame plans.");
         }
-
-        private int passCount() {
-            return planA.shaderPasses().size();
-        }
-
-        @Override
-        public void close() {
-            planA.close();
-            if (planB != planA) {
-                planB.close();
-            }
+        private int passCount() { return plansA.stream().mapToInt(plan -> plan.shaderPasses().size()).sum(); }
+        @Override public void close() {
+            Set<FramePlan> all = Collections.newSetFromMap(new IdentityHashMap<>());
+            all.addAll(plansA); all.addAll(plansB); all.forEach(FramePlan::close);
         }
     }
 
@@ -4637,6 +5186,7 @@ public final class VeyraRenderer {
 
         @Override
         public void close() {
+            pipelines.values().forEach(VeyraGeometryTargets::unregister);
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
         }
@@ -4679,13 +5229,20 @@ public final class VeyraRenderer {
 
         @Override
         public GpuTextureView texture(Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            if (samplerName.equals(NOISE_INPUT_NAME)) {
+                return VeyraNoiseTexture.view();
+            }
             if (samplerName.equals(DEPTH1_INPUT_NAME)) {
                 return depthTex1Snapshot.sampledView();
             }
             if (samplerName.equals(DEPTH2_INPUT_NAME)) {
                 return depthTex2Snapshot.sampledView();
             }
-            if (samplerName.equals(SHADOW_DEPTH_INPUT_NAME)) {
+            if (samplerName.equals(PostShadowSamplers.Input.OPAQUE_DEPTH.inputName()))
+                return VeyraShadowRenderer.opaqueShadowDepthTextureView();
+            if (samplerName.equals(PostShadowSamplers.Input.COLOR.inputName()))
+                return VeyraShadowRenderer.shadowColorTextureView();
+            if (samplerName.equals(PostShadowSamplers.Input.DEPTH.inputName())) {
                 return VeyraShadowRenderer.shadowDepthTextureView();
             }
             return sampledDepthTextureView();
@@ -4693,7 +5250,7 @@ public final class VeyraRenderer {
 
         @Override
         public boolean bilinear() {
-            return false;
+            return PostShadowSamplers.bilinear(samplerName);
         }
     }
 

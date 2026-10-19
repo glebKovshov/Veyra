@@ -83,6 +83,18 @@ class ShaderIncludesTest {
     }
 
     @Test
+    void boundsBranchingRecursionAcrossSiblingIncludes() {
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        IOException failure = assertThrows(IOException.class, () -> ShaderIncludes.expand("final.fsh",
+                "#include \"branch.glsl\"\n", path -> {
+                    reads.incrementAndGet();
+                    return Optional.of("#include \"branch.glsl\"\n#include \"branch.glsl\"\n");
+                }));
+        assertTrue(failure.getMessage().contains("expansion count"));
+        assertTrue(reads.get() <= 4096);
+    }
+
+    @Test
     void acceptsCrLfAndBom() throws IOException {
         assertTrue(expand("\uFEFF#include \"a.glsl\"\r\n", Map.of("a.glsl", "float a;")).contains("float a;"));
     }

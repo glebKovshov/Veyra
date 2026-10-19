@@ -19,8 +19,9 @@ public abstract class WorldRendererMixin {
                                        double camX, double camY, double camZ,
                                        Matrix4f modelView, Matrix4f projection,
                                        CallbackInfo ci) {
-        if (renderType == TerrainRenderType.TRANSLUCENT) {
+        if (renderType == TerrainRenderType.TRANSLUCENT && !VeyraShadowRenderer.isRendering()) {
             VeyraRenderer.captureDepthTex1();
+            VeyraRenderer.renderDeferred(net.minecraft.client.Minecraft.getInstance());
         }
     }
 

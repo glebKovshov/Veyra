@@ -42,6 +42,23 @@ class ShaderPackTest {
     }
 
     @Test
+    void readsEyeBrightnessHalfLifeFromAnyGlslFileAndUsesIrisDefault() throws IOException {
+        Path shaderRoot = Files.createDirectories(directory.resolve("smooth/shaders"));
+        Path shaders = Files.createDirectories(shaderRoot.resolve("lib"));
+        Files.writeString(shaderRoot.resolve("final.fsh"), "void main() {}\n");
+        Files.writeString(shaders.resolve("lighting.glsl"), """
+                // const float eyeBrightnessHalflife = 99.0;
+                const float eyeBrightnessHalflife = 5.0;
+                """);
+        Path packPath = shaderRoot.getParent();
+        assertEquals(5.0F, ShaderPack.inspect(packPath).readEyeBrightnessHalflife());
+
+        Files.delete(shaders.resolve("lighting.glsl"));
+        assertEquals(EyeBrightnessSmoother.DEFAULT_HALF_LIFE_TICKS,
+                ShaderPack.inspect(packPath).readEyeBrightnessHalflife());
+    }
+
+    @Test
     void rejectsOversizedSource() throws IOException {
         Path shaders = Files.createDirectories(directory.resolve("large/shaders"));
         Files.writeString(shaders.resolve("final.fsh"), "x".repeat(1024 * 1024 + 1));

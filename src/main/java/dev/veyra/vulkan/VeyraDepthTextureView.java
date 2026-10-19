@@ -4,6 +4,7 @@ import net.vulkanmod.gl.VkGlTexture;
 import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkTextureView;
 import net.vulkanmod.vulkan.Vulkan;
+import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.vulkan.VK10;
 
@@ -44,8 +45,9 @@ public final class VeyraDepthTextureView extends VkTextureView {
         }
 
         private DepthSampleTexture(VkGpuTexture source, SampledDepth sampledDepth) {
-            super(sampledDepth.textureId(), source.getLabel(), source.getFormat(), source.getWidth(0),
-                    source.getHeight(0), source.getDepthOrLayers(), source.getMipLevels(), source.usage(),
+            // VulkanMod's constructor takes usage first and the native texture ID after mip levels.
+            super(source.usage(), source.getLabel(), source.getFormat(), source.getWidth(0),
+                    source.getHeight(0), source.getDepthOrLayers(), source.getMipLevels(), sampledDepth.textureId(),
                     VkGlTexture.getTexture(sampledDepth.textureId()));
             textureId = sampledDepth.textureId();
             depthImageView = sampledDepth.imageView();
@@ -71,7 +73,10 @@ public final class VeyraDepthTextureView extends VkTextureView {
 
         private void closeDepthImageView() {
             if (depthImageView != 0L) {
-                VK10.vkDestroyImageView(Vulkan.getVkDevice(), depthImageView, null);
+                // Submitted descriptors can still reference this borrowed depth view after a
+                // pack switch/resize. Retire it at VulkanMod's frame fence, like native images.
+                var device = Vulkan.getVkDevice();
+                MemoryManager.getInstance().addFrameOp(() -> VK10.vkDestroyImageView(device, depthImageView, null));
             }
             VkGlTexture.setVulkanImage(textureId, null);
             VkGlTexture.glDeleteTextures(textureId);

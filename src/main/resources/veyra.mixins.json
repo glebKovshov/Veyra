@@ -22,7 +22,21 @@
     "accessor.PostPassAccessor",
     "accessor.RenderSetupAccessor",
     "accessor.RenderTypeAccessor",
-    "accessor.RenderTargetAccessor"
+    "accessor.RenderTargetAccessor",
+    "VkGpuDeviceMixin",
+    "accessor.ShaderCompilationKeyAccessor",
+    "DeviceManagerMixin",
+    "GraphicsPipelineMixin",
+    "RendererGeometryTargetsMixin",
+    "accessor.PipelineStateAccessor",
+    "accessor.RendererFramebufferAccessor",
+    "accessor.VkGpuTextureAccessor",
+    "accessor.NativePipelineRegistryAccessor",
+    "SwapChainMixin",
+    "TextureAtlasMixin",
+    "accessor.TextureAtlasAccessor",
+    "accessor.TextureAtlasSpriteAccessor",
+    "accessor.TextureManagerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

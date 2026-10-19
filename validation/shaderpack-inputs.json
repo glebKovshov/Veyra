@@ -1,0 +1,33 @@
+[
+  {
+    "name": "complementary-reimagined",
+    "version": "r5.9.3",
+    "profile_audit_key": "complementary-reimagined.zip",
+    "filename": "ComplementaryReimagined_r5.9.3.zip",
+    "url": "https://cdn.modrinth.com/data/HVnmMxH1/versions/Bqen1mJX/ComplementaryReimagined_r5.9.3.zip",
+    "sha512": "45304b1d7862afdb2177b7e6226fc9c6737911d17a4ad46cc9c519ca4deb935f05072cd337cd8b19a15bb8062b57b54eceec7bdee4cd572d94858e2946d37d85"
+  },
+  {
+    "name": "complementary-unbound",
+    "version": "r5.9.3",
+    "profile_audit_key": "complementary-unbound.zip",
+    "filename": "ComplementaryUnbound_r5.9.3.zip",
+    "url": "https://cdn.modrinth.com/data/R6NEzAwj/versions/B1kyfoUZ/ComplementaryUnbound_r5.9.3.zip",
+    "sha512": "a085d1d8cda67cd17a2b414eeba48bbd809da069f269bab46246235ec8fe714a275013c70d0504527b0987d810deddddba4564332414ab3b3bd7435932ff808c"
+  },
+  {
+    "name": "bsl-shaders",
+    "version": "10.1.8",
+    "profile_audit_key": "bsl-shaders.zip",
+    "filename": "BSL_v10.1.8.zip",
+    "url": "https://cdn.modrinth.com/data/Q1vvjJYV/versions/Y68yiql9/BSL_v10.1.8.zip",
+    "sha512": "94a3c25d6820868db624e11347873e6b572e7cd571967d9ac6f4690ca5d37ca302a7645d85eec800e0654541e3825fba14d37b5a25d3996aaf038178552be26f"
+  },
+  {
+    "name": "sildurs-vibrant-shaders",
+    "version": "2.02",
+    "filename": "Sildur's Vibrant Shaders v2.02 Extreme.zip",
+    "url": "https://cdn.modrinth.com/data/z8EjLYqN/versions/J4RlzpKF/Sildur%27s%20Vibrant%20Shaders%20v2.02%20Extreme.zip",
+    "sha512": "da6d9cfdfaedfe96741f7b61d69a650d4b2f7a02f744b9e0935873135b9b9fff74ea73c44c74c22c828e7a42783e25db767d5ef867d47f4d907e5aedb1294971"
+  }
+]
