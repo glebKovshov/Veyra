@@ -3032,6 +3032,10 @@ public final class VeyraRenderer {
     private static GraphicsPipeline compileCloudPipeline(ShaderPack pack) throws IOException {
         String shaderPath = ShaderLoadUtil.resolveShaderPath("basic/clouds");
         String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "clouds.vsh");
+        Optional<String> shaderPackVertex = pack.readCloudVertex();
+        if (shaderPackVertex.isPresent()) {
+            vertexSource = CloudShaderAdapter.adaptVertex(vertexSource, shaderPackVertex.get());
+        }
         String source = pack.readCloudFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_clouds.fsh."));
         CloudShaderAdapter.AdaptedFragment adaptedFragment = CloudShaderAdapter.adapt(source);

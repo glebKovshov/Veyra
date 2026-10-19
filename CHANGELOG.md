@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.5 — 2026-10-19 (prerelease)
+
+- Read and adapt `gbuffers_clouds.vsh` when a pack provides it, using VulkanMod's position/color cloud mesh and the supported `color` / `vertexDistance` outputs.
+- Translate the cloud vertex `gl_Vertex`, `gl_Color`, `gl_ModelViewProjectionMatrix`, and `ftransform()` inputs; reject unavailable attributes, texture access, and custom vertex uniforms with a diagnostic.
+- Add a runnable cloud vertex example plus include-loading, adapter, and Vulkan SPIR-V regression fixtures.
+- Correct the historical compatibility note that still said the beta.4 audit was pending. Cloud `colortex0`, cloud textures, velocity, selected compute stages, and real-pack visual validation remain unresolved.
+
 ## 0.2.0-beta.4 — 2026-10-19 (prerelease)
 
 - Read Iris `entity.properties` and `block.properties` with shader-pack option preprocessing, including entity IDs, block state predicates, and registered block tags.

@@ -70,6 +70,56 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsCloudVertexShaderToVulkanModPositionColorInputs() throws IOException {
+        String vulkanModVertex = """
+                #version 450
+                layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out float vertexDistance;
+                void main() {
+                    gl_Position = MVP * vec4(Position, 1.0);
+                    vertexColor = Color * ColorModulator;
+                    vertexDistance = length(Position + ModelOffset);
+                }
+                """;
+        String adapted = CloudShaderAdapter.adaptVertex(vulkanModVertex, """
+                #version 120
+                varying vec4 color;
+                varying float vertexDistance;
+                void main() {
+                    gl_Position = ftransform();
+                    color = gl_Color;
+                    vertexDistance = length(gl_Vertex.xyz);
+                }
+                """);
+
+        assertTrue(adapted.contains("#define ftransform() (MVP * vec4(Position, 1.0))"));
+        assertTrue(adapted.contains("#define color vertexColor"));
+        assertTrue(adapted.contains("vertexColor = Color * ColorModulator;"));
+        assertTrue(adapted.contains("gl_Position = ftransform();"));
+        assertTrue(adapted.contains("color = gl_Color;"));
+        assertFalse(adapted.contains("varying vec4 color;"));
+        assertFalse(adapted.contains("varying float vertexDistance;"));
+    }
+
+    @Test
+    void rejectsCloudVertexShaderInputsMissingFromVulkanModMesh() {
+        String vulkanModVertex = "#version 450\nvoid main() { gl_Position = vec4(0.0); }\n";
+        IOException error = assertThrows(IOException.class, () -> CloudShaderAdapter.adaptVertex(vulkanModVertex, """
+                #version 120
+                varying vec2 coord0;
+                void main() {
+                    gl_Position = ftransform();
+                    coord0 = vec2(0.0);
+                }
+                """));
+        assertTrue(error.getMessage().contains("attributes or transforms"), error.getMessage());
+    }
+
+    @Test
     void mapsIrisFogUniformsIntoCloudPipelineFields() throws IOException {
         CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
                 #version 120

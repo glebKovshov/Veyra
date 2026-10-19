@@ -80,6 +80,23 @@ public class ShaderCompileSmoke {
                     }
                     """);
             compile(compiler, options, cloudFog, "cloud-fog-uniforms", true);
+            Path cloudVertexPath = Path.of("examples/gbuffers-clouds/shaders/gbuffers_clouds.vsh");
+            String cloudPackVertex = GlslPreprocessor.process("gbuffers_clouds.vsh", Files.readString(cloudVertexPath));
+            String cloudVertex = CloudShaderAdapter.adaptVertex("""
+                    #version 450
+                    layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                    layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec4 Color;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out float vertexDistance;
+                    void main() {
+                        gl_Position = MVP * vec4(Position, 1.0);
+                        vertexColor = Color * ColorModulator;
+                        vertexDistance = length(Position + ModelOffset);
+                    }
+                    """, cloudPackVertex);
+            compileVertex(compiler, options, cloudVertex, "cloud-vertex-adapter", true);
             String postShadowSource = "uniform sampler2DShadow shadowtex1;\n"
                     + "float compare(sampler2DShadow depthMap){return texture(depthMap,vec3(0.5));}\n"
                     + "layout(location=0) out vec4 outColor;void main(){outColor=vec4(texture(shadowtex1,vec3(0.5))+compare(shadowtex1))+shadow2D(shadowtex1,vec3(0.5));}\n";
@@ -99,7 +116,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-ID, entity-shadow and cloud-fog fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-ID, entity-shadow, cloud-fog and cloud-vertex fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
@@ -108,6 +125,15 @@ public class ShaderCompileSmoke {
     }
     private static void compile(long compiler, long options, String source, String name, boolean expected) {
         long result = shaderc_compile_into_spv(compiler, source, shaderc_fragment_shader, name, "main", options);
+        try {
+            boolean success = shaderc_result_get_compilation_status(result) == shaderc_compilation_status_success;
+            if (success != expected) throw new AssertionError(name + ": " + shaderc_result_get_error_message(result));
+            System.out.println("PASS " + name);
+        } finally { shaderc_result_release(result); }
+    }
+
+    private static void compileVertex(long compiler, long options, String source, String name, boolean expected) {
+        long result = shaderc_compile_into_spv(compiler, source, shaderc_vertex_shader, name, "main", options);
         try {
             boolean success = shaderc_result_get_compilation_status(result) == shaderc_compilation_status_success;
             if (success != expected) throw new AssertionError(name + ": " + shaderc_result_get_error_message(result));
