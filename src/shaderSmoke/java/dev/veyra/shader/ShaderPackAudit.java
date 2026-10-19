@@ -40,7 +40,8 @@ public final class ShaderPackAudit {
                         if (!file.endsWith(".fsh")) continue;
                         String program = file.substring(0, file.length() - 4);
                         try {
-                            if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water")) TerrainShaderAdapter.adaptFragment(source);
+                            if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water"))
+                                TerrainShaderAdapter.adaptFragment(source, pack.hasShadowFragment(), program.equals("gbuffers_water"));
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
                                     || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
                                 EntityShaderAdapter.adaptFragment(source, program,

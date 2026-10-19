@@ -33,7 +33,7 @@ class ShaderAdapterTest {
                 } else if (name.startsWith("gbuffers_entities")) {
                     adapted = EntityShaderAdapter.adaptFragment(source);
                 } else {
-                    adapted = TerrainShaderAdapter.adaptFragment(source);
+                    adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
                 }
                 assertTrue(adapted.startsWith("#version 460\n"));
                 assertTrue(adapted.contains("void main("));
@@ -269,6 +269,22 @@ class ShaderAdapterTest {
                 """, false);
         assertFalse(adapted.contains("VeyraNoiseSampler"));
         assertFalse(adapted.contains("VeyraShadowSampler"));
+    }
+
+    @Test
+    void opaqueDepthIsOnlyExposedToTheWaterBridge() throws IOException {
+        String source = "uniform sampler2D depthtex1;\nvoid main(){gl_FragColor=vec4(texture2D(depthtex1,vec2(0.5)).r);}\n";
+        assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(source, false));
+        String adapted = TerrainShaderAdapter.adaptFragment(source, false, true);
+        assertTrue(adapted.contains("layout(binding = 7) uniform sampler2D VeyraDepthTex1Sampler;"));
+        assertTrue(adapted.contains("#define depthtex1 VeyraDepthTex1Sampler"));
+        assertTrue(adapted.contains("veyraSample(depthtex1,vec2(0.5))"));
+        assertFalse(adapted.contains("VeyraShadowSampler"));
+        assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(
+                source.replace("sampler2D depthtex1", "sampler2DShadow depthtex1"), false, true));
+        String unused = "uniform sampler2D depthtex1;\nvoid main(){gl_FragColor=vec4(1.0);}\n";
+        assertFalse(TerrainShaderAdapter.usesOpaqueDepthSampler(unused));
+        assertFalse(TerrainShaderAdapter.adaptFragment(unused, false, true).contains("VeyraDepthTex1Sampler"));
     }
 
     @Test

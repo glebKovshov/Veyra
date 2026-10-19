@@ -61,6 +61,7 @@ import net.vulkanmod.render.shader.PipelineManager;
 import net.vulkanmod.render.shader.ShaderLoadUtil;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
@@ -607,7 +608,7 @@ public final class VeyraRenderer {
         eyeBrightnessSmoothLevel = minecraft.level;
         eyeBrightnessSmoother.reset();
         initializedColorTargets.clear();
-        depthTex1Snapshot.close();
+        closeOpaqueDepthSnapshot();
         depthTex2Snapshot.close();
         int dimension = minecraft.level.dimension().equals(net.minecraft.world.level.Level.NETHER) ? -1
                 : minecraft.level.dimension().equals(net.minecraft.world.level.Level.END) ? 1 : 0;
@@ -709,6 +710,7 @@ public final class VeyraRenderer {
     }
 
     private static boolean selectedPackUsesDepth1Sampler() {
+        if (terrainUsesOpaqueDepthSampler()) return true;
         if (!pipelinesDirty && pipelineSet != null) {
             return pipelineSet.usesDepth1Sampler();
         }
@@ -717,6 +719,8 @@ public final class VeyraRenderer {
             return false;
         }
         try {
+            if (pack.terrainPrograms().contains("gbuffers_water") && TerrainShaderAdapter.usesOpaqueDepthSampler(
+                    pack.readTerrainFragment("gbuffers_water").orElse(""))) return true;
             return pack.readPrograms().stream().anyMatch(program -> DEPTH1_SAMPLER.matcher(
                     COMMENTS.matcher(program.source()).replaceAll("")).find());
         } catch (IOException exception) {
@@ -2399,13 +2403,16 @@ public final class VeyraRenderer {
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                boolean usesOpaqueDepthSampler = programName.equals("gbuffers_water")
+                        && TerrainShaderAdapter.usesOpaqueDepthSampler(fragmentSource);
                 if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 FragmentOutputs outputLayout = FragmentOutputs.parse(fragmentSource);
-                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable);
+                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
+                        programName.equals("gbuffers_water"));
 
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler));
+                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler, usesOpaqueDepthSampler));
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
@@ -2413,6 +2420,11 @@ public final class VeyraRenderer {
                 VeyraGeometryTargets.register(pipeline, outputLayout, pack.readGeometryBlendSettings(programName));
                 setShadowSamplerLayout(pipeline, shadowSamplerAvailable);
                 setNoiseSamplerLayout(pipeline);
+                var opaqueDepth = pipeline.getImageDescriptor("VeyraDepthTex1Sampler");
+                if (opaqueDepth != null) {
+                    opaqueDepth.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    opaqueDepth.isReadOnlyLayout = false;
+                }
                 for (UBO ubo : pipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
                 }
@@ -2449,6 +2461,11 @@ public final class VeyraRenderer {
     }
 
     private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable) {
+        return terrainPipelineConfig(shadowSamplerAvailable, noiseSamplerAvailable, false);
+    }
+
+    private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable,
+                                                       boolean opaqueDepthSamplerAvailable) {
         PipelineConfig.UB.Builder terrainUniforms = PipelineConfig.UB.builder(
                         1, org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_ALL_GRAPHICS)
                 .addUniform("vec4", "FogColor")
@@ -2481,7 +2498,32 @@ public final class VeyraRenderer {
         if (noiseSamplerAvailable) {
             config.addImageDescriptor(6, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4);
         }
+        if (opaqueDepthSamplerAvailable) {
+            config.addImageDescriptor(7, "sampler2D", "VeyraDepthTex1Sampler", 5);
+        }
         return config.build();
+    }
+
+    /** The capture hook runs before water draws; bind the depth-only borrowed view, never scene depth. */
+    public static void bindTerrainOpaqueDepth(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor("VeyraDepthTex1Sampler");
+        if (descriptor == null) return;
+        var view = (net.vulkanmod.render.engine.VkTextureView) depthTex1Snapshot.sampledView();
+        // WorldRenderer refreshes the indexed native table from VRenderSystem after pipeline bind.
+        // Keep both tables on the same live view, including after a resize or previous post draw.
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
+        net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx,
+                view.texture().getVulkanImage());
+    }
+
+    private static boolean terrainUsesOpaqueDepthSampler() {
+        return terrainPipelineSet != null && terrainPipelineSet.pipelines().values().stream()
+                .anyMatch(pipeline -> pipeline.getImageDescriptor("VeyraDepthTex1Sampler") != null);
+    }
+
+    private static void closeOpaqueDepthSnapshot() {
+        VRenderSystem.setShaderTexture(5, null);
+        depthTex1Snapshot.close();
     }
 
     private static void setNoiseSamplerLayout(GraphicsPipeline pipeline) {
@@ -4871,8 +4913,8 @@ public final class VeyraRenderer {
             sampledDepthTextureView = null;
             sampledDepthTexture = null;
         }
-        if (next == null || !next.usesDepth1Sampler()) {
-            depthTex1Snapshot.close();
+        if ((next == null || !next.usesDepth1Sampler()) && !terrainUsesOpaqueDepthSampler()) {
+            closeOpaqueDepthSnapshot();
         }
         if (next == null || !next.usesDepth2Sampler()) {
             depthTex2Snapshot.close();
@@ -4884,6 +4926,9 @@ public final class VeyraRenderer {
         terrainPipelineSet = next;
         if (old != null && old != next) {
             old.close();
+        }
+        if (!terrainUsesOpaqueDepthSampler() && (pipelineSet == null || !pipelineSet.usesDepth1Sampler())) {
+            closeOpaqueDepthSnapshot();
         }
     }
 

@@ -49,6 +49,7 @@ public final class VeyraGeometryTargets {
 
     public static void beforeBind(GraphicsPipeline pipeline) {
         VeyraNoiseTexture.bind(pipeline);
+        if (layouts.containsKey(pipeline)) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
         Renderer renderer = Renderer.getInstance();
         FragmentOutputs layout = layouts.get(pipeline);
         Framebuffer bound = renderer.getBoundFramebuffer();

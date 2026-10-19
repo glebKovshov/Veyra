@@ -205,3 +205,13 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - `main` и `origin/main` = `e37f188`, готовые stability/release 0.1.1 ветки интегрированы; 35 tests/0 failures и build/validateShaders подтверждены в отдельном worktree, GitHub main Build также success. Feature #2 остаётся draft, alpha tag не означает готовность stable 0.2.
 - Новые implementation commits: `5b6a356` (include budget, Windows audit, CI gates), `2b5acb0` (alpha version/release). Последующие commits содержат только evidence/docs. Исходные untracked screenshots/dumps и GOAL.md сохранены, bulk add/clean/reset не применялись.
 - Полная исходная цель остаётся незавершённой: нет stable 0.2 или Iris parity. Следующий приоритет — отдельный opaque shadowtex1/resource lifecycle и реальные pack-specific sampler/uniform blockers, затем физические GPU/UI/end-to-end проверки. Не снимать draft и не продвигать alpha в stable только на основании CPU/source/synthetic результатов.
+
+## Продолжение после alpha — water geometry depthtex1 (2026-10-19)
+
+Предыдущий goal turn классифицирован как progress: опубликован проверенный alpha, готовая линия 0.1.1 интегрирована в main. Полная стабильная цель остаётся активной.
+
+- На старте tracked tree чистое, HEAD 55c93ce. Существующие реализации сохранены.
+- Реализуется следующий backend blocker: `depthtex1` в `gbuffers_water`. Используется существующий snapshot, захватываемый перед translucent terrain; добавлены GLSL bridge, отдельный descriptor binding 7/native slot 5 и синхронизация обеих texture tables VulkanMod. Opaque/shadow geometry по-прежнему отклоняет этот sampler до определения корректной семантики.
+- Ownership snapshot учитывает post и terrain consumers, чтобы rebuild post pipeline не освобождал используемый water depth view; world/reset/disable очищают table binding и используют существующее fence-retirement depth view.
+- Новый оригинальный `examples/water-opaque-depth` проверяет depth за water fragment, исключая очищенный far-depth. Добавлен отдельный graphics CI matrix case с водой над opaque floor; прежний MRT fixture сохранён.
+- Локально: 95 JUnit tests, 0 failures/errors/skips; build и JAR verifier проходят; shaderc: 23 example sources / 20 direct SPIR-V compilations. Новый GPU fixture ещё не подтверждён, source matrix предстоит пересчитать. Не объявлять water sampling проверенным в runtime до readback/validation.

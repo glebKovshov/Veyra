@@ -25,7 +25,7 @@ public class ShaderCompileSmoke {
                     source = GlslPreprocessor.process(name, source);
                     String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
                             : name.startsWith("gbuffers_entities") ? EntityShaderAdapter.adaptFragment(source)
-                            : TerrainShaderAdapter.adaptFragment(source);
+                            : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);
                     try {

@@ -167,6 +167,11 @@ public final class TerrainShaderAdapter {
     }
 
     public static String adaptFragment(String source, boolean shadowSamplerAvailable) throws IOException {
+        return adaptFragment(source, shadowSamplerAvailable, false);
+    }
+
+    /** Opaque depth is available only after the copy preceding translucent terrain. */
+    public static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean opaqueDepthAvailable) throws IOException {
         FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
         source = fragmentOutputs.rewriteLegacy(source);
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
@@ -188,6 +193,7 @@ public final class TerrainShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
                     && !sampler.equals("noisetex")
+                    && !(sampler.equals("depthtex1") && opaqueDepthAvailable)
                     && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
@@ -291,6 +297,10 @@ public final class TerrainShaderAdapter {
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
                         + fogUniforms.bridge() + "#define texture Sampler0");
+        if (opaqueDepthAvailable && usesOpaqueDepthSampler(source)) {
+            bridge = "layout(binding = 7) uniform sampler2D VeyraDepthTex1Sampler;\n"
+                    + "#define depthtex1 VeyraDepthTex1Sampler\n" + bridge;
+        }
         if (declaredVaryings.contains("normal")) {
             bridge = bridge.replace("#define texture Sampler0", """
                     vec3 veyraTerrainNormal() {
@@ -320,6 +330,11 @@ public final class TerrainShaderAdapter {
 
     public static List<ShaderUniform> shaderPackUniforms() {
         return SHADERPACK_UNIFORMS;
+    }
+
+    public static boolean usesOpaqueDepthSampler(String source) {
+        return Pattern.compile("\\bdepthtex1\\b").matcher(
+                UnusedSamplerDeclarations.removeUnused(COMMENTS.matcher(source).replaceAll(""))).find();
     }
 
     public static boolean usesNoiseSampler(String source) {
