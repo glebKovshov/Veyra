@@ -169,7 +169,7 @@ public final class VeyraRenderer {
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:eyePosition|relativeEyePosition|cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![012]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
@@ -201,13 +201,15 @@ public final class VeyraRenderer {
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
-            "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract");
+            "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract",
+            "eyePosition", "relativeEyePosition");
     private static final List<String> MATRIX_UNIFORMS = List.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse");
     private static final List<String> VECTOR3_UNIFORMS = List.of(
-            "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract");
+            "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract",
+            "eyePosition", "relativeEyePosition");
     private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
@@ -222,7 +224,8 @@ public final class VeyraRenderer {
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
-            "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract");
+            "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract",
+            "eyePosition", "relativeEyePosition");
     private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
     private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<EntityPipelineKey, RenderPipeline> ENTITY_PIPELINE_CACHE = new HashMap<>();
@@ -517,6 +520,8 @@ public final class VeyraRenderer {
             case "cameraPositionFract" -> uniforms.cameraPositionFract();
             case "previousCameraPosition" -> uniforms.previousCameraPosition();
             case "previousCameraPositionFract" -> uniforms.previousCameraPositionFract();
+            case "eyePosition" -> uniforms.eyePosition();
+            case "relativeEyePosition" -> uniforms.relativeEyePosition();
             default -> throw new IllegalArgumentException("Unknown shader pack vector uniform " + name + ".");
         };
         buffer.putFloat(0, value.x);
@@ -741,12 +746,22 @@ public final class VeyraRenderer {
             eyeBrightnessSmoother.reset();
         }
         Vector2i brightness = eyeBrightness(minecraft, cameraPosition);
+        // Iris: eyePosition is the camera entity's interpolated eye; relativeEyePosition is camera minus eye.
+        Vector3f eyePosition = new Vector3f();
+        Vector3f relativeEyePosition = new Vector3f();
+        net.minecraft.world.entity.Entity cameraEntity = minecraft.getCameraEntity();
+        if (cameraEntity != null) {
+            Vec3 eye = cameraEntity.getEyePosition(minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false));
+            eyePosition.set((float) eye.x, (float) eye.y, (float) eye.z);
+            relativeEyePosition.set((float) (cameraPosition.x - eye.x), (float) (cameraPosition.y - eye.y),
+                    (float) (cameraPosition.z - eye.z));
+        }
         Vector2i smoothedBrightness = eyeBrightnessSmoother.update(
                 brightness.x, brightness.y, frameTime, selectedEyeBrightnessHalfLifeTicks());
         cameraUniforms = new CameraUniforms(
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition(),
-                brightness, smoothedBrightness);
+                brightness, smoothedBrightness, eyePosition, relativeEyePosition);
         cameraUniformsInitialized = true;
         updateShaderPackVectorUniforms(cameraUniforms);
         updateShaderPackIntegerVector2Uniforms(cameraUniforms);
@@ -4645,6 +4660,8 @@ public final class VeyraRenderer {
                 case "previousCameraPosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPosition());
                 case "previousCameraPositionInt" -> new UniformValue.IVec3Uniform(frameUniforms.camera().previousCameraPositionInt());
                 case "previousCameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPositionFract());
+                case "eyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().eyePosition());
+                case "relativeEyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().relativeEyePosition());
                 default -> customUniformValue(uniform);
             });
         }
@@ -5287,10 +5304,12 @@ public final class VeyraRenderer {
 
     private record CameraUniforms(Vector3f cameraPosition, Vector3i cameraPositionInt, Vector3f cameraPositionFract,
                                   Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
-                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness, Vector2i eyeBrightnessSmooth) {
+                                  Vector3f previousCameraPositionFract, Vector2i eyeBrightness, Vector2i eyeBrightnessSmooth,
+                                  Vector3f eyePosition, Vector3f relativeEyePosition) {
         private static final CameraUniforms ZERO = new CameraUniforms(
                 new Vector3f(), new Vector3i(), new Vector3f(),
-                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i(), new Vector2i());
+                new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i(), new Vector2i(),
+                new Vector3f(), new Vector3f());
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,

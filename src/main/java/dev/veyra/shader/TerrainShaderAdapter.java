@@ -73,6 +73,8 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("previousCameraPosition", "vec3", false),
             new ShaderUniform("previousCameraPositionInt", "ivec3", false),
             new ShaderUniform("previousCameraPositionFract", "vec3", false),
+            new ShaderUniform("eyePosition", "vec3", false),
+            new ShaderUniform("relativeEyePosition", "vec3", false),
             new ShaderUniform("screenBrightness", "float", false),
             new ShaderUniform("blindness", "float", false),
             new ShaderUniform("nightVision", "float", false),
@@ -226,6 +228,10 @@ public final class TerrainShaderAdapter {
         while (uniformMatcher.find()) {
             String type = uniformMatcher.group(1);
             String name = uniformMatcher.group(2);
+            if (ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_terrain", type, name)) {
+                uniformMatcher.appendReplacement(withoutShaderPackUniforms, "const int " + name + " = 0;\n");
+                continue;
+            }
             ShaderUniform uniform = shaderPackUniform(name);
             if (uniform == null) {
                 throw new IOException(unsupportedUniformMessage("gbuffers_terrain", name));

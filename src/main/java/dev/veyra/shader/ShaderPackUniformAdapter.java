@@ -17,6 +17,10 @@ public final class ShaderPackUniformAdapter {
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
 
+    private static final List<String> ENTITY_IDENTIFIERS = List.of("entityId", "blockEntityId", "currentRenderedItemId");
+    private static final Pattern ENTITY_ATTRIBUTE_PROGRAM = Pattern.compile(
+            "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*)|.*sign_text.*");
+
     private ShaderPackUniformAdapter() {
     }
 
@@ -33,6 +37,11 @@ public final class ShaderPackUniformAdapter {
         while (matcher.find()) {
             String type = matcher.group(1);
             String name = matcher.group(2);
+            if (isUnboundEntityIdentifier(programName, type, name)) {
+                matcher.appendReplacement(withoutUniforms, "");
+                macros.append("const int ").append(name).append(" = 0;\n");
+                continue;
+            }
             TerrainShaderAdapter.ShaderUniform uniform = supportedUniforms.get(name);
             boolean matrixUniform = uniform == null && type.equals("mat4") && MATRIX_UNIFORMS.contains(name);
             if (uniform == null && !matrixUniform) {
@@ -72,6 +81,16 @@ public final class ShaderPackUniformAdapter {
     }
 
     public record UniformField(String type, String name) {
+    }
+
+    /**
+     * Iris patches entityId, blockEntityId and currentRenderedItemId only into programs whose vertex
+     * format carries the entity attribute (entity/block-entity/hand overlay formats and text). Elsewhere
+     * the declarations remain unbound GL uniforms and read 0, which these programs receive here as well.
+     */
+    public static boolean isUnboundEntityIdentifier(String programName, String type, String name) {
+        return type.equals("int") && ENTITY_IDENTIFIERS.contains(name)
+                && !ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
     }
 
     public static List<String> matrixUniforms() {
