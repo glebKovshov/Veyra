@@ -28,7 +28,7 @@ The terrain path maps shader output locations to physical colortex indices, reta
 | Geometry vertex stage | Existing synthesized interfaces | Execute arbitrary pack vertex GLSL, required attributes, IDs and varyings |
 | Geometry color outputs | Native terrain MRT with per-target blend overrides; other geometry remains single-output | Entity/hand/block/cloud/shadow MRT, wider format/state semantics and runtime verification |
 | Post outputs | Separate fullscreen draws per output | Genuine MRT where simultaneous execution or side effects matter |
-| Textures/uniforms | Existing restricted sampler and uniform sets | Noise/custom textures/images, extra depth/shadow/color inputs, custom expression uniforms |
+| Textures/uniforms | Generated `noisetex`, main depth and depth history, post color-target samplers, shared frame uniforms including raw/smoothed eye brightness; unused geometry samplers are removed; `tex` aliases the block atlas | Active color-target sampling in geometry, PBR specular textures, wider shadow/depth samplers, custom texture/image units, and custom expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
 | Pack properties | Options, target/shadow settings, program conditions | Full state/property semantics, feature flags, custom images/SSBOs |
 | Runtime verification | Full build, unit tests, CPU shaderc/source audits; one Lavapipe synthetic terrain-MRT/composite client fixture passes | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
