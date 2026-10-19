@@ -195,3 +195,13 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Настоящий Python runner `scripts/run_shaderpack_source_audit.py` теперь успешно выполнен на Windows целиком: 12 default + 63 profile/dimension, 5178 stages, 18 accepted / 699 rejected. JSON arguments и gradlew.bat проверены фактическим запуском.
 - Graphics prerequisite release run `39206709151` успешен на точном alpha tag. Скачанный artifact: 222926 active magenta pixels / 0 disabled; runtime validation errors 0; teardown diagnostics 10031. Это synthetic fixture, не visual certification популярных паков.
 - Main `e37f188` также прошёл GitHub Build `39206618052`; PR #1 closed/merged. Feature PR #2 остаётся draft.
+
+### Публикация завершена — 2026-10-19
+
+- Реальный GitHub prerelease опубликован (`draft=false`, `prerelease=true`): https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-alpha.1%2Bmc1.21.11
+- JAR: https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-alpha.1%2Bmc1.21.11/veyra-0.2.0-alpha.1%2Bmc1.21.11.jar
+- Tag `v0.2.0-alpha.1+mc1.21.11` закреплён на `2b5acb0ddc823443e42733ae712803d78982d986`. Release run https://github.com/glebKovshov/Veyra/actions/runs/39206709151 — success: оба reusable gate’а, build/tests/shaderc/JAR verification и publication завершены успешно.
+- Все три опубликованных binary/source/example assets скачаны заново с публичных release URLs и сверены с SHA256SUMS.txt. Скачанный mod JAR повторно прошёл `scripts/verify_jar.py`. SHA-256 JAR: `e421f600972bd7d6e8ed509d7c4a0f134c440c7a4faefab2d75679230c7552a6` (430757 bytes).
+- `main` и `origin/main` = `e37f188`, готовые stability/release 0.1.1 ветки интегрированы; 35 tests/0 failures и build/validateShaders подтверждены в отдельном worktree, GitHub main Build также success. Feature #2 остаётся draft, alpha tag не означает готовность stable 0.2.
+- Новые implementation commits: `5b6a356` (include budget, Windows audit, CI gates), `2b5acb0` (alpha version/release). Последующие commits содержат только evidence/docs. Исходные untracked screenshots/dumps и GOAL.md сохранены, bulk add/clean/reset не применялись.
+- Полная исходная цель остаётся незавершённой: нет stable 0.2 или Iris parity. Следующий приоритет — отдельный opaque shadowtex1/resource lifecycle и реальные pack-specific sampler/uniform blockers, затем физические GPU/UI/end-to-end проверки. Не снимать draft и не продвигать alpha в stable только на основании CPU/source/synthetic результатов.
