@@ -1791,6 +1791,15 @@ public final class VeyraRenderer {
     }
 
     public static void bindCloudSceneColor(VkRenderPass pass, GraphicsPipeline pipeline) {
+        bindCloudSceneColor(pipeline);
+        var descriptor = pipeline.getImageDescriptor(CLOUD_SCENE_SAMPLER_NAME);
+        if (descriptor == null) return;
+        pass.bindTexture(CLOUD_SCENE_SAMPLER_NAME, cloudSceneColorSnapshot.sampledView(),
+                RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.NEAREST));
+    }
+
+    /** Bind the scene snapshot for VulkanMod's direct cloud VBO pipeline path. */
+    public static void bindCloudSceneColor(GraphicsPipeline pipeline) {
         var descriptor = pipeline.getImageDescriptor(CLOUD_SCENE_SAMPLER_NAME);
         if (descriptor == null) return;
         if (!cloudSceneColorCaptured) {
@@ -1802,8 +1811,6 @@ public final class VeyraRenderer {
         // VulkanMod's descriptor wrapper has independent layout tracking for this external snapshot.
         descriptor.isReadOnlyLayout = false;
         image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
-        pass.bindTexture(CLOUD_SCENE_SAMPLER_NAME, view,
-                RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.NEAREST));
         VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
         net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx, image);
     }

@@ -15,6 +15,7 @@ public abstract class PipelineManagerMixin {
     private static void veyra$useCloudsShader(CallbackInfoReturnable<GraphicsPipeline> callback) {
         GraphicsPipeline pipeline = VeyraRenderer.getCloudsPipeline();
         if (pipeline != null) {
+            VeyraRenderer.bindCloudSceneColor(pipeline);
             callback.setReturnValue(pipeline);
         }
     }
