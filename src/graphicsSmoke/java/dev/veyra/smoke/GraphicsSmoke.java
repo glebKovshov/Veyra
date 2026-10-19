@@ -23,6 +23,8 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
+    private static boolean entityFixtureStarted;
+    private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
     public static void tick(Minecraft client) {
@@ -35,8 +37,24 @@ public final class GraphicsSmoke {
             if (++ticks > 2400) throw new IllegalStateException("Timed out waiting for the validation world/readback; screen=" + client.screen);
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
+            boolean entityFixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt")).equals("specular-entity");
+            if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
+                entityFixtureStarted = true;
+                var server = client.getSingleplayerServer();
+                server.execute(() -> {
+                    try {
+                        var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+                        if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
+                        cow.setPos(-2.5, -59, 3.5);
+                        cow.setNoAi(true);
+                        java.util.Objects.requireNonNull(cow.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE)).setBaseValue(2.0);
+                        server.overworld().addFreshEntity(cow);
+                    } catch (Throwable failure) { entityFixtureFailure = failure; }
+                });
+            }
+            if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
             client.options.hideGui = true;
-            client.player.setXRot(35.0F);
+            client.player.setXRot(entityFixture ? 15.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())

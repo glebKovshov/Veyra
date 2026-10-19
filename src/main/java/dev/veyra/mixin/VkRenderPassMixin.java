@@ -6,6 +6,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
+import dev.veyra.vulkan.VeyraSpecularTextures;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
 import net.vulkanmod.render.engine.VkRenderPass;
 import net.vulkanmod.render.engine.VkTextureView;
@@ -41,6 +42,15 @@ public abstract class VkRenderPassMixin {
         if (sampler != repeatSampler) {
             ((VkRenderPass) (Object) this).bindTexture(name, view, repeatSampler);
             ci.cancel();
+        }
+    }
+
+    @Inject(method = "bindTexture", at = @At("RETURN"), remap = false)
+    private void veyra$bindSpecular(String name, GpuTextureView view, GpuSampler sampler, CallbackInfo ci) {
+        VkRenderPass pass = (VkRenderPass) (Object) this;
+        if (name.equals("Sampler0") && pass.getPipeline() != null
+                && pass.getPipeline().getFragmentShader().getNamespace().equals("veyra")) {
+            VeyraSpecularTextures.bindEntity(pass, view);
         }
     }
 

@@ -5,6 +5,17 @@ import pathlib
 import shutil
 import struct
 import argparse
+import json
+import zlib
+
+
+def material_png(path):
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = (b'\0' + bytes([242, 5, 204, 255]) * 16) * 16
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 16, 16, 8, 6, 0, 0, 0))
+                     + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
 
 
 def string(value):
@@ -35,7 +46,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity'], default='geometry-mrt')
     fixture = parser.parse_args().fixture
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
     if fixture.startswith('water-'):
@@ -84,7 +95,23 @@ def main():
     config = root / "veyra"
     config.mkdir(parents=True, exist_ok=True)
     (config / "selected-pack.txt").write_text(fixture, encoding="utf-8")
-    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n", encoding="utf-8")
+    (config / 'graphics-fixture.txt').write_text(fixture, encoding='utf-8')
+    extra_options = ''
+    if fixture.startswith('specular-'):
+        resource_pack = root / 'resourcepacks/veyra-material-fixture'
+        resource_pack.mkdir(parents=True, exist_ok=True)
+        (resource_pack / 'pack.mcmeta').write_text(json.dumps({'pack': {
+            'description': 'Original Veyra material data fixture', 'min_format': [75, 0], 'max_format': [75, 0]}}), encoding='utf-8')
+        textures = resource_pack / 'assets/minecraft/textures'
+        for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
+            material_png(textures / f'block/{sprite}_s.png')
+        for variant in ['temperate_cow', 'cold_cow', 'warm_cow']:
+            material_png(textures / f'entity/cow/{variant}_s.png')
+        properties = resource_pack / 'assets/minecraft/optifine/texture.properties'
+        properties.parent.mkdir(parents=True, exist_ok=True)
+        properties.write_text('format=lab-pbr/1.3\n', encoding='utf-8')
+        extra_options = 'resourcePacks:["vanilla","file/veyra-material-fixture"]\n'
+    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
     print(f"Prepared original Minecraft 1.21.11 flat world and {fixture} fixture")
 
 

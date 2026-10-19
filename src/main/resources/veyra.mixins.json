@@ -32,7 +32,11 @@
     "accessor.RendererFramebufferAccessor",
     "accessor.VkGpuTextureAccessor",
     "accessor.NativePipelineRegistryAccessor",
-    "SwapChainMixin"
+    "SwapChainMixin",
+    "TextureAtlasMixin",
+    "accessor.TextureAtlasAccessor",
+    "accessor.TextureAtlasSpriteAccessor",
+    "accessor.TextureManagerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

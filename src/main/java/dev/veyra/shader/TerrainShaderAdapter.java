@@ -194,6 +194,7 @@ public final class TerrainShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
                     && !sampler.equals("noisetex")
+                    && !sampler.equals("specular")
                     && !colorInputs.containsKey(sampler)
                     && !(sampler.equals("depthtex1") && waterInputsAvailable)
                     && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
@@ -306,6 +307,10 @@ public final class TerrainShaderAdapter {
                     + "#define depthtex1 VeyraDepthTex1Sampler\n" + bridge;
         }
         int colorBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0) + (usesDepth ? 1 : 0);
+        if (usesSpecularSampler(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D VeyraSpecularSampler;\n"
+                    + "#define specular VeyraSpecularSampler\n" + bridge;
+        }
         StringBuilder colorBridge = new StringBuilder();
         for (int index : GeometryColorSamplers.indices(colorInputs)) {
             colorBridge.append("layout(binding = ").append(colorBinding++).append(") uniform sampler2D ")
@@ -353,6 +358,11 @@ public final class TerrainShaderAdapter {
     public static boolean usesOpaqueDepthSampler(String source) {
         return Pattern.compile("\\bdepthtex1\\b").matcher(
                 UnusedSamplerDeclarations.removeUnused(COMMENTS.matcher(source).replaceAll(""))).find();
+    }
+
+    public static boolean usesSpecularSampler(String source) {
+        return Pattern.compile("\\bspecular\\b").matcher(UnusedSamplerDeclarations.removeUnused(
+                ShaderSource.maskBlockAndLineComments(source))).find();
     }
 
     public static boolean usesNoiseSampler(String source) {

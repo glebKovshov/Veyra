@@ -367,7 +367,7 @@ public final class EntityShaderAdapter {
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
-                    && !sampler.equals("lightmap") && !sampler.equals("noisetex")
+                    && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
                     && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
@@ -634,6 +634,9 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_CYLINDRICAL_DISTANCE__",
                         suppliesCylindricalDistance ? "in float cylindricalVertexDistance;\n" : "")
                 .replace("__VEYRA_FOG_BRIDGE__", fogUniforms.bridge());
+        if (TerrainShaderAdapter.usesSpecularSampler(source)) {
+            bridge = "uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n" + bridge;
+        }
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
