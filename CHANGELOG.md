@@ -2,6 +2,10 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Added copied opaque depth sampling to `gbuffers_water`, with shared post/terrain snapshot ownership and a dedicated software Vulkan readback fixture.
+- Fixed optional terrain descriptor binding gaps when shadow/noise samplers are absent, including noise-only terrain layouts.
+- Fixed borrowed main-depth native table binding in the depth-copy pass; the water fixture exposed sampling of its own color attachment and Vulkan layout errors.
+
 - Bound total include-expansion work across recursive sibling branches before preprocessing, with a regression test.
 - Made the full pinned source/profile audit runnable on Windows using a JSON argument file and the Windows Gradle wrapper.
 - Required pinned source audit and synthetic Vulkan graphics smoke before release publication, and enabled both checks on relevant pull requests. These gates do not establish popular-pack visual compatibility or clean device teardown.

@@ -1,5 +1,16 @@
 # 0.2 development validation status
 
+## Current water-depth validation (after alpha.1)
+
+Runtime code commit `51c5875949259444b465409828ad19cbd6557006` passes the [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39208570869), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39208577331), [push graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39208570838) and [PR graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39208577387).
+
+- 96 JUnit tests, zero failures/errors/skips; 23 example sources preprocessed, 20 compiled directly to Vulkan SPIR-V, conditional and shadow helper fixtures pass. The remapped JAR verifier passes.
+- Original terrain MRT fixture: 222,983 active versus 0 disabled magenta pixels, 0 runtime validation errors, 10,031 teardown diagnostics.
+- New water opaque-depth fixture: 222,757 versus 0 pixels, 0 runtime validation errors, 10,050 teardown diagnostics. It requires copied opaque depth behind each water fragment, excluding cleared far-depth; screenshots were downloaded and inspected.
+- The first test exposed sparse descriptor binding failure; the next exposed borrowed main depth pointing at the copy pass's own color output. Both were fixed before this passing result. The readback threshold was preserved.
+- The 75 local source-audit records exactly match the downloaded [CI source audit](https://github.com/glebKovshov/Veyra/actions/runs/39208129938): 5,178 sources, 18 accepted / 699 rejected. Complementary water now advances to its unsupported `gaux2` sampler.
+
+The additional 19 teardown diagnostics are VkPipeline objects; ownership is not established. These checks do not establish third-party-pack visual compatibility, clean teardown, physical-GPU support or long-session stability. The published alpha.1 tag predates these fixes. Stable 0.2 remains pending.
 ## Local continuation checks — 2026-10-19
 
 On top of `e42f151`, JDK 21.0.12.1 ran `test --rerun-tasks` (92 tests, zero failures/errors/skips) and `build validateShaders packageExamplePacks` successfully. `scripts/verify_jar.py build/libs/veyra-0.2.0+mc1.21.11.jar` verified the remapped JAR, metadata, mixins, nested JCPP and exclusion of the graphics harness. Historical JARs remain in the local build directory; an explicit path avoids selecting stale artifacts.
@@ -9,7 +20,7 @@ The include expander now bounds total recursive work, in addition to depth and o
 Windows UI validation is blocked: `sky.list_apps()` returned `Computer Use native pipe is unavailable: failed to connect native pipe: Не удается найти указанный файл. (os error 2)`. No current physical-GPU/UI compatibility result is claimed. The prior graphics and source results below are historical and retain their original source commit attribution.
 
 
-The current feature branch passed the full Fabric Loom build, tests, remapping and distributable verification at commit `340db0ca80010d42591383b13e12d76463467048` in both the [push run](https://github.com/glebKovshov/Veyra/actions/runs/39166689216) and the [PR run](https://github.com/glebKovshov/Veyra/actions/runs/39166691696). This produces a development artifact, not a stable release.
+At the historical commit below, the feature branch passed the full Fabric Loom build, tests, remapping and distributable verification at commit `340db0ca80010d42591383b13e12d76463467048` in both the [push run](https://github.com/glebKovshov/Veyra/actions/runs/39166689216) and the [PR run](https://github.com/glebKovshov/Veyra/actions/runs/39166691696). This produces a development artifact, not a stable release.
 
 - At that historical commit, 74 JUnit tests pass with no failures or skips, including pinned VulkanMod bytecode contracts, draw-buffer mappings, per-target blend properties, moon phase uniforms and the entity-color bridge.
 - At that historical commit, native shaderc checks preprocess 19 examples and compile 16 directly to SPIR-V. Four conditional-include compiler checks and an unbound-output dataflow compiler check also pass. These checks do not establish descriptor/runtime correctness.

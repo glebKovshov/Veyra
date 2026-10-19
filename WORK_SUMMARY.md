@@ -1,9 +1,20 @@
-﻿# Veyra — передача контекста разработки
+# Veyra — передача контекста разработки
 
 Проверено: **2026-10-19**. Репозиторий: `https://github.com/glebKovshov/Veyra`. Это рабочая сводка для следующего агента, а не заявление о релизной готовности.
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
+## Актуальный срез после water depth fix — 2026-10-19
+
+- Последний runtime code commit: `51c5875949259444b465409828ad19cbd6557006`. Build push `39208570869` и PR `39208577331` — success. 96 JUnit tests, 0 failures/errors/skips; shaderc 23 example preprocesses / 20 direct SPIR-V compilations; JAR verifier проходит.
+- Graphics push `39208570838` и PR `39208577387` — success, оба matrix cases. MRT: 222983 active / 0 disabled magenta pixels, runtime validation errors 0. Water opaque-depth: 222757 / 0, runtime validation errors 0. Скачанные кадры просмотрены; water signal занимает поверхность, а не случайные пиксели.
+- `gbuffers_water` теперь читает существующий separate `depthtex1` snapshot (nearest/clamp); в opaque/shadow terrain этот sampler не разрешён. Ownership учитывает post и terrain, resize/world/reset используют прежний depth view fence retirement. Исправлены реальные runtime defects: optional descriptor gaps и main-depth borrowed view, ошибочно подменявшийся цветовым output depth-copy pass.
+- Полный source audit: 75 configurations / 5178 sources / 18 accepted / 699 rejected. Все 75 локальных записей совпали как JSON-данные со скачанным CI source audit `39208129938` (`0815d6e`). Обновлены оба committed JSON reports; старые отчёты также содержали уже устранённые ранее `shadowtex0` и dimension uniform ошибки. Complementary water теперь останавливается на `gaux2` (colortex5), а не depthtex1.
+- Teardown остаётся НЕ чистым: MRT 10031, water 10050 diagnostics. По сравнению artifact’ов дополнительные 19 — VkPipeline; ownership/причина ещё не доказаны. Не объявлять исправленные runtime layouts доказательством отсутствия GPU leaks.
+- `main` остаётся на готовой 0.1.1 (`e37f188`). PR #2 draft. Публичный alpha.1 tag — старый `2b5acb0`, новые water fixes в него не входят. Stable 0.2 и полный Iris parity не достигнуты; цель остаётся активной.
+- Следующие backend задачи: water `gaux2`/colortex5 и colortex4 с корректными read/write feedback rules; отдельный opaque shadowtex1; PBR specular и pack-specific uniforms. Далее physical GPU/UI и lifecycle stress. Не публиковать stable только на основании этих двух synthetic fixtures.
+
+Сведения ниже до раздела «Продолжение после alpha» сохраняют историю первоначального состояния, а не заменяют этот актуальный срез.
 ## Цель и целевая среда
 
 Продолжить существующий Veyra, не переписывая его с нуля. Целевая связка зафиксирована в `gradle.properties`, `fabric.mod.json` и исходниках VulkanMod, на которые рассчитаны mixin’ы:
@@ -41,7 +52,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 
 - `VeyraMrtFramebuffer.java`, `VeyraGeometryTargets.java`, `VeyraDeviceFeatures.java` и mixin’ы вокруг `GraphicsPipeline`/render pass реализуют **одновременный MRT только для terrain geometry**: fragment output location сопоставляется физическому colortex target, доступны per-target blending, проверка `independentBlend` и максимального числа color attachments. Сохраняются viewport/scissor и draw state VulkanMod.
 - `colortex0` — текущий scene color; `colortex1..15` — on-demand ping-pong color targets. Поддерживаются лишь документированные в README форматы (R8, RGBA8, R16F, RGBA16F, R32F) и ограничения возможностей устройства. Terrain geometry targets должны иметь размер сцены. Post outputs сейчас выполняются отдельными fullscreen draws по одному output; это не настоящий одновременный post MRT с image-store/atomic semantics.
-- `VeyraDepthTextureSnapshot.java` делает Vulkan depth snapshots с явными clear/layout transitions. В post доступны `depthtex0`/`DepthSampler` (главный depth attachment), `depthtex1` (opaque/cutout snapshot до translucent terrain), `depthtex2` (до hand). Это **не означает**, что любой geometry pass может сэмплировать их: например, Complementary water geometry с активным `depthtex1` остаётся source blocker.
+- `VeyraDepthTextureSnapshot.java` делает Vulkan depth snapshots с явными clear/layout transitions. В post доступны `depthtex0`/`DepthSampler` (главный depth attachment), `depthtex1` (opaque/cutout snapshot до translucent terrain), `depthtex2` (до hand). Это **не означает**, что любой geometry pass может сэмплировать их: на текущем HEAD `gbuffers_water` поддерживает `depthtex1`, но opaque/shadow geometry ещё ограничены.
 - `VeyraDepthTextureView.java` создаёт depth-only sampled view для depth-stencil изображения. Код переводит только корректный image/aspect в shader-read и восстанавливает состояние до повторного использования attachment.
 - `VeyraNoiseTexture.java` генерирует Vulkan-backed Iris `noisetex`; размер по умолчанию 256, `noiseTextureResolution` ограничен 1..4096, sampler linear/repeat. Подключён к поддержанным terrain, shadow, entity/hand/block/sign и post программам.
 - `shadowtex0` подключается к поддержанным terrain/entity/block/hand/text программам и post-пассам, если pack предоставляет shadow pass; сравнение depth программно адаптируется для поддержанных вызовов. Есть shadow variants solid/cutout/translucent/entities/block и свойства дистанции. **Второй shadow map `shadowtex1` и `shadowcolor` отсутствуют.**
@@ -85,7 +96,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 
 | Пак и закреплённая версия | Source audit geometry result по матрице | Зафиксированные блокеры | Полный визуальный тест |
 | --- | ---: | --- | --- |
-| Complementary Reimagined r5.9.3 | 0 принято / 270 отклонено (27 конфигураций) | активный `specular`; в water geometry — `depthtex1`/`colortex5`; cloud/spider-eye `blockEntityId`; `shadowcomp.csh` compute в части профилей | Нет |
+| Complementary Reimagined r5.9.3 | 0 принято / 270 отклонено (27 конфигураций) | активный `specular`; в water geometry — `gaux2`/`colortex5`; cloud/spider-eye `blockEntityId`; `shadowcomp.csh` compute в части профилей | Нет |
 | Complementary Unbound r5.9.3 | 0 / 270 (27) | те же группы ограничений, что и Reimagined | Нет |
 | BSL 10.1.8 | 18 / 144 (18) | `shadowtex1`, `gaux2`, custom `entityId`, `blockEntityId`, `shadowFade`, cloud `texture`; точные ошибки различаются по профилю/измерению | Нет |
 | Sildur’s Vibrant 2.02 Extreme | 0 / 15 (3) | активный `colortex4` в translucent geometry и cloud custom `texture` | Нет |

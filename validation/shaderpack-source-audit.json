@@ -24,7 +24,7 @@
                        "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027specular\u0027.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027specular\u0027.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027depthtex1\u0027."
+                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],
         "visualValidation":  false
     },
@@ -53,7 +53,7 @@
                        "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027specular\u0027.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027specular\u0027.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027depthtex1\u0027."
+                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],
         "visualValidation":  false
     },
@@ -73,12 +73,12 @@
         "computeStages":  1,
         "errorCount":  8,
         "errors":  [
-                       "gbuffers_block.fsh adapter: gbuffers_block uses unsupported sampler \u0027shadowtex0\u0027.",
+                       "gbuffers_block.fsh adapter: gbuffers_block uses unsupported sampler \u0027shadowtex1\u0027.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027texture\u0027 is not supported yet.",
-                       "gbuffers_entities.fsh adapter: gbuffers_entities uses unsupported sampler \u0027shadowtex0\u0027.",
-                       "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing uses unsupported sampler \u0027shadowtex0\u0027.",
-                       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler \u0027shadowtex0\u0027.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027shadowtex0\u0027.",
+                       "gbuffers_entities.fsh adapter: gbuffers_entities uses unsupported sampler \u0027shadowtex1\u0027.",
+                       "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing uses unsupported sampler \u0027shadowtex1\u0027.",
+                       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler \u0027shadowtex1\u0027.",
+                       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027shadowtex1\u0027.",
                        "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027shadowtex1\u0027.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],
@@ -133,7 +133,7 @@
                        "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027specular\u0027.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027specular\u0027.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027depthtex1\u0027."
+                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],
         "visualValidation":  false
     },
@@ -162,7 +162,7 @@
                        "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027specular\u0027.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027specular\u0027.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027depthtex1\u0027."
+                       "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],
         "visualValidation":  false
     },
@@ -186,9 +186,9 @@
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027texture\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027bedrockLevel\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027cloudHeight\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027bedrockLevel\u0027 is not supported yet.",
+                       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],
         "visualValidation":  false
@@ -291,12 +291,12 @@
         "computeStages":  1,
         "errorCount":  8,
         "errors":  [
-                       "gbuffers_block.fsh adapter: gbuffers_block uses unsupported sampler \u0027shadowtex0\u0027.",
+                       "gbuffers_block.fsh adapter: gbuffers_block uses unsupported sampler \u0027shadowtex1\u0027.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027texture\u0027 is not supported yet.",
-                       "gbuffers_entities.fsh adapter: gbuffers_entities uses unsupported sampler \u0027shadowtex0\u0027.",
-                       "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing uses unsupported sampler \u0027shadowtex0\u0027.",
-                       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler \u0027shadowtex0\u0027.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027shadowtex0\u0027.",
+                       "gbuffers_entities.fsh adapter: gbuffers_entities uses unsupported sampler \u0027shadowtex1\u0027.",
+                       "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing uses unsupported sampler \u0027shadowtex1\u0027.",
+                       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler \u0027shadowtex1\u0027.",
+                       "gbuffers_hand.fsh adapter: gbuffers_hand uses unsupported sampler \u0027shadowtex1\u0027.",
                        "gbuffers_terrain.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027shadowtex1\u0027.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain uses unsupported sampler \u0027gaux2\u0027."
                    ],

@@ -53,6 +53,8 @@ The currently supported formats are `R8`, `RGBA8`, `R16F`, `RGBA16F`, and `R32F`
 
 `depthtex0` and `DepthSampler` sample the main VulkanMod depth attachment. `depthtex1` samples a depth-only snapshot captured after opaque and cutout geometry and before translucent terrain. This lets post passes use solid depth without later translucent draws changing the snapshot. `examples/depthtex1` samples both buffers and displays them in red and green, with their difference in blue. `depthtex2` is captured after the world render and before first-person hands, matching the depth-texture boundary used by Iris.
 
+On the development branch after alpha.1, `gbuffers_water` can also read `depthtex1` using nearest/clamp sampling. Other geometry stages still reject it. `examples/water-opaque-depth` checks the copied opaque floor behind a water surface through MRT and a final pass. Its software Vulkan readback passes; popular-pack water compatibility and physical-GPU behavior remain unverified. The published alpha.1 does not contain this newer bridge.
+
 ## Noise texture sampler
 
 The Iris `noisetex` sampler is backed by a generated Vulkan texture and is available to supported terrain, shadow, entity, hand, block, sign, and post programs. Its default size is 256 by 256. Set `const int noiseTextureResolution` in `shaders.properties` to choose a square size from 1 to 4096. Veyra binds the sampler with linear filtering and repeat addressing.
