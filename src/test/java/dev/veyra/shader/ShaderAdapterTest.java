@@ -63,6 +63,34 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsIrisDimensionUniformsForTerrainAndPostPrograms() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                uniform int bedrockLevel;
+                uniform float cloudHeight;
+                uniform float endFlashIntensity;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = vec4(float(bedrockLevel) / 128.0 + cloudHeight + endFlashIntensity + texcoord.x); }
+                """);
+        assertTrue(terrain.contains("int bedrockLevel;"));
+        assertTrue(terrain.contains("float cloudHeight;"));
+        assertTrue(terrain.contains("float endFlashIntensity;"));
+        assertFalse(terrain.contains("uniform int bedrockLevel;"));
+        assertFalse(terrain.contains("uniform float cloudHeight;"));
+        assertFalse(terrain.contains("uniform float endFlashIntensity;"));
+
+        ShaderPackUniformAdapter.AdaptedShader post = ShaderPackUniformAdapter.extract(
+                "uniform int bedrockLevel;\nuniform float cloudHeight;\nuniform float endFlashIntensity;\nvoid main() {}\n", "composite");
+        assertTrue(post.declarations().contains("uniform int bedrockLevel;"));
+        assertTrue(post.declarations().contains("uniform float cloudHeight;"));
+        assertTrue(post.declarations().contains("uniform float endFlashIntensity;"));
+        assertTrue(post.fields().contains(new ShaderPackUniformAdapter.UniformField("int", "bedrockLevel")));
+        assertTrue(post.fields().contains(new ShaderPackUniformAdapter.UniformField("float", "cloudHeight")));
+        assertTrue(post.fields().contains(new ShaderPackUniformAdapter.UniformField("float", "endFlashIntensity")));
+        assertEquals("void main() {}", post.source().trim());
+    }
+
+    @Test
     void adaptsIrisSmoothedEyeBrightnessForCloudPrograms() throws IOException {
         CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
                 #version 120

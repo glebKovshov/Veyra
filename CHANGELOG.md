@@ -9,6 +9,7 @@
 - Kept discovered packs available when restoring a broken active pack fails.
 - Added `world0`, `world-1` and `world1` program overrides and dimension-aware relative includes. Pack/world changes reset temporal matrix and depth history.
 - Added Iris' integer `moonPhase` uniform to the shared geometry and post-pass frame snapshot, using the active dimension's moon phase.
+- Added Iris' `bedrockLevel`, `cloudHeight` and 1.21.9+ `endFlashIntensity` uniforms to terrain and post-processing programs, sourced from the active level and its environment attributes.
 - Added the Iris entity `varying vec4 color` input alias, bridged to VulkanMod's entity vertex color and covered by a regression test.
 - Added an Iris-compatible generated `noisetex`, including `noiseTextureResolution` and linear/repeat sampler binding for supported geometry, shadow, and post programs.
 - Exposed Iris' raw `eyeBrightness` and smoothed `eyeBrightnessSmooth` `ivec2` uniforms to geometry and post programs. The time-based smoothing half-life reads `const float eyeBrightnessHalflife` from GLSL and defaults to ten game ticks.
@@ -25,7 +26,7 @@
 - Corrected swapchain image usage metadata and requested transfer-source usage only where the surface supports it. Ordered sampled color-image transitions in the main frame graph after their producers.
 - Added a development-only real Minecraft world/readback harness using software Vulkan in CI. Runtime results remain separate from unit/build success.
 - Added explicit errors for unsupported required Iris features and active compute, geometry, tessellation or begin stages.
-- Added a checksum-pinned external shaderpack source-audit workflow for four public packs and their declared profiles, embedded JCPP license notices, distributable checks and CI test-report artifacts. The current branch has 89 regression tests.
+- Added a checksum-pinned external shaderpack source-audit workflow for four public packs and their declared profiles, embedded JCPP license notices, distributable checks and CI test-report artifacts.
 - Updated GitHub Actions to Node 24 action releases, pinned hosted runners to Ubuntu 24.04, and selected Gradle's open-source basic cache provider.
 - Remaining release blockers include active PBR/depth/shadow sampler reads, pack-specific uniforms, arbitrary geometry vertex inputs, MRT for the other geometry bridges, compute/tessellation execution, and real client/Vulkan pack validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
 
