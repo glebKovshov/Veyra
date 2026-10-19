@@ -184,3 +184,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Computer Use повторно инициализирован по skill; `sky.list_apps()` возвращает `Computer Use native pipe is unavailable: failed to connect native pipe: Не удается найти указанный файл. (os error 2)`. Поэтому новая физическая GPU/UI проверка не выполнена. Это не дефект Minecraft/Veyra.
 - Stable release и слияние draft feature пока не подтверждены: остаются реальные shaderpack/backend blockers и непроверенный graphics lifecycle. Не считать эту запись выполнением полной цели.
 - Подтверждено: origin/main является предком релизного e37f188; обе старые рабочие ветки уже являются предками feature HEAD. Начата отдельная сборка 0.1.1 перед fast-forward интеграцией готовой линии в main. Feature 0.2 не объявляется готовой.
+
+- Full pinned source audit завершён: 75 configurations, 5178/5178 preprocessed, 18 accepted / 699 rejected; expansion-limit failures 0. Checksums всех четырёх inputs совпали.
+- Готовая линия 0.1.1 после отдельного build/validateShaders/packageExamplePacks и проверки metadata/mixins интегрирована fast-forward в origin/main до e37f188. GitHub подтвердил PR #1 merged. Локальные артефакты сохранены.
+- Для публикации текущего проверяемого подмножества выбрана отдельная версия 0.2.0-alpha.1+mc1.21.11 и prerelease, stable 0.2.0 не объявляется. Release workflow автоматически ставит prerelease и latest=false для semver с суффиксом до build metadata. Backend blockers остаются.

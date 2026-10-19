@@ -1,16 +1,33 @@
-# Veyra 0.2 development — not a stable release
+# Veyra 0.2.0-alpha.1 — experimental supported subset
 
-Target: Minecraft **1.21.11**, Fabric Loader **0.18.4+**, VulkanMod **0.6.8**, Java **21+**.
+This is an **alpha prerelease**, not stable Iris parity. The stable 0.1.1 release remains available. Complementary, BSL and Sildur's have known source incompatibilities and are not certified playable.
 
-This branch is not ready for the requested main-branch full-Iris release. Do not publish these development notes as a claim of broad shaderpack compatibility. Existing 0.1.1 release assets and notes remain attached to that release.
+## Installation
 
-Implemented changes include persistent shader options/profiles and a Minecraft configuration screen, conditional GLSL preprocessing, dimension-specific programs and enable conditions, separate prepare/deferred/composite boundaries, pipeline/cache lifecycle fixes and initialized depth history. See CHANGELOG.md for details.
+- Minecraft **1.21.11**, Fabric Loader **0.18.4+**, VulkanMod **0.6.8**, Java **21+**.
+- Put `veyra-0.2.0-alpha.1+mc1.21.11.jar` in the instance's `mods/` folder alongside VulkanMod. Do not install the sources JAR. VulkanMod bundles its required Fabric modules; the development build uses Fabric API 0.140.0+1.21.11.
+- Extract the optional example-pack archive into `shaderpacks/`, or add a supported pack folder/ZIP. Press **F6**, select the pack and use **Configure / Apply** for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
 
-Validation at branch commit `340db0ca80010d42591383b13e12d76463467048`: 74 regression tests pass. Full Fabric Loom builds, shaderc example checks and distributable-content verification pass in GitHub Actions ([push build](https://github.com/glebKovshov/Veyra/actions/runs/39166689216), [PR build](https://github.com/glebKovshov/Veyra/actions/runs/39166691696)). Native checks preprocess 19 bundled examples and compile 16 directly to Vulkan SPIR-V, plus four conditional-include checks. The pinned source-audit workflow checked four popular packs at defaults in three dimensions and all 21 declared profiles across three dimensions (75 total cases, 5,178 stage-source preprocesses). Only 18 of 717 geometry fragment/configuration adapter attempts were accepted. See COMPATIBILITY.md for exact pack blockers and the source-only limits.
+## Changes
 
-**Known blockers:** arbitrary geometry vertex stages/attributes, non-terrain geometry MRT, unsupported geometry samplers and custom uniforms, compute/tessellation execution and additional Iris stages. Some Complementary profile/dimension cases require unsupported compute. The [Lavapipe client smoke run](https://github.com/glebKovshov/Veyra/actions/runs/39166399772) passes Veyra's synthetic MRT/composite fixture (222,934 active magenta pixels, 0 with shaders disabled) with no runtime Vulkan validation errors; it does not render the popular packs. The run still reports 10,031 Vulkan child-object diagnostics during process teardown. No physical GPU memory stress test or FPS benchmark has been performed. See COMPATIBILITY.md and ARCHITECTURE.md for exact evidence and remaining work.
+- Preserves the existing VulkanMod bridges and adds persistent options/profiles, conditional preprocessing, dimension-specific programs, separate prepare/deferred/composite boundaries, terrain MRT, initialized depth snapshots and generated noise textures.
+- Bridges supported Iris uniforms and entity shadow depth sampling, with device feature checks and frame-fence resource retirement.
+- Bounds recursive include expansion work and fixes Windows full-matrix audit argument handling.
+- Release publication requires the pinned source audit, Lavapipe synthetic rendering, Gradle build/tests, shaderc validation and JAR-content verification. See CHANGELOG.md for the full implementation history.
 
-The CI artifact is a development build of the supported subset, not evidence of the requested complete mod. Main-branch merging and a stable release remain pending implementation and runtime verification of those blockers.
+## Evidence and limitations
 
+Local JDK 21 validation: **92 JUnit tests**, no failures/errors/skips; **21** example sources preprocessed, **18** direct Vulkan SPIR-V compilations, conditional-include checks and the entity shadow sampler fixture pass. The remapped JAR excludes the graphics test harness and includes required metadata, mixins and the licensed nested JCPP dependency.
 
-Continuation 2026-10-19: local JDK 21 rebuild passes 92 regression tests, 21 source preprocesses and 18 direct SPIR-V compilations. JAR content verification passes. Recursive include work is bounded and the complete source audit now supports Windows argument files. Release publication now depends on source-audit and graphics-smoke workflows. These additions do not resolve the popular-pack or physical-GPU blockers above.
+Pinned source audit: **75** configurations, **5,178** sources preprocessed, **18** geometry fragment/configuration cases accepted and **699** rejected. This measures adapter coverage, not successful in-game rendering.
+
+| Pack | Source audit | Visual compatibility |
+| --- | --- | --- |
+| Complementary Reimagined r5.9.3 | 0 accepted / 270 rejected | Not verified; known unsupported resources/stages |
+| Complementary Unbound r5.9.3 | 0 / 270 | Not verified; known unsupported resources/stages |
+| BSL 10.1.8 | 18 / 144 | Not verified; incomplete pipeline |
+| Sildur's Vibrant 2.02 Extreme | 0 / 15 | Not verified; unsupported geometry samplers |
+
+The release workflow runs the small Lavapipe terrain-MRT/composite readback fixture. It does not render those packs. Historical runs have no runtime validation errors but report **10,031** Vulkan child-object diagnostics during whole-process teardown; clean teardown and memory stability are not established. Physical GPU/UI testing is currently blocked by the Windows Computer Use native pipe; resize/reload/world-switch stress and FPS benchmarks remain unverified.
+
+Arbitrary geometry vertex stages, non-terrain MRT, PBR `specular`, a separate opaque `shadowtex1`, additional geometry samplers/custom uniforms and compute/tessellation execution remain incomplete. Unsupported active features produce diagnostics rather than fake output. See COMPATIBILITY.md, ARCHITECTURE.md and VALIDATION.md. Third-party shaderpacks are not redistributed.

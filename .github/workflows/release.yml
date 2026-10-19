@@ -61,6 +61,10 @@ jobs:
           if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" > existing-tag.txt; then
             test "$(cut -f1 existing-tag.txt)" = "$GITHUB_SHA"
           fi
+          release_flags=()
+          if [[ "${RELEASE_TAG%%+*}" == *-* ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
           gh release create "$RELEASE_TAG" release-assets/* \
             --target "$GITHUB_SHA" --title "Veyra ${RELEASE_TAG#v}" \
-            --notes-file RELEASE_NOTES.md
+            --notes-file RELEASE_NOTES.md "${release_flags[@]}"
