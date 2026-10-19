@@ -148,6 +148,26 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void lowersShadowCompareSamplerTypesInsideShaderPackHelpers() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                uniform sampler2DShadow shadowtex0;
+                varying vec2 texcoord;
+                float sampleShadow(sampler2DShadow depthSampler, vec3 coordinate) {
+                    return shadow2D(depthSampler, coordinate).x;
+                }
+                void main() {
+                    gl_FragColor = vec4(sampleShadow(shadowtex0, vec3(texcoord, 0.5)));
+                }
+                """);
+
+        assertTrue(adapted.contains("float sampleShadow(sampler2D depthSampler, vec3 coordinate)"));
+        assertTrue(adapted.contains("#define shadow2D(sampler, coord) veyraSample(sampler, coord)"));
+        assertTrue(adapted.contains("sampleShadow(shadowtex0"));
+        assertFalse(adapted.contains("sampler2DShadow"));
+    }
+
+    @Test
     void bridgesLegacyTexSamplerAndTextureSizeToTheBlockAtlas() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 uniform sampler2D tex;

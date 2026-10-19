@@ -197,7 +197,12 @@ public final class TerrainShaderAdapter {
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
-        adapted = withoutSamplers.toString();
+        // The Vulkan bridge samples the depth image as sampler2D and emulates the
+        // shadow comparison in veyraSample(..., vec3). Lower helper-function
+        // parameters too; otherwise Iris/OptiFine helpers such as
+        // texture2DShadow(sampler2DShadow depthMap, ...) retain an incompatible
+        // comparison-sampler type after the uniform declaration is removed.
+        adapted = withoutSamplers.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D");
         IrisFogUniformAdapter.AdaptedShader fogUniforms =
                 IrisFogUniformAdapter.extract(adapted, "gbuffers_terrain", true);
         adapted = fogUniforms.source();

@@ -13,6 +13,7 @@
 - Added an Iris-compatible generated `noisetex`, including `noiseTextureResolution` and linear/repeat sampler binding for supported geometry, shadow, and post programs.
 - Exposed Iris' raw `eyeBrightness` and smoothed `eyeBrightnessSmooth` `ivec2` uniforms to geometry and post programs. The time-based smoothing half-life reads `const float eyeBrightnessHalflife` from GLSL and defaults to ten game ticks.
 - Removed unused shaderpack sampler declarations from geometry stages before interface validation, while still rejecting active reads from unsupported samplers.
+- Lowered `sampler2DShadow` helper parameters in terrain shaders to Veyra's raw-depth sampler type, so the Vulkan software depth comparison also works through common Iris/OptiFine helper functions.
 - Bridged the legacy `tex` sampler to VulkanMod's atlas and allowed standard `textureSize` queries for bridged samplers; added a SPIR-V example and adapter regressions.
 - Scheduled prepare, deferred and composite/final at separate rendering boundaries, preserving auxiliary ping-pong buffers between phases. Deferred runs after the opaque depth snapshot and before translucent terrain.
 - Initialized first-frame depth history with a real Vulkan transfer clear, including usage/format checks and layout transitions. VulkanMod's unbound `clearDepthTexture` only queues a later attachment clear and is insufficient for immediate sampling.
