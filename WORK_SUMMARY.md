@@ -418,3 +418,12 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Версия обновлена до `0.2.0-beta.3+mc1.21.11`; `test --rerun-tasks validateShaders build packageExamplePacks` после смены версии прошёл полностью (13 задач). XML: 161 тест, 0 failures/errors/skips. Beta.3 JAR: 510,745 bytes, SHA-256 `06647cc838563ca7b562b9b522741bbbabe78fba820ba15a2978407ae6675be3`; PowerShell проверил те же distributable-content инварианты, что `scripts/verify_jar.py` (в текущей Windows среде Python отсутствует). Добавлен свежий локальный срез в `VALIDATION.md`. PR/Release ещё не созданы; GitHub CI не запускался.
 - Дальше: проверить diff и GitHub доступ, commit/push branch, открыть и немедленно связать PR с Build/source-audit/graphics gates, обновить CI evidence, merge в main, push tag `v0.2.0-beta.3+mc1.21.11`, подтвердить настоящий GitHub Release и скачать заново JAR/checksum.
 - Следующая крупная функциональная задача остаётся per-draw `entityId`/`blockEntityId`: их нельзя передать правильным общим uniform в батчированные vertex buffers. Требуются расширенный entity vertex format/write path и Iris mappings `entity.properties`/`block.properties`; текущий адаптер по-прежнему честно отклоняет эти программы. Никакой визуальной проверки реального пакета и физического GPU в этой работе не было.
+
+
+### PR #4 CI — 2026-10-19
+
+- PR #4 (`feature/cloud-fog-uniforms` -> `main`, head `566e059c433bd64a14184a5d0e6dd66d394bff7d`) is linked to this T3 thread: https://github.com/glebKovshov/Veyra/pull/4.
+- GitHub Build run [39294368264](https://github.com/glebKovshov/Veyra/actions/runs/39294368264) passed.
+- GitHub Graphics smoke run [39294368250](https://github.com/glebKovshov/Veyra/actions/runs/39294368250) passed all 12 Lavapipe fixtures.
+- GitHub Shaderpack source audit run [39294367864](https://github.com/glebKovshov/Veyra/actions/runs/39294367864) passed.
+- The PR is ready to merge. The beta.3 GitHub Release and published JAR are still pending; they are not claimed as published here.

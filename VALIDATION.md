@@ -167,3 +167,8 @@ The graphics prerequisite in [release run 39206709151](https://github.com/glebKo
 The already-published 0.1.1 line was independently rebuilt in a detached worktree and fast-forwarded into `main` at `e37f188`; GitHub confirms PR #1 merged. PR #2 remains draft for the incomplete 0.2 feature line.
 
 The alpha prerelease is now [published](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-alpha.1%2Bmc1.21.11); the complete release workflow succeeded. All three published assets were downloaded again and matched the published SHA-256 checksums. The downloaded installable JAR passed `scripts/verify_jar.py`; its SHA-256 is `e421f600972bd7d6e8ed509d7c4a0f134c440c7a4faefab2d75679230c7552a6`. This remains an experimental supported subset, not stable full-Iris compatibility.
+
+
+### GitHub CI for beta.3 candidate
+
+PR #4 at commit `566e059c433bd64a14184a5d0e6dd66d394bff7d` passed the GitHub Build workflow ([39294368264](https://github.com/glebKovshov/Veyra/actions/runs/39294368264)), all 12 Lavapipe graphics smoke fixtures ([39294368250](https://github.com/glebKovshov/Veyra/actions/runs/39294368250)), and the pinned shaderpack source audit ([39294367864](https://github.com/glebKovshov/Veyra/actions/runs/39294367864)). Real shaderpack visual validation remains outstanding.
