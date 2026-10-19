@@ -206,7 +206,7 @@ public final class VeyraShadowRenderer {
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
                               DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.hasShadowPass()) {
+        if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.hasShadowPass()) {
             shadowModelView.identity();
             shadowProjection.identity();
             updateShadowMatrixUniformBuffers();
