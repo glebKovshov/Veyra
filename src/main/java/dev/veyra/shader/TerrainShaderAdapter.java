@@ -28,7 +28,7 @@ public final class TerrainShaderAdapter {
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
     private static final Pattern UNSUPPORTED_GBUFFER_INPUT = Pattern.compile(
-            "\\b(mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
+            "\\b(mc_Entity|mc_midTexCoord|midTexCoord|viewNormal|tangent|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
@@ -47,6 +47,7 @@ public final class TerrainShaderAdapter {
             Map.entry("shadowPos", new Varying("vec4", 6)),
             Map.entry("shadowCoord", new Varying("vec4", 6)),
             Map.entry("normal", new Varying("vec3", 7)),
+            Map.entry("viewPos", new Varying("vec3", 10)),
             Map.entry("sphericalVertexDistance", new Varying("float", 8)),
             Map.entry("cylindricalVertexDistance", new Varying("float", 9)));
     private static final List<ShaderUniform> SHADERPACK_UNIFORMS = withIrisExtras(List.of(
@@ -141,6 +142,7 @@ public final class TerrainShaderAdapter {
             layout(location = 7) in vec3 veyraTerrainPosition;
             layout(location = 8) in float veyraSphericalVertexDistance;
             layout(location = 9) in float veyraCylindricalVertexDistance;
+            layout(location = 10) in vec3 veyraViewPosition;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -163,6 +165,7 @@ public final class TerrainShaderAdapter {
             #define noisetex VeyraNoiseSampler
             #define shadowPos veyraShadowPos
             #define shadowCoord veyraShadowPos
+            #define viewPos veyraViewPosition
             #define shadow2D(sampler, coord) veyraSample(sampler, coord)
             #define sphericalVertexDistance veyraSphericalVertexDistance
             #define cylindricalVertexDistance veyraCylindricalVertexDistance
@@ -490,7 +493,8 @@ public final class TerrainShaderAdapter {
                         + "\nlayout (location = 6) out vec4 veyraShadowPos;"
                         + "\nlayout (location = 7) out vec3 veyraTerrainPosition;"
                         + "\nlayout (location = 8) out float veyraSphericalVertexDistance;"
-                        + "\nlayout (location = 9) out float veyraCylindricalVertexDistance;");
+                        + "\nlayout (location = 9) out float veyraCylindricalVertexDistance;"
+                        + "\nlayout (location = 10) out vec3 veyraViewPosition;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
@@ -507,7 +511,7 @@ public final class TerrainShaderAdapter {
             throw new IOException("VulkanMod's terrain uniform buffer changed; Veyra cannot provide shadow matrices.");
         }
         adapted = adapted.replace(uniformMarker,
-                uniformMarker + "\n    mat4 shadowModelView;\n    mat4 shadowProjection;");
+                uniformMarker + "\n    mat4 shadowModelView;\n    mat4 shadowProjection;\n" + shaderPackUniformFields());
         String positionMarker = "    const vec3 pos = getVertexPosition();";
         if (!adapted.contains(positionMarker)) {
             throw new IOException("VulkanMod's terrain vertex position changed; Veyra cannot calculate shadow coordinates.");
@@ -516,7 +520,8 @@ public final class TerrainShaderAdapter {
                 positionMarker + "\n    veyraTerrainPosition = pos;"
                         + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);"
                         + "\n    veyraSphericalVertexDistance = length(pos);"
-                        + "\n    veyraCylindricalVertexDistance = max(length(pos.xz), abs(pos.y));");
+                        + "\n    veyraCylindricalVertexDistance = max(length(pos.xz), abs(pos.y));"
+                        + "\n    veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;");
     }
 
     private record Varying(String type, int location) {

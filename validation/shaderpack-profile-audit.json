@@ -457,11 +457,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -469,7 +469,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -484,11 +483,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -496,7 +495,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -511,11 +509,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -523,7 +521,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -538,11 +535,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -550,7 +547,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -565,11 +561,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -577,7 +573,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1040,11 +1035,11 @@
         "profiles":  5,
         "stages":  59,
         "preprocessed":  59,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  16,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1052,7 +1047,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1067,11 +1061,11 @@
         "profiles":  5,
         "stages":  59,
         "preprocessed":  59,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  16,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1079,7 +1073,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1094,11 +1087,11 @@
         "profiles":  5,
         "stages":  59,
         "preprocessed":  59,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  16,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1106,7 +1099,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1121,11 +1113,11 @@
         "profiles":  5,
         "stages":  59,
         "preprocessed":  59,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  16,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1133,7 +1125,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1148,11 +1139,11 @@
         "profiles":  5,
         "stages":  59,
         "preprocessed":  59,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  16,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1160,7 +1151,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1623,11 +1613,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1635,7 +1625,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1650,11 +1639,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1662,7 +1651,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1677,11 +1665,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1689,7 +1677,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1704,11 +1691,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1716,7 +1703,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
@@ -1731,11 +1717,11 @@
         "profiles":  5,
         "stages":  63,
         "preprocessed":  63,
-        "geometryFragmentsAccepted":  1,
-        "geometryFragmentsRejected":  8,
+        "geometryFragmentsAccepted":  2,
+        "geometryFragmentsRejected":  7,
         "geometryVertexStages":  18,
         "computeStages":  1,
-        "errorCount":  8,
+        "errorCount":  7,
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block declares inputs that are not provided by Veyra\u0027s entity bridge yet.",
                        "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler \u0027texture\u0027 is not supported; cloud shaders can sample scene color or noisetex.",
@@ -1743,7 +1729,6 @@
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityColor\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027viewPos\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
                        "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false

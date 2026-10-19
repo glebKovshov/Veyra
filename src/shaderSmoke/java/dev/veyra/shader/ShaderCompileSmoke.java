@@ -97,6 +97,30 @@ public class ShaderCompileSmoke {
                     }
                     """, cloudPackVertex);
             compileVertex(compiler, options, cloudVertex, "cloud-vertex-adapter", true);
+            String terrainVertex = TerrainShaderAdapter.adaptVertex("""
+                    #version 460
+                    layout(binding = 0) uniform UBO0 { mat4 MVP; };
+                    layout(binding = 1) uniform UBO {
+                        int UseRgss;
+                    };
+                    layout(binding = 4) uniform sampler2D Sampler2;
+                    layout(location = 0) in ivec4 Position;
+                    layout(location = 1) in uint PackedColor;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout (location = 4) out flat float fadeFactor;
+                    vec3 getVertexPosition() { return vec3(Position.xyz); }
+                    vec4 sample_lightmap2(sampler2D sourceSampler, int coordinates) {
+                        return texture(sourceSampler, vec2(float(coordinates)));
+                    }
+                    void main() {
+                        const vec3 pos = getVertexPosition();
+                        gl_Position = MVP * vec4(pos, 1.0);
+                        const vec4 Color = unpackUnorm4x8(PackedColor);
+                        vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                        fadeFactor = 1.0;
+                    }
+                    """);
+            compileVertex(compiler, options, terrainVertex, "terrain-view-position-vertex-adapter", true);
             String postShadowSource = "uniform sampler2DShadow shadowtex1;\n"
                     + "float compare(sampler2DShadow depthMap){return texture(depthMap,vec3(0.5));}\n"
                     + "layout(location=0) out vec4 outColor;void main(){outColor=vec4(texture(shadowtex1,vec3(0.5))+compare(shadowtex1))+shadow2D(shadowtex1,vec3(0.5));}\n";
@@ -116,7 +140,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-ID, entity-shadow, cloud-fog and cloud-vertex fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-ID, entity-shadow, cloud-fog, cloud-vertex and terrain-view-position fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
