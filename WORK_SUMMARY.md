@@ -12,6 +12,8 @@
 - Локально `test validateShaders build` прошли: **115 tests, 0 failures/errors**, 28 example preprocesses / 25 direct SPIR-V compilations; JAR verifier прошёл. Это ещё не доказательство runtime корректности.
 - Graphics matrix расширена двумя original fixtures: atlas проверяет настоящий material и mip level 2, entity проверяет material текстуры cow. Порог 2000 magenta pixels и disabled baseline сохранены. GPU CI и свежий полный source audit ещё выполняются; не считать их зелёными до просмотра результатов.
 - PR #2 остаётся draft, stable merge/release не готовы. Существующий опубликованный alpha.1 не содержит этих изменений.
+- Первый CI run `39213650838` (`c4e7406`): скачаны обе новые graphics evidence. Atlas 223051 active / 0 disabled, entity 4688 / 0; оба result.json passed. Полную matrix/validation ещё нужно сверить. После этого upload переведён с encoder на direct image upload queue, чтобы не менять глобальный slot 0; entity fixture дополнительно проверяет отличающуюся albedo. Этот последующий fix требует отдельного CI.
+- Полный локальный audit завершён: 75 configurations, 5178 sources, 18 accepted / 699 rejected; Complementary теперь блокируют shadowcolor0 и blockEntityId, а не specular. Оба committed JSON обновлены; exact-commit CI сравнение ещё предстоит.
 
 ## Предыдущий подтверждённый срез: water color inputs — 2026-10-19
 

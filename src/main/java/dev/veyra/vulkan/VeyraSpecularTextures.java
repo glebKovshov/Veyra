@@ -17,6 +17,7 @@ import net.minecraft.server.packs.resources.Resource;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkRenderPass;
+import net.vulkanmod.render.texture.SpriteUpdateUtil;
 import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.texture.SamplerManager;
@@ -160,7 +161,10 @@ public final class VeyraSpecularTextures {
                 try (NativeImage data = new NativeImage(pixels.width(), pixels.height(), false)) {
                     for (int y = 0; y < pixels.height(); y++) for (int x = 0; x < pixels.width(); x++)
                         data.setPixel(x, y, pixels.pixels()[y * pixels.width() + x]);
-                    device.createCommandEncoder().writeToTexture(texture, data, level, 0, 0, 0, pixels.width(), pixels.height(), 0, 0);
+                    // Match VulkanMod's upload queue/layout tracking without its encoder's
+                    // global slot-0 mutation: entity materials can be created during a draw.
+                    SpriteUpdateUtil.addTransitionedLayout(image);
+                    image.uploadSubTextureAsync(level, 0, pixels.width(), pixels.height(), 0, 0, 0, 0, pixels.width(), data.getPointer());
                 }
                 size += (long) pixels.width() * pixels.height() * 4;
                 if (level + 1 < mipLevels) pixels = SpecularPixels.mip(pixels, labPbr);

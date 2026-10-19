@@ -2,6 +2,8 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Added resource-pack static specular material textures to terrain/shadow/entity bridges, including atlas padding, straight UNORM channels and linear/LabPBR mipmaps. Missing maps use the zero default; animated maps are explicitly unsupported.
+- Added original atlas-mipmap and entity-material Vulkan fixtures. Runtime validation is tracked in VALIDATION.md.
 - Added auxiliary color sampling to water geometry, including legacy aliases, post-deferred buffer sides, read-only target initialization and graphics-ordered sampling barriers. Same-attachment feedback is rejected.
 - Added a water-color-inputs Vulkan readback case alongside the existing MRT and water-depth fixtures.
 - Aligned active noisetex detection between runtime descriptors and the GLSL bridge; unused header declarations no longer shift later bindings.
