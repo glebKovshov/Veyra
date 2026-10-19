@@ -5,6 +5,7 @@
   "client": [
     "MinecraftMixin",
     "BiomesMixin",
+    "LightTextureMixin",
     "GameRendererMixin",
     "BlockEntityRenderDispatcherMixin",
     "SubmitNodeCollectionMixin",

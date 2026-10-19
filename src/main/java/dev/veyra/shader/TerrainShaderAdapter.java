@@ -50,6 +50,7 @@ public final class TerrainShaderAdapter {
     private static final List<ShaderUniform> SHADERPACK_UNIFORMS = List.of(
             new ShaderUniform("near", "float", false),
             new ShaderUniform("far", "float", false),
+            new ShaderUniform("darknessLightFactor", "float", false),
             new ShaderUniform("heldBlockLightValue", "int", false),
             new ShaderUniform("heldBlockLightValue2", "int", false),
             new ShaderUniform("heldItemId", "int", false),

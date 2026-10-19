@@ -163,7 +163,7 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
@@ -194,7 +194,7 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "darknessLightFactor", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
             "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
@@ -218,7 +218,8 @@ public final class VeyraRenderer {
             "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
-            "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
+            "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -465,6 +466,7 @@ public final class VeyraRenderer {
             case "biome" -> (double) currentBiomeId(minecraft);
             case "near" -> (double) IRIS_NEAR_PLANE;
             case "far" -> (double) farPlane();
+            case "darknessLightFactor" -> (double) darknessLightFactor;
             case "heldBlockLightValue" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
             case "heldBlockLightValue2" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.OFF_HAND);
             case "heldItemId" -> (double) heldItemId(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -631,6 +633,9 @@ public final class VeyraRenderer {
         if (name.equals("far")) {
             return farPlane();
         }
+        if (name.equals("darknessLightFactor")) {
+            return darknessLightFactor;
+        }
         if (name.equals("viewWidth")) {
             return minecraft.getWindow().getWidth();
         }
@@ -700,6 +705,13 @@ public final class VeyraRenderer {
         }
         return minecraft.level.getBiome(minecraft.player.blockPosition()).unwrapKey()
                 .map(key -> BiomeIds.id(key.identifier().toString())).orElse(0);
+    }
+
+    private static volatile float darknessLightFactor;
+
+    /** Called from the lightmap update with Iris' darknessLightFactor. */
+    public static void captureDarknessLightFactor(float value) {
+        darknessLightFactor = value;
     }
 
     /** Iris reports a fixed 0.05 near plane. */
@@ -4691,6 +4703,7 @@ public final class VeyraRenderer {
             values.add(switch (uniform) {
                 case "near" -> new UniformValue.FloatUniform(IRIS_NEAR_PLANE);
                 case "far" -> new UniformValue.FloatUniform(farPlane());
+                case "darknessLightFactor" -> new UniformValue.FloatUniform(darknessLightFactor);
                 case "heldBlockLightValue" -> new UniformValue.IntUniform(
                         heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND));
                 case "heldBlockLightValue2" -> new UniformValue.IntUniform(
