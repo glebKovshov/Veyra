@@ -23,7 +23,7 @@ public abstract class GraphicsDescriptorsMixin {
     @Unique private static final Set<String> veyra$seen = new HashSet<>();
     @Inject(method = "bindPipeline", at = @At("HEAD"), remap = false)
     private void veyra$recordDescriptors(RenderPipeline pipeline, CallbackInfoReturnable<Boolean> ci) {
-        if (!pipeline.getLocation().getNamespace().equals("veyra")) return;
+        if (!pipeline.getFragmentShader().getNamespace().equals("veyra")) return;
         var nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
         if (nativePipeline == null) return;
         var renderer = Renderer.getInstance();
