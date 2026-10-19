@@ -83,8 +83,37 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsTerrainViewPositionToViewSpaceVarying() throws IOException {
+        String fragment = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec3 viewPos;
+                void main() { gl_FragColor = vec4(abs(viewPos) / 64.0, 1.0); }
+                """);
+        String vertex = TerrainShaderAdapter.adaptVertex("""
+                #version 460
+                layout (location = 4) out flat float fadeFactor;
+                layout(binding = 1) uniform UBO {
+                    int UseRgss;
+                };
+                void main() {
+                    const vec3 pos = getVertexPosition();
+                    vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                }
+                """);
+
+        assertTrue(fragment.contains("layout(location = 10) in vec3 veyraViewPosition;"));
+        assertTrue(fragment.contains("#define viewPos veyraViewPosition"));
+        assertFalse(fragment.contains("varying vec3 viewPos;"));
+        assertTrue(vertex.contains("layout (location = 10) out vec3 veyraViewPosition;"));
+        assertTrue(vertex.contains("float near;\n    float far;"));
+        assertTrue(vertex.contains("mat4 gbufferModelView;"));
+        assertTrue(vertex.indexOf("float near;") < vertex.indexOf("mat4 gbufferModelView;"));
+        assertTrue(vertex.contains("veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;"));
+    }
+
+    @Test
     void reportsTheSpecificUnsupportedTerrainInput() {
-        for (String input : List.of("mc_Entity", "mc_midTexCoord", "midTexCoord", "viewPos", "viewNormal", "tangent", "at_tangent")) {
+        for (String input : List.of("mc_Entity", "mc_midTexCoord", "midTexCoord", "viewNormal", "tangent", "at_tangent")) {
             IOException error = assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(
                     "void main() { gl_FragColor = vec4(" + input + "); }\n"));
             assertTrue(error.getMessage().contains("input '" + input + "'"), error.getMessage());

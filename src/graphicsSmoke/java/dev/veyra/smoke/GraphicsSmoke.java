@@ -23,7 +23,7 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture;
+    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -40,6 +40,7 @@ public final class GraphicsSmoke {
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
             cloudFixture = fixture.equals("cloud-colortex0");
+            geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -92,7 +93,9 @@ public final class GraphicsSmoke {
             var source = renderer.getMainPass().getMainFramebuffer().getColorAttachment();
             if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
                 throw new IllegalStateException("Surface image does not support frame readback");
-            var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture
+            // This fixture declares no auxiliary MRT target and validates its signal in the
+            // presented colortex0 image. Keep the existing colortex1 check for other fixtures.
+            var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
