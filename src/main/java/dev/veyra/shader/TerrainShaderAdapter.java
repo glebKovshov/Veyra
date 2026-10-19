@@ -298,7 +298,8 @@ public final class TerrainShaderAdapter {
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
                         + fogUniforms.bridge() + "#define texture Sampler0");
         if (opaqueDepthAvailable && usesOpaqueDepthSampler(source)) {
-            bridge = "layout(binding = 7) uniform sampler2D VeyraDepthTex1Sampler;\n"
+            int depthBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0);
+            bridge = "layout(binding = " + depthBinding + ") uniform sampler2D VeyraDepthTex1Sampler;\n"
                     + "#define depthtex1 VeyraDepthTex1Sampler\n" + bridge;
         }
         if (declaredVaryings.contains("normal")) {
@@ -321,6 +322,11 @@ public final class TerrainShaderAdapter {
             bridge = bridge.replaceAll(
                     "(?m)^[\\t ]*layout\\(binding = 6\\) uniform sampler2D VeyraNoiseSampler;[\\t ]*\\R", "")
                     .replaceAll("(?m)^[\\t ]*#define noisetex VeyraNoiseSampler[\\t ]*\\R", "");
+        } else if (!shadowSamplerAvailable) {
+            // VulkanMod 0.6.8 indexes its layout array by binding, so optional images
+            // must remain contiguous after the three UBOs and two base terrain samplers.
+            bridge = bridge.replace("layout(binding = 6) uniform sampler2D VeyraNoiseSampler;",
+                    "layout(binding = 5) uniform sampler2D VeyraNoiseSampler;");
         }
         result.append(bridge
                 .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())

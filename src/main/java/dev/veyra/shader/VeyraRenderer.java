@@ -2492,14 +2492,15 @@ public final class VeyraRenderer {
                 .setPushConstants(PipelineConfigs.TERRAIN_PC)
                 .addImageDescriptor(3, "sampler2D", "Sampler0", 0)
                 .addImageDescriptor(4, "sampler2D", "LightTexture", 2);
+        int nextBinding = 5;
         if (shadowSamplerAvailable) {
-            config.addImageDescriptor(5, "sampler2D", "VeyraShadowSampler", 3);
+            config.addImageDescriptor(nextBinding++, "sampler2D", "VeyraShadowSampler", 3);
         }
         if (noiseSamplerAvailable) {
-            config.addImageDescriptor(6, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4);
+            config.addImageDescriptor(nextBinding++, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4);
         }
         if (opaqueDepthSamplerAvailable) {
-            config.addImageDescriptor(7, "sampler2D", "VeyraDepthTex1Sampler", 5);
+            config.addImageDescriptor(nextBinding, "sampler2D", "VeyraDepthTex1Sampler", 5);
         }
         return config.build();
     }

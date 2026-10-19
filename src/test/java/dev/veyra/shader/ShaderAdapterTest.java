@@ -276,7 +276,7 @@ class ShaderAdapterTest {
         String source = "uniform sampler2D depthtex1;\nvoid main(){gl_FragColor=vec4(texture2D(depthtex1,vec2(0.5)).r);}\n";
         assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(source, false));
         String adapted = TerrainShaderAdapter.adaptFragment(source, false, true);
-        assertTrue(adapted.contains("layout(binding = 7) uniform sampler2D VeyraDepthTex1Sampler;"));
+        assertTrue(adapted.contains("layout(binding = 5) uniform sampler2D VeyraDepthTex1Sampler;"));
         assertTrue(adapted.contains("#define depthtex1 VeyraDepthTex1Sampler"));
         assertTrue(adapted.contains("veyraSample(depthtex1,vec2(0.5))"));
         assertFalse(adapted.contains("VeyraShadowSampler"));
@@ -285,6 +285,23 @@ class ShaderAdapterTest {
         String unused = "uniform sampler2D depthtex1;\nvoid main(){gl_FragColor=vec4(1.0);}\n";
         assertFalse(TerrainShaderAdapter.usesOpaqueDepthSampler(unused));
         assertFalse(TerrainShaderAdapter.adaptFragment(unused, false, true).contains("VeyraDepthTex1Sampler"));
+    }
+
+    @Test
+    void terrainOptionalSamplersUseContiguousBindings() throws IOException {
+        for (boolean shadows : List.of(false, true)) {
+            for (boolean noise : List.of(false, true)) {
+                String source = "uniform sampler2D depthtex1;\n"
+                        + (noise ? "uniform sampler2D noisetex;\n" : "")
+                        + "void main(){gl_FragColor=texture2D(depthtex1,vec2(0.5))"
+                        + (noise ? "+texture2D(noisetex,vec2(0.5))" : "") + ";}\n";
+                String adapted = TerrainShaderAdapter.adaptFragment(source, shadows, true);
+                int next = 5;
+                if (shadows) assertTrue(adapted.contains("layout(binding = " + next++ + ") uniform sampler2D VeyraShadowSampler;"));
+                if (noise) assertTrue(adapted.contains("layout(binding = " + next++ + ") uniform sampler2D VeyraNoiseSampler;"));
+                assertTrue(adapted.contains("layout(binding = " + next + ") uniform sampler2D VeyraDepthTex1Sampler;"));
+            }
+        }
     }
 
     @Test

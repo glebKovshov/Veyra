@@ -215,3 +215,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Ownership snapshot учитывает post и terrain consumers, чтобы rebuild post pipeline не освобождал используемый water depth view; world/reset/disable очищают table binding и используют существующее fence-retirement depth view.
 - Новый оригинальный `examples/water-opaque-depth` проверяет depth за water fragment, исключая очищенный far-depth. Добавлен отдельный graphics CI matrix case с водой над opaque floor; прежний MRT fixture сохранён.
 - Локально: 95 JUnit tests, 0 failures/errors/skips; build и JAR verifier проходят; shaderc: 23 example sources / 20 direct SPIR-V compilations. Новый GPU fixture ещё не подтверждён, source matrix предстоит пересчитать. Не объявлять water sampling проверенным в runtime до readback/validation.
+
+### Первый GPU прогон и исправление descriptor layout
+
+- Commit 1fd74ed: GitHub Build success; прежний MRT fixture прошёл (223059/0 magenta, runtime validation errors 0), новый water fixture отклонён с IndexOutOfBoundsException при `Pipeline.createDescriptorSetLayout`, до проверки изображения.
+- Причина установлена по полному stack trace и pinned VulkanMod 0.6.8 source: layout buffer имеет размер числу descriptors, но индексируется binding number. Фиксированный optional binding 7 создавал разрыв при отсутствии shadow/noise. Исправлена непрерывная нумерация 5..N согласованно в terrain GLSL и PipelineConfig, включая уже существовавший noisetex-without-shadow gap. Native texture indices 3/4/5 не меняются.
+- Добавлена regression матрица всех сочетаний shadow/noise для water depth binding. GPU fixture не ослаблялся; повторный прогон необходим.
