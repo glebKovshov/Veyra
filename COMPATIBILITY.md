@@ -1,11 +1,19 @@
 # Shaderpack compatibility: development 0.2
 
-This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The pinned archives were checked by the [CI source-audit run](https://github.com/glebKovshov/Veyra/actions/runs/39210665829) at commit `ef6fb4413d4ec8831e8b3c92fae2c9db6467bd46`: 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game.
+## Static material inputs (development)
+
+The geometry bridges now read resource-pack `_s.png` specular maps for terrain/shadow atlases and standalone entity textures. Atlas rectangles follow the live albedo sprites, including edge padding. Data use straight UNORM channels, with linear or LabPBR category-aware mipmaps selected by `optifine/texture.properties`. Missing maps use the zero specular default. Animated material maps and normal maps remain unsupported; animated specular inputs produce an explicit error. General Iris filtering/mipmap settings are incomplete.
+
+The complete local 75-case source audit matches the downloaded exact-commit CI report for `3c1d749`. Complementary advances from `specular` to `shadowcolor0` or `blockEntityId`; total acceptance remains 18/717. Original atlas/entity fixtures validate material data separately from third-party shaderpacks; they do not establish popular-pack visual compatibility.
+
+## Verified source checkpoint
+
+This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The pinned archives were checked by the [CI source-audit run](https://github.com/glebKovshov/Veyra/actions/runs/39214805068) at commit `3c1d749c69fbd33b6e6e43ab4b684bf3c551ae9a`: 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game.
 
 | Pack | Version | Options / profiles | Default stages preprocessed, Overworld / Nether / End | Default geometry fragments accepted / attempted | Current source blockers | In-game pack result |
 | --- | --- | --- | --- | --- | --- | --- |
-| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Active `specular` reads in terrain/entity/block/hand/water programs; cloud/spider-eye `blockEntityId`; `shadowcomp.csh` compute in selected profiles | Not tested |
-| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Active `specular` reads in terrain/entity/block/hand/water programs; cloud/spider-eye `blockEntityId`; `shadowcomp.csh` compute in selected profiles | Not tested |
+| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Active `shadowcolor0` reads or custom `blockEntityId` in geometry programs; `shadowcomp.csh` compute in selected profiles | Not tested |
+| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Active `shadowcolor0` reads or custom `blockEntityId` in geometry programs; `shadowcomp.csh` compute in selected profiles | Not tested |
 | BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | 1 / 9 | Active `shadowtex1` in block/entity/hand/terrain/water programs; custom `entityId`, `blockEntityId`, and `shadowFade` uniforms; cloud `texture` uniform | Not tested |
 | Sildur's Vibrant | 2.02 Extreme | 115 / 0 | 42/42, 42/42, 42/42 | 0 / 5 | `colortex4` in translucent entity/block/hand geometry; water reads colortex4 while it is also an attachment (feedback); cloud custom uniform `texture` | Not tested |
 
@@ -44,4 +52,4 @@ Water geometry now reads up to six distinct auxiliary colortex1..15 images, incl
 
 The original water-color-inputs fixture writes colortex4 in opaque MRT, changes colortex5's ping-pong side in deferred, and checks a half-resolution read-only colortex7 clear value. Its first software Vulkan run passed with 222,757 magenta pixels versus 0 disabled and no runtime validation errors. The existing MRT and water-depth checks also passed. Current exact-commit evidence is recorded in VALIDATION.md; this is not a third-party-pack result.
 
-The complete local 75-case source matrix exactly matches downloaded CI run 39210665829. Complementary water now advances from gaux2 to specular; BSL water advances to shadowtex1 or shadowFade. Sildur's water requires defined image-feedback behavior in addition to the still-missing colortex4 inputs in other geometry bridges. Overall acceptance is still 18/717.
+The complete local 75-case source matrix exactly matches downloaded CI run 39214805068. Complementary water now advances from specular to shadowcolor0 or blockEntityId; BSL water advances to shadowtex1 or shadowFade. Sildur's water requires defined image-feedback behavior in addition to the still-missing colortex4 inputs in other geometry bridges. Overall acceptance is still 18/717.

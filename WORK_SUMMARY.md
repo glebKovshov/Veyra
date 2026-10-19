@@ -4,7 +4,17 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Текущая работа: resource-pack specular — 2026-10-19
+## Актуальный срез: static specular materials — 2026-10-19
+
+- Runtime/test HEAD `3c1d749`: Build push/PR `39214797686` / `39214805186` success; скачанные XML подтверждают **115 tests, 0 failures/errors/skips**, 28 example preprocesses / 25 direct SPIR-V compilations. Скачанный mod JAR artifact 12168259361 прошёл verifier.
+- Graphics push/PR `39214797662` / `39214805071` success, все **5 fixtures**. Скачанные exact-commit evidence: MRT **223595/0**, water-depth **222757/0**, water-color **222757/0**, specular-atlas **222914/0**, specular-entity **18532/0** active/disabled magenta pixels. Runtime validation errors **0 у всех**. Entity active screenshot просмотрен; проверка требует одновременно реального material и отличающегося albedo.
+- Реальные static resource-pack `_s.png` работают в terrain atlas и entity bridges; atlas mip level 2 / минимум 3 image levels проверены GPU. CPU regressions проверяют straight alpha/data, padding/rescaling, LabPBR category-aware mipmaps и descriptor layout. Shadow binding реализован, отдельного specular-shadow GPU fixture пока нет.
+- Первый entity failure оказался ошибкой fixed test subject при randomized player spawn. Положение исправлено относительно фактической camera; threshold не снижен. Upload использует native image queue без encoder slot-0 mutation. Cache bounded 512 MiB/256 base textures; invalidate использует frame retirement.
+- Source run **39214805068** для `3c1d749` success. Скачанный artifact **12168784638** полностью совпадает со всеми **75 локальными и committed JSON records**: 5178 sources, 18 accepted / 699 rejected, visualValidation=false у всех. Complementary блокируют shadowcolor0/blockEntityId; BSL shadowtex1/shadowFade; Sildur feedback/other geometry colortex4.
+- Teardown остаётся НЕ чистым: для пяти fixtures выше **10031 / 10370 / 10049 / 10031 / 10355** diagnostics. Ownership/stress не закрыты. Normal maps, animated materials, physical GPU/UI и popular-pack visual support не подтверждены. Stable merge/release пока не готов.
+- `main` остаётся e37f188/0.1.1; PR #2 draft. Опубликованный alpha.1 tag остаётся 2b5acb0, текущих water/PBR fixes в нём нет. Следующий backend приоритет: отдельная opaque shadowtex1/shadowcolor inputs, pack-specific uniforms, затем lifecycle/real-pack validation.
+
+## История реализации specular и диагностики fixtures — 2026-10-19
 
 - Commit `c4e7406` добавляет настоящие static `_s.png` из активных resource packs: standalone entity textures и atlas с живыми sprite rectangles/padding. Отсутствующая карта получает zero default; повреждённая/animated карта выдаёт явную диагностику. Normal maps и animation ещё не реализованы.
 - Terrain/shadow/entity bridges получают отдельный specular descriptor; entity использует фактический native image index. Cache ограничен 512 MiB/256 base textures, reload/disable/shutdown используют frame retirement.

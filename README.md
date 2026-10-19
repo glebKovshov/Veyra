@@ -8,6 +8,8 @@ This branch adds shader options, quality profiles, conditional preprocessing and
 
 Post programs are scheduled at separate world boundaries: `prepare` after shadows, `deferred` before translucent terrain, and `composite`/`final` after world rendering. This integration is compiled and requires in-game Vulkan validation. Geometry still uses Veyra's existing synthesized vertex bridges; arbitrary shaderpack geometry vertex stages are not implemented. Terrain programs now have a native simultaneous MRT path; other geometry bridges still use a single color output. Unsupported compute, geometry, tessellation and begin stages produce an explicit load error instead of being silently omitted.
 
+Development material support includes resource-pack static `_s.png` specular maps for terrain/shadow atlases and entity textures, with linear/LabPBR mipmaps. Animated specular maps and normal maps remain unsupported. The original `examples/specular-atlas` and `examples/specular-entity` fixtures exercise this path; published alpha.1 predates it.
+
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.

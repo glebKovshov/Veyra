@@ -1,6 +1,26 @@
 # 0.2 development validation status
 
-## Current water-color validation (after alpha.1)
+## Static specular validation (after alpha.1)
+
+Runtime/test commit `3c1d749c69fbd33b6e6e43ab4b684bf3c551ae9a` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39214797686), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39214805186), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39214797662) and [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39214805071). Downloaded XML confirms 115 tests with zero failures/errors/skips; the downloaded CI mod JAR passes the verifier.
+
+| Fixture | Active / disabled magenta pixels | Runtime validation errors | Teardown diagnostics |
+| --- | --- | --- | --- |
+| Terrain MRT | 223595 / 0 | 0 | 10031 |
+| Water opaque depth | 222757 / 0 | 0 | 10370 |
+| Water color inputs | 222757 / 0 | 0 | 10049 |
+| Static specular atlas + mip level 2 | 222914 / 0 | 0 | 10031 |
+| Static entity specular + separate albedo | 18532 / 0 | 0 | 10355 |
+
+Local `test validateShaders build` passes with 115 JUnit tests, zero failures/errors, 28 example preprocesses and 25 direct SPIR-V compilations. The distributable verifier passes. All 75 local source-audit records match the downloaded [exact-commit source CI](https://github.com/glebKovshov/Veyra/actions/runs/39214805068) at `3c1d749c69fbd33b6e6e43ab4b684bf3c551ae9a`: 5,178 sources, 18 accepted / 699 rejected. Complementary now reaches shadowcolor0 or blockEntityId.
+
+The initial material-only [graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39213650838) passes: atlas 223,051/0 active/disabled magenta pixels, entity 4,688/0, runtime validation errors zero for both downloaded artifacts. The atlas fixture requires mip level 2 and at least three image levels. Screenshots were inspected. Teardown diagnostics remain 10,351/10,355 respectively; ownership is unresolved.
+
+The later entity predicate also reads albedo and requires it to differ from the material. Its first run failed because the subject was outside the randomized player camera, established from login coordinates and screenshots. Commit `3c1d749` places the subject relative to the actual player position; the fresh run above passes the stronger predicate. Its screenshot was inspected. The threshold remains 2000 pixels and the disabled baseline requirement is unchanged. The material shadow binding is implemented but has no dedicated PBR-shadow GPU fixture yet.
+
+Static specular support does not include normal maps or material animation. Physical GPU, real-pack visual validation and long lifecycle stress remain unverified. PR #2 stays draft; stable release is not ready.
+
+## Historical water-color validation (after alpha.1)
 
 Runtime code `ef6fb4413d4ec8831e8b3c92fae2c9db6467bd46` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39210665983), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39210672564), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39210665863), [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39210672561), [push source audit](https://github.com/glebKovshov/Veyra/actions/runs/39210665829) and [PR source audit](https://github.com/glebKovshov/Veyra/actions/runs/39210672681).
 

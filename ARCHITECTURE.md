@@ -20,6 +20,10 @@ Consequently, adding simultaneous geometry MRT required changes to framebuffer c
 
 The terrain path maps shader output locations to physical colortex indices, retains the current ping-pong side, inherits VulkanMod draw state and applies pack blend overrides per target. Sparse write masks and per-target blending require the enabled independentBlend device feature. Target sizes must match the scene. Retired framebuffer passes and their cached native pipeline variants are destroyed at frame completion. Sampled post inputs receive graph-ordered image barriers on the main command buffer rather than upload-queue transitions before their producing draws. Swapchain wrappers now preserve actual native usage flags; transfer-source usage is requested only when supported by the surface.
 
+`VeyraSpecularTextures` resolves resource-pack `_s.png` data against the live albedo GPU texture. Atlas inputs use the existing sprite rectangles and padding; standalone SimpleTexture inputs use their resource IDs. The bounded cache owns only newly allocated material images/views and retires them after frame fences on invalidation. Static mipmaps preserve straight data channels; LabPBR category voting prevents averaging different metal identities or emissive sentinels. Native uploads use VulkanMod's image upload queue/layout tracking directly, avoiding the command encoder's global slot-0 mutation during lazy entity material creation. Entity sampler indices come from the compiled native descriptor, while terrain uses its reserved slot 1. Missing maps use zero; animated maps fail explicitly.
+
+The material-path comparison additionally inspected Iris commit `0a1fcaae55099356bf53410b4f5302753edb0ffc`: PBRType, AtlasPBRLoader and LabPBRTextureFormat. These establish resource naming, default data and channel semantics; Veyra implements its own CPU data operations and Vulkan ownership.
+
 ## Known gaps
 
 | Component | Current state | Needed for broad pack compatibility |
@@ -28,7 +32,7 @@ The terrain path maps shader output locations to physical colortex indices, reta
 | Geometry vertex stage | Existing synthesized interfaces | Execute arbitrary pack vertex GLSL, required attributes, IDs and varyings |
 | Geometry color outputs | Native terrain MRT with per-target blend overrides; other geometry remains single-output | Entity/hand/block/cloud/shadow MRT, wider format/state semantics and runtime verification |
 | Post outputs | Separate fullscreen draws per output | Genuine MRT where simultaneous execution or side effects matter |
-| Textures/uniforms | Generated `noisetex`, main depth and depth history, post color-target samplers, shared frame uniforms including raw/smoothed eye brightness; unused geometry samplers are removed; `tex` aliases the block atlas | Active color-target sampling in geometry, PBR specular textures, wider shadow/depth samplers, custom texture/image units, and custom expression uniforms |
+| Textures/uniforms | Generated `noisetex`, depth/history, water opaque-depth and auxiliary-color sampling, static resource-pack specular maps, shared frame uniforms; unused samplers removed | Normal/animated material maps, auxiliary-color inputs in other geometry bridges, attachment feedback, wider shadow/depth samplers, custom texture/image units and expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
 | Pack properties | Options, target/shadow settings, program conditions | Full state/property semantics, feature flags, custom images/SSBOs |
 | Runtime verification | Full build, unit tests, CPU shaderc/source audits; one Lavapipe synthetic terrain-MRT/composite client fixture passes | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
@@ -38,6 +42,7 @@ The synthetic client fixture confirms the terrain-MRT to composite path under La
 ## Sources and licensing
 
 - [Iris source](https://github.com/IrisShaders/Iris/tree/bff1e69cb6c5519d8745784aa9c8b92984de67e7/common/src/main/java/net/irisshaders/iris)
+- [Iris material data reference](https://github.com/IrisShaders/Iris/tree/0a1fcaae55099356bf53410b4f5302753edb0ffc/common/src/main/java/net/irisshaders/iris/pbr)
 - [VulkanMod source](https://github.com/xCollateral/VulkanMod/tree/087ef24e58e5522dec5ccb44f279768786bfb6da/src/main/java/net/vulkanmod)
 - [Vulkan depth/stencil clear requirements](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdClearDepthStencilImage.html)
 
