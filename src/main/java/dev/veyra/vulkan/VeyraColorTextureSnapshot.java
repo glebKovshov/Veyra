@@ -12,6 +12,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VK11;
 import org.lwjgl.vulkan.VkFormatProperties;
+import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageCopy;
 
 /** A sampled copy of a completed scene color image, with the source format and dimensions. */
@@ -85,7 +86,8 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         }
         Renderer renderer = Renderer.getInstance();
         if (renderer.getBoundRenderPass() != null) renderer.endRenderPass();
-        ensure(source.width, source.height, source.format);
+        int destinationFormat = sampledFormat(source.format);
+        ensure(source.width, source.height, destinationFormat);
         VulkanImage destination = image();
         if ((destination.usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             throw new IllegalStateException("The " + name + " image does not support transfer writes.");
@@ -93,8 +95,8 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         if ((destination.usage & VK10.VK_IMAGE_USAGE_SAMPLED_BIT) == 0) {
             throw new IllegalStateException("The " + name + " image does not support shader sampling.");
         }
-        if (source.format != destination.format || source.width != destination.width
-                || source.height != destination.height || source.getId() == destination.getId()) {
+        if (source.width != destination.width || source.height != destination.height
+                || source.getId() == destination.getId()) {
             throw new IllegalStateException("The " + name + " image does not match its source scene color.");
         }
 
@@ -104,21 +106,45 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
             throw new IllegalStateException("The source scene color image has not been initialized.");
         }
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            VkFormatProperties properties = VkFormatProperties.calloc(stack);
-            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, source.format, properties);
-            int transferFeatures = VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-            if ((properties.optimalTilingFeatures() & transferFeatures) != transferFeatures) {
-                throw new IllegalStateException("The scene color format does not support Vulkan image copies.");
+            VkFormatProperties sourceProperties = VkFormatProperties.calloc(stack);
+            VkFormatProperties destinationProperties = VkFormatProperties.calloc(stack);
+            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice,
+                    source.format, sourceProperties);
+            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice,
+                    destination.format, destinationProperties);
+            int sourceFeatures = sourceProperties.optimalTilingFeatures();
+            int destinationFeatures = destinationProperties.optimalTilingFeatures();
+            if (source.format == destination.format) {
+                int copyFeatures = VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+                if ((sourceFeatures & copyFeatures) != copyFeatures) {
+                    throw new IllegalStateException("The scene color format does not support Vulkan image copies.");
+                }
+            } else if ((sourceFeatures & VK11.VK_FORMAT_FEATURE_BLIT_SRC_BIT) == 0
+                    || (destinationFeatures & VK11.VK_FORMAT_FEATURE_BLIT_DST_BIT) == 0) {
+                throw new IllegalStateException("The scene color formats do not support Vulkan blits.");
             }
             var commands = Renderer.getCommandBuffer();
             source.transitionImageLayout(stack, commands, VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
             destination.transitionImageLayout(stack, commands, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            VkImageCopy.Buffer region = VkImageCopy.calloc(1, stack);
-            region.srcSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
-            region.dstSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
-            region.extent().set(source.width, source.height, 1);
-            VK10.vkCmdCopyImage(commands, source.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    destination.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region);
+            if (source.format == destination.format) {
+                VkImageCopy.Buffer region = VkImageCopy.calloc(1, stack);
+                region.srcSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+                region.dstSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+                region.extent().set(source.width, source.height, 1);
+                VK10.vkCmdCopyImage(commands, source.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        destination.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region);
+            } else {
+                VkImageBlit.Buffer region = VkImageBlit.calloc(1, stack);
+                region.srcSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+                region.srcOffsets(0).set(0, 0, 0);
+                region.srcOffsets(1).set(source.width, source.height, 1);
+                region.dstSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+                region.dstOffsets(0).set(0, 0, 0);
+                region.dstOffsets(1).set(destination.width, destination.height, 1);
+                VK10.vkCmdBlitImage(commands, source.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        destination.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region,
+                        VK10.VK_FILTER_NEAREST);
+            }
             source.transitionImageLayout(stack, commands, previousLayout);
         }
         transitionToSampling();
@@ -146,6 +172,13 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         width = 0;
         height = 0;
         format = 0;
+    }
+
+
+    static int sampledFormat(int sourceFormat) {
+        if (sourceFormat == VK10.VK_FORMAT_B8G8R8A8_UNORM) return VK10.VK_FORMAT_R8G8B8A8_UNORM;
+        if (sourceFormat == VK10.VK_FORMAT_B8G8R8A8_SRGB) return VK10.VK_FORMAT_R8G8B8A8_SRGB;
+        return sourceFormat;
     }
 
     private boolean isAllocated() {
