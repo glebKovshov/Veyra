@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — unreleased development branch
+## 0.2.0-beta.1 — 2026-10-19 (prerelease)
 
 - Added post-stage shadowtex1 and shadowcolor0/shadowcolor inputs, with explicit metadata, color alias deduplication, depth/color filtering and a combined twelve-sampler budget.
 - Preserved modern float and legacy vec4 comparison-helper semantics in post shaders; added a four-phase prepare/deferred/composite/final readback chain.

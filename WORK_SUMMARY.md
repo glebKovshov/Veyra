@@ -4,6 +4,13 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
+## Текущая работа: выпуск 0.2.0-beta.1 — 2026-10-19
+
+- Teardown audit завершён: registry snapshot совпадает с vanilla baseline (46/667/97), Veyra-named объектов нет; ~10031 diagnostics относятся к VulkanMod и присутствуют без shaderpack.
+- Версия поднята до `0.2.0-beta.1+mc1.21.11` (prerelease, не stable/не Iris parity). Локально JDK 21: `clean test validateShaders build packageExamplePacks` success, **139 tests / 0 failures/errors/skips**, verify_jar прошёл.
+- RELEASE_NOTES.md, README, CHANGELOG обновлены. Далее: push → PR #2 ready+merge в main → tag `v0.2.0-beta.1+mc1.21.11` → Release workflow публикует JAR.
+- Следующие backend задачи после beta.1: per-draw entityId/blockEntityId, shadowFade, произвольные geometry vertex stages, non-terrain MRT, проверка на физическом GPU и реальных паках.
+
 ## Текущая работа: teardown ownership audit — 2026-10-19
 
 - Добавлен original vanilla-baseline без выбранного shaderpack, с readback после 240 world ticks. Он требует отсутствие selected pack/rendering и отсутствие shader signal; predicates остальных 10 fixtures не изменены.
