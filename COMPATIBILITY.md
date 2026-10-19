@@ -8,15 +8,15 @@
 - An undefined `BIOME_*` constant (Complementary r5.9.3 references `BIOME_SULFUR_CAVES`, which vanilla 1.21.11 does not register) fails in Iris too: Iris warns and never sets the uniform, so shaders read 0. Veyra now mirrors that for such definitions and their dependents and logs the same kind of warning. Inputs that Iris provides but Veyra does not still reject the program.
 - The offline source audit seeds vanilla biome ids from Minecraft's `Biomes` class in the same order `BiomesMixin` records at runtime, so `BIOME_*` constants no longer produce audit-only rejections.
 
-Refreshed pinned source audit (75 cases, all 5,178 stages preprocessed): 72 geometry fragment programs accepted, 645 rejected; every case has `visualValidation: false`. Default Overworld blockers per program:
+The refreshed pinned source audit on PR #11 head `cc56216` (75 cases, all 5,178 stages preprocessed) accepted 72 geometry fragment programs and rejected 645; every case has `visualValidation: false`. The overall counts did not change because the newly supported aliases occur in programs with other unsupported inputs. Default Overworld blockers per program:
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 1/10, 1/10, 1/10 | terrain/water: missing `lmCoord` input; entity/block/hand/spidereyes: `currentRenderedItemId`; cloud adapter accepts observed `colortex0` and `noisetex` reads; selected profiles: `shadowcomp.csh` compute | Not tested |
-| BSL 10.1.8 | 1/9, 1/9, 1/9 | terrain/water: pack vertex varyings `color` / `mat`; entities: `entityColor`; hand: `isMainHand` varying; block: unsupported entity-bridge inputs; clouds: `texture` sampler | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 1/10, 1/10, 1/10 | terrain/water: `signMidCoordPos` (requires unavailable `mc_midTexCoord`); entity/block/hand/spidereyes: `currentRenderedItemId`; cloud adapter accepts observed `colortex0` and `noisetex` reads; selected profiles: `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 1/9, 1/9, 1/9 | terrain: an entity-metadata, midpoint-UV, view-space, or tangent input grouped by the adapter diagnostic; water: `mat`; entities: `entityColor`; hand: `isMainHand` varying; block: unsupported entity-bridge inputs; clouds: `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent block/entity/hand geometry; water reads `colortex4` while it is an attachment; clouds: `texture` sampler | Not tested |
 
-Complementary terrain/water no longer stop at `heavyFog`, `velocity`, or biome constants; their next rejection is the `lmCoord` input that the terrain bridge does not provide. The cloud adapter bridges the scene-color and noisetex sampling calls observed in the pinned default programs. Uniform declarations that the adapters cannot bind are named in the diagnostic.
+PR #11 adds the terrain aliases `lmCoord` (VulkanMod lightmap input, location 5) and `color` (VulkanMod vertex color input, location 0); the refreshed audit no longer reports either alias as a blocker. Complementary terrain/water now stop at `signMidCoordPos`, which depends on `mc_midTexCoord`; BSL terrain advances past `color` but still hits an unsupported vertex input. The audit accepted-count did not increase because the full programs contain additional missing inputs. The cloud adapter bridges the scene-color and noisetex sampling calls observed in the pinned default programs. Uniform declarations that the adapters cannot bind are named in the diagnostic.
 
 ## Entity and block entity identifiers (beta.4)
 

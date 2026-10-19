@@ -38,7 +38,9 @@ public final class TerrainShaderAdapter {
             Map.entry("texCoord", new Varying("vec2", 1)),
             Map.entry("texCoord0", new Varying("vec2", 1)),
             Map.entry("lmcoord", new Varying("vec2", 5)),
+            Map.entry("lmCoord", new Varying("vec2", 5)),
             Map.entry("lightMapCoord", new Varying("vec2", 5)),
+            Map.entry("color", new Varying("vec4", 0)),
             Map.entry("glcolor", new Varying("vec4", 0)),
             Map.entry("glColor", new Varying("vec4", 0)),
             Map.entry("gl_Color", new Varying("vec4", 0)),
@@ -169,7 +171,9 @@ public final class TerrainShaderAdapter {
             #define texCoord veyraTexCoord
             #define texCoord0 veyraTexCoord
             #define lmcoord veyraLightmapCoord
+            #define lmCoord veyraLightmapCoord
             #define lightMapCoord veyraLightmapCoord
+            #define color veyraVertexColor
             #define glcolor veyraVertexColor
             #define glColor veyraVertexColor
             #define gl_Color veyraVertexColor
