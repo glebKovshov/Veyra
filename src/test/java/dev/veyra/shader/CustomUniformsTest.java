@@ -99,6 +99,15 @@ class CustomUniformsTest {
     }
 
     @Test
+    void customShadowFadeReusesTheBuiltInPostUniformSlot() {
+        CustomUniforms uniforms = CustomUniforms.parse("uniform.float.shadowFade=1.0\n");
+
+        assertEquals(1, uniforms.uniforms().size());
+        assertEquals(List.of("sunAngle", "shadowFade"), ShaderPackUniformAdapter.mergeUniformNames(
+                List.of("sunAngle", "shadowFade"), uniforms.uniforms()));
+    }
+
+    @Test
     void operatorPrecedenceTernaryAndDivisionByZero() {
         CustomUniforms uniforms = CustomUniforms.parse("""
                 uniform.float.a=1 + 2 * 3 - 4 / 2

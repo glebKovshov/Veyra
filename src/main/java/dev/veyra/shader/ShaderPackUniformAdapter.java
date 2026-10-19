@@ -3,6 +3,7 @@ package dev.veyra.shader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -105,5 +106,16 @@ public final class ShaderPackUniformAdapter {
 
     public static List<String> matrixUniforms() {
         return MATRIX_UNIFORMS;
+    }
+
+    /** Merges Iris built-ins and pack uniforms without creating duplicate uniform-block members. */
+    static List<String> mergeUniformNames(List<String> builtInUniforms,
+                                          List<CustomUniforms.Uniform> customUniforms) {
+        if (customUniforms.isEmpty()) {
+            return builtInUniforms;
+        }
+        LinkedHashSet<String> names = new LinkedHashSet<>(builtInUniforms);
+        customUniforms.stream().map(CustomUniforms.Uniform::name).forEach(names::add);
+        return List.copyOf(names);
     }
 }

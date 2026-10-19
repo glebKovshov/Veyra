@@ -2561,13 +2561,8 @@ public final class VeyraRenderer {
 
     /** Built-in post uniforms followed by the active pack's custom uniforms. */
     private static List<String> availableUniforms() {
-        List<CustomUniforms.Uniform> custom = CustomUniforms.active().uniforms();
-        if (custom.isEmpty()) {
-            return SUPPORTED_UNIFORMS;
-        }
-        List<String> names = new ArrayList<>(SUPPORTED_UNIFORMS);
-        custom.stream().map(CustomUniforms.Uniform::name).forEach(names::add);
-        return names;
+        return ShaderPackUniformAdapter.mergeUniformNames(
+                SUPPORTED_UNIFORMS, CustomUniforms.active().uniforms());
     }
 
     private static boolean isBooleanUniform(String uniform) {
