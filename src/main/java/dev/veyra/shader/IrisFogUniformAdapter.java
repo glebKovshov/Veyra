@@ -1,7 +1,9 @@
 package dev.veyra.shader;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -12,9 +14,9 @@ final class IrisFogUniformAdapter {
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Map<String, FogUniform> UNIFORMS = Map.of(
-            "fogColor", new FogUniform("vec3", "(FogColor.rgb)"),
-            "fogStart", new FogUniform("float", "FogEnvironmentalStart"),
-            "fogEnd", new FogUniform("float", "FogEnvironmentalEnd"));
+            "fogColor", new FogUniform("vec3", "(FogColor.rgb)", "vec4", "FogColor"),
+            "fogStart", new FogUniform("float", "FogEnvironmentalStart", "float", "FogEnvironmentalStart"),
+            "fogEnd", new FogUniform("float", "FogEnvironmentalEnd", "float", "FogEnvironmentalEnd"));
     private static final String FOG_BLOCK = """
             layout(std140) uniform Fog {
                 vec4 FogColor;
@@ -39,6 +41,7 @@ final class IrisFogUniformAdapter {
         Matcher matcher = UNIFORM_DECLARATION.matcher(source);
         StringBuilder remaining = new StringBuilder(source.length());
         StringBuilder macros = new StringBuilder();
+        List<ShaderPackUniformAdapter.UniformField> fields = new ArrayList<>();
         Set<String> declaredUniforms = new HashSet<>();
         int cursor = 0;
         boolean usesFog = false;
@@ -59,18 +62,21 @@ final class IrisFogUniformAdapter {
             cursor = matcher.end();
             macros.append("#define ").append(name).append(' ')
                     .append(fogUniform.expression()).append('\n');
+            fields.add(new ShaderPackUniformAdapter.UniformField(
+                    fogUniform.bufferType(), fogUniform.bufferField()));
             usesFog = true;
         }
         if (!usesFog) {
-            return new AdaptedShader(source, "");
+            return new AdaptedShader(source, "", List.of());
         }
         remaining.append(source, cursor, source.length());
-        return new AdaptedShader(remaining.toString(), (fogValuesAlreadyDeclared ? "" : FOG_BLOCK) + macros);
+        return new AdaptedShader(remaining.toString(),
+                (fogValuesAlreadyDeclared ? "" : FOG_BLOCK) + macros, List.copyOf(fields));
     }
 
-    record AdaptedShader(String source, String bridge) {
+    record AdaptedShader(String source, String bridge, List<ShaderPackUniformAdapter.UniformField> fields) {
     }
 
-    private record FogUniform(String type, String expression) {
+    private record FogUniform(String type, String expression, String bufferType, String bufferField) {
     }
 }

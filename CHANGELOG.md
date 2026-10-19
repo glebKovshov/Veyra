@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.3 — 2026-10-19 (prerelease)
+
+- Added Iris cloud fog uniforms `fogColor`, `fogStart`, and `fogEnd`, backed by VulkanMod's live cloud uniform buffer and fog uniform providers.
+- Added a cloud fog shaderc fixture and expanded the pinned audit; no Complementary or other pack cloud fragment now fails specifically on `fogColor`.
+- Updated the source-only compatibility matrix. Complementary cloud shaders still encounter active `colortex0` sampling, and no third-party pack has been visually validated.
+
 ## 0.2.0-beta.2 — 2026-10-19 (prerelease)
 
 - Added scalar shader-pack custom-uniform expression evaluation from `shaders.properties`, including supported `uniform.*` and `variable.*` float, int, and bool definitions.

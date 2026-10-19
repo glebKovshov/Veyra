@@ -70,6 +70,34 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void mapsIrisFogUniformsIntoCloudPipelineFields() throws IOException {
+        CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform vec3 fogColor;
+                uniform float fogStart;
+                uniform float fogEnd;
+                varying vec4 color;
+                void main() {
+                    float fog = clamp((fogEnd - 1.0) / max(fogEnd - fogStart, 1.0), 0.0, 1.0);
+                    gl_FragColor = vec4(mix(color.rgb, fogColor, fog), color.a);
+                }
+                """);
+
+        assertTrue(adapted.source().contains("vec4 FogColor;"));
+        assertTrue(adapted.source().contains("float FogEnvironmentalStart;"));
+        assertTrue(adapted.source().contains("float FogEnvironmentalEnd;"));
+        assertTrue(adapted.source().contains("#define fogColor (FogColor.rgb)"));
+        assertTrue(adapted.source().contains("#define fogStart FogEnvironmentalStart"));
+        assertTrue(adapted.source().contains("#define fogEnd FogEnvironmentalEnd"));
+        assertFalse(adapted.source().contains("uniform vec3 fogColor;"));
+        assertEquals(List.of(
+                new ShaderPackUniformAdapter.UniformField("vec4", "FogColor"),
+                new ShaderPackUniformAdapter.UniformField("float", "FogEnvironmentalStart"),
+                new ShaderPackUniformAdapter.UniformField("float", "FogEnvironmentalEnd")),
+                adapted.uniformFields());
+    }
+
+    @Test
     void adaptsIrisShadowFadeUniformForTerrainAndPostPrograms() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 #version 120
