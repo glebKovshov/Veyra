@@ -2,6 +2,9 @@ package dev.veyra.shader;
 
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.veyra.VeyraClient;
@@ -23,15 +26,19 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.framebuffer.RenderPass;
+import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import net.vulkanmod.vulkan.util.MappedBuffer;
+import net.vulkanmod.render.engine.VkGpuDevice;
+import net.vulkanmod.render.engine.VkRenderPass;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 
 import java.nio.ByteBuffer;
 import java.util.HashSet;
+import java.util.OptionalDouble;
 import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -53,6 +60,7 @@ public final class VeyraShadowRenderer {
     private static Framebuffer framebuffer;
     private static RenderPass renderPass;
     private static GpuTextureView depthTextureView;
+    private static GpuSampler shadowSampler;
     private static RenderBuffers shadowRenderBuffers;
     private static SubmitNodeStorage shadowSubmitNodeStorage;
     private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
@@ -90,6 +98,21 @@ public final class VeyraShadowRenderer {
 
     public static GpuTextureView shadowDepthTextureView() {
         return target == null ? null : target.getDepthTextureView();
+    }
+
+    /** Binds the generated raw depth map to Iris entity programs using VulkanMod's reserved sampler slot 3. */
+    public static void bindEntityShadowSampler(VkRenderPass renderPass, GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor("Sampler3");
+        GpuTextureView depthView = shadowDepthTextureView();
+        if (descriptor == null || depthView == null || depthView.isClosed()) {
+            return;
+        }
+        ensureShadowSampler();
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        // The shadow render pass owns the transition; do not let this secondary sampler view
+        // transition the same image from a stale per-wrapper layout value.
+        descriptor.isReadOnlyLayout = false;
+        renderPass.bindTexture("Sampler3", depthView, shadowSampler);
     }
 
     public static Matrix4f shadowModelView() {
@@ -214,6 +237,10 @@ public final class VeyraShadowRenderer {
         }
         VRenderSystem.setShaderTexture(3, null);
         depthTextureView = null;
+        if (shadowSampler != null) {
+            shadowSampler.close();
+            shadowSampler = null;
+        }
         if (framebuffer != null) {
             framebuffer.cleanUp(false);
             framebuffer = null;
@@ -254,6 +281,17 @@ public final class VeyraShadowRenderer {
         // The target owns this view. Sampling its native depth view avoids creating a second
         // Vulkan view object for the same image, which can upset VulkanMod's descriptor binding.
         depthTextureView = target.getDepthTextureView();
+    }
+
+    private static void ensureShadowSampler() {
+        if (shadowSampler != null) {
+            return;
+        }
+        if (!(RenderSystem.getDevice() instanceof VkGpuDevice device)) {
+            throw new IllegalStateException("The Iris shadow sampler requires VulkanMod's Vulkan device.");
+        }
+        shadowSampler = device.createSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                FilterMode.NEAREST, FilterMode.NEAREST, 1, OptionalDouble.empty());
     }
 
     private static void renderEntityAndBlockEntityGeometry(

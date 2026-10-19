@@ -42,7 +42,10 @@ public final class ShaderPackAudit {
                         try {
                             if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water")) TerrainShaderAdapter.adaptFragment(source);
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
-                                    || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) EntityShaderAdapter.adaptFragment(source, program);
+                                    || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
+                                EntityShaderAdapter.adaptFragment(source, program,
+                                        program.startsWith("gbuffers_hand"), pack.hasShadowFragment());
+                            }
                             else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.
                             accepted++;

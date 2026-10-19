@@ -196,6 +196,35 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void bridgesEntityShadowDepthReadsToVulkanModTextureSlotThree() throws IOException {
+        String adapted = EntityShaderAdapter.adaptFragment("""
+                #version 120
+                uniform sampler2DShadow shadowtex0;
+                varying vec2 texcoord;
+                float sampleShadow(sampler2DShadow depthSampler, vec3 coordinate) {
+                    return texture2DShadow(depthSampler, coordinate);
+                }
+                void main() {
+                    gl_FragColor = vec4(sampleShadow(shadowtex0, vec3(texcoord, 0.5)));
+                }
+                """, "gbuffers_entities", false, true);
+
+        assertTrue(adapted.contains("uniform sampler2D Sampler3;"));
+        assertTrue(adapted.contains("#define shadowtex0 Sampler3"));
+        assertTrue(adapted.contains("float sampleShadow(sampler2D depthSampler, vec3 coordinate)"));
+        assertTrue(adapted.contains("float veyraEntityShadowCompare(sampler2D sourceSampler, vec3 sourceCoord)"));
+        assertTrue(adapted.contains("veyraEntityShadowCompare(depthSampler, coordinate)"));
+        assertFalse(adapted.contains("sampler2DShadow"));
+
+        IOException unavailable = assertThrows(IOException.class, () -> EntityShaderAdapter.adaptFragment("""
+                uniform sampler2D shadowtex0;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(shadowtex0, texcoord); }
+                """, "gbuffers_entities"));
+        assertTrue(unavailable.getMessage().contains("shadow pass"));
+    }
+
+    @Test
     void bridgesLegacyTexSamplerAndTextureSizeToTheBlockAtlas() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 uniform sampler2D tex;

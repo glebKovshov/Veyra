@@ -3,6 +3,7 @@ package dev.veyra.mixin;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
@@ -25,6 +26,10 @@ public abstract class VkRenderPassMixin {
         var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
         if (pipeline != null && pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME) != null) {
             VeyraNoiseTexture.bind(pass);
+        }
+        if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")
+                && active.getSamplers().contains("Sampler3")) {
+            VeyraShadowRenderer.bindEntityShadowSampler(pass, pipeline);
         }
     }
 

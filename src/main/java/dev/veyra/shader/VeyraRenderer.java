@@ -2604,7 +2604,8 @@ public final class VeyraRenderer {
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
-                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName, hand);
+                fragmentSource = EntityShaderAdapter.adaptFragment(
+                        fragmentSource, programName, hand, pack.hasShadowFragment());
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -2735,7 +2736,8 @@ public final class VeyraRenderer {
                 requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
-                fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+                fragmentSource = EntityShaderAdapter.adaptFragment(
+                        fragmentSource, programName, false, pack.hasShadowFragment());
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -2791,7 +2793,8 @@ public final class VeyraRenderer {
             }
             requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
             requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
-            fragmentSource = EntityShaderAdapter.adaptTextFragment(fragmentSource, programName);
+            fragmentSource = EntityShaderAdapter.adaptTextFragment(
+                    fragmentSource, programName, pack.hasShadowFragment());
         } catch (IOException exception) {
             VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
                     programName, exception.getMessage());
@@ -2937,9 +2940,10 @@ public final class VeyraRenderer {
         Identifier selectedVertexShader = vertexShader;
         String selectedVertexSource = adaptedVertex;
         boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;");
+        boolean usesShadowSampler = fragmentSource.contains("uniform sampler2D Sampler3;");
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
-                fragmentShader, usesNoiseSampler);
+                fragmentShader, usesNoiseSampler, usesShadowSampler);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
                 return fragmentSource;
@@ -3606,6 +3610,12 @@ public final class VeyraRenderer {
 
     private static RenderPipeline copyPipelineWithShaders(
             RenderPipeline original, Identifier vertexShader, Identifier fragmentShader, boolean useNoiseSampler) {
+        return copyPipelineWithShaders(original, vertexShader, fragmentShader, useNoiseSampler, false);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler, boolean useShadowSampler) {
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(original.getLocation())
                 .withVertexShader(vertexShader)
@@ -3634,6 +3644,9 @@ public final class VeyraRenderer {
         original.getSamplers().forEach(builder::withSampler);
         if (useNoiseSampler && !original.getSamplers().contains(VeyraNoiseTexture.SAMPLER_NAME)) {
             builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
+        }
+        if (useShadowSampler && !original.getSamplers().contains("Sampler3")) {
+            builder.withSampler("Sampler3");
         }
         for (RenderPipeline.UniformDescription uniform : original.getUniforms()) {
             if (uniform.type() == UniformType.TEXEL_BUFFER) {

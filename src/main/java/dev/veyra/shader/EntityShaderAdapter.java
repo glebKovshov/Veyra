@@ -38,6 +38,7 @@ public final class EntityShaderAdapter {
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
+    private static final Pattern SHADOWTEX_REFERENCE = Pattern.compile("\\bshadowtex0\\b");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
     private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
@@ -100,15 +101,25 @@ public final class EntityShaderAdapter {
     }
 
     public static String adaptFragment(String source, String programName) throws IOException {
-        return adaptFragment(source, programName, false, false);
+        return adaptFragment(source, programName, false, false, false);
     }
 
     public static String adaptFragment(String source, String programName, boolean handPass) throws IOException {
-        return adaptFragment(source, programName, false, handPass);
+        return adaptFragment(source, programName, handPass, false);
+    }
+
+    public static String adaptFragment(String source, String programName, boolean handPass,
+                                       boolean shadowSamplerAvailable) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
-        return adaptFragment(source, programName, true, false);
+        return adaptTextFragment(source, programName, false);
+    }
+
+    public static String adaptTextFragment(String source, String programName,
+                                          boolean shadowSamplerAvailable) throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable);
     }
 
     public static boolean requiresNormalInput(String source) {
@@ -326,7 +337,7 @@ public final class EntityShaderAdapter {
     }
 
     private static String adaptFragment(String source, String programName, boolean textPipeline,
-                                        boolean handPass) throws IOException {
+                                        boolean handPass, boolean shadowSamplerAvailable) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -345,6 +356,10 @@ public final class EntityShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        boolean usesShadowSampler = usesShadowSampler(adapted);
+        if (usesShadowSampler && !shadowSamplerAvailable) {
+            throw new IOException(programName + " samples shadowtex0, but this shader pack has no supported shadow pass.");
+        }
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
@@ -352,10 +367,14 @@ public final class EntityShaderAdapter {
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
-                    && !sampler.equals("lightmap") && !sampler.equals("noisetex")) {
+                    && !sampler.equals("lightmap") && !sampler.equals("noisetex")
+                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
-            if (!samplerMatcher.group(1).equals("sampler2D")) {
+            String samplerType = samplerMatcher.group(1);
+            if (!samplerType.equals("sampler2D")
+                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable
+                    && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
             if (sampler.equals("lightmap")) {
@@ -364,7 +383,9 @@ public final class EntityShaderAdapter {
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
-        adapted = withoutSamplers.toString();
+        // VulkanMod exposes its bound shadow depth image through texture slot 3.
+        // Lower comparison sampler parameters to raw depth reads and perform the compare here.
+        adapted = withoutSamplers.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D");
         if (!usesLightmapSampler) {
             usesLightmapSampler = Pattern.compile("\\blightmap\\b")
                     .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
@@ -496,6 +517,8 @@ public final class EntityShaderAdapter {
                 .replaceAll("\\btextureLod\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraEntitySampleGrad(")
                 .replaceAll("\\btextureGrad\\s*\\(", "veyraEntitySampleGrad(")
+                .replaceAll("\\btexture2DShadow\\s*\\(", "veyraEntityShadowCompare(")
+                .replaceAll("\\bshadow2D\\s*\\(", "veyraEntityShadowSample(")
                 .replaceAll("\\btexture2D\\s*\\(", "veyraEntitySample(")
                 .replaceAll("\\btexture\\s*\\(", "veyraEntitySample(")
                 .replaceAll("\\bgl_FragColor\\b", outputName)
@@ -515,6 +538,7 @@ public final class EntityShaderAdapter {
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_SHADOW_SAMPLER__
                 __VEYRA_NOISE_SAMPLER__
                 __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
@@ -526,6 +550,7 @@ public final class EntityShaderAdapter {
                 vec4 veyraEntitySampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
+                __VEYRA_SHADOW_FUNCTIONS__
                 #define texture Sampler0
                 #define tex Sampler0
                 #define gtexture Sampler0
@@ -564,6 +589,7 @@ public final class EntityShaderAdapter {
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
+                __VEYRA_SHADOW_SAMPLER__
                 __VEYRA_NOISE_SAMPLER__
                 __VEYRA_LIGHTMAP_SAMPLER__
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
@@ -575,6 +601,7 @@ public final class EntityShaderAdapter {
                 vec4 veyraEntitySampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
+                __VEYRA_SHADOW_FUNCTIONS__
                 #define texture Sampler0
                 #define tex Sampler0
                 #define gtexture Sampler0
@@ -592,6 +619,16 @@ public final class EntityShaderAdapter {
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler
                         ? "uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n" : "")
+                .replace("__VEYRA_SHADOW_SAMPLER__", usesShadowSampler
+                        ? "uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n" : "")
+                .replace("__VEYRA_SHADOW_FUNCTIONS__", usesShadowSampler ? """
+                        float veyraEntityShadowCompare(sampler2D sourceSampler, vec3 sourceCoord) {
+                            return step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                        }
+                        vec4 veyraEntityShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                            return vec4(veyraEntityShadowCompare(sourceSampler, sourceCoord));
+                        }
+                        """ : "")
                 .replace("__VEYRA_SPHERICAL_DISTANCE__",
                         suppliesSphericalDistance ? "in float sphericalVertexDistance;\n" : "")
                 .replace("__VEYRA_CYLINDRICAL_DISTANCE__",
@@ -612,6 +649,11 @@ public final class EntityShaderAdapter {
 
     public static boolean usesNoiseSampler(String source) {
         return NOISETEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
+                .find();
+    }
+
+    public static boolean usesShadowSampler(String source) {
+        return SHADOWTEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
                 .find();
     }
 
