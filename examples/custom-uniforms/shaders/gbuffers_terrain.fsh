@@ -1,0 +1,12 @@
+#version 120
+/* RENDERTARGETS:0,1 */
+const vec4 colortex1ClearColor = vec4(0.0);
+uniform float veyraNoonFade;
+uniform int veyraDayTick;
+uniform bool veyraFlag;
+uniform float veyraScaled;
+void main() {
+    bool custom = veyraNoonFade > 0.99 && veyraDayTick == 7 && veyraFlag && abs(veyraScaled - 2.0) < 0.001;
+    gl_FragData[0] = vec4(0.02, 0.8, 0.05, 1.0);
+    gl_FragData[1] = custom ? vec4(0.95, 0.02, 0.8, 1.0) : vec4(0.02, 0.8, 0.05, 1.0);
+}

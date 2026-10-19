@@ -16,10 +16,6 @@ public final class ShaderPackUniformAdapter {
             "shadowProjection", "shadowProjectionInverse");
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Map<String, TerrainShaderAdapter.ShaderUniform> SUPPORTED_UNIFORMS =
-            TerrainShaderAdapter.shaderPackUniforms().stream()
-                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                            TerrainShaderAdapter.ShaderUniform::name, uniform -> uniform));
 
     private ShaderPackUniformAdapter() {
     }
@@ -31,14 +27,16 @@ public final class ShaderPackUniformAdapter {
         List<UniformField> fields = new ArrayList<>();
         StringBuilder macros = new StringBuilder();
         Map<String, String> declaredUniforms = new HashMap<>();
+        Map<String, TerrainShaderAdapter.ShaderUniform> supportedUniforms = new HashMap<>();
+        TerrainShaderAdapter.shaderPackUniforms().forEach(uniform -> supportedUniforms.put(uniform.name(), uniform));
 
         while (matcher.find()) {
             String type = matcher.group(1);
             String name = matcher.group(2);
-            TerrainShaderAdapter.ShaderUniform uniform = SUPPORTED_UNIFORMS.get(name);
+            TerrainShaderAdapter.ShaderUniform uniform = supportedUniforms.get(name);
             boolean matrixUniform = uniform == null && type.equals("mat4") && MATRIX_UNIFORMS.contains(name);
             if (uniform == null && !matrixUniform) {
-                throw new IOException(programName + " custom uniform '" + name + "' is not supported yet.");
+                throw new IOException(TerrainShaderAdapter.unsupportedUniformMessage(programName, name));
             }
             if (uniform != null && !uniform.accepts(type)) {
                 throw new IOException(programName + " uniform '" + name + "' must use "

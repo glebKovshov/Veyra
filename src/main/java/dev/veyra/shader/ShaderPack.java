@@ -361,6 +361,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
     }
 
+    /** Reads uniform./variable. definitions from the preprocessed shaders.properties. */
+    public CustomUniforms readCustomUniforms() throws IOException {
+        return CustomUniforms.parse(readShader("shaders.properties").orElse(""));
+    }
+
     /** Iris defaults noisetex to 256 square pixels and exposes this shader-pack directive. */
     public int readNoiseTextureResolution() throws IOException {
         String properties = readShader("shaders.properties").orElse("");

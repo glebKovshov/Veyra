@@ -333,6 +333,7 @@ public final class VeyraRenderer {
     public static void initialize(ShaderPackRepository packRepository) {
         repository = packRepository;
         registerShaderPackUniforms();
+        activateCustomUniforms(packRepository.getSelected().orElse(null));
         VeyraShadowRenderer.initialize();
         packRepository.getSelected().ifPresent(pack -> {
             try {
@@ -420,6 +421,83 @@ public final class VeyraRenderer {
             }
         }
         shaderPackUniformsRegistered = true;
+    }
+
+    private static void activateCustomUniforms(ShaderPack pack) {
+        CustomUniforms uniforms = CustomUniforms.EMPTY;
+        if (pack != null) {
+            try {
+                uniforms = pack.readCustomUniforms();
+            } catch (IOException exception) {
+                VeyraClient.LOGGER.warn("Could not read custom uniforms for '{}'.", pack.name(), exception);
+            }
+        }
+        CustomUniforms.activate(uniforms);
+        registerCustomUniforms();
+    }
+
+    /** VulkanMod resolves uniform block members by name; custom names read the latest evaluated value. */
+    private static void registerCustomUniforms() {
+        for (CustomUniforms.Uniform uniform : CustomUniforms.active().uniforms()) {
+            String name = uniform.name();
+            if (uniform.type() == CustomUniforms.Type.FLOAT) {
+                Uniforms.vec1f_uniformMap.put(name, () -> CustomUniforms.active().floatValue(name));
+            } else {
+                Uniforms.vec1i_uniformMap.put(name, () -> CustomUniforms.active().intValue(name));
+                if (uniform.type() == CustomUniforms.Type.BOOL) {
+                    Uniforms.vec1i_uniformMap.put("veyra_" + name,
+                            () -> CustomUniforms.active().intValue(name));
+                }
+            }
+        }
+    }
+
+    private static Double customUniformInput(String name, FrameUniforms frame) {
+        Minecraft minecraft = Minecraft.getInstance();
+        CameraUniforms camera = frame.camera();
+        return switch (name) {
+            case "viewWidth" -> (double) minecraft.getWindow().getWidth();
+            case "viewHeight" -> (double) minecraft.getWindow().getHeight();
+            case "aspectRatio" -> minecraft.getWindow().getHeight() == 0 ? 0.0
+                    : (double) minecraft.getWindow().getWidth() / minecraft.getWindow().getHeight();
+            case "frameTimeCounter" -> (double) frame.frameTimeCounter();
+            case "frameTime" -> (double) frame.frameTime();
+            case "frameCounter" -> (double) frame.frameCounter();
+            case "sunAngle" -> (double) frame.sunAngle();
+            case "rainStrength" -> (double) frame.rainStrength();
+            case "wetness" -> (double) frame.wetness();
+            case "thunderStrength" -> (double) frame.thunderStrength();
+            case "worldTime" -> (double) frame.worldTime();
+            case "worldDay" -> (double) frame.worldDay();
+            case "moonPhase" -> (double) frame.moonPhase();
+            case "bedrockLevel" -> (double) frame.bedrockLevel();
+            case "cloudHeight" -> (double) frame.cloudHeight();
+            case "endFlashIntensity" -> (double) frame.endFlashIntensity();
+            case "eyeAltitude" -> (double) frame.eyeAltitude();
+            case "screenBrightness" -> (double) frame.screenBrightness();
+            case "blindness" -> (double) frame.blindness();
+            case "nightVision" -> (double) frame.nightVision();
+            case "darknessFactor" -> (double) frame.darknessFactor();
+            case "isEyeInWater" -> (double) frame.isEyeInWater();
+            case "isSpectator" -> frame.isSpectator() ? 1.0 : 0.0;
+            case "is_sneaking" -> frame.isSneaking() ? 1.0 : 0.0;
+            case "is_sprinting" -> frame.isSprinting() ? 1.0 : 0.0;
+            case "is_on_ground" -> frame.isOnGround() ? 1.0 : 0.0;
+            case "is_hurt" -> frame.isHurt() ? 1.0 : 0.0;
+            case "is_invisible" -> frame.isInvisible() ? 1.0 : 0.0;
+            case "is_burning" -> frame.isBurning() ? 1.0 : 0.0;
+            case "cameraPosition.x" -> (double) camera.cameraPosition().x;
+            case "cameraPosition.y" -> (double) camera.cameraPosition().y;
+            case "cameraPosition.z" -> (double) camera.cameraPosition().z;
+            case "previousCameraPosition.x" -> (double) camera.previousCameraPosition().x;
+            case "previousCameraPosition.y" -> (double) camera.previousCameraPosition().y;
+            case "previousCameraPosition.z" -> (double) camera.previousCameraPosition().z;
+            case "eyeBrightness.x" -> (double) camera.eyeBrightness().x;
+            case "eyeBrightness.y" -> (double) camera.eyeBrightness().y;
+            case "eyeBrightnessSmooth.x" -> (double) camera.eyeBrightnessSmooth().x;
+            case "eyeBrightnessSmooth.y" -> (double) camera.eyeBrightnessSmooth().y;
+            default -> null;
+        };
     }
 
     private static void registerShaderPackVectorUniform(String name) {
@@ -675,6 +753,8 @@ public final class VeyraRenderer {
         updateShaderPackIntegerVectorUniforms(cameraUniforms);
         if (minecraft.level != null && minecraft.player != null) {
             shaderPackFrameUniforms = updateFrameUniforms(minecraft);
+            FrameUniforms frame = shaderPackFrameUniforms;
+            CustomUniforms.active().evaluate(name -> customUniformInput(name, frame), frame.frameTime());
         }
     }
 
@@ -1597,8 +1677,12 @@ public final class VeyraRenderer {
         DamagedBlockPipelineSet preparedDamagedBlocks = null;
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
+        CustomUniforms previousCustomUniforms = CustomUniforms.active();
         try {
             pack.validatePipelineCapabilities();
+            // Adapters size uniform blocks from the active definitions, so install them before compiling.
+            CustomUniforms.activate(pack.readCustomUniforms());
+            registerCustomUniforms();
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height);
@@ -1787,6 +1871,9 @@ public final class VeyraRenderer {
             purgeUnusedPipelines();
             return "Enabled " + pack.name() + " (" + String.join(", ", features) + ").";
         } catch (Exception exception) {
+            if (repository.getSelected().orElse(null) != pack) {
+                CustomUniforms.activate(previousCustomUniforms);
+            }
             if (prepared != null) {
                 prepared.close();
             }
@@ -1818,6 +1905,7 @@ public final class VeyraRenderer {
 
     public static String disable() {
         VeyraSpecularTextures.invalidate();
+        CustomUniforms.activate(CustomUniforms.EMPTY);
         IOException saveFailure = null;
         try {
             repository.select(null);
@@ -2236,14 +2324,15 @@ public final class VeyraRenderer {
             String name = matcher.group(2);
             String supportedType = shaderPackUniformType(name);
             if (supportedType == null) {
-                throw new IllegalArgumentException(programName + ".vsh declares unsupported custom uniform '" + name + "'.");
+                throw new IllegalArgumentException(
+                        TerrainShaderAdapter.unsupportedUniformMessage(programName + ".vsh", name));
             }
-            boolean validType = BOOLEAN_UNIFORMS.contains(name)
+            boolean validType = isBooleanUniform(name)
                     ? type.equals("bool") || type.equals("int")
                     : type.equals(supportedType);
             if (!validType) {
                 throw new IllegalArgumentException(programName + ".vsh uniform '" + name
-                        + "' must use " + (BOOLEAN_UNIFORMS.contains(name) ? "bool or int" : supportedType) + ".");
+                        + "' must use " + (isBooleanUniform(name) ? "bool or int" : supportedType) + ".");
             }
             if (!declaredUniforms.add(name)) {
                 throw new IllegalArgumentException(programName + ".vsh declares uniform '" + name + "' more than once.");
@@ -2254,10 +2343,34 @@ public final class VeyraRenderer {
             throw new IllegalArgumentException(programName
                     + ".vsh uses an unsupported uniform declaration; only Veyra's built-in shader-pack uniforms are available.");
         }
-        return SUPPORTED_UNIFORMS.stream().filter(declaredUniforms::contains).toList();
+        return availableUniforms().stream().filter(declaredUniforms::contains).toList();
+    }
+
+    /** Built-in post uniforms followed by the active pack's custom uniforms. */
+    private static List<String> availableUniforms() {
+        List<CustomUniforms.Uniform> custom = CustomUniforms.active().uniforms();
+        if (custom.isEmpty()) {
+            return SUPPORTED_UNIFORMS;
+        }
+        List<String> names = new ArrayList<>(SUPPORTED_UNIFORMS);
+        custom.stream().map(CustomUniforms.Uniform::name).forEach(names::add);
+        return names;
+    }
+
+    private static boolean isBooleanUniform(String uniform) {
+        if (BOOLEAN_UNIFORMS.contains(uniform)) {
+            return true;
+        }
+        CustomUniforms.Uniform custom = SUPPORTED_UNIFORMS.contains(uniform) ? null
+                : CustomUniforms.active().uniform(uniform);
+        return custom != null && custom.type() == CustomUniforms.Type.BOOL;
     }
 
     private static String shaderPackUniformType(String uniform) {
+        if (!SUPPORTED_UNIFORMS.contains(uniform)) {
+            CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
+            return custom == null ? null : custom.type() == CustomUniforms.Type.FLOAT ? "float" : "int";
+        }
         if (MATRIX_UNIFORMS.contains(uniform)) {
             return "mat4";
         }
@@ -2281,12 +2394,12 @@ public final class VeyraRenderer {
         for (String uniform : uniforms) {
             String type = shaderPackUniformType(uniform);
             // VulkanMod's shader parser rejects bool members in uniform blocks, so expose them through int fields.
-            String memberName = BOOLEAN_UNIFORMS.contains(uniform) ? "veyra_" + uniform : uniform;
+            String memberName = isBooleanUniform(uniform) ? "veyra_" + uniform : uniform;
             source.append("    ").append(type).append(' ').append(memberName).append(";\n");
         }
         source.append("};\n");
         for (String uniform : uniforms) {
-            if (BOOLEAN_UNIFORMS.contains(uniform)) {
+            if (isBooleanUniform(uniform)) {
                 source.append("#define ").append(uniform).append(" (veyra_")
                         .append(uniform).append(" != 0)\n");
             }
@@ -4097,7 +4210,7 @@ public final class VeyraRenderer {
                 + (usesDepth1Sampler ? 1 : 0) + (usesDepth2Sampler ? 1 : 0) + (usesNoiseSampler ? 1 : 0)
                 + (int) colorSamplers.stream().filter(index -> index > 0).count());
         String uniformSource = body;
-        List<String> uniforms = SUPPORTED_UNIFORMS.stream()
+        List<String> uniforms = availableUniforms().stream()
                 .filter(uniform -> containsIdentifier(uniformSource, uniform) || additionalUniforms.contains(uniform))
                 .toList();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(body).find()) {
@@ -4131,6 +4244,7 @@ public final class VeyraRenderer {
         body = DEPTH1_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH2_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
+        body = stripCustomUniformDeclarations(body);
         body = SUPPORTED_IVEC2_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
@@ -4531,14 +4645,56 @@ public final class VeyraRenderer {
                 case "previousCameraPosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPosition());
                 case "previousCameraPositionInt" -> new UniformValue.IVec3Uniform(frameUniforms.camera().previousCameraPositionInt());
                 case "previousCameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPositionFract());
-                default -> throw new IllegalArgumentException("Unknown shader pack uniform " + uniform + ".");
+                default -> customUniformValue(uniform);
             });
         }
         return List.copyOf(values);
     }
 
+    /** Removes declarations of active shaders.properties uniforms; the generated block provides them. */
+    static String stripCustomUniformDeclarations(String body) throws IOException {
+        Matcher matcher = POST_VERTEX_UNIFORM_DECLARATION.matcher(body);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            String name = matcher.group(2);
+            CustomUniforms.Uniform custom = SUPPORTED_UNIFORMS.contains(name) ? null
+                    : CustomUniforms.active().uniform(name);
+            if (custom == null) {
+                String reason = CustomUniforms.active().unavailableReason(name);
+                if (reason != null) {
+                    throw new IOException("Custom uniform '" + name + "' from shaders.properties is unavailable: "
+                            + reason + ".");
+                }
+                continue;
+            }
+            String declared = matcher.group(1);
+            boolean valid = custom.type() == CustomUniforms.Type.BOOL
+                    ? declared.equals("bool") || declared.equals("int")
+                    : declared.equals(custom.type().glsl());
+            if (!valid) {
+                throw new IOException("Custom uniform '" + name + "' is declared as " + declared
+                        + " but shaders.properties defines it as " + custom.type().glsl() + ".");
+            }
+            matcher.appendReplacement(result, "");
+        }
+        matcher.appendTail(result);
+        return result.toString();
+    }
+
+    private static UniformValue customUniformValue(String uniform) {
+        CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
+        if (custom == null) {
+            throw new IllegalArgumentException("Unknown shader pack uniform " + uniform + ".");
+        }
+        return custom.type() == CustomUniforms.Type.FLOAT
+                ? new UniformValue.FloatUniform(CustomUniforms.active().floatValue(uniform))
+                : new UniformValue.IntUniform(CustomUniforms.active().intValue(uniform));
+    }
+
     private static boolean usesDynamicUniforms(PipelineProgram program) {
-        return program.uniforms().stream().anyMatch(DYNAMIC_UNIFORMS::contains);
+        // Custom uniforms are re-evaluated every frame.
+        return program.uniforms().stream().anyMatch(uniform -> DYNAMIC_UNIFORMS.contains(uniform)
+                || !SUPPORTED_UNIFORMS.contains(uniform));
     }
 
     private static void makeDynamicUniformBuffer(PostPass pass, PipelineProgram program, int width, int height) {

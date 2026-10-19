@@ -228,7 +228,7 @@ public final class TerrainShaderAdapter {
             String name = uniformMatcher.group(2);
             ShaderUniform uniform = shaderPackUniform(name);
             if (uniform == null) {
-                throw new IOException("gbuffers_terrain custom uniform '" + name + "' is not supported yet.");
+                throw new IOException(unsupportedUniformMessage("gbuffers_terrain", name));
             }
             if (!uniform.accepts(type)) {
                 throw new IOException("gbuffers_terrain uniform '" + name + "' must use " + uniform.sourceTypeDescription() + ".");
@@ -361,8 +361,26 @@ public final class TerrainShaderAdapter {
         return result.append(adapted).toString();
     }
 
+    /** Built-in Iris uniforms followed by the active shader pack's custom uniforms. */
     public static List<ShaderUniform> shaderPackUniforms() {
-        return SHADERPACK_UNIFORMS;
+        List<CustomUniforms.Uniform> custom = CustomUniforms.active().uniforms();
+        if (custom.isEmpty()) {
+            return SHADERPACK_UNIFORMS;
+        }
+        List<ShaderUniform> uniforms = new ArrayList<>(SHADERPACK_UNIFORMS);
+        for (CustomUniforms.Uniform uniform : custom) {
+            uniforms.add(new ShaderUniform(uniform.name(), uniform.type().glsl(),
+                    uniform.type() == CustomUniforms.Type.BOOL));
+        }
+        return List.copyOf(uniforms);
+    }
+
+    /** Describes why a declared uniform is unavailable, including unsupported custom definitions. */
+    public static String unsupportedUniformMessage(String programName, String name) {
+        String reason = CustomUniforms.active().unavailableReason(name);
+        return reason == null
+                ? programName + " custom uniform '" + name + "' is not supported yet."
+                : programName + " custom uniform '" + name + "' from shaders.properties is unavailable: " + reason + ".";
     }
 
     public static boolean usesOpaqueDepthSampler(String source) {
@@ -382,7 +400,7 @@ public final class TerrainShaderAdapter {
     }
 
     private static ShaderUniform shaderPackUniform(String name) {
-        return SHADERPACK_UNIFORMS.stream()
+        return shaderPackUniforms().stream()
                 .filter(uniform -> uniform.name().equals(name))
                 .findFirst()
                 .orElse(null);
@@ -390,7 +408,7 @@ public final class TerrainShaderAdapter {
 
     private static String shaderPackUniformFields() {
         StringBuilder fields = new StringBuilder();
-        for (ShaderUniform uniform : SHADERPACK_UNIFORMS) {
+        for (ShaderUniform uniform : shaderPackUniforms()) {
             fields.append("    ").append(uniform.bufferType()).append(' ')
                     .append(uniform.blockMemberName()).append(";\n");
         }
@@ -399,7 +417,7 @@ public final class TerrainShaderAdapter {
 
     private static String shaderPackUniformMacros(Map<String, String> declaredUniforms) {
         StringBuilder macros = new StringBuilder();
-        for (ShaderUniform uniform : SHADERPACK_UNIFORMS) {
+        for (ShaderUniform uniform : shaderPackUniforms()) {
             if (uniform.booleanField()) {
                 macros.append("#define ").append(uniform.name()).append(' ');
                 if ("int".equals(declaredUniforms.get(uniform.name()))) {
