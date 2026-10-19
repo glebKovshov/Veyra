@@ -1,6 +1,6 @@
 # Shaderpack compatibility: development 0.2
 
-## Entity and block entity identifiers (beta.4 candidate)
+## Entity and block entity identifiers (beta.4)
 
 Veyra reads option-preprocessed Iris `entity.properties` and `block.properties`. Entity type mappings feed `entityId`; block IDs, partial state predicates and registered block tags feed `blockEntityId`. Block state rules follow source order, so the first matching selector wins. The renderer captures the identifier for each entity or block entity submission and routes its `RenderType` to a cached Vulkan pipeline variant with compile-time identifier constants. Unmapped values are `-1`.
 
@@ -9,6 +9,10 @@ Unit tests cover parsing, namespace defaults, duplicate precedence, conditional 
 ## Cloud fog uniforms
 
 Cloud fragments now map Iris `fogColor`, `fogStart`, and `fogEnd` to VulkanMod 0.6.8's live `FogColor`, `FogEnvironmentalStart`, and `FogEnvironmentalEnd` uniform providers. Veyra extends both stages' binding-1 uniform block and pipeline configuration for only the fields a pack declares. Unit and shaderc fixtures cover the GLSL mapping; the pinned 75-case source audit has no remaining cloud `fogColor` adapter rejection. This does not add cloud texture sampling, texture coordinates, extra outputs, or visual validation.
+
+## Cloud vertex shader (beta.5 candidate)
+
+When a pack provides `gbuffers_clouds.vsh`, Veyra now adapts it against VulkanMod's `POSITION_COLOR` cloud mesh. The bridge supports `Position`, `Color`, `gl_Vertex`, `gl_Color`, `gl_ModelViewProjectionMatrix`, `ftransform()`, and the `color` / `vertexDistance` varyings. It initializes the normal VulkanMod color and distance outputs before running the pack's vertex main, so a shader can override only the values it needs. Texture coordinates, normals, texture sampling, other vertex inputs/outputs, and custom vertex uniforms are rejected with a diagnostic. Fragment-stage cloud uniform support is unchanged. Unit, include-loading, and shaderc SPIR-V fixtures cover this subset; no third-party cloud pack has been visually checked.
 
 ## Static material inputs (development)
 
@@ -30,7 +34,7 @@ Prepare, deferred, composite and final programs read actual shadowtex0/shadowtex
 
 ## Beta.3 source checkpoint (historical)
 
-This is the beta.3 **source-only compatibility audit** and is retained as a historical baseline. It does not compile complete shaderpack pipelines or render third-party packs. The refreshed pinned archives cover 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. The beta.4 candidate adds entity ID maps; the pinned audit is being re-run for that code. Neither this historical source audit nor synthetic Lavapipe fixtures are third-party-pack visual validation.
+This is the beta.3 **source-only compatibility audit** and is retained as a historical baseline. It does not compile complete shaderpack pipelines or render third-party packs. The refreshed pinned archives cover 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. The beta.4 audit for the same pinned inputs is recorded below. Neither this historical source audit nor synthetic Lavapipe fixtures are third-party-pack visual validation.
 
 | Pack | Version | Options / profiles | Default stages preprocessed, Overworld / Nether / End | Default geometry fragments accepted / attempted | Blockers at beta.3 | In-game pack result |
 | --- | --- | --- | --- | --- | --- | --- |

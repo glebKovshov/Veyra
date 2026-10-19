@@ -663,6 +663,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return Optional.of(expandIncludes(fileName, source.get()));
     }
 
+    public Optional<String> readCloudVertex() throws IOException {
+        if (!supportsShaderPrograms() || !hasCloudFragment) {
+            return Optional.empty();
+        }
+        String fileName = "gbuffers_clouds.vsh";
+        Optional<String> source = readShader(fileName);
+        if (source.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(expandIncludes(fileName, source.get()));
+    }
+
     public boolean hasEntityFragment() {
         return !entityPrograms.isEmpty() || hasTexturedLitFragment || hasTexturedFragment;
     }

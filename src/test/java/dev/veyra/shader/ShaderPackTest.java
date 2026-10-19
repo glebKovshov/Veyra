@@ -42,6 +42,19 @@ class ShaderPackTest {
     }
 
     @Test
+    void readsAndExpandsCloudVertexProgram() throws IOException {
+        Path zip = directory.resolve("clouds.zip");
+        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
+            entry(out, "wrapper/shaders/gbuffers_clouds.fsh", "void main() { gl_FragColor = color; }\n");
+            entry(out, "wrapper/shaders/gbuffers_clouds.vsh", "#include \"lib/cloud-vertex.glsl\"\n");
+            entry(out, "wrapper/shaders/lib/cloud-vertex.glsl", "varying vec4 color;\nvoid main() { gl_Position = ftransform(); }\n");
+        }
+
+        ShaderPack pack = ShaderPack.inspect(zip);
+        assertTrue(pack.readCloudVertex().orElseThrow().contains("varying vec4 color;"));
+    }
+
+    @Test
     void readsEyeBrightnessHalfLifeFromAnyGlslFileAndUsesIrisDefault() throws IOException {
         Path shaderRoot = Files.createDirectories(directory.resolve("smooth/shaders"));
         Path shaders = Files.createDirectories(shaderRoot.resolve("lib"));
