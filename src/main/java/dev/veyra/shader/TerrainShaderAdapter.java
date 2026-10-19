@@ -52,6 +52,7 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("far", "float", false),
             new ShaderUniform("darknessLightFactor", "float", false),
             new ShaderUniform("shadowFade", "float", false),
+            new ShaderUniform("velocity", "float", false),
             new ShaderUniform("playerMood", "float", false),
             new ShaderUniform("biome_precipitation", "int", false),
             new ShaderUniform("playerLookVector", "vec3", false),
@@ -261,8 +262,14 @@ public final class TerrainShaderAdapter {
         }
         uniformMatcher.appendTail(withoutShaderPackUniforms);
         adapted = withoutShaderPackUniforms.toString();
-        if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
-            throw new IOException("gbuffers_terrain has an unsupported uniform declaration; supported Iris scalar/matrix uniforms and the built-in samplers are available.");
+        Matcher unsupportedUniform = UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted);
+        if (unsupportedUniform.find()) {
+            int lineEnd = adapted.indexOf('\n', unsupportedUniform.start());
+            String declaration = adapted.substring(unsupportedUniform.start(), lineEnd < 0 ? adapted.length() : lineEnd)
+                    .strip();
+            if (declaration.length() > 120) declaration = declaration.substring(0, 120) + "...";
+            throw new IOException("gbuffers_terrain has an unsupported uniform declaration '" + declaration
+                    + "'; supported Iris scalar/matrix uniforms and the built-in samplers are available.");
         }
 
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);

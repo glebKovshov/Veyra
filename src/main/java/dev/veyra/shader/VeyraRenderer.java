@@ -169,7 +169,7 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|shadowFade|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|shadowFade|velocity|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth|atlasSize)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
@@ -200,8 +200,8 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "shadowFade", "playerMood", "biome_precipitation", "atlasSize", "lightningBoltPosition",
-            "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "darknessLightFactor", "shadowFade", "velocity", "playerMood", "biome_precipitation", "atlasSize",
+            "lightningBoltPosition", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
             "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
@@ -230,7 +230,7 @@ public final class VeyraRenderer {
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
             "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "lightningBoltPosition",
-            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "shadowFade", "rainStrength", "wetness", "thunderStrength",
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "shadowFade", "velocity", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -472,8 +472,15 @@ public final class VeyraRenderer {
 
     /** VulkanMod resolves uniform block members by name; custom names read the latest evaluated value. */
     private static void registerCustomUniforms() {
+        // Both activation paths end here; report definitions that stay 0 the way Iris warns about them.
+        CustomUniforms.active().irisUnresolved().forEach((name, reason) -> VeyraClient.LOGGER.warn(
+                "Custom uniform '{}' stays 0 because Iris cannot resolve it either: {}.", name, reason));
         for (CustomUniforms.Uniform uniform : CustomUniforms.active().uniforms()) {
             String name = uniform.name();
+            if (CustomUniforms.PACK_OVERRIDABLE.contains(name)) {
+                // The built-in supplier resolves the pack override itself and must survive pack switches.
+                continue;
+            }
             if (uniform.type() == CustomUniforms.Type.FLOAT) {
                 Uniforms.vec1f_uniformMap.put(name, () -> CustomUniforms.active().floatValue(name));
             } else {
@@ -495,6 +502,7 @@ public final class VeyraRenderer {
             case "far" -> (double) farPlane();
             case "darknessLightFactor" -> (double) darknessLightFactor;
             case "shadowFade" -> (double) frame.shadowFade();
+            case "velocity" -> (double) cameraVelocity(camera);
             case "playerMood" -> (double) playerMood();
             case "biome_precipitation" -> (double) biomePrecipitation();
             case "heldBlockLightValue" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -696,9 +704,27 @@ public final class VeyraRenderer {
     }
 
     private static float shadowFadeUniform(FrameUniforms frame) {
+        return packOverridableFloat("shadowFade", frame.shadowFade());
+    }
+
+    /** Iris hardcoded custom uniforms yield to a shaders.properties definition with the same name. */
+    private static float packOverridableFloat(String name, float builtInValue) {
         CustomUniforms customUniforms = CustomUniforms.active();
-        return customUniforms.uniform("shadowFade") == null
-                ? frame.shadowFade() : customUniforms.floatValue("shadowFade");
+        return customUniforms.uniform(name) == null ? builtInValue : customUniforms.floatValue(name);
+    }
+
+    /**
+     * Iris' hardcoded velocity: the distance in blocks the camera moved since the previous frame.
+     * Integer and fractional parts are subtracted separately to keep precision far from the origin.
+     */
+    private static float cameraVelocity(CameraUniforms camera) {
+        double dx = (camera.cameraPositionInt().x - camera.previousCameraPositionInt().x)
+                + (double) (camera.cameraPositionFract().x - camera.previousCameraPositionFract().x);
+        double dy = (camera.cameraPositionInt().y - camera.previousCameraPositionInt().y)
+                + (double) (camera.cameraPositionFract().y - camera.previousCameraPositionFract().y);
+        double dz = (camera.cameraPositionInt().z - camera.previousCameraPositionInt().z)
+                + (double) (camera.cameraPositionFract().z - camera.previousCameraPositionFract().z);
+        return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     private static float shaderPackFloatUniform(String name) {
@@ -732,6 +758,7 @@ public final class VeyraRenderer {
             case "frameTime" -> frame.frameTime();
             case "sunAngle" -> frame.sunAngle();
             case "shadowFade" -> shadowFadeUniform(frame);
+            case "velocity" -> packOverridableFloat("velocity", cameraVelocity(frame.camera()));
             case "rainStrength" -> frame.rainStrength();
             case "wetness" -> frame.wetness();
             case "thunderStrength" -> frame.thunderStrength();
@@ -4980,6 +5007,8 @@ public final class VeyraRenderer {
                 case "frameCounter" -> new UniformValue.IntUniform(frameUniforms.frameCounter());
                 case "sunAngle" -> new UniformValue.FloatUniform(frameUniforms.sunAngle());
                 case "shadowFade" -> new UniformValue.FloatUniform(shadowFadeUniform(frameUniforms));
+                case "velocity" -> new UniformValue.FloatUniform(
+                        packOverridableFloat("velocity", cameraVelocity(frameUniforms.camera())));
                 case "rainStrength" -> new UniformValue.FloatUniform(frameUniforms.rainStrength());
                 case "wetness" -> new UniformValue.FloatUniform(frameUniforms.wetness());
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());

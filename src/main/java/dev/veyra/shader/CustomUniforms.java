@@ -20,10 +20,10 @@ import java.util.regex.Pattern;
  * them fail with a clear diagnostic instead of receiving fake values.
  */
 public final class CustomUniforms {
-    public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of());
+    public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of(), Map.of());
     /** Built-in scalar inputs an expression may reference; vector inputs are exposed by component. */
     public static final Set<String> BUILT_IN_INPUTS = Set.of(
-            "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "shadowFade", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
+            "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "shadowFade", "velocity", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay", "moonPhase",
             "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "screenBrightness", "blindness",
@@ -32,6 +32,11 @@ public final class CustomUniforms {
             "cameraPosition.x", "cameraPosition.y", "cameraPosition.z",
             "previousCameraPosition.x", "previousCameraPosition.y", "previousCameraPosition.z",
             "eyeBrightness.x", "eyeBrightness.y", "eyeBrightnessSmooth.x", "eyeBrightnessSmooth.y");
+    /**
+     * Iris "hardcoded custom uniforms" that Veyra also provides as float built-ins. A shaders.properties
+     * definition with the same name (BSL defines shadowFade) takes precedence over the built-in value.
+     */
+    public static final Set<String> PACK_OVERRIDABLE = Set.of("shadowFade", "velocity");
     private static final Pattern DEFINITION = Pattern.compile(
             "(uniform|variable)\\.(float|int|bool|vec2|vec3|vec4)\\.([A-Za-z_][A-Za-z0-9_]*)\\s*[=:]\\s*(.*)",
             Pattern.DOTALL);
@@ -62,11 +67,14 @@ public final class CustomUniforms {
 
     private final List<Definition> definitions;
     private final Map<String, String> unavailable;
+    private final Map<String, String> irisUnresolved;
     private final Map<String, Double> values = new HashMap<>();
 
-    private CustomUniforms(List<Definition> definitions, Map<String, String> unavailable) {
+    private CustomUniforms(List<Definition> definitions, Map<String, String> unavailable,
+                           Map<String, String> irisUnresolved) {
         this.definitions = definitions;
         this.unavailable = unavailable;
+        this.irisUnresolved = irisUnresolved;
     }
 
     public static CustomUniforms active() {
@@ -81,6 +89,7 @@ public final class CustomUniforms {
     public static CustomUniforms parse(String properties) {
         List<Definition> definitions = new ArrayList<>();
         Map<String, String> unavailable = new LinkedHashMap<>();
+        Map<String, String> irisUnresolved = new LinkedHashMap<>();
         Map<String, Type> known = new HashMap<>();
         for (String line : logicalLines(properties == null ? "" : properties)) {
             Matcher matcher = DEFINITION.matcher(line);
@@ -92,9 +101,10 @@ public final class CustomUniforms {
             known.remove(name);
             definitions.removeIf(definition -> definition.name().equals(name));
             unavailable.remove(name);
-            // BSL defines its own expression for shadowFade in shaders.properties. Keep that pack
-            // override compatible while still exposing Iris' frame value when it is not overridden.
-            if (BUILT_IN_INPUTS.contains(name) && !name.equals("shadowFade")) {
+            irisUnresolved.remove(name);
+            // BSL defines its own expression for shadowFade in shaders.properties. Keep such pack
+            // overrides compatible while still exposing Iris' frame value when they are absent.
+            if (BUILT_IN_INPUTS.contains(name) && !PACK_OVERRIDABLE.contains(name)) {
                 unavailable.put(name, "it would replace a built-in uniform");
                 continue;
             }
@@ -110,6 +120,17 @@ public final class CustomUniforms {
             try {
                 expression = new Parser(source).parse();
                 String missing = expression.missingInput(known.keySet());
+                if (missing != null && (irisUnresolved.containsKey(missing) || missing.startsWith("BIOME_"))) {
+                    // Iris logs "Failed to resolve uniform" and never sets such a uniform, so shaders
+                    // read 0. Vanilla biome constants match Iris exactly (BiomeIds), so an undefined
+                    // BIOME_* constant (Complementary's BIOME_SULFUR_CAVES on 1.21.11) fails in Iris too.
+                    irisUnresolved.put(name, irisUnresolved.containsKey(missing)
+                            ? "it depends on '" + missing + "', which Iris cannot resolve"
+                            : "'" + missing + "' is not a registered vanilla biome");
+                    definitions.add(new Definition(name, Type.valueOf(typeName.toUpperCase(java.util.Locale.ROOT)),
+                            uniform, new Constant(0.0)));
+                    continue;
+                }
                 if (missing != null) {
                     unavailable.put(name, unavailable.containsKey(missing)
                             ? "it depends on unavailable '" + missing + "'"
@@ -121,14 +142,23 @@ public final class CustomUniforms {
                 continue;
             }
             Type type = Type.valueOf(typeName.toUpperCase(java.util.Locale.ROOT));
-            if (name.equals("shadowFade") && type != Type.FLOAT) {
-                unavailable.put(name, "the built-in shadowFade uniform must remain a float");
+            if (PACK_OVERRIDABLE.contains(name) && type != Type.FLOAT) {
+                unavailable.put(name, "the built-in " + name + " uniform must remain a float");
                 continue;
             }
             definitions.add(new Definition(name, type, uniform, expression));
             known.put(name, type);
         }
-        return new CustomUniforms(List.copyOf(definitions), Collections.unmodifiableMap(unavailable));
+        return new CustomUniforms(List.copyOf(definitions), Collections.unmodifiableMap(unavailable),
+                Collections.unmodifiableMap(irisUnresolved));
+    }
+
+    /**
+     * Definitions that Iris itself cannot resolve, mapped to the reason. Like Iris they stay 0;
+     * callers should log them the way Iris warns about them.
+     */
+    public Map<String, String> irisUnresolved() {
+        return irisUnresolved;
     }
 
     /** Uniforms (not helper variables) that can be supplied to shaders, in definition order. */
@@ -285,10 +315,13 @@ public final class CustomUniforms {
             this.arguments = arguments;
             int count = arguments.size();
             boolean valid = switch (name) {
-                case "sin", "cos", "tan", "asin", "acos", "abs", "floor", "ceil", "exp", "exp2", "log", "log2",
-                     "frac", "fract", "sqrt", "signum", "sign", "round", "torad", "todeg", "radians", "degrees" -> count == 1;
-                case "atan" -> count == 1 || count == 2;
-                case "atan2", "pow", "fmod", "mod", "step" -> count == 2;
+                case "sin", "cos", "tan", "asin", "acos", "abs", "floor", "ceil", "exp", "exp2", "exp10", "log2",
+                     "log10", "frac", "fract", "sqrt", "signum", "sign", "round", "torad", "todeg", "radians",
+                     "degrees" -> count == 1;
+                case "atan", "log" -> count == 1 || count == 2;
+                case "atan2", "pow", "fmod", "mod", "step", "edge" -> count == 2;
+                case "random" -> count == 0 || count == 2;
+                case "randomInt" -> count <= 2;
                 case "min", "max" -> count >= 2;
                 case "clamp", "between", "mix", "lerp", "smoothstep" -> count == 3;
                 case "equals" -> count == 3;
@@ -329,6 +362,20 @@ public final class CustomUniforms {
                 }
                 case "smooth":
                     return smooth(inputs, frameTime);
+                case "random": {
+                    double unit = java.util.concurrent.ThreadLocalRandom.current().nextDouble();
+                    if (arguments.isEmpty()) return unit;
+                    double min = arg(0, inputs, frameTime);
+                    return min + unit * (arg(1, inputs, frameTime) - min);
+                }
+                case "randomInt": {
+                    java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+                    if (arguments.isEmpty()) return random.nextInt();
+                    int first = (int) arg(0, inputs, frameTime);
+                    if (arguments.size() == 1) return first > 0 ? random.nextInt(first) : 0;
+                    int second = (int) arg(1, inputs, frameTime);
+                    return second > first ? random.nextInt(first, second) : first;
+                }
                 default:
                     break;
             }
@@ -346,8 +393,11 @@ public final class CustomUniforms {
                 case "ceil" -> Math.ceil(a);
                 case "exp" -> Math.exp(a);
                 case "exp2" -> Math.pow(2.0, a);
-                case "log" -> Math.log(a);
+                case "exp10" -> Math.pow(10.0, a);
+                // Iris: log(x) is natural, log(base, x) uses the given base.
+                case "log" -> arguments.size() == 1 ? Math.log(a) : Math.log(arg(1, inputs, frameTime)) / Math.log(a);
                 case "log2" -> Math.log(a) / Math.log(2.0);
+                case "log10" -> Math.log10(a);
                 case "frac", "fract" -> a - Math.floor(a);
                 case "sqrt" -> Math.sqrt(a);
                 case "signum", "sign" -> Math.signum(a);
@@ -355,15 +405,13 @@ public final class CustomUniforms {
                 case "torad", "radians" -> Math.toRadians(a);
                 case "todeg", "degrees" -> Math.toDegrees(a);
                 case "pow" -> Math.pow(a, arg(1, inputs, frameTime));
-                case "fmod" -> {
-                    double b = arg(1, inputs, frameTime);
-                    yield b == 0.0 ? 0.0 : a % b;
-                }
-                case "mod" -> {
+                // Iris fmod is a floored modulo: (a % b + b) % b, Math.floorMod for integers.
+                case "fmod", "mod" -> {
                     double b = arg(1, inputs, frameTime);
                     yield b == 0.0 ? 0.0 : a - b * Math.floor(a / b);
                 }
-                case "step" -> arg(1, inputs, frameTime) < a ? 0.0 : 1.0;
+                // GLSL step(edge, x) and Iris edge(edge, x) are both 0 below the edge.
+                case "step", "edge" -> arg(1, inputs, frameTime) < a ? 0.0 : 1.0;
                 case "clamp" -> Math.max(arg(1, inputs, frameTime), Math.min(arg(2, inputs, frameTime), a));
                 case "between" -> a >= arg(1, inputs, frameTime) && a <= arg(2, inputs, frameTime) ? 1.0 : 0.0;
                 case "equals" -> Math.abs(a - arg(1, inputs, frameTime)) <= arg(2, inputs, frameTime) ? 1.0 : 0.0;
@@ -383,26 +431,29 @@ public final class CustomUniforms {
         }
 
         /**
-         * OptiFine smooth([id,] value[, fadeUpSeconds[, fadeDownSeconds]]): exponential approach whose
-         * fade time is the time to cover ~99% of the change (default one second). The id only names the
-         * state in OptiFine; each call site keeps its own state here.
+         * smooth([id,] value[, fadeUp[, fadeDown]]) as implemented by Iris' SmoothFloat: exponential
+         * smoothing whose fade arguments are half-lives in tenths of a second (default 1), and a zero
+         * fade follows the value immediately. A constant first argument is OptiFine's state id; each call
+         * site keeps its own state here, so the id is not needed to separate them.
          */
         private double smooth(Function<String, Double> inputs, double frameTime) {
-            int offset = arguments.size() == 4 ? 1 : 0;
+            int offset = arguments.size() >= 2 && arguments.getFirst() instanceof Constant ? 1 : 0;
             double target = arg(offset, inputs, frameTime);
-            double fadeUp = arguments.size() > offset + 1 ? arg(offset + 1, inputs, frameTime) : 1.0;
-            double fadeDown = arguments.size() > offset + 2 ? arg(offset + 2, inputs, frameTime) : fadeUp;
+            int fades = arguments.size() - offset - 1;
+            double fadeUp = fades >= 1 ? arg(offset + 1, inputs, frameTime) : 1.0;
+            double fadeDown = fades >= 2 ? arg(offset + 2, inputs, frameTime) : fadeUp;
             if (!smoothed) {
                 smoothed = true;
                 smoothValue = target;
                 return target;
             }
-            double fade = target > smoothValue ? fadeUp : fadeDown;
-            if (fade <= 0.0 || frameTime <= 0.0) {
+            double halfLifeSeconds = (target > smoothValue ? fadeUp : fadeDown) * 0.1;
+            if (halfLifeSeconds <= 0.0) {
                 smoothValue = target;
-            } else {
-                double factor = Math.exp(-Math.log(100.0) * frameTime / fade);
-                smoothValue = target + (smoothValue - target) * factor;
+            } else if (frameTime > 0.0) {
+                double decay = Math.log(2.0) / halfLifeSeconds;
+                double smoothing = 1.0 - Math.exp(-decay * frameTime);
+                smoothValue += (target - smoothValue) * smoothing;
             }
             return smoothValue;
         }

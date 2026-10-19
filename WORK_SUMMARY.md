@@ -4,6 +4,15 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
+## Текущее состояние после beta.5 — 2026-10-19 (вечер)
+
+- Опубликованный последний prerelease — **beta.5** (`main` = `b19f96e`); история beta.2–beta.5 ниже в разделах «Beta.2 опубликована» … «Beta.5 cloud vertex bridge». Эти выпуски сделала параллельная T3-сессия `[GPT] Veyra`; она прервана пользователем в 22:11, работу продолжает эта сессия.
+- **Незавершённая работа той сессии сохранена:** облачный `colortex0` через snapshot сцены (адаптер облаков готов, в рендерере начат). Она в `git stash` («WIP cloud colortex0 scene snapshot …», сделан с ветки `feature/cloud-scene-color-input`), копии patch и нового `VeyraColorTextureSnapshot.java` лежат в `%TEMP%\veyra-wip-backup`. Не удалять до переноса в ветку.
+- Ветка `feature/iris-velocity-smooth` (от `main`): встроенный Iris `velocity` (с приоритетом выражения пака), общий механизм `CustomUniforms.PACK_OVERRIDABLE`; исправлен дефект, из-за которого после пака с собственным `shadowFade` geometry-программы других паков получали 0. `smooth()` переведён на семантику Iris `SmoothFloat` (half-life в десятых секунды), `fmod` — floored, добавлены `edge`, `log(base,x)`, `log10`, `exp10`, `random`, `randomInt`.
+- Неопределённые `BIOME_*` (Complementary `BIOME_SULFUR_CAVES`, биома нет в 1.21.11) ведут себя как в Iris: uniform не разрешается, равен 0, пишется предупреждение; Iris-входы, которых нет в Veyra, по-прежнему отклоняют программу. Аудит засевает ванильные id биомов из класса `Biomes` (65 id), поэтому audit-only отказов по `BIOME_*` больше нет. Диагностика terrain называет конкретное неподдерживаемое объявление.
+- Локально JDK 21: `clean test validateShaders build packageExamplePacks` — **172 теста, 0 failures/errors/skips**, verify_jar прошёл. Полный pinned audit: 75 случаев, 18 accepted / 699 rejected; `validation/*.json` перегенерированы (прежние файлы устарели ещё до beta.4). Фикстура `custom-uniforms` проверяет `velocity` в terrain и выражение на его основе в post; GPU CI для этой ветки ещё не прогонялся.
+- Следующие реальные блокеры (default Overworld): Complementary terrain/water — Iris `heavyFog`; entity/block/hand — `currentRenderedItemId`; clouds — `colortex0` (stash). BSL — vertex varyings `color`/`mat`, `entityColor`, `isMainHand`, clouds `texture`. Sildur — `colortex4` feedback. Сравнение с исходниками Iris (bff1e69) показало ~60 нереализованных Iris uniforms (`heavyFog`, `hasCeiling`, `sunPosition`/`moonPosition`/`shadowLightPosition`/`upPosition`, здоровье/голод/воздух игрока, `temperature`/`rainfall`, hardcoded `timeAngle`/`timeBrightness` и др.) — план: единый реестр Iris uniforms вместо разрозненных списков.
+
 ## Текущая работа: выпуск 0.2.0-beta.1 — 2026-10-19
 
 - Teardown audit завершён: registry snapshot совпадает с vanilla baseline (46/667/97), Veyra-named объектов нет; ~10031 diagnostics относятся к VulkanMod и присутствуют без shaderpack.
