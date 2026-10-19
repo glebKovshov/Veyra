@@ -1765,11 +1765,18 @@ public final class VeyraRenderer {
         if (pipeline == null || !cloudPipelineUsesSceneColor) return;
 
         try {
-            var mainFramebuffer = Renderer.getInstance().getMainPass().getMainFramebuffer();
-            if (mainFramebuffer == null || mainFramebuffer.getColorAttachment() == null) {
-                throw new IllegalStateException("The cloud colortex0 scene framebuffer is unavailable.");
+            var mainPass = Renderer.getInstance().getMainPass();
+            var mainFramebuffer = mainPass.getMainFramebuffer();
+            if (mainFramebuffer == null) {
+                throw new IllegalStateException("The cloud colortex0 MainPass has no framebuffer ("
+                        + mainPass.getClass().getName() + ").");
             }
             VulkanImage colorImage = mainFramebuffer.getColorAttachment();
+            if (colorImage == null) {
+                throw new IllegalStateException("The cloud colortex0 MainPass framebuffer has no active color image ("
+                        + mainPass.getClass().getName() + ", " + mainFramebuffer.getClass().getName() + ", "
+                        + mainFramebuffer.getWidth() + "x" + mainFramebuffer.getHeight() + ").");
+            }
             cloudSceneColorSnapshot.capture(colorImage);
             cloudSceneColorCaptured = true;
         } catch (Exception exception) {
