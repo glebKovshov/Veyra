@@ -1765,8 +1765,7 @@ public final class VeyraRenderer {
         if (pipeline == null || !cloudPipelineUsesSceneColor) return;
 
         try {
-            RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
-            GpuTexture colorTexture = ((RenderTargetAccessor) mainTarget).veyra$getColorTexture();
+            GpuTexture colorTexture = Renderer.getInstance().getMainPass().getColorAttachment();
             if (!(colorTexture instanceof VkGpuTexture vulkanTexture) || vulkanTexture.isClosed()) {
                 throw new IllegalStateException("The main scene color attachment is not a live VulkanMod image.");
             }
