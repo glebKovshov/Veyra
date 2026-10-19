@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.8 — 2026-10-20 (prerelease)
+
+- Add terrain aliases for Iris `lmCoord`/`lightMapCoord` and BSL `color`, using VulkanMod's existing lightmap and vertex-color inputs.
+- Name the exact unsupported terrain input in adapter diagnostics; keep the existing legacy `gl_FragData` output rewrite covered by a regression test.
+- Refresh the pinned source-audit reports and compatibility matrix: Complementary terrain/water still need `signMidCoordPos`/`mc_midTexCoord`, and BSL terrain still needs `viewPos`.
+
 ## 0.2.0-beta.7 — 2026-10-20 (prerelease)
 
 - Add Iris cloud inputs for `colortex0` scene-color sampling and the existing Vulkan-backed `noisetex`, including legacy `texture2DLod` reads lowered to Vulkan GLSL `textureLod`. Veyra snapshots scene color before clouds draw to avoid sampling its active color attachment.
