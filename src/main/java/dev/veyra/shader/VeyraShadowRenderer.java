@@ -275,6 +275,14 @@ public final class VeyraShadowRenderer {
                 renderer.endRenderPass();
                 shadowRenderPassStarted = false;
             }
+            // Entity feature passes can leave depth in attachment layout when translucency
+            // is disabled. Complete the producer transitions on this graphics command buffer.
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                ((net.vulkanmod.render.engine.VkGpuTexture) target.getDepthTexture()).getVulkanImage()
+                        .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                ((net.vulkanmod.render.engine.VkGpuTexture) target.getColorTexture()).getVulkanImage()
+                        .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
         } catch (Exception exception) {
             VeyraClient.LOGGER.error("Could not render the shader pack shadow map.", exception);
             VeyraRenderer.shadowInputFailed(exception);
