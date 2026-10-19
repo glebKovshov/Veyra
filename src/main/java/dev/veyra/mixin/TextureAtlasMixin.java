@@ -12,4 +12,11 @@ public abstract class TextureAtlasMixin {
     private void veyra$invalidateSpecular(SpriteLoader.Preparations preparations, CallbackInfo ci) {
         VeyraSpecularTextures.invalidate();
     }
+
+    @Inject(method = "upload", at = @At("TAIL"))
+    private void veyra$captureBlockAtlasSize(SpriteLoader.Preparations preparations, CallbackInfo ci) {
+        if (((TextureAtlas) (Object) this).location().equals(TextureAtlas.LOCATION_BLOCKS)) {
+            dev.veyra.shader.VeyraRenderer.captureBlockAtlasSize(preparations.width(), preparations.height());
+        }
+    }
 }

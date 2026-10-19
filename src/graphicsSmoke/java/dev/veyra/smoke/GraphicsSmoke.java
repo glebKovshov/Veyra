@@ -90,6 +90,10 @@ public final class GraphicsSmoke {
             if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
                 throw new IllegalStateException("Surface image does not support frame readback");
             var auxiliary = VeyraRenderer.isRenderingEnabled() ? VeyraRenderer.geometryColorAttachment(1) : null;
+            for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
+                LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
+                        dev.veyra.shader.CustomUniforms.active().floatValue(custom.name()), dev.veyra.shader.CustomUniforms.active().intValue(custom.name()));
+            }
             LoggerFactory.getLogger("veyra-graphics-smoke").info("Frame evidence: active={} main={} auxiliary={}",
                     captureActive, Long.toHexString(source.getId()), auxiliary == null ? "disabled" : Long.toHexString(auxiliary.getId()));
             int width = source.width, height = source.height, format = source.format;

@@ -34,6 +34,7 @@ final class GlslPreprocessor {
         macros.put("MC_SHADOW_QUALITY", "1.0");
         macros.put("MC_HAND_DEPTH", "0.125");
         macros.put("VEYRA", "200");
+        macros.putAll(BiomeIds.defines());
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         macros.put(os.contains("win") ? "MC_OS_WINDOWS" : os.contains("mac") ? "MC_OS_MAC" : "MC_OS_LINUX", "1");
         return macros;
@@ -70,7 +71,31 @@ final class GlslPreprocessor {
         }
         long versions = active.stream().filter(d -> d.matches("#\\s*version\\b.*")).count();
         if (versions > 1) throw new IOException(file + ": more than one active #version directive.");
-        return String.join("\n", active) + "\n" + processed;
+        return splitUniformLists(String.join("\n", active) + "\n" + processed);
+    }
+
+    private static final Pattern UNIFORM_LIST = Pattern.compile(
+            "(?m)^([\\t ]*)uniform[\\t ]+((?:(?:lowp|mediump|highp)[\\t ]+)?[A-Za-z_][A-Za-z0-9_]*)[\\t ]+"
+                    + "([A-Za-z_][A-Za-z0-9_]*(?:[\\t ]*,[\\t ]*[A-Za-z_][A-Za-z0-9_]*)+)[\\t ]*;");
+
+    /**
+     * Rewrites {@code uniform float near, far;} as one declaration per line. GLSL allows declarator
+     * lists and packs such as BSL use them, while Veyra's adapters bridge uniforms by single declarations.
+     */
+    static String splitUniformLists(String source) {
+        Matcher matcher = UNIFORM_LIST.matcher(source);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            StringBuilder declarations = new StringBuilder();
+            for (String name : matcher.group(3).split(",")) {
+                if (!declarations.isEmpty()) declarations.append('\n');
+                declarations.append(matcher.group(1)).append("uniform ").append(matcher.group(2)).append(' ')
+                        .append(name.strip()).append(';');
+            }
+            matcher.appendReplacement(result, Matcher.quoteReplacement(declarations.toString()));
+        }
+        matcher.appendTail(result);
+        return result.toString();
     }
 
     static boolean condition(String expression, Map<String, String> values) throws IOException {

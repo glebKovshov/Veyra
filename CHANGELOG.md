@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0-beta.2 — 2026-10-19 (prerelease)
+
+- Added scalar shader-pack custom-uniform expression evaluation from `shaders.properties`, including supported `uniform.*` and `variable.*` float, int, and bool definitions.
+- Added Iris `shadowFade` support using current sun/moon angles, while preserving a pack-defined `shadowFade` expression such as BSL's.
+- Added Iris near/far, held item/light, biome precipitation, player mood/look, sky color, atlas size, lightning bolt position, and darkness-light uniforms; added relative eye position uniforms to post programs.
+- Fixed `ivec2` post-uniform blocks and the handling of Iris-unbound entity identifiers and `entityColor`.
+- Pinned source audit covers 75 cases and 5,178 preprocessed sources; 18 geometry fragment cases are accepted and 699 rejected. This remains a source-only result.
+- See [RELEASE_NOTES.md](RELEASE_NOTES.md) for installation, verification and known limits.
+
 ## 0.2.0-beta.1 — 2026-10-19 (prerelease)
 
 - Added post-stage shadowtex1 and shadowcolor0/shadowcolor inputs, with explicit metadata, color alias deduplication, depth/color filtering and a combined twelve-sampler budget.

@@ -3,6 +3,7 @@ package dev.veyra.shader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -16,10 +17,11 @@ public final class ShaderPackUniformAdapter {
             "shadowProjection", "shadowProjectionInverse");
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Map<String, TerrainShaderAdapter.ShaderUniform> SUPPORTED_UNIFORMS =
-            TerrainShaderAdapter.shaderPackUniforms().stream()
-                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                            TerrainShaderAdapter.ShaderUniform::name, uniform -> uniform));
+
+    private static final Map<String, String> UNBOUND_ENTITY_VALUES = Map.of(
+            "entityId", "int", "blockEntityId", "int", "currentRenderedItemId", "int", "entityColor", "vec4");
+    private static final Pattern ENTITY_ATTRIBUTE_PROGRAM = Pattern.compile(
+            "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*)|.*sign_text.*");
 
     private ShaderPackUniformAdapter() {
     }
@@ -31,14 +33,22 @@ public final class ShaderPackUniformAdapter {
         List<UniformField> fields = new ArrayList<>();
         StringBuilder macros = new StringBuilder();
         Map<String, String> declaredUniforms = new HashMap<>();
+        Map<String, TerrainShaderAdapter.ShaderUniform> supportedUniforms = new HashMap<>();
+        TerrainShaderAdapter.shaderPackUniforms().forEach(uniform -> supportedUniforms.put(uniform.name(), uniform));
 
         while (matcher.find()) {
             String type = matcher.group(1);
             String name = matcher.group(2);
-            TerrainShaderAdapter.ShaderUniform uniform = SUPPORTED_UNIFORMS.get(name);
+            String unbound = unboundEntityDeclaration(programName, type, name);
+            if (unbound != null) {
+                matcher.appendReplacement(withoutUniforms, "");
+                macros.append(unbound);
+                continue;
+            }
+            TerrainShaderAdapter.ShaderUniform uniform = supportedUniforms.get(name);
             boolean matrixUniform = uniform == null && type.equals("mat4") && MATRIX_UNIFORMS.contains(name);
             if (uniform == null && !matrixUniform) {
-                throw new IOException(programName + " custom uniform '" + name + "' is not supported yet.");
+                throw new IOException(TerrainShaderAdapter.unsupportedUniformMessage(programName, name));
             }
             if (uniform != null && !uniform.accepts(type)) {
                 throw new IOException(programName + " uniform '" + name + "' must use "
@@ -76,7 +86,36 @@ public final class ShaderPackUniformAdapter {
     public record UniformField(String type, String name) {
     }
 
+    /**
+     * Iris patches entityId, blockEntityId and currentRenderedItemId only into programs whose vertex
+     * format carries the entity attribute (entity/block-entity/hand overlay formats and text). Elsewhere
+     * the declarations remain unbound GL uniforms and read 0, which these programs receive here as well.
+     */
+    public static boolean isUnboundEntityIdentifier(String programName, String type, String name) {
+        return type.equals(UNBOUND_ENTITY_VALUES.get(name))
+                && !ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
+    }
+
+    /** A zero-valued constant replacing an Iris-unbound entity uniform, or null when Iris binds it. */
+    public static String unboundEntityDeclaration(String programName, String type, String name) {
+        if (!isUnboundEntityIdentifier(programName, type, name)) {
+            return null;
+        }
+        return "const " + type + " " + name + " = " + (type.equals("int") ? "0" : "vec4(0.0)") + ";\n";
+    }
+
     public static List<String> matrixUniforms() {
         return MATRIX_UNIFORMS;
+    }
+
+    /** Merges Iris built-ins and pack uniforms without creating duplicate uniform-block members. */
+    static List<String> mergeUniformNames(List<String> builtInUniforms,
+                                          List<CustomUniforms.Uniform> customUniforms) {
+        if (customUniforms.isEmpty()) {
+            return builtInUniforms;
+        }
+        LinkedHashSet<String> names = new LinkedHashSet<>(builtInUniforms);
+        customUniforms.stream().map(CustomUniforms.Uniform::name).forEach(names::add);
+        return List.copyOf(names);
     }
 }

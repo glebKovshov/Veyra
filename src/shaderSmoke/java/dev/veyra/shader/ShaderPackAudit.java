@@ -22,6 +22,8 @@ public final class ShaderPackAudit {
                 if (values == null) throw new IllegalArgumentException("Unknown profile '" + profile + "' in " + argument);
                 pack = pack.configured(pack.readOptions().validate(values), dimension);
             }
+            // Match runtime selection: adapters see the pack's shaders.properties custom uniforms.
+            CustomUniforms.activate(pack.readCustomUniforms());
             List<String> errors = new ArrayList<>();
             String capabilityError = "";
             int options = 0, profiles = 0, stages = 0, preprocessed = 0, accepted = 0, rejected = 0, geometryVertices = 0, compute = 0;

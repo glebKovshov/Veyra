@@ -4,6 +4,8 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "MinecraftMixin",
+    "BiomesMixin",
+    "LightTextureMixin",
     "GameRendererMixin",
     "BlockEntityRenderDispatcherMixin",
     "SubmitNodeCollectionMixin",

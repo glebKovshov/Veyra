@@ -27,13 +27,20 @@ class ShaderAdapterTest {
                     return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                 });
                 source = GlslPreprocessor.process(name, source);
+                Path properties = path.getParent().resolve("shaders.properties");
+                CustomUniforms.activate(Files.exists(properties)
+                        ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                 String adapted;
+                try {
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);
                 } else if (name.startsWith("gbuffers_entities")) {
                     adapted = EntityShaderAdapter.adaptFragment(source, name.substring(0, name.length()-4), false, Files.exists(path.getParent().resolve("shadow.fsh")));
                 } else {
                     adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
+                }
+                } finally {
+                    CustomUniforms.activate(CustomUniforms.EMPTY);
                 }
                 assertTrue(adapted.startsWith("#version 460\n"));
                 assertTrue(adapted.contains("void main("));
@@ -60,6 +67,22 @@ class ShaderAdapterTest {
         assertTrue(adapted.contains("int moonPhase;"));
         assertTrue(adapted.contains("float(moonPhase)"));
         assertFalse(adapted.contains("uniform int moonPhase;"));
+    }
+
+    @Test
+    void adaptsIrisShadowFadeUniformForTerrainAndPostPrograms() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                uniform float shadowFade;
+                void main() { gl_FragColor = vec4(shadowFade); }
+                """);
+        assertTrue(terrain.contains("float shadowFade;"));
+        assertFalse(terrain.contains("uniform float shadowFade;"));
+
+        ShaderPackUniformAdapter.AdaptedShader post = ShaderPackUniformAdapter.extract(
+                "uniform float shadowFade;\nvoid main() { }\n", "composite");
+        assertTrue(post.declarations().contains("uniform float shadowFade;"));
+        assertTrue(post.fields().contains(new ShaderPackUniformAdapter.UniformField("float", "shadowFade")));
     }
 
     @Test
