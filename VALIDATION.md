@@ -172,3 +172,10 @@ The alpha prerelease is now [published](https://github.com/glebKovshov/Veyra/rel
 ### GitHub CI for beta.3 candidate
 
 PR #4 at commit `566e059c433bd64a14184a5d0e6dd66d394bff7d` passed the GitHub Build workflow ([39294368264](https://github.com/glebKovshov/Veyra/actions/runs/39294368264)), all 12 Lavapipe graphics smoke fixtures ([39294368250](https://github.com/glebKovshov/Veyra/actions/runs/39294368250)), and the pinned shaderpack source audit ([39294367864](https://github.com/glebKovshov/Veyra/actions/runs/39294367864)). Real shaderpack visual validation remains outstanding.
+
+
+### Published beta.3 artifact
+
+The merged beta.3 candidate passed the final PR Build, shaderpack source audit, and all 12 Lavapipe graphics smoke fixtures. The tag release workflow also passed its source/graphics gates, `./gradlew build validateShaders packageExamplePacks`, and `scripts/verify_jar.py` (release run [39295725182](https://github.com/glebKovshov/Veyra/actions/runs/39295725182)). Downloaded [veyra-0.2.0-beta.3+mc1.21.11.jar](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.3%2Bmc1.21.11/veyra-0.2.0-beta.3%2Bmc1.21.11.jar) is 510,727 bytes and has SHA-256 `5a397886d9781d1bdf10a22484a97f320614147abbbe57a3833d0e1a00b62552`, matching the published `SHA256SUMS.txt`.
+
+These graphics checks use software Vulkan/Lavapipe and synthetic fixtures. They do not establish real shaderpack visual compatibility on a physical GPU; pinned pack-source results continue to mark every case `visualValidation=false`.
