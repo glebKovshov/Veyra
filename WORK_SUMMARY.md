@@ -14,6 +14,9 @@
 - PR #2 остаётся draft, stable merge/release не готовы. Существующий опубликованный alpha.1 не содержит этих изменений.
 - Первый CI run `39213650838` (`c4e7406`): скачаны обе новые graphics evidence. Atlas 223051 active / 0 disabled, entity 4688 / 0; оба result.json passed. Полную matrix/validation ещё нужно сверить. После этого upload переведён с encoder на direct image upload queue, чтобы не менять глобальный slot 0; entity fixture дополнительно проверяет отличающуюся albedo. Этот последующий fix требует отдельного CI.
 - Полный локальный audit завершён: 75 configurations, 5178 sources, 18 accepted / 699 rejected; Complementary теперь блокируют shadowcolor0 и blockEntityId, а не specular. Оба committed JSON обновлены; exact-commit CI сравнение ещё предстоит.
+- **Новый runtime blocker:** усиленный entity fixture в `a8f9c2a` даёт 0 active pixels (artifact 12169066320, run 39214054781), runtime validation errors=0. Одновременное чтение specular/albedo ещё не подтверждено, поэтому первый зелёный fixture недостаточен. Commit `e1e830d` добавляет descriptor trace также для entity pipelines с minecraft location и отдельные red/blue failure colors; порог/проверка не ослаблены. Требуется установить причину и исправить до integration/release.
+- Скачанный source artifact 12168777659 от `c4e7406` содержит все 75 records, полностью совпадающие с локальным JSON. Это не runtime доказательство.
+- Причина нулевого entity signal установлена по login positions: первый игрок `(7.5,-59,-2.5)` видел fixed cow, второй `(8.5,-59,9.5)` смотрел в другую сторону от неё. Это fixture placement bug, а не доказанная ошибка bindings. Cow теперь ставится относительно фактической позиции игрока вдоль camera yaw=45; усиленный predicate и failure colors сохранены. Нужен повторный GPU run.
 
 ## Предыдущий подтверждённый срез: water color inputs — 2026-10-19
 

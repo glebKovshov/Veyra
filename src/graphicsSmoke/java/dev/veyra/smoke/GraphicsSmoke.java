@@ -41,11 +41,14 @@ public final class GraphicsSmoke {
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();
+                // Initial player spawn is randomized around the world's spawn point.
+                // Place the subject along the fixed 45-degree camera direction instead.
+                double cowX = client.player.getX() - 4.0, cowY = client.player.getY(), cowZ = client.player.getZ() + 4.0;
                 server.execute(() -> {
                     try {
                         var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                         if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
-                        cow.setPos(-2.5, -59, 3.5);
+                        cow.setPos(cowX, cowY, cowZ);
                         cow.setNoAi(true);
                         java.util.Objects.requireNonNull(cow.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE)).setBaseValue(2.0);
                         server.overworld().addFreshEntity(cow);
