@@ -10,7 +10,7 @@ Post programs are scheduled at separate world boundaries: `prepare` after shadow
 
 Development material support includes resource-pack static `_s.png` specular maps for terrain/shadow atlases and entity textures, with linear/LabPBR mipmaps. Animated specular maps and normal maps remain unsupported. The original `examples/specular-atlas` and `examples/specular-entity` fixtures exercise this path; published alpha.1 predates it.
 
-Terrain and entity-family programs can also sample the completed shadow pass color through `shadowcolor0` or `shadowcolor` (linear/clamp, base level). The second shadow depth map, other shadow colors and general shadow format/mipmap properties remain unsupported. These development changes also postdate published alpha.1.
+Terrain and entity-family programs can sample the completed shadow pass color through `shadowcolor0` or `shadowcolor` (linear/clamp, base level), and separate pre-translucent depth through `shadowtex1` (nearest/clamp, base level). Shadow feedback is rejected. Post-program shadowtex1, other shadow colors and general shadow format/mipmap properties remain unsupported. These development changes postdate published alpha.1.
 
 ## Install and use
 

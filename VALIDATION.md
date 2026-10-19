@@ -1,6 +1,26 @@
 # 0.2 development validation status
 
-## Shadow color validation (after alpha.1)
+## Separate shadow depth validation (after alpha.1)
+
+Runtime commit `cca001973c906da89f461c30998e121a88e27405` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39246874678), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39246882115) and [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39246874812). Downloaded CI XML confirms **131 tests, zero failures/errors/skips**; the downloaded mod JAR passes the verifier. shaderc preprocesses 36 examples and compiles 33 directly to SPIR-V, plus both shadow comparison helper fixtures and existing conditional/dataflow checks.
+
+| Fixture | Active / disabled magenta pixels | Runtime errors | Teardown diagnostics |
+| --- | --- | --- | --- |
+| Terrain MRT | 221976 / 0 | 0 | 10031 |
+| Water opaque depth | 222757 / 0 | 0 | 10050 |
+| Water color inputs | 222757 / 0 | 0 | 10370 |
+| Specular atlas | 222590 / 0 | 0 | 10031 |
+| Specular entity | 18293 / 0 | 0 | 10035 |
+| Shadow color terrain | 222445 / 0 | 0 | 10032 |
+| Shadow color entity | 18410 / 0 | 0 | 10676 |
+| Separate shadow depth, water | 226902 / 0 | 0 | 10049 |
+| Separate shadow depth, entity | 16456 / 0 | 0 | 10053 |
+
+All nine exact-commit graphics artifacts were downloaded; both new active screenshots were inspected. The new fixtures enable shadowTranslucent explicitly and author opaque depth 0.75 and water depth 0.25. A main draw must read both values from separate shadowtex1/shadowtex0 images at the same coordinate; an alias, late snapshot or cleared texture cannot pass. Initial runs exposed missing fixture translucency and a real producer depth-layout error after entity features; the failing evidence is preserved in WORK_SUMMARY.md. Final graphics validation has no runtime errors; process teardown ownership is still unresolved. This verifies original synthetic scenes, not third-party shaderpack lighting or physical GPUs.
+
+The fresh local source audit processes all 75 configurations: 5,178 sources, 18 accepted / 699 rejected. Complementary now reaches blockEntityId; BSL reaches entityId/blockEntityId/shadowFade. All 75 local and committed JSON records match the downloaded [exact-commit source CI](https://github.com/glebKovshov/Veyra/actions/runs/39246874561), with visualValidation=false throughout. [PR source audit](https://github.com/glebKovshov/Veyra/actions/runs/39246882138) and [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39246882139) also pass. Post-program shadowtex1, wider sampler properties, real-pack visual validation and lifecycle stress remain incomplete; stable integration/release is not ready.
+
+## Historical shadow color validation (after alpha.1)
 
 Runtime commit `ad69519` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39215900899), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39215900818) and [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39215906459). Downloaded CI XML confirms **122 tests, zero failures/errors/skips**. shaderc preprocesses 31 example sources and compiles 28 directly to SPIR-V. The downloaded mod JAR passes the verifier.
 

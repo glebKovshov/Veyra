@@ -2,6 +2,9 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Added a separate pre-translucent `shadowtex1` image for terrain/entity programs, copied on the graphics queue after opaque terrain and entity/block features. Translucent shadow terrain now resumes the existing target with LOAD/STORE.
+- Fixed final shadow depth layout when entity feature passes leave it as an attachment, restored main matrices after shadow translucency, and retire cached pipeline variants for released shadow passes at frame completion.
+- Added water/entity Vulkan fixtures that require different authored depths from shadowtex0 and shadowtex1; missing/aliased/late snapshots cannot pass.
 - Added completed shadow color sampling (`shadowcolor0` / legacy `shadowcolor`) to terrain and entity-family bridges. Shadow attachment feedback and native-slot collisions fail explicitly.
 - Added separate terrain/entity shadow-color Vulkan readback fixtures using authored shadow shader output.
 - Added resource-pack static specular material textures to terrain/shadow/entity bridges, including atlas padding, straight UNORM channels and linear/LabPBR mipmaps. Missing maps use the zero default; animated maps are explicitly unsupported.
