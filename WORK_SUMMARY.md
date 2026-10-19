@@ -1,0 +1,186 @@
+﻿# Veyra — передача контекста разработки
+
+Проверено: **2026-10-19**. Репозиторий: `https://github.com/glebKovshov/Veyra`. Это рабочая сводка для следующего агента, а не заявление о релизной готовности.
+
+Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
+
+## Цель и целевая среда
+
+Продолжить существующий Veyra, не переписывая его с нуля. Целевая связка зафиксирована в `gradle.properties`, `fabric.mod.json` и исходниках VulkanMod, на которые рассчитаны mixin’ы:
+
+- Minecraft **1.21.11**;
+- Fabric Loader **0.18.4+**, Fabric API **0.140.0+1.21.11**;
+- VulkanMod **0.6.8**;
+- Java **21+**;
+- версия текущей разработки: `0.2.0+mc1.21.11`.
+
+Veyra реализует подмножество Iris/OptiFine shaderpack API поверх VulkanMod. Iris в основном управляет OpenGL pipeline; его framebuffer/program objects нельзя переносить напрямую в Vulkan. Veyra использует Minecraft RenderPipeline и внутренние точки VulkanMod, создавая Vulkan-совместимый bridge.
+
+## Что уже реализовано
+
+### Загрузка наборов и настройки
+
+- `src/main/java/dev/veyra/shader/ShaderPackRepository.java` обнаруживает ZIP-архивы и распакованные папки в `shaderpacks/`, включая ZIP с одной внешней папкой-обёрткой. Выбранный pack хранится в `veyra/selected-pack.txt`.
+- `ShaderPack.java` строит ограниченный снимок shaderpack-файлов, находит программы/измерения, свойства и условия, разворачивает dimension overrides и shadow/render-target настройки. При ошибке чтения/компиляции предыдущий активный pipeline сохраняется; refresh переоткрывает файлы с диска.
+- `ShaderIncludes.java` рекурсивно раскрывает quoted/angle includes и ограничивает разрешение путей внутри shaderpack. `GlslPreprocessor.java` использует JCPP для define/условной GLSL обработки; filesystem-доступ препроцессора выключен.
+- `ShaderPackOptions.java`, `ShaderOptionStore.java`, `AtomicFiles.java` реализуют поддерживаемое подмножество опций `shaders.properties`: define/constant options, допустимые значения, профили и их наследование, program toggles, sliders, вложенные screens, labels и columns. Overrides сохраняются отдельно на pack без изменения архива; запись атомарная, некорректные/устаревшие сохранённые значения игнорируются.
+- `ShaderPackScreen.java` и `ShaderOptionsScreen.java` предоставляют внутриигровой экран F6: выбор, отключение, refresh, диагностика неподдерживаемых наборов, настройки, профили, применение и сброс. Применение перекомпилирует pack до сохранения выбора; ошибка замены оставляет прежний активный pack.
+- При смене измерения/мира сбрасываются временные матрицы и depth history. Pipeline/source caches ограничены загрузкой pack; изменение настроек без изменения значений не требует перекомпиляции.
+
+### GLSL и поддержанные программы
+
+`VeyraRenderer.java` — основной renderer/компилятор и координатор lifecycle (крупный класс, не заменять рефакторингом без необходимости). Он адаптирует источники к pipeline Minecraft/VulkanMod, компилирует через shader manager VulkanMod и планирует pass’ы на границах world rendering.
+
+- Post-фазы: `prepare` после shadow pass, `deferred` перед translucent terrain, `composite`/`final` после world render. Нумерованные pass’ы идут по номеру. Post vertex stage поддерживается ограниченно: full-screen triangle и несколько встроенных vertex символов/только `texcoord` varyings; произвольные vertex attributes/uniforms не поддержаны.
+- Семейства geometry bridges: terrain (solid/cutout/water), entity/armor, hand, block entity models/items/custom geometry, sign glyph text, particles, weather, lightning, basic/leash, lines, glint, sky, world-border, damaged-block overlay, beacon beam, clouds. Программы имеют ограниченные Iris-style fallback-цепочки; неподходящий Minecraft pipeline пропускается с диагностикой.
+- `TerrainShaderAdapter`, `EntityShaderAdapter`, `CloudShaderAdapter`, `ColorDistanceShaderAdapter`, `TextureColorDistanceShaderAdapter`, `DamagedBlockShaderAdapter`, `BeaconBeamShaderAdapter`, `IrisFogUniformAdapter`, `ShaderPackUniformAdapter` адаптируют доступные vertex inputs, varyings, uniforms, samplers и GLSL spellings. `FragmentOutputs.java` читает `layout(location)`, `outColorN`, `DRAWBUFFERS`/`RENDERTARGETS`; `GeometryBlendSettings.java` разбирает глобальный и per-target blend state.
+- Реализованы ограниченные GLSL-совместимости: `gl_FragColor`/`gl_FragData`, старые `texture2D`/`texture`/`textureSize`, `tex` alias блока/terrain atlas, entity `varying vec4 color`, fog/alpha inputs, очистка только **неиспользуемых** sampler declarations перед адаптацией. Активные неизвестные samplers/uniforms приводят к явному отказу программы.
+- Активные `compute`, `geometry`, `tessellation` и `begin` shader stages не исполняются. `ShaderPack` делает preflight и возвращает понятную ошибку вместо молчаливого пропуска обязательной возможности.
+
+### Vulkan backend и ресурсы
+
+- `VeyraMrtFramebuffer.java`, `VeyraGeometryTargets.java`, `VeyraDeviceFeatures.java` и mixin’ы вокруг `GraphicsPipeline`/render pass реализуют **одновременный MRT только для terrain geometry**: fragment output location сопоставляется физическому colortex target, доступны per-target blending, проверка `independentBlend` и максимального числа color attachments. Сохраняются viewport/scissor и draw state VulkanMod.
+- `colortex0` — текущий scene color; `colortex1..15` — on-demand ping-pong color targets. Поддерживаются лишь документированные в README форматы (R8, RGBA8, R16F, RGBA16F, R32F) и ограничения возможностей устройства. Terrain geometry targets должны иметь размер сцены. Post outputs сейчас выполняются отдельными fullscreen draws по одному output; это не настоящий одновременный post MRT с image-store/atomic semantics.
+- `VeyraDepthTextureSnapshot.java` делает Vulkan depth snapshots с явными clear/layout transitions. В post доступны `depthtex0`/`DepthSampler` (главный depth attachment), `depthtex1` (opaque/cutout snapshot до translucent terrain), `depthtex2` (до hand). Это **не означает**, что любой geometry pass может сэмплировать их: например, Complementary water geometry с активным `depthtex1` остаётся source blocker.
+- `VeyraDepthTextureView.java` создаёт depth-only sampled view для depth-stencil изображения. Код переводит только корректный image/aspect в shader-read и восстанавливает состояние до повторного использования attachment.
+- `VeyraNoiseTexture.java` генерирует Vulkan-backed Iris `noisetex`; размер по умолчанию 256, `noiseTextureResolution` ограничен 1..4096, sampler linear/repeat. Подключён к поддержанным terrain, shadow, entity/hand/block/sign и post программам.
+- `shadowtex0` подключается к поддержанным terrain/entity/block/hand/text программам и post-пассам, если pack предоставляет shadow pass; сравнение depth программно адаптируется для поддержанных вызовов. Есть shadow variants solid/cutout/translucent/entities/block и свойства дистанции. **Второй shadow map `shadowtex1` и `shadowcolor` отсутствуют.**
+- `VeyraPipelineResources`, `VeyraPipelinePassCache`, `VeyraShaderCache` и mixin’ы откладывают уничтожение созданных pipeline/view до очереди frame cleanup VulkanMod и удаляют устаревшие source/pipeline-cache entries Veyra. `SwapChainMixin` сохраняет native usage flags; sampled image barriers привязаны к основной graphics frame graph.
+- `EyeBrightnessSmoother`, `ShaderPackIVec2Uniform`, `VeyraUniformsMixin` и общий snapshot передают доступные built-in Iris uniforms. Среди них: frame/world/weather/player/status-effect значения, matrix/camera позиции (включая integer/fractional/previous), `moonPhase`, raw/smoothed `eyeBrightness`, `bedrockLevel`, `cloudHeight`, `endFlashIntensity`, hand depth и fog. `eyeBrightnessHalflife` читается из GLSL; wetness использует Iris-подобные 600-tick wet/200-tick dry half-lives, но pack-specific wetness settings пока не читаются.
+
+### Важные точки интеграции
+
+`src/main/resources/veyra.mixins.json` включает hooks/accessors в Minecraft и внутренние классы VulkanMod, в том числе `ShaderManagerMixin`, `PipelineManagerMixin`, `WorldRendererMixin`, `VkGpuDeviceMixin`, `GraphicsPipelineMixin`, `VkRenderPassMixin`, `VkCommandEncoderMixin`, `RendererGeometryTargetsMixin`, `SwapChainMixin`, `DeviceManagerMixin` и accessors. Они рассчитаны на закреплённую версию VulkanMod 0.6.8. `VeyraShadowRenderer.java` обслуживает shadow path. Отдельные `src/graphicsSmoke` mixins/tests — test-only source set, не мод для дистрибутива.
+
+## Существенные ошибки, уже исправленные
+
+Ниже — отобранные интеграционные ошибки, подтверждённые коммитами/историей. Это не полный bug-by-bug changelog.
+
+| Проблема и причина | Исправление |
+| --- | --- |
+| F6 polling пропускал короткие нажатия; первое KeyboardHandler-событие в выбранной связке также не срабатывало. Экран сначала пытался сделать второй blur в том же кадре. | В ранней версии hotkey переведён на tick edge-detection, меню рисует собственный фон. F6 открывал pack selector в Modrinth. |
+| У Minecraft 1.21.11 отсутствовал использованный ранним прототипом `post/blit.vsh`; фактический quad vertex shader — `core/screenquad`. VulkanMod GLSL parser неверно интерпретировал `layout(location=...)`; неподходящий суффикс sampler мешал привязке post input. | Используется верный vertex shader; adapters нормализуют output layouts для соответствующего пути; вход связывается под именем `InSampler`. |
+| Сначала post pass запускался до появления окончательного scene color; тест показывал вспомогательный красно-серый фон/ломал кадр. Map targets передавались как immutable `Map.of`, хотя frame graph мутирует map. В раннем пути освобождение transient render target приводило к native crash VulkanMod/NVIDIA. | Hook перенесён после world render перед GUI, graph получает mutable targets, текстура переведена на явно управляемый target. В переписке зафиксирован успешный grayscale pass в ранней версии; это не подтверждение совместимости сторонних pack’ов в текущем 0.2. |
+| Прямое чтение depth attachment приводило к `VK_ERROR_DEVICE_LOST` или пустой/неверной карте: брался не тот texture, D24S8 view включал stencil, VulkanMod заново разрешал underlying image, дескриптор неизвестного sampler попадал в unit -1, wrapper терял tracked layout; барьер ждал только late depth tests. | Используется attachment из внутреннего main pass VulkanMod, depth-only image view и закреплённый sampler slot; image/layout state синхронизирован с native image, барьеры включают ранний и поздний fragment depth tests, переходы возвращаются в корректном render lifecycle. Для history применяется настоящий transfer clear. Последующий synthetic Lavapipe smoke проходит; visual correctness широких pack’ов ещё не доказана. |
+| VulkanMod базово не поддерживал несколько color attachments; terrain MRT также требовал сохранить viewport/scissor, проверить `maxColorAttachments`/`independentBlend`, очистить новые targets и не маршрутизировать draw после ошибки. | Добавлены собственные borrowed multi-attachment framebuffer/render pass, pipeline state, draw routing, проверки возможностей, сохранение render state и тесты; устаревшие pipeline variants снимаются после frame fence. |
+| Shader adapters отклоняли неиспользуемые samplers; `tex` и `textureSize`/shadow helper типы отличались от ожиданий VulkanMod; у terrain helper-функции `sampler2DShadow` оставался неподдерживаемый тип. | Неиспользуемые declarations удаляются по фактическим references; `tex` отображается на atlas; helper shadow sampler понижается к raw depth для реализованного сравнения; добавлены JUnit и shaderc regressions. Активные неподдерживаемые чтения всё ещё отклоняются. |
+| В `ClientLevel` тестовых/переходных миров `endFlashState()` бывает `null`; uniform getter падал с NPE. | `endFlashIntensity` в отсутствие состояния равен Iris-совместимому `0.0`; добавлен регрессионный тест (`c2a87c7`). |
+| Раннее восстановление настроек выбрасывало из списка все найденные pack’и, если выбранный pack содержал неверные свойства; сохранение выбора могло оставить частично записанные настройки. | Каталог discovery сохраняется независимо от ошибки restore; настройки/selected-pack пишутся атомарно с откатом предыдущих значений. |
+| Linux CI изначально не мог исполнять `gradlew` без executable bit; ранние GitHub Actions использовали устаревшие версии actions/runner. | Исправлены права wrapper, обновлены actions до Node 24 и runner зафиксирован на Ubuntu 24.04. Gradle cache использует basic provider. |
+
+## Что работает частично и ограничения
+
+1. **Совместимость с Iris — подмножество, а не универсальный loader.** Source audit умеет обнаружить/препроцессировать больше stage-файлов, чем backend может скомпилировать или отрисовать. Успешное preprocessing не равно успешно загруженному pack.
+2. **Настройки и переключение:** UI и persistence реализованы; compile-before-apply и сохранение старого pipeline предусмотрены. Современное GUI поведение на текущем jar не было подтверждено в последней сессии Computer Use.
+3. **Геометрические vertex shaders:** geometry использует синтезированные Minecraft/VulkanMod vertex interfaces. Собственный `.vsh` для geometry/shadow, произвольные attributes/IDs/varyings не исполняются. Ограниченный fullscreen post `.vsh` поддерживает только соответствующие встроенные данные.
+4. **Outputs:** настоящий MRT сделан для terrain geometry. Entity/hand/block/sign/sky/particles/weather/cloud/shadow bridges по-прежнему ограничены одним output. Post `DRAWBUFFERS`/`RENDERTARGETS` — последовательные отдельные draws, а не единый MRT.
+5. **Textures/resources:** только документированные color/depth/noise/shadow aliases. Нет PBR `specular`, `shadowtex1`, `shadowcolor`, произвольных texture/image units, custom images/SSBOs и compute ресурса. Built-in `gaux` aliases не покрывают семантику всех legacy packs.
+6. **Pass properties/state:** обработана часть options, profiles, dimension conditions, blend/clear/size/format settings; полная семантика Iris/OptiFine properties, feature flags и пользовательских expressions не реализована.
+7. **Uniforms:** есть заметный набор Iris built-ins, но активные pack-specific uniforms (например `entityId`, `blockEntityId`, `shadowFade`, некоторые uniforms clouds) не поддержаны. Паковые значения wetness half-life не читаются.
+8. **Device/runtime:** target formats и device capabilities ограничены. Resize, reload, долгие игровые сессии, переключение миров/измерений/pack’ов и выделение/освобождение GPU памяти не прошли полного стресс-теста. FPS-прирост не измерялся и не заявляется.
+
+## Shaderpack audit — что реально подтверждено
+
+`COMPATIBILITY.md`, `validation/shaderpack-inputs.json`, `validation/shaderpack-profile-matrix.json`, `validation/shaderpack-source-audit.json` и `validation/shaderpack-profile-audit.json` описывают pinned source audit, а не игровые прогоны. Текущие отчёты: **75 конфигураций** (12 default + 63 объявленных profile/dimension), **5 178 stage sources** обнаружены и обработаны; adapters приняли **18** и отклонили **699** geometry-fragment/configuration случаев. Во всех 75 report entries `visualValidation=false`.
+
+| Пак и закреплённая версия | Source audit geometry result по матрице | Зафиксированные блокеры | Полный визуальный тест |
+| --- | ---: | --- | --- |
+| Complementary Reimagined r5.9.3 | 0 принято / 270 отклонено (27 конфигураций) | активный `specular`; в water geometry — `depthtex1`/`colortex5`; cloud/spider-eye `blockEntityId`; `shadowcomp.csh` compute в части профилей | Нет |
+| Complementary Unbound r5.9.3 | 0 / 270 (27) | те же группы ограничений, что и Reimagined | Нет |
+| BSL 10.1.8 | 18 / 144 (18) | `shadowtex1`, `gaux2`, custom `entityId`, `blockEntityId`, `shadowFade`, cloud `texture`; точные ошибки различаются по профилю/измерению | Нет |
+| Sildur’s Vibrant 2.02 Extreme | 0 / 15 (3) | активный `colortex4` в translucent geometry и cloud custom `texture` | Нет |
+
+Отдельно проверены `noisetex`, BSL entity `varying vec4 color`, часть Iris uniforms и `sampler2DShadow` helper адаптации. Эти результаты говорят только о source adapter/compiler coverage. Они **не** подтверждают descriptor binding, правильные layout transitions, работу lighting/water/shadows/sky/transparency или корректное изображение. Источники pack’ов скачиваются CI по URL/SHA-512 и не входят в репозиторий из-за лицензий авторов.
+
+## Сборки и проверки
+
+### Проверки, завершившиеся успешно
+
+- GitHub Build для текущего HEAD `e42f151`: [run 39184823848](https://github.com/glebKovshov/Veyra/actions/runs/39184823848) — **Success**, собран development artifact; workflow выполняет `build validateShaders` и `scripts/verify_jar.py`.
+- GitHub PR Build для `e42f151`: [run 39184828650](https://github.com/glebKovshov/Veyra/actions/runs/39184828650) — **Success**. GitHub показал development JAR artifact около 403 KB; это Actions artifact с 14-дневным сроком хранения, не Release asset.
+- Graphics smoke и pinned shader audit проходили на последнем code commit `c2a87c7`, после которого `c34e47d`/`e42f151` изменяли документацию/link. [Graphics run 39183912225](https://github.com/glebKovshov/Veyra/actions/runs/39183912225); [source audit run 39183912243](https://github.com/glebKovshov/Veyra/actions/runs/39183912243).
+- Synthetic Lavapipe client fixture (Minecraft 1.21.11 + VulkanMod 0.6.8, Mesa Lavapipe, validation layer) прошёл terrain-MRT → composite readback: в активном frame **222 319 magenta пикселей**, baseline без shader pass — **0**, Vulkan validation errors **0 до начала shutdown**. Это тестовый fixture, не готовый shaderpack.
+- При `vkDestroyDevice` тот же smoke оставляет **10 031** `VUID-vkDestroyDevice-device-05137` child-object diagnostics. Авторы/владельцы объектов пока не установлены; это не основание списывать их автоматически на Veyra или VulkanMod.
+- GitHub PR page на дату проверки: [PR #2](https://github.com/glebKovshov/Veyra/pull/2) открыт как **Draft**, 57 commits в target `main`.
+
+### Локальные результаты и оговорки
+
+- В существующих `build/test-results/test/*.xml` агрегируется **91 JUnit test, 0 failures, 0 errors, 0 skipped** (10 suites; отчёты датированы 2026-10-19 01:07 UTC). XML не закрепляет source SHA; точный HEAD независимо подтверждают GitHub Build/PR Build для `e42f151`.
+- История последней локальной проверки сообщает `test validateShaders build` на JDK 21: 21 пример shader source, 18 компиляций в Vulkan SPIR-V и 4 проверки conditional includes. Это не проверка descriptor/runtime поведений. Ранее проверялись source адаптеры и pipeline contract tests.
+- `VALIDATION.md` содержит устаревшие цифры **74 tests / commit 340db0c**; не использовать их вместо текущих отчётов. Обновить его после следующего зафиксированного прогона.
+- Локальный `build/libs` содержит `veyra-0.2.0+mc1.21.11.jar` и sources JAR. Их наличие не делает 0.2 опубликованным stable release.
+- Ранняя версия `0.1.x` с простым grayscale final pass действительно запускалась в Modrinth и показывала эффект. Это историческая проверка базового fullscreen pass, не текущей версии 0.2 и не Complementary/BSL/Sildur’s.
+- Последняя отдельная просьба проверить Modrinth на Windows не выполнена: Computer Use вернул `native pipe is unavailable: ... Не удается найти указанный файл`; `cua.getState()` показывал `apps: []`. Это ограничение среды управления приложениями, не диагностированная ошибка Veyra.
+
+## Текущее состояние Git, PR и релизов
+
+На момент проверки:
+
+- `HEAD`: `e42f151` — `Link current development JAR`.
+- Текущая ветка `feature/iris-compatibility-0.2` совпадает с `origin/feature/iris-compatibility-0.2` на `e42f151`.
+- `main` и `origin/main`: `2eedd38` (`docs: add eye brightness shader example`). Feature branch имеет **57 commits ahead** относительно `main`; PR #2 не слит и остаётся draft. `e37f188` (релизный commit 0.1.1) не является предком `origin/main`, хотя опубликованный release существует.
+- В начале этой сверки tracked-файлы были чистыми, но Git показывал **119 untracked entries**: локальные `.png` скриншоты/кадры, `.txt` VulkanMod dumps, `assets/` и `logs/`. Это уже существующие локальные артефакты, не включать их в `git add -A` и не удалять/перемещать без отдельной необходимости. После создания этой сводки `WORK_SUMMARY.md` тоже будет новым untracked файлом.
+- GitHub Release [Veyra 0.1.1+mc1.21.11](https://github.com/glebKovshov/Veyra/releases) опубликован с tag `v0.1.1+mc1.21.11`, commit `e37f188`, mod JAR, sources/example assets и checksums. **Release 0.2.0 отсутствует.**
+- `CHANGELOG.md`/`RELEASE_NOTES.md` описывают 0.2 как unreleased development и прямо запрещают заявлять полный Iris parity. README указывает на development workflow artifact.
+
+### Значимые коммиты
+
+- `c8be8c8` — первый commit в GitHub, README; проект стартовал из пустого репозитория.
+- `e37f188` — опубликованный, CI-проверенный release 0.1.1 (предыдущая ветка стабилизации `4120c78`).
+- `96d6c2e`, `35c3fde`, `bb08ede`, `3530144` — conditional preprocessing/options, pass scheduling/resource ownership, depth history/backend requirements, dimension conditions.
+- `d594f58`, `34ad27a`, `1e6523f`, `b315fcc`, `a422737`, `b7ef2b0`, `00c2054` — terrain MRT, validation/state routing, readback/retirement, per-target blend, swapchain usage/layout synchronization.
+- `d983391` — Vulkan-backed Iris `noisetex`.
+- `ad25aac`, `e3ce1ea`, `b0bc7fe` — неиспользуемые samplers, `tex` alias, shadow sampler type lowering.
+- `8cf7620`, `a6049e1`, `c2a87c7` — dimension uniforms; `shadowtex0` bridge; null-safe End flash uniform.
+- `c34e47d` — compatibility/README/CHANGELOG evidence refresh.
+- `e42f151` — актуальная ссылка на development JAR; текущий HEAD.
+
+### CI pipeline
+
+- `.github/workflows/build.yml`: каждый push/PR — Java 21, `build validateShaders`, проверка содержимого JAR, test reports и JAR artifact.
+- `shaderpack-audit.yml`: pinned profile/source audit для feature branch и `workflow_dispatch`.
+- `graphics-smoke.yml`: Lavapipe test mod/readback для feature branch и `workflow_dispatch`.
+- `release.yml`: gated tag/`release/**` workflow проверяет версию, `build validateShaders packageExamplePacks`, JAR и checksums, затем публикует Release.
+- На текущий момент source audit и graphics smoke проходят отдельными CI workflow, но **не являются шагами release workflow**; workflow аудита и графики не настроены на `pull_request`. Перед релизом надо явно решить, какие CI доказательства блокируют публикацию.
+
+## Известные риски и неразрешённые вопросы
+
+- 10 031 Vulkan teardown diagnostics в Lavapipe smoke остаются расследовать; нужно baseline-сравнение без Veyra и трассировка ownership до/после переключения паков. Не объявлять это доказанной утечкой Veyra без такого анализа, но и не объявлять GPU teardown чистым.
+- Реальные популярные pack’и не проверены end-to-end. Нет подтверждения воды, теней, sky, fog, lighting, transparency, GUI/hand, dimension switching и долговременной стабильности.
+- В истории были `VK_ERROR_DEVICE_LOST` на ранних версиях depth sampler; текущий синтетический smoke проходит, но это не заменяет физический GPU тест и стресс смены targets.
+- VulkanMod 0.6.8 и Minecraft internals жёстко закреплены mixin’ами. Обновление Minecraft/VulkanMod без bytecode/API contract review может сломать старт клиента или native pipeline.
+- Адаптеры намеренно отклоняют unsupported active inputs. Не маскировать ошибку удалением чтения или заглушками: shaderpack может собраться, но неверно отрисоваться.
+- В корневых untracked Vulkan dumps/screenshots может быть полезная историческая диагностика, но у большинства нет закреплённого commit/run ID; считать их подсказками, не сертификатом последнего build.
+
+## Приоритет следующих действий
+
+1. **Сохранить рабочее дерево.** Не чистить 119 untracked entries; зафиксировать текущий HEAD/статус; добавить в отдельную документационную ветку только осознанно выбранные файлы.
+2. **Добиться реального окна Modrinth/Computer Use.** Повторить загрузку свежего development JAR в профиль Fabric 1.21.11 + VulkanMod 0.6.8. Сейчас последняя попытка блокирована native pipe. Если доступ появится — начать с F6, обнаружения folder/ZIP, Configure/Apply/reset/disable, сохранения настроек и одного синтетического pack.
+3. **Провести shaderpack проверки по одному паку.** Начать с BSL и выбранных профилей, затем Complementary Reimagined/Unbound и Sildur’s. Записывать pack hash/profile/GPU/действия, полный log, скриншоты и frame outputs; не считать source audit визуальным тестом.
+4. **Устранить blocker’ы из pinned audit с технически правильной Vulkan семантикой:** PBR `specular`; отдельный непрозрачный `shadowtex1`; активные `depthtex1`/legacy `gaux` geometry uses; pack-specific entity/cloud uniforms; `colortex5`/`colortex4` в geometry. Пересчитать source audit и сохранить каждый устранённый отказ отдельным тестом.
+5. **Расширять backend поэтапно:** arbitrary geometry vertex stages/inputs, geometry-family MRT, полноценные target/blend/clear/state properties, дополнительные samplers/images, compute и tessellation только после соответствующего Vulkan pipeline/dispatch/barrier/resource lifecycle.
+6. **Проверить lifecycle:** resize, resource reload, dimension/world change, pack enable/disable/switch, повторные циклы и shutdown под validation layers; выяснить происхождение teardown objects и измерить GPU memory без неподтверждённых выводов.
+7. **Обновить документацию и pipeline по фактическим проверкам.** Особенно синхронизировать `VALIDATION.md` (устаревшие 74 tests), compatibility limitations и статус current HEAD. Убедиться, что release-gating включает необходимый audit/graphics smoke либо честно документировать отдельные ручные gate’ы.
+8. **Только после фактических end-to-end тестов** решить вопрос о ready-to-review PR, снять draft, слить в `main`, подготовить release notes/tag `v0.2.0+mc1.21.11`, прогнать release workflow и прикрепить JAR. Пока эти условия не выполнены — не публиковать и не заявлять Iris parity.
+
+## Критически важные решения для продолжения
+
+- Не переписывать `VeyraRenderer` и существующие bridges «с нуля»; сначала локализовать конкретную проблему и добавить regression fixture.
+- Не переносить OpenGL Iris framebuffer/program logic напрямую. Сохранять адаптацию к VulkanMod pipeline, descriptor model, render pass/frame graph и image layout synchronization.
+- Не отключать активную shaderpack-функцию ради зелёной сборки и не выдавать compile-only результат за визуальную поддержку. Неизвестные активные ресурсы должны завершаться диагностикой до draw.
+- Не удалять depth-only view, explicit initial depth clear, graphics-ordered barriers, shared-resource ownership или frame-fence cleanup без эквивалентной гарантии корректного Vulkan lifetime.
+- Сохранять capability checks (`independentBlend`, attachment count, image usage/format support) и исходное состояние VulkanMod pipeline/terrain optimization при отключении/ошибке.
+- Оставлять graphics smoke test-only; не включать synthetic validation world/hooks в production JAR.
+- Не изменять сторонние shaderpack ZIP’ы и не добавлять их в repo/release. Сохранять source URLs/checksums и соблюдение лицензий; проект MIT, JCPP сопровождается Apache-2.0 notice.
+- Не приписывать 10 031 teardown diagnostics конкретному компоненту до доказательства. Не заявлять прирост FPS без измерений.
+- Отделять три результата: unit/source compilation, Vulkan synthetic render fixture, third-party pack visual compatibility. Они проверяют разные уровни.
+
+## Продолжение 2026-10-19 — текущая сессия
+
+- Начальное состояние подтверждено `git fetch origin`: feature HEAD `e42f151`, tracked files чистые, локальные untracked артефакты сохранены. PR #2 остаётся draft; зарегистрирован в текущем T3 thread. GitHub API авторизован через существующий Git credential helper (секреты не выводились).
+- Найден и исправлен недостаток include expansion: общий лимит 4096 раскрытий ограничивает разветвлённую рекурсию, а размер входа проверяется до копирования/masking. Сохранены guards, duplicate includes и conditional include behavior. Добавлен regression test.
+- `test --rerun-tasks`: 92 tests, 0 failures/errors/skipped. `build validateShaders packageExamplePacks` успешен: 21 source preprocessed, 18 Vulkan SPIR-V compilations, conditional checks и shadow-sampler fixture пройдены.
+- Полная Windows source-audit команда упёрлась в cmd.exe command-length limit. Добавлена передача JSON argument file в Gradle; Python runner выбирает gradlew.bat на Windows. Повторная проверка матрицы выполняется.
+- Computer Use повторно инициализирован по skill; `sky.list_apps()` возвращает `Computer Use native pipe is unavailable: failed to connect native pipe: Не удается найти указанный файл. (os error 2)`. Поэтому новая физическая GPU/UI проверка не выполнена. Это не дефект Minecraft/Veyra.
+- Stable release и слияние draft feature пока не подтверждены: остаются реальные shaderpack/backend blockers и непроверенный graphics lifecycle. Не считать эту запись выполнением полной цели.
+- Подтверждено: origin/main является предком релизного e37f188; обе старые рабочие ветки уже являются предками feature HEAD. Начата отдельная сборка 0.1.1 перед fast-forward интеграцией готовой линии в main. Feature 0.2 не объявляется готовой.

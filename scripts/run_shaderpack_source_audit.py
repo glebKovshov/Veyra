@@ -98,7 +98,11 @@ def main() -> int:
     REPORTS.mkdir(parents=True, exist_ok=True)
     profiles, paths = fetch_pinned_inputs()
     args = audit_arguments(profiles, paths)
-    command = ["./gradlew", "--no-daemon", "auditShaderPacks", f"-PshaderPacks={','.join(args)}"]
+    # Keep paths and all profile arguments out of cmd.exe's 8191-character limit.
+    arguments_file = REPORTS / "arguments.json"
+    arguments_file.write_text(json.dumps(args), encoding="utf-8")
+    wrapper = str(ROOT / "gradlew.bat") if sys.platform == "win32" else "./gradlew"
+    command = [wrapper, "--no-daemon", "auditShaderPacks", f"-PshaderPackAuditArguments={arguments_file}"]
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
     (REPORTS / "gradle-output.txt").write_text(result.stdout + result.stderr, encoding="utf-8")
     if result.returncode:

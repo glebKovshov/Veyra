@@ -11,7 +11,12 @@ permissions:
   contents: read
 
 jobs:
+  source-audit:
+    uses: ./.github/workflows/shaderpack-audit.yml
+  graphics-smoke:
+    uses: ./.github/workflows/graphics-smoke.yml
   release:
+    needs: [source-audit, graphics-smoke]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

@@ -1,9 +1,18 @@
 # 0.2 development validation status
 
+## Local continuation checks — 2026-10-19
+
+On top of `e42f151`, JDK 21.0.12.1 ran `test --rerun-tasks` (92 tests, zero failures/errors/skips) and `build validateShaders packageExamplePacks` successfully. `scripts/verify_jar.py build/libs/veyra-0.2.0+mc1.21.11.jar` verified the remapped JAR, metadata, mixins, nested JCPP and exclusion of the graphics harness. Historical JARs remain in the local build directory; an explicit path avoids selecting stale artifacts.
+
+The include expander now bounds total recursive work, in addition to depth and output size. The pinned audit accepts a JSON argument file to avoid Windows command-length limits. Source audit and Lavapipe workflows are reusable release prerequisites and run on relevant pull requests. The audit records unsupported features; a green audit job is not a claim that those packs run.
+
+Windows UI validation is blocked: `sky.list_apps()` returned `Computer Use native pipe is unavailable: failed to connect native pipe: Не удается найти указанный файл. (os error 2)`. No current physical-GPU/UI compatibility result is claimed. The prior graphics and source results below are historical and retain their original source commit attribution.
+
+
 The current feature branch passed the full Fabric Loom build, tests, remapping and distributable verification at commit `340db0ca80010d42591383b13e12d76463467048` in both the [push run](https://github.com/glebKovshov/Veyra/actions/runs/39166689216) and the [PR run](https://github.com/glebKovshov/Veyra/actions/runs/39166691696). This produces a development artifact, not a stable release.
 
-- 74 JUnit tests pass with no failures or skips, including pinned VulkanMod bytecode contracts, draw-buffer mappings, per-target blend properties, moon phase uniforms and the entity-color bridge.
-- Native shaderc checks preprocess 19 examples and compile 16 directly to SPIR-V. Four conditional-include compiler checks and an unbound-output dataflow compiler check also pass. These checks do not establish descriptor/runtime correctness.
+- At that historical commit, 74 JUnit tests pass with no failures or skips, including pinned VulkanMod bytecode contracts, draw-buffer mappings, per-target blend properties, moon phase uniforms and the entity-color bridge.
+- At that historical commit, native shaderc checks preprocess 19 examples and compile 16 directly to SPIR-V. Four conditional-include compiler checks and an unbound-output dataflow compiler check also pass. These checks do not establish descriptor/runtime correctness.
 - Four pinned external packs were audited in the [source-audit run](https://github.com/glebKovshov/Veyra/actions/runs/39166689354): 12 default cases plus 63 declared-profile/dimension cases. All 5,178 selected stage sources preprocess. The geometry adapters accepted 18 and rejected 699 fragment/configuration combinations; none of the packs has a complete working pipeline. See COMPATIBILITY.md for the per-pack failures.
 - A new isolated test mod launches Minecraft 1.21.11 with VulkanMod 0.6.8, an original generated flat world, Mesa Lavapipe and the Vulkan validation layer. It compares the fixture's auxiliary MRT color against disabled shaders and uploads images, logs and a machine-readable result. The harness is excluded from the distributed mod.
 - [Lavapipe graphics run 39166399772](https://github.com/glebKovshov/Veyra/actions/runs/39166399772) passed the synthetic MRT/composite check: the captured active frame contains 222,934 magenta pixels and the shaders-disabled baseline contains 0. No Vulkan validation errors occurred during runtime. The run still reports 10,031 `VUID-vkDestroyDevice-device-05137` diagnostics during whole-process device teardown; these remain in the artifact and do **not** establish clean Vulkan resource teardown.

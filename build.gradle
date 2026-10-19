@@ -124,6 +124,13 @@ tasks.register('auditShaderPacks', JavaExec) {
     dependsOn tasks.named('shaderSmokeClasses')
     classpath = sourceSets.shaderSmoke.runtimeClasspath
     mainClass = 'dev.veyra.shader.ShaderPackAudit'
+    if (project.hasProperty('shaderPackAuditArguments')) {
+        def auditArguments = new groovy.json.JsonSlurper().parse(file(project.property('shaderPackAuditArguments')))
+        if (!(auditArguments instanceof List) || !auditArguments.every { it instanceof String }) {
+            throw new GradleException('Shaderpack audit arguments must be a JSON array of strings.')
+        }
+        args auditArguments
+    }
     if (project.hasProperty('shaderPacks')) args project.property('shaderPacks').toString().split(',')
 }
 

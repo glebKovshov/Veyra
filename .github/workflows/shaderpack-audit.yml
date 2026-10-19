@@ -1,7 +1,16 @@
 name: Shaderpack source audit
 
 on:
+  workflow_call:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/main/java/dev/veyra/shader/**'
+      - 'src/shaderSmoke/**'
+      - 'validation/**'
+      - 'scripts/run_shaderpack_source_audit.py'
+      - 'build.gradle'
+      - '.github/workflows/shaderpack-audit.yml'
   push:
     branches: ['feature/iris-compatibility-0.2']
     paths:

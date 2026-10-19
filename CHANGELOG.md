@@ -2,6 +2,9 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Bound total include-expansion work across recursive sibling branches before preprocessing, with a regression test.
+- Made the full pinned source/profile audit runnable on Windows using a JSON argument file and the Windows Gradle wrapper.
+- Required pinned source audit and synthetic Vulkan graphics smoke before release publication, and enabled both checks on relevant pull requests. These gates do not establish popular-pack visual compatibility or clean device teardown.
 - Added a bounded GLSL conditional/macro preprocessor before interface adaptation; inactive declarations no longer confuse adapter validation. Includes remain sandboxed.
 - Added shaderpack define/constant options, allowed-value validation, profiles with inheritance and program toggles, sliders, nested screens, pack labels and screen column settings.
 - Persisted per-pack overrides atomically without modifying shaderpack files. Failed selection writes restore the previous option file.
