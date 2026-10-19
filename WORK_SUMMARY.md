@@ -11,12 +11,12 @@
 - На PR HEAD `83a05d7` Build `39330757396`, source audit `39330757293` и Graphics smoke `39330757123` прошли. Все 13 fixtures успешны; cloud signal — 52,412 magenta pixels active / 0 disabled, runtime Vulkan validation errors — 0. Source audit четырёх закреплённых паков обработал 75 default/profile/dimension cases и 5,178 sources; 72 geometry fragments приняты / 645 отклонены, все записи имеют `visualValidation=false`. Beta.7 по-прежнему experimental prerelease: реальные third-party shaderpacks на физическом GPU и полная Iris parity не подтверждены.
 - `GOAL.md` всё ещё не выполнен полностью: реальные third-party shaderpacks и физический GPU не визуально проверены, полная Iris parity отсутствует. beta.7 — prerelease, не stable release. Пользовательские скриншоты, `assets/`, `logs/`, дампы, `GOAL.md` и `scripts/analyze_vulkan_shutdown.py` остаются нетронутыми и не должны попадать в staging.
 
-## Продолжение после beta.7: terrain `lmCoord` — 2026-10-20
+## Продолжение после beta.7: terrain varying aliases — 2026-10-20
 
-- В новой ветке `feature/iris-terrain-lmcoord`, ответвлённой от `main` `a9b11f9`, добавлен alias Iris `lmCoord` к уже рассчитанному VulkanMod lightmap input (`veyraLightmapCoord`, location 5). Остальные имена (`lmcoord`, `lightMapCoord`) не менялись.
-- Добавлен regression-тест на удаление исходного varying и его замену на location 5. На JDK 21.0.12.1 прошёл полный `test validateShaders build packageExamplePacks`: **188 тестов, 0 failures/errors/skips**, 40 примеров обработано, 37 скомпилировано прямо в Vulkan SPIR-V; distributable verifier прошёл.
-- Полный pinned third-party source audit и GPU-графические fixtures после этого изменения ещё не прогонялись. Предыдущая compatibility matrix — до alias и не обновлена по новому источнику. Проверки на физическом GPU и визуальной совместимости реальных паков нет; это изменение не подтверждает игровую совместимость.
-- Следующий шаг: получить результаты CI source audit и 13 Lavapipe fixtures на PR; только после audit обновить матрицу и выбрать следующий конкретный blocker. `GOAL.md` остаётся незавершённым.
+- В ветке `feature/iris-terrain-lmcoord` от `main` `a9b11f9` добавлены aliases: Iris `lmCoord` → VulkanMod lightmap input (`veyraLightmapCoord`, location 5) и BSL `color` → terrain vertex color (`veyraVertexColor`, location 0). Существующие имена сохранены. Каждый alias покрыт regression-тестом, проверяющим объявление input и замену varying.
+- На JDK 21.0.12.1 прошёл полный `test validateShaders build packageExamplePacks`: **189 тестов, 0 failures/errors/skips**, 40 примеров обработано, 37 скомпилировано прямо в Vulkan SPIR-V; distributable verifier прошёл.
+- Первый PR source audit `39333331822` успешно обработал 75 cases / 5,178 stages (72 accepted / 645 rejected; `visualValidation=false` во всех записях). На том HEAD Complementary terrain/water продвинулись от `lmCoord` до `signMidCoordPos`; BSL terrain остановился на `color`. После этого добавлен BSL color alias, поэтому повторный source audit ещё ожидается. Build и все 13 Lavapipe fixtures на первом HEAD прошли; CI для второго коммита нужно дождаться.
+- `signMidCoordPos` требует `mc_midTexCoord`, которого нет во входе VulkanMod terrain; корректное получение этих midpoint-координат требует отдельного изменения vertex-data path. Нельзя считать его поддержанным по результату aliases. Проверки на физическом GPU и визуальной совместимости реальных паков нет; `GOAL.md` остаётся незавершённым.
 
 ## Историческое состояние после beta.5 — 2026-10-19 (вечер)
 

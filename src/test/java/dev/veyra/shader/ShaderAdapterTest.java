@@ -70,6 +70,19 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsPackColorToTerrainVertexColorInput() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec4 color;
+                void main() { gl_FragColor = color; }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 0) in vec4 veyraVertexColor;"));
+        assertTrue(adapted.contains("#define color veyraVertexColor"));
+        assertFalse(adapted.contains("varying vec4 color;"));
+    }
+
+    @Test
     void adaptsIrisMoonPhaseUniformForGeometryPrograms() throws IOException {
         String adapted = CloudShaderAdapter.adaptFragment("""
                 #version 120
