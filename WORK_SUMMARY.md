@@ -261,3 +261,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Локальный audit process оставался живым (Java pid 14796, main CPU ~239s). JDK jstack показал RUNNABLE внутри `GeometryColorSamplers.read`, Pattern BmpCharPropertyGreedy/Caret на leading `^\s*`. Это доказанная квадратичная обработка длинных блоков пустых строк после preprocessing, не timeout-наблюдение и не внешний blocker.
 - Начальный whitespace ограничен `[\t ]*`; такой же guard исправлен в terrain unsupported-uniform scan. Regression использует 60000 пустых строк и generous 5-second bound; проходит вместе с build/test/shaderc.
 - Именно этот собственный Java audit остановлен после диагностики; прежние CI source audits c4106f6/bf5037f отменены, новый полный прогон запущен на исправленной версии. Незавершённый первый audit не считать результатом матрицы.
+
+### Полный source audit и cleanup ownership
+
+- Исправленный локальный runner завершил все 75 configurations / 5178 stage sources; 18 accepted / 699 rejected. Complementary water теперь отклоняется по specular, BSL water по shadowtex1 (Overworld/End) или shadowFade (Nether). Sildur water читает colortex4, одновременно присутствующий в attachments; остаётся явный feedback blocker, не работающий pack.
+- Cleanup теперь хранит identity конкретных color view/image, которые Veyra положил в native/VRenderSystem slots, и очищает только совпадающие записи. Чужие/неиспользованные slots не сбрасываются. Images по-прежнему принадлежат существующим color targets и освобождаются прежним lifecycle.
+- Native Computer Use перепроверен: тот же `native pipe is unavailable ... os error 2`; physical GPU/UI test не выполнен. Это не мешает продолжению backend задач и не является основанием объявлять всю цель blocked.

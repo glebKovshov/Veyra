@@ -247,6 +247,7 @@ public final class VeyraRenderer {
     private static RenderTarget swapTargetB;
     private static final Map<Integer, ColorTargetPair> colorTargets = new HashMap<>();
     private static final Map<Integer, Identifier> currentColorTargets = new HashMap<>();
+    private static final Map<Integer, GeometryColorBinding> geometryColorBindings = new HashMap<>();
     private static final Set<Integer> initializedColorTargets = new java.util.HashSet<>();
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
@@ -4734,10 +4735,12 @@ public final class VeyraRenderer {
 
     private static void releaseColorTargets() {
         VeyraGeometryTargets.releaseTargets();
-        for (int slot = GeometryColorSamplers.FIRST_IMAGE_SLOT;
-             slot < GeometryColorSamplers.FIRST_IMAGE_SLOT + GeometryColorSamplers.MAX_INPUTS; slot++) {
-            VRenderSystem.setShaderTexture(slot, null);
-        }
+        geometryColorBindings.forEach((slot, binding) -> {
+            if (VRenderSystem.getShaderTexture(slot) == binding.view()) VRenderSystem.setShaderTexture(slot, null);
+            if (net.vulkanmod.vulkan.texture.VTextureSelector.getImage(slot) == binding.image())
+                net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(slot, null);
+        });
+        geometryColorBindings.clear();
         colorTargets.values().forEach(pair -> {
             pair.targetA().destroyBuffers();
             pair.targetB().destroyBuffers();
@@ -4780,6 +4783,7 @@ public final class VeyraRenderer {
             image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
             VRenderSystem.setShaderTexture(descriptor.imageIdx, target.getColorTextureView());
             net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx, image);
+            geometryColorBindings.put(descriptor.imageIdx, new GeometryColorBinding(target.getColorTextureView(), image));
         }
         return endedPass;
     }
@@ -5103,6 +5107,8 @@ public final class VeyraRenderer {
 
     private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {
     }
+
+    private record GeometryColorBinding(GpuTextureView view, VulkanImage image) { }
 
     private record OutputMapping(int fragmentOutputIndex, int targetIndex) {
     }
