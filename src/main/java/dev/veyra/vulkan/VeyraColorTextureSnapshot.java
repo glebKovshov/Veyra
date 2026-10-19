@@ -1,15 +1,11 @@
 package dev.veyra.vulkan;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import dev.veyra.mixin.accessor.RenderTargetAccessor;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
-import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.texture.SamplerManager;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
@@ -21,7 +17,11 @@ import org.lwjgl.vulkan.VkImageCopy;
 /** A sampled copy of a completed scene color image, with the source format and dimensions. */
 public final class VeyraColorTextureSnapshot implements AutoCloseable {
     private final String name;
-    private TextureTarget target;
+    private VkGpuTexture texture;
+    private GpuTextureView view;
+    private int width;
+    private int height;
+    private int format;
     private boolean ready;
 
     public VeyraColorTextureSnapshot(String name) {
@@ -29,12 +29,11 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
     }
 
     public boolean isReady(int width, int height, int format) {
-        return ready && target != null && target.width == width && target.height == height
-                && image().format == format;
+        return ready && isAllocated() && this.width == width && this.height == height && this.format == format;
     }
 
     public void ensure(int width, int height, int format) {
-        if (target != null && target.width == width && target.height == height && image().format == format) {
+        if (isAllocated() && this.width == width && this.height == height && this.format == format) {
             return;
         }
         close();
@@ -45,47 +44,36 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
             throw new IllegalStateException("The active GPU device is not VulkanMod's Vulkan device.");
         }
 
-        target = new TextureTarget("Veyra " + name, width, height, false);
-        RenderTargetAccessor accessor = (RenderTargetAccessor) target;
-        GpuTexture oldTexture = accessor.veyra$getColorTexture();
-        GpuTextureView oldView = accessor.veyra$getColorTextureView();
-        if (oldView != null && !oldView.isClosed()) oldView.close();
-        if (oldTexture != null && !oldTexture.isClosed()) oldTexture.close();
-
         VulkanImage image = VulkanImage.builder(width, height)
                 .setName("Veyra " + name)
                 .setFormat(format)
                 .setUsage(VK10.VK_IMAGE_USAGE_SAMPLED_BIT | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                 .createVulkanImage();
-        VkGpuTexture texture = device.gpuTextureFromVulkanImage(image);
+        VkGpuTexture createdTexture = device.gpuTextureFromVulkanImage(image);
+        GpuTextureView createdView = null;
         try {
-            GpuTextureView view = device.createTextureView(texture);
-            accessor.veyra$setColorTexture(texture);
-            accessor.veyra$setColorTextureView(view);
+            createdView = device.createTextureView(createdTexture);
+            texture = createdTexture;
+            view = createdView;
+            this.width = width;
+            this.height = height;
+            this.format = format;
         } catch (RuntimeException | Error exception) {
-            texture.close();
-            target.destroyBuffers();
-            target = null;
+            if (createdView != null && !createdView.isClosed()) createdView.close();
+            createdTexture.close();
             throw exception;
         }
     }
 
-    public RenderTarget renderTarget() {
-        if (target == null) throw new IllegalStateException("The " + name + " target has not been created.");
-        return target;
-    }
-
     public VulkanImage image() {
-        GpuTexture texture = ((RenderTargetAccessor) renderTarget()).veyra$getColorTexture();
-        if (!(texture instanceof VkGpuTexture vulkanTexture) || vulkanTexture.isClosed()) {
+        if (!isAllocated()) {
             throw new IllegalStateException("The " + name + " color attachment is unavailable.");
         }
-        return vulkanTexture.getVulkanImage();
+        return texture.getVulkanImage();
     }
 
     public GpuTextureView sampledView() {
         if (!ready) throw new IllegalStateException("The " + name + " snapshot has not been captured yet.");
-        GpuTextureView view = ((RenderTargetAccessor) renderTarget()).veyra$getColorTextureView();
         if (view == null || view.isClosed()) throw new IllegalStateException("The " + name + " view is unavailable.");
         return view;
     }
@@ -151,7 +139,16 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
     @Override
     public void close() {
         ready = false;
-        if (target != null) target.destroyBuffers();
-        target = null;
+        if (view != null && !view.isClosed()) view.close();
+        view = null;
+        if (texture != null && !texture.isClosed()) texture.close();
+        texture = null;
+        width = 0;
+        height = 0;
+        format = 0;
+    }
+
+    private boolean isAllocated() {
+        return texture != null && !texture.isClosed() && view != null && !view.isClosed();
     }
 }
