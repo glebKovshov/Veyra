@@ -4,13 +4,16 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Текущая работа: shadow color inputs — 2026-10-19
+## Актуальный срез: shadow color inputs — 2026-10-19
 
 - Добавлено чтение существующего completed shadow color attachment через `shadowcolor0` и legacy `shadowcolor` в terrain/entity bridges. Linear/clamp соответствует default Iris color sampler; shadowtex1, дополнительные shadow colors, format/mipmap properties пока не реализованы.
 - Shadow-pass feedback отклоняется адаптерами. Terrain использует slot 11; вместе с этим sampler доступны максимум 5 auxiliary water images, шестой явно отклоняется до native binding. Entity использует фактический descriptor index. Color view заимствован у существующего shadow target; отдельное изображение не создаётся, cleanup очищает только owned binding identity.
-- Локально `test validateShaders build` success; shaderc: 31 examples preprocess / 28 direct SPIR-V. Добавлены regression tests на alias, отсутствие shadow pass/feedback, sampler type, unused declarations и slot collision.
-- Graphics matrix расширена до 7 fixtures: original shadow-color-terrain и shadow-color-entity должны прочитать цвет, записанный shadow shader; white/zero fallback не проходит. Entity использует camera-relative cow. Новый GPU CI и полный source audit ещё не проверены; не считать эту реализацию runtime-ready до их завершения.
-- Предыдущий этап ниже остаётся последним полностью подтверждённым checkpoint. Stable merge/release не готовы, цель активна.
+- Runtime HEAD **ad69519ba00bc473c8724818a7dfad4f622edb69**. Build push/PR **39215900899 / 39215906457** success. Скачанные CI XML: **122 tests, 0 failures/errors/skips**; `test validateShaders build` локально success, shaderc **31 examples / 28 direct SPIR-V**. Скачанный CI JAR artifact 12169124438 повторно прошёл verifier.
+- Graphics push/PR **39215900818 / 39215906459** success, все **7 fixtures**. Скачаны все exact-commit evidence. MRT **223272/0**, water-depth **222757/0**, water-color **222757/0**, specular-atlas **222561/0**, specular-entity **18410/0**, shadow-color-terrain **222509/0**, shadow-color-entity **18532/0**. Runtime validation errors **0 у всех**. Обе новые active screenshots просмотрены; white/zero fallback не проходит predicate.
+- Полный source push/PR **39215900786 / 39215906467** success. Artifact **12169363995**: все **75 records совпали с локальным и обоими committed reports**, 5178 sources, 18 accepted / 699 rejected, visualValidation=false у всех. Complementary теперь блокирует shadowtex1 (и blockEntityId в других вариантах), а не shadowcolor0. BSL/Sildur blockers остаются.
+- Teardown всё ещё НЕ чистый. В порядке семи fixtures выше diagnostics **10031 / 10049 / 10049 / 10671 / 10035 / 10672 / 10036**. Значения варьируются; ownership не установлен. Не приписывать все объекты Veyra/VulkanMod без доказательств.
+- Следующий конкретный шаг: **настоящий pre-translucent shadowtex1**. Проверенный Iris `ShadowRenderer` (0a1fcaae) делает opaque terrain → entities/block entities → depth copy → translucent terrain. В Veyra translucent terrain сейчас раньше entities; исправить порядок, добавить отдельный snapshot с fence retirement и GPU fixture, доказывающий отличие от all-geometry shadowtex0. Не создавать alias обеих карт.
+- `main` остаётся e37f188/0.1.1, PR #2 draft, alpha.1 tag остаётся старым 2b5acb0. Эти новые water/PBR/shadow fixes пока development artifacts. Stable merge/release не готовы; physical GPU/UI, real-pack visuals и длительный lifecycle stress не подтверждены. Цель активна.
 
 ## Предыдущий подтверждённый срез: static specular materials — 2026-10-19
 

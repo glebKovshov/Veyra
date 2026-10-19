@@ -1,6 +1,22 @@
 # 0.2 development validation status
 
-## Static specular validation (after alpha.1)
+## Shadow color validation (after alpha.1)
+
+Runtime commit `ad69519` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39215900899), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39215900818) and [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39215906459). Downloaded CI XML confirms **122 tests, zero failures/errors/skips**. shaderc preprocesses 31 example sources and compiles 28 directly to SPIR-V. The downloaded mod JAR passes the verifier.
+
+| Fixture | Active / disabled magenta pixels | Runtime errors | Teardown diagnostics |
+| --- | --- | --- | --- |
+| Terrain MRT | 223272 / 0 | 0 | 10031 |
+| Water opaque depth | 222757 / 0 | 0 | 10049 |
+| Water color inputs | 222757 / 0 | 0 | 10049 |
+| Specular atlas | 222561 / 0 | 0 | 10671 |
+| Specular entity | 18410 / 0 | 0 | 10035 |
+| Shadow color terrain | 222509 / 0 | 0 | 10672 |
+| Shadow color entity | 18532 / 0 | 0 | 10036 |
+
+All seven exact-commit artifacts were downloaded. Both new screenshots were inspected. The shadow fixtures require the authored color written by shadow.fsh through both modern and legacy sampler names; default/clear images cannot pass. CPU tests cover missing shadow pass/feedback, sampler types, unused declarations and collision with six auxiliary water inputs. Runtime-green does not resolve teardown ownership or establish third-party-pack visual support. All 75 local and committed source-audit records match the downloaded [exact-commit source CI](https://github.com/glebKovshov/Veyra/actions/runs/39215900786): 5,178 sources, 18 accepted / 699 rejected, visualValidation=false throughout. Complementary now reaches shadowtex1 or blockEntityId.
+
+## Historical static specular validation (after alpha.1)
 
 Runtime/test commit `3c1d749c69fbd33b6e6e43ab4b684bf3c551ae9a` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39214797686), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39214805186), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39214797662) and [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39214805071). Downloaded XML confirms 115 tests with zero failures/errors/skips; the downloaded CI mod JAR passes the verifier.
 

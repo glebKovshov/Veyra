@@ -26,18 +26,22 @@ The material-path comparison additionally inspected Iris commit `0a1fcaae5509935
 
 ## Known gaps
 
+Completed shadow color sampling borrows the existing shadow target's color view. Terrain reserves native slot 11 and validates that auxiliary water inputs do not collide (at most five with shadow color); entity indices come from the converted native pipeline. Producer render passes own layout transitions, so sampled wrappers do not perform stale-layout transitions. Color sampling uses linear/clamp at base level. `shadowcolor0` and `shadowcolor` share a descriptor; shadow programs cannot read their own attachment. No additional shadow color image is allocated.
+
+For the pending second shadow depth map, Iris `ShadowRenderer` at `0a1fcaae55099356bf53410b4f5302753edb0ffc` renders entities/block entities before copying pre-translucent depth and then drawing translucent terrain. Veyra currently draws translucent terrain before entity features; this order needs correction along with a genuinely separate snapshot. Aliasing the current all-geometry depth map as shadowtex1 would be incorrect.
+
 | Component | Current state | Needed for broad pack compatibility |
 | --- | --- | --- |
 | Pack discovery/options | ZIP/folder, dimensions, macros, profiles, screens, persistence | Wider option syntax/localization coverage and client UI testing |
 | Geometry vertex stage | Existing synthesized interfaces | Execute arbitrary pack vertex GLSL, required attributes, IDs and varyings |
 | Geometry color outputs | Native terrain MRT with per-target blend overrides; other geometry remains single-output | Entity/hand/block/cloud/shadow MRT, wider format/state semantics and runtime verification |
 | Post outputs | Separate fullscreen draws per output | Genuine MRT where simultaneous execution or side effects matter |
-| Textures/uniforms | Generated `noisetex`, depth/history, water opaque-depth and auxiliary-color sampling, static resource-pack specular maps, shared frame uniforms; unused samplers removed | Normal/animated material maps, auxiliary-color inputs in other geometry bridges, attachment feedback, wider shadow/depth samplers, custom texture/image units and expression uniforms |
+| Textures/uniforms | Generated `noisetex`, depth/history, water opaque-depth and auxiliary-color sampling, completed shadow color, static resource-pack specular maps, shared frame uniforms; unused samplers removed | Normal/animated material maps, auxiliary-color inputs in other geometry bridges, attachment feedback, wider shadow/depth samplers, custom texture/image units and expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
 | Pack properties | Options, target/shadow settings, program conditions | Full state/property semantics, feature flags, custom images/SSBOs |
-| Runtime verification | Full build, unit tests, CPU shaderc/source audits; one Lavapipe synthetic terrain-MRT/composite client fixture passes | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
+| Runtime verification | Full build, unit tests, CPU shaderc/source audits; seven Lavapipe synthetic fixtures pass for terrain MRT, water depth/colors, static specular atlas/entity and shadow color terrain/entity | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
 
-The synthetic client fixture confirms the terrain-MRT to composite path under Lavapipe and reports no runtime validation errors before world shutdown. It also observes 10,031 `VUID-vkDestroyDevice-device-05137` child-object diagnostics during VulkanMod/Minecraft process teardown; ownership is not identified, so process-wide cleanup is not yet validated. The broader shader-pack pipeline, other geometry families, visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
+The seven synthetic client fixtures report no runtime validation errors before world shutdown. Process teardown still reports child-object diagnostics with variable counts; exact results are retained in VALIDATION.md and CI artifacts. Ownership is not identified, so process-wide cleanup is not yet validated. The broader shader-pack pipeline, other geometry families, visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
 
 ## Sources and licensing
 

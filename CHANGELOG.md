@@ -2,6 +2,8 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Added completed shadow color sampling (`shadowcolor0` / legacy `shadowcolor`) to terrain and entity-family bridges. Shadow attachment feedback and native-slot collisions fail explicitly.
+- Added separate terrain/entity shadow-color Vulkan readback fixtures using authored shadow shader output.
 - Added resource-pack static specular material textures to terrain/shadow/entity bridges, including atlas padding, straight UNORM channels and linear/LabPBR mipmaps. Missing maps use the zero default; animated maps are explicitly unsupported.
 - Added original atlas-mipmap and entity-material Vulkan fixtures. Runtime validation is tracked in VALIDATION.md.
 - Added auxiliary color sampling to water geometry, including legacy aliases, post-deferred buffer sides, read-only target initialization and graphics-ordered sampling barriers. Same-attachment feedback is rejected.

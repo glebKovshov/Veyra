@@ -10,6 +10,8 @@ Post programs are scheduled at separate world boundaries: `prepare` after shadow
 
 Development material support includes resource-pack static `_s.png` specular maps for terrain/shadow atlases and entity textures, with linear/LabPBR mipmaps. Animated specular maps and normal maps remain unsupported. The original `examples/specular-atlas` and `examples/specular-entity` fixtures exercise this path; published alpha.1 predates it.
 
+Terrain and entity-family programs can also sample the completed shadow pass color through `shadowcolor0` or `shadowcolor` (linear/clamp, base level). The second shadow depth map, other shadow colors and general shadow format/mipmap properties remain unsupported. These development changes also postdate published alpha.1.
+
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.
