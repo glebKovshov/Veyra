@@ -46,7 +46,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs'], default='geometry-mrt')
     fixture = parser.parse_args().fixture
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
     if fixture.startswith('water-'):
@@ -92,6 +92,11 @@ def main():
         output.write(bytes([10]) + string("") + payload(10, {"Data": (10, data)}))
     pack = root / 'shaderpacks' / fixture
     shutil.copytree(pathlib.Path('examples') / fixture, pack, dirs_exist_ok=True)
+    if fixture == 'water-post-shadow-inputs':
+        # Exercise full post adapter scans across expanded include-style blank regions.
+        for stage in ['prepare', 'deferred', 'composite', 'final']:
+            source_file = pack / 'shaders' / f'{stage}.fsh'
+            source_file.write_text(source_file.read_text(encoding='utf-8').replace('#version 120\n', '#version 120\n' + '\n' * 60000, 1), encoding='utf-8')
     config = root / "veyra"
     config.mkdir(parents=True, exist_ok=True)
     (config / "selected-pack.txt").write_text(fixture, encoding="utf-8")

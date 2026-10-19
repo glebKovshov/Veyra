@@ -134,8 +134,8 @@ public final class VeyraRenderer {
                 outColor = texture(InSampler, texCoord);
             }
             """;
-    private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^\\s*#version[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^\\s*#extension[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*$");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
@@ -148,7 +148,7 @@ public final class VeyraRenderer {
             "(?m)\\bconst\\s+int\\s+colortex\\d+Format\\s*=\\s*[A-Za-z_][A-Za-z0-9_]*\\s*;");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
-    private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^\\s*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
+    private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^[\\t ]*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
     private static final Pattern POST_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|out)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_INPUT_DECLARATION = Pattern.compile(
@@ -157,37 +157,32 @@ public final class VeyraRenderer {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|out)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
+    private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern POST_VERTEX_MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
     private static final Pattern POST_VERTEX_LEGACY_ATTRIBUTES = Pattern.compile(
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
-    private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
-    private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
+    private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![012]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
     private static final Pattern DEPTH1_SAMPLER = Pattern.compile("\\bdepthtex1\\b");
     private static final Pattern DEPTH2_SAMPLER = Pattern.compile("\\bdepthtex2\\b");
-    private static final Pattern UNSUPPORTED_SHADOW_SAMPLER = Pattern.compile(
-            "\\b(?:shadowtex(?!0\\b)[A-Za-z0-9_]*|shadowcolor[A-Za-z0-9_]*)\\b");
-    private static final Pattern SHADOW_DEPTH_SAMPLER = Pattern.compile("\\bshadowtex0\\b");
-    private static final Pattern SHADOW_DEPTH_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+shadowtex0\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern DEPTH_SAMPLER_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+(?:depthtex0|DepthSampler)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+(?:depthtex0|DepthSampler)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern DEPTH1_SAMPLER_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex1\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern DEPTH2_SAMPLER_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex2\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+depthtex2\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern NOISETEX_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+noisetex\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+noisetex\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     // PostPass appends "Sampler" to every input name when binding it to the render pass.
     private static final String DEPTH_INPUT_NAME = "Sampler1";
@@ -196,8 +191,6 @@ public final class VeyraRenderer {
     private static final String DEPTH1_INPUT_SAMPLER = DEPTH1_INPUT_NAME + "Sampler";
     private static final String DEPTH2_INPUT_NAME = "VeyraDepthTex2";
     private static final String DEPTH2_INPUT_SAMPLER = DEPTH2_INPUT_NAME + "Sampler";
-    private static final String SHADOW_DEPTH_INPUT_NAME = "VeyraShadowDepth";
-    private static final String SHADOW_DEPTH_INPUT_SAMPLER = SHADOW_DEPTH_INPUT_NAME + "Sampler";
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
@@ -838,7 +831,7 @@ public final class VeyraRenderer {
                 .build();
         PipelineProgram program = new PipelineProgram(DEPTH1_CAPTURE_SHADER_ID,
                 DEPTH1_CAPTURE_FRAGMENT_SOURCE, BLIT_VERTEX_ID, null,
-                List.of(), true, false, false, false, Set.of(), 0, pipeline);
+                List.of(), true, false, false, false, Set.of(), Set.of(), 0, pipeline);
         compilePipeline(program);
         depthTex1CaptureProgram = program;
         return program;
@@ -1953,7 +1946,7 @@ public final class VeyraRenderer {
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
             if (pipelineSet.usesShadowSampler() && VeyraShadowRenderer.shadowDepthTextureView() == null) {
-                throw new IllegalStateException("The shader pack samples shadowtex0, but VulkanMod did not produce a shadow map.");
+                throw new IllegalStateException("The post program requires shadow inputs, but VulkanMod did not produce a shadow map.");
             }
             ensureSwapTargets(mainTarget.width, mainTarget.height);
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
@@ -2150,7 +2143,7 @@ public final class VeyraRenderer {
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
             copyProgram = pipelineProgram("copy",
-                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, false, false, Set.of(), 0), null);
+                    new AdaptedShader(COPY_FRAGMENT_SHADER, List.of(), false, false, false, false, Set.of(), Set.of(), 0), null);
             compilePipeline(copyProgram);
         }
 
@@ -3901,9 +3894,8 @@ public final class VeyraRenderer {
                     if (program.usesDepth2Sampler()) {
                         inputs.add(new ExternalTextureInput(DEPTH2_INPUT_NAME));
                     }
-                    if (program.usesShadowSampler()) {
-                        inputs.add(new ExternalTextureInput(SHADOW_DEPTH_INPUT_NAME));
-                    }
+                    for (PostShadowSamplers.Input input : PostShadowSamplers.Input.values())
+                        if (program.shadowInputs().contains(input)) inputs.add(new ExternalTextureInput(input.inputName()));
                     if (program.fragmentSource().contains("uniform sampler2D "
                             + VeyraNoiseTexture.SAMPLER_NAME + ";")) {
                         inputs.add(new ExternalTextureInput(NOISE_INPUT_NAME));
@@ -3982,11 +3974,11 @@ public final class VeyraRenderer {
                     + VeyraNoiseTexture.SAMPLER_NAME + ";");
             return new PipelineProgram(shaderId, shader.source(), vertexShaderId, vertexSource, shader.uniforms(),
                     shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
-                    shader.usesShadowSampler(),
+                    shader.usesShadowSampler(), shader.shadowInputs(),
                     shader.colorSamplers(), shader.outputTarget(),
                     createPipeline(pipelineId, shaderId, vertexShaderId, shader.uniforms(),
                             shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
-                            shader.usesShadowSampler(),
+                            shader.shadowInputs(),
                             usesNoiseSampler,
                             shader.colorSamplers()));
         });
@@ -4020,7 +4012,7 @@ public final class VeyraRenderer {
     private static RenderPipeline createPipeline(
             Identifier pipeline, Identifier fragmentShader, Identifier vertexShader, List<String> uniforms,
             boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-            boolean usesShadowSampler,
+            Set<PostShadowSamplers.Input> shadowInputs,
             boolean usesNoiseSampler,
             Set<Integer> colorSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
@@ -4038,9 +4030,8 @@ public final class VeyraRenderer {
         if (usesDepth2Sampler) {
             builder.withSampler(DEPTH2_INPUT_SAMPLER);
         }
-        if (usesShadowSampler) {
-            builder.withSampler(SHADOW_DEPTH_INPUT_SAMPLER);
-        }
+        for (PostShadowSamplers.Input input : PostShadowSamplers.Input.values())
+            if (shadowInputs.contains(input)) builder.withSampler(input.samplerName());
         if (usesNoiseSampler) {
             builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
         }
@@ -4068,36 +4059,15 @@ public final class VeyraRenderer {
         body = RENDERTARGETS_DIRECTIVE.matcher(body).replaceAll("");
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
-        boolean usesNoiseSampler = NOISETEX_REFERENCE.matcher(body).find();
 
         Matcher unsupportedDepthSampler = UNSUPPORTED_DEPTH_SAMPLER.matcher(body);
         if (unsupportedDepthSampler.find()) {
             throw new IOException("Veyra supports depthtex0, depthtex1, and depthtex2 for depth texture sampling on VulkanMod.");
         }
-        Matcher unsupportedShadowSampler = UNSUPPORTED_SHADOW_SAMPLER.matcher(body);
-        if (unsupportedShadowSampler.find()) {
-            throw new IOException("Veyra currently supports only the shadowtex0 depth sampler in post-processing programs.");
-        }
-        boolean usesShadowSampler = SHADOW_DEPTH_SAMPLER.matcher(body).find();
-        if (usesShadowSampler && !shadowPassAvailable) {
-            throw new IOException("The post-processing program samples shadowtex0, but the shader pack has no shadow pass.");
-        }
-        Matcher shadowSamplerDeclaration = SHADOW_DEPTH_UNIFORM_DECLARATION.matcher(body);
-        StringBuffer bodyWithoutShadowSampler = new StringBuffer();
-        boolean declaredShadowSampler = false;
-        while (shadowSamplerDeclaration.find()) {
-            String samplerType = shadowSamplerDeclaration.group(1);
-            if (!samplerType.equals("sampler2D") && !samplerType.equals("sampler2DShadow")) {
-                throw new IOException("shadowtex0 must be declared as sampler2D or sampler2DShadow.");
-            }
-            if (declaredShadowSampler) {
-                throw new IOException("shadowtex0 is declared more than once.");
-            }
-            declaredShadowSampler = true;
-            shadowSamplerDeclaration.appendReplacement(bodyWithoutShadowSampler, "");
-        }
-        shadowSamplerDeclaration.appendTail(bodyWithoutShadowSampler);
-        body = bodyWithoutShadowSampler.toString();
+        PostShadowSamplers.Adapted shadows = PostShadowSamplers.adapt(body, shadowPassAvailable);
+        body = shadows.source();
+        boolean usesNoiseSampler = NOISETEX_REFERENCE.matcher(body).find();
+        boolean usesShadowSampler = !shadows.inputs().isEmpty();
         Matcher noiseSamplerDeclaration = NOISETEX_UNIFORM_DECLARATION.matcher(body);
         StringBuffer bodyWithoutNoiseSampler = new StringBuffer();
         while (noiseSamplerDeclaration.find()) {
@@ -4123,6 +4093,9 @@ public final class VeyraRenderer {
             }
             colorSamplers.add(index);
         }
+        PostShadowSamplers.validateBudget(shadows.inputs(), 1 + (usesDepthSampler ? 1 : 0)
+                + (usesDepth1Sampler ? 1 : 0) + (usesDepth2Sampler ? 1 : 0) + (usesNoiseSampler ? 1 : 0)
+                + (int) colorSamplers.stream().filter(index -> index > 0).count());
         String uniformSource = body;
         List<String> uniforms = SUPPORTED_UNIFORMS.stream()
                 .filter(uniform -> containsIdentifier(uniformSource, uniform) || additionalUniforms.contains(uniform))
@@ -4162,9 +4135,6 @@ public final class VeyraRenderer {
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
-        if (usesShadowSampler) {
-            body = body.replaceAll("\\b(?:texture2D|texture)\\s*\\(\\s*shadowtex0\\s*,", "veyraSample(shadowtex0,");
-        }
         body = body.replaceAll("\\btexture2D\\s*\\(", "texture(");
 
         List<AdaptedShader> adaptedShaders = new ArrayList<>(outputMappings.size());
@@ -4192,25 +4162,7 @@ public final class VeyraRenderer {
                 }
             }
             appendShaderPackUniformBlock(adapted, uniforms);
-            if (usesShadowSampler) {
-                adapted.append("""
-                        vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
-                            return texture(sourceSampler, sourceUv);
-                        }
-                        vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv, float lodBias) {
-                            return texture(sourceSampler, sourceUv, lodBias);
-                        }
-                        vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
-                            float visibility = step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
-                            return vec4(visibility);
-                        }
-                        vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord, float lodBias) {
-                            float visibility = step(sourceCoord.z - 0.0005,
-                                    textureLod(sourceSampler, sourceCoord.xy, lodBias).r);
-                            return vec4(visibility);
-                        }
-                        """);
-            }
+            adapted.append(PostShadowSamplers.bridge(shadows.inputs()));
             adapted.append("uniform sampler2D InSampler;\n")
                     .append("#define colortex0 InSampler\n")
                     .append("#define Sampler0 InSampler\n")
@@ -4238,18 +4190,13 @@ public final class VeyraRenderer {
                 adapted.append("uniform sampler2D ").append(DEPTH2_INPUT_SAMPLER).append(";\n")
                         .append("#define depthtex2 ").append(DEPTH2_INPUT_SAMPLER).append('\n');
             }
-            if (usesShadowSampler) {
-                adapted.append("uniform sampler2D ").append(SHADOW_DEPTH_INPUT_SAMPLER).append(";\n")
-                        .append("#define shadowtex0 ").append(SHADOW_DEPTH_INPUT_SAMPLER).append('\n')
-                        .append("#define shadow2D(shadowSampler, coord) veyraSample(shadowSampler, coord)\n");
-            }
             if (usesNoiseSampler) {
                 adapted.append("uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
                         .append("#define noisetex ").append(VeyraNoiseTexture.SAMPLER_NAME).append('\n');
             }
             adapted.append(outputBody);
             adaptedShaders.add(new AdaptedShader(adapted.toString(), uniforms,
-                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler,
+                    usesDepthSampler, usesDepth1Sampler, usesDepth2Sampler, usesShadowSampler, shadows.inputs(),
                     Set.copyOf(colorSamplers), output.targetIndex()));
         }
         return List.copyOf(adaptedShaders);
@@ -5096,7 +5043,7 @@ public final class VeyraRenderer {
 
     private record AdaptedShader(String source, List<String> uniforms,
                                  boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-                                 boolean usesShadowSampler,
+                                 boolean usesShadowSampler, Set<PostShadowSamplers.Input> shadowInputs,
                                  Set<Integer> colorSamplers, int outputTarget) {
     }
 
@@ -5109,7 +5056,7 @@ public final class VeyraRenderer {
     private record PipelineProgram(Identifier shaderId, String fragmentSource,
                                    Identifier vertexShaderId, String vertexSource, List<String> uniforms,
                                    boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
-                                   boolean usesShadowSampler,
+                                   boolean usesShadowSampler, Set<PostShadowSamplers.Input> shadowInputs,
                                    Set<Integer> colorSamplers,
                                    int outputTarget, RenderPipeline pipeline) {
     }
@@ -5291,7 +5238,11 @@ public final class VeyraRenderer {
             if (samplerName.equals(DEPTH2_INPUT_NAME)) {
                 return depthTex2Snapshot.sampledView();
             }
-            if (samplerName.equals(SHADOW_DEPTH_INPUT_NAME)) {
+            if (samplerName.equals(PostShadowSamplers.Input.OPAQUE_DEPTH.inputName()))
+                return VeyraShadowRenderer.opaqueShadowDepthTextureView();
+            if (samplerName.equals(PostShadowSamplers.Input.COLOR.inputName()))
+                return VeyraShadowRenderer.shadowColorTextureView();
+            if (samplerName.equals(PostShadowSamplers.Input.DEPTH.inputName())) {
                 return VeyraShadowRenderer.shadowDepthTextureView();
             }
             return sampledDepthTextureView();
@@ -5299,7 +5250,7 @@ public final class VeyraRenderer {
 
         @Override
         public boolean bilinear() {
-            return false;
+            return PostShadowSamplers.bilinear(samplerName);
         }
     }
 

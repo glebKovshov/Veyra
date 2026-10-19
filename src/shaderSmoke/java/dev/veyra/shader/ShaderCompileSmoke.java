@@ -58,6 +58,12 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = vec4(readDepth(shadowtex1)); }
                     """, "gbuffers_entities", false, true);
             compile(compiler, options, entityOpaqueShadow, "entity-opaque-shadow-comparison", true);
+            String postShadowSource = "uniform sampler2DShadow shadowtex1;\n"
+                    + "float compare(sampler2DShadow depthMap){return texture(depthMap,vec3(0.5));}\n"
+                    + "layout(location=0) out vec4 outColor;void main(){outColor=vec4(texture(shadowtex1,vec3(0.5))+compare(shadowtex1))+shadow2D(shadowtex1,vec3(0.5));}\n";
+            var postShadows = PostShadowSamplers.adapt(postShadowSource, true);
+            compile(compiler, options, "#version 450\n" + PostShadowSamplers.bridge(postShadows.inputs()) + postShadows.source(),
+                    "post-shadow-comparison-helpers", true);
             if (count == 0) throw new AssertionError("No example shaders found.");
             String inactive = ShaderIncludes.expand("final.fsh", "#if 0\n#include \"missing.glsl\"\n#endif\n", p -> Optional.empty());
             compile(compiler, options, "#version 450\n" + inactive + "layout(location=0) out vec4 color;\nvoid main(){color=vec4(1);}\n", "inactive-missing-include", true);

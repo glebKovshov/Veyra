@@ -104,6 +104,10 @@ public final class VeyraShadowRenderer {
         return target == null ? null : target.getDepthTextureView();
     }
 
+    public static GpuTextureView opaqueShadowDepthTextureView() {
+        return opaqueDepth.sampledView();
+    }
+
     public static void bindTerrainShadowColor(GraphicsPipeline pipeline) {
         var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
         if (descriptor == null) return;

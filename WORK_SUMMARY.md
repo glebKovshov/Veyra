@@ -4,7 +4,15 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Актуальный срез: separate shadowtex1 — 2026-10-19
+## Текущая работа: post shadow inputs — 2026-10-19
+
+- Post parser/planning расширены с shadowtex0 на отдельный shadowtex1 и shadowcolor0/legacy shadowcolor. Набор inputs хранится в metadata program/pass, aliases цвета дедуплицируются. Frame graph получает существующие producer views, без новых GPU images; color linear/clamp, depth nearest/clamp.
+- Новый pure PostShadowSamplers проверяет shadow pass availability, sampler types, дубли, unsupported shadow names и общий native budget (12 descriptors). Comparison uniforms/helper params сохраняют float-результат modern texture; legacy shadow2D остаётся vec4. Добавлены JUnit и shaderc fixtures.
+- Начальные multiline scans в post/vertex parser переведены с `^\s*` на horizontal whitespace. Original water-post-shadow-inputs fixture проверяет prepare → deferred → composite → final: каждая фаза читает обе depth-карты/оба color alias и передаёт sentinel через colortex4/5/6. Modern/legacy comparison helpers, unused noisetex header и по 60000 expanded blank lines включены в runtime fixture. Matrix теперь 10 cases.
+- Финально локально `test validateShaders build` success: **139 tests, 0 failures/errors/skips**, shaderc **38 examples preprocess / 35 direct SPIR-V**, plus post comparison helper fixture; mod JAR verifier прошёл. Unused-noise detection согласован с удалением unused declarations. GPU/source CI ещё не проверены; не объявлять post runtime поддержку подтверждённой до их завершения.
+- Предыдущий подтверждённый checkpoint ниже сохранён. Stable integration/release пока не готовы; next steps остаются реальные per-draw IDs/shadowFade и lifecycle/real-pack validation.
+
+## Предыдущий подтверждённый срез: separate shadowtex1 — 2026-10-19
 
 - Runtime HEAD **cca001973c906da89f461c30998e121a88e27405**. Build push/PR **39246874678 / 39246882115** success. Скачанные CI XML artifact **12184271081** подтверждают **131 tests, 0 failures/errors/skips**; shaderc **36 examples preprocess / 33 direct SPIR-V**, plus separate shadowtex1 comparison fixture. Скачанный mod JAR artifact **12184111327** прошёл verifier.
 - Graphics push/PR **39246874812 / 39246882139** success, все **9 fixtures**. Все exact-commit artifacts скачаны: MRT **221976/0**, water-depth **222757/0**, water-color **222757/0**, specular-atlas **222590/0**, specular-entity **18293/0**, shadow-color-terrain **222445/0**, shadow-color-entity **18410/0**, separate-shadow-depth water **226902/0**, entity **16456/0**. Runtime validation errors **0 у всех**. Обе новые active screenshots просмотрены.
