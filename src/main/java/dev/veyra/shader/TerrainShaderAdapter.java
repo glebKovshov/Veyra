@@ -240,8 +240,9 @@ public final class TerrainShaderAdapter {
         while (uniformMatcher.find()) {
             String type = uniformMatcher.group(1);
             String name = uniformMatcher.group(2);
-            if (ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_terrain", type, name)) {
-                uniformMatcher.appendReplacement(withoutShaderPackUniforms, "const int " + name + " = 0;\n");
+            String unbound = ShaderPackUniformAdapter.unboundEntityDeclaration("gbuffers_terrain", type, name);
+            if (unbound != null) {
+                uniformMatcher.appendReplacement(withoutShaderPackUniforms, unbound);
                 continue;
             }
             ShaderUniform uniform = shaderPackUniform(name);

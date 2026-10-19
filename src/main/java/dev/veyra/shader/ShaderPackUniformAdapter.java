@@ -17,7 +17,8 @@ public final class ShaderPackUniformAdapter {
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
 
-    private static final List<String> ENTITY_IDENTIFIERS = List.of("entityId", "blockEntityId", "currentRenderedItemId");
+    private static final Map<String, String> UNBOUND_ENTITY_VALUES = Map.of(
+            "entityId", "int", "blockEntityId", "int", "currentRenderedItemId", "int", "entityColor", "vec4");
     private static final Pattern ENTITY_ATTRIBUTE_PROGRAM = Pattern.compile(
             "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*)|.*sign_text.*");
 
@@ -37,9 +38,10 @@ public final class ShaderPackUniformAdapter {
         while (matcher.find()) {
             String type = matcher.group(1);
             String name = matcher.group(2);
-            if (isUnboundEntityIdentifier(programName, type, name)) {
+            String unbound = unboundEntityDeclaration(programName, type, name);
+            if (unbound != null) {
                 matcher.appendReplacement(withoutUniforms, "");
-                macros.append("const int ").append(name).append(" = 0;\n");
+                macros.append(unbound);
                 continue;
             }
             TerrainShaderAdapter.ShaderUniform uniform = supportedUniforms.get(name);
@@ -89,8 +91,16 @@ public final class ShaderPackUniformAdapter {
      * the declarations remain unbound GL uniforms and read 0, which these programs receive here as well.
      */
     public static boolean isUnboundEntityIdentifier(String programName, String type, String name) {
-        return type.equals("int") && ENTITY_IDENTIFIERS.contains(name)
+        return type.equals(UNBOUND_ENTITY_VALUES.get(name))
                 && !ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
+    }
+
+    /** A zero-valued constant replacing an Iris-unbound entity uniform, or null when Iris binds it. */
+    public static String unboundEntityDeclaration(String programName, String type, String name) {
+        if (!isUnboundEntityIdentifier(programName, type, name)) {
+            return null;
+        }
+        return "const " + type + " " + name + " = " + (type.equals("int") ? "0" : "vec4(0.0)") + ";\n";
     }
 
     public static List<String> matrixUniforms() {

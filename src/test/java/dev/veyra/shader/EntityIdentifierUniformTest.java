@@ -30,5 +30,8 @@ class EntityIdentifierUniformTest {
         assertFalse(ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_hand_water", "int", "entityId"));
         assertTrue(ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_basic", "int", "entityId"));
         assertFalse(ShaderPackUniformAdapter.isUnboundEntityIdentifier("gbuffers_basic", "float", "entityId"));
+        assertEquals("const vec4 entityColor = vec4(0.0);\n",
+                ShaderPackUniformAdapter.unboundEntityDeclaration("gbuffers_terrain", "vec4", "entityColor"));
+        assertNull(ShaderPackUniformAdapter.unboundEntityDeclaration("gbuffers_entities", "vec4", "entityColor"));
     }
 }
