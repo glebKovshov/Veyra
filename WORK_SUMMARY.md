@@ -222,3 +222,10 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Причина установлена по полному stack trace и pinned VulkanMod 0.6.8 source: layout buffer имеет размер числу descriptors, но индексируется binding number. Фиксированный optional binding 7 создавал разрыв при отсутствии shadow/noise. Исправлена непрерывная нумерация 5..N согласованно в terrain GLSL и PipelineConfig, включая уже существовавший noisetex-without-shadow gap. Native texture indices 3/4/5 не меняются.
 - Добавлена regression матрица всех сочетаний shadow/noise для water depth binding. GPU fixture не ослаблялся; повторный прогон необходим.
 - Water depth sampler явно использует nearest/clamp-to-edge через кэш SamplerManager VulkanMod, без отдельного unmanaged sampler. Локальная повторная build/test/shaderc проверка проходит.
+
+### Второй GPU прогон: источник depth-copy
+
+- `0815d6e` устранил descriptor-layout exception. Старый MRT fixture снова прошёл (222663/0 magenta), water fixture остался красным (1775/0 при неизменённом пороге 2000).
+- Artifact run 39208129962 показал runtime Vulkan layout errors. В descriptor evidence depth-copy sampler `Sampler1Sampler` с native index 0 указывал на **собственный Color attachment snapshot**, а не borrowed main depth view. Это диагностированный binding defect существующего depth-copy пути; random magenta не считается подтверждением.
+- `VkRenderPassMixin` расширен на основной borrowed depth sampler, с namespace guard для Veyra, явной native image table привязкой и layout ownership. Snapshot samplers сохраняют тот же путь. Повторный GPU test обязателен; threshold не уменьшался.
+- CI теперь сохраняет validation error files и при неудачном readback result, до итоговых assertions.

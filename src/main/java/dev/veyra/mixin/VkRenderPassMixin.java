@@ -46,17 +46,20 @@ public abstract class VkRenderPassMixin {
 
     @Inject(method = "bindTexture", at = @At("RETURN"), remap = false)
     private void veyra$bindDepthSnapshots(String name, GpuTextureView view, GpuSampler sampler, CallbackInfo ci) {
-        if (!name.equals("VeyraDepthTex1Sampler") && !name.equals("VeyraDepthTex2Sampler")) {
+        if (!name.equals("Sampler1Sampler") && !name.equals("VeyraDepthTex1Sampler") && !name.equals("VeyraDepthTex2Sampler")) {
             return;
         }
         VkRenderPass pass = (VkRenderPass) (Object) this;
-        if (pass.getPipeline() == null || !(view instanceof VkTextureView vulkanView)) {
+        if (pass.getPipeline() == null || !pass.getPipeline().getFragmentShader().getNamespace().equals("veyra")
+                || !(view instanceof VkTextureView vulkanView)) {
             return;
         }
         var pipeline = ExtendedRenderPipeline.of(pass.getPipeline()).getPipeline();
         var descriptor = pipeline.getImageDescriptor(name);
         var texture = vulkanView.texture();
         if (descriptor != null && !texture.isClosed() && texture.getVulkanImage() != null) {
+            descriptor.setLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
             // External snapshots must populate VulkanMod's indexed image table for this descriptor.
             VTextureSelector.bindTexture(descriptor.imageIdx, texture.getVulkanImage());
         }

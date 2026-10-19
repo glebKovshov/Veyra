@@ -65,7 +65,6 @@ jobs:
           import json,pathlib,re
           result=json.loads(pathlib.Path('build/reports/graphics-smoke/result.json').read_text())
           print(json.dumps(result,indent=2))
-          assert result['status']=='passed', result
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
           # Minecraft/VulkanMod 0.6.8 reports its still-live process-wide Vulkan objects only
@@ -82,6 +81,7 @@ jobs:
           print(f'Runtime validation errors: {len(runtime_errors)}')
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
+          assert result['status']=='passed', result
           PY
       - name: Upload graphics evidence
         if: always()
