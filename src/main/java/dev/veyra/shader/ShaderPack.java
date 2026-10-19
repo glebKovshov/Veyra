@@ -361,6 +361,16 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
     }
 
+    /** Reads item.properties ids, preprocessed with the pack options like shaders.properties. */
+    public ItemIdMap readItemIds() throws IOException {
+        Optional<String> source = readRawShader(programPath("item.properties"));
+        if (source.isEmpty()) {
+            return ItemIdMap.EMPTY;
+        }
+        return ItemIdMap.parse(GlslPreprocessor.properties(source.get(),
+                readOptions().effective(configuration.options())));
+    }
+
     /** Reads uniform./variable. definitions from the preprocessed shaders.properties. */
     public CustomUniforms readCustomUniforms() throws IOException {
         return CustomUniforms.parse(readShader("shaders.properties").orElse(""));

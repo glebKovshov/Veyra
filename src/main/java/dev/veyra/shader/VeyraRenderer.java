@@ -163,7 +163,7 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
@@ -193,6 +193,7 @@ public final class VeyraRenderer {
     private static final String DEPTH2_INPUT_SAMPLER = DEPTH2_INPUT_NAME + "Sampler";
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
+            "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
@@ -214,10 +215,10 @@ public final class VeyraRenderer {
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> INTEGER_UNIFORMS = List.of(
-            "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
+            "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
-            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
+            "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -428,8 +429,10 @@ public final class VeyraRenderer {
 
     private static void activateCustomUniforms(ShaderPack pack) {
         CustomUniforms uniforms = CustomUniforms.EMPTY;
+        ItemIdMap.activate(ItemIdMap.EMPTY);
         if (pack != null) {
             try {
+                ItemIdMap.activate(pack.readItemIds());
                 uniforms = pack.readCustomUniforms();
             } catch (IOException exception) {
                 VeyraClient.LOGGER.warn("Could not read custom uniforms for '{}'.", pack.name(), exception);
@@ -459,6 +462,13 @@ public final class VeyraRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         CameraUniforms camera = frame.camera();
         return switch (name) {
+            case "biome" -> (double) currentBiomeId(minecraft);
+            case "near" -> (double) IRIS_NEAR_PLANE;
+            case "far" -> (double) farPlane();
+            case "heldBlockLightValue" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
+            case "heldBlockLightValue2" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.OFF_HAND);
+            case "heldItemId" -> (double) heldItemId(net.minecraft.world.InteractionHand.MAIN_HAND);
+            case "heldItemId2" -> (double) heldItemId(net.minecraft.world.InteractionHand.OFF_HAND);
             case "viewWidth" -> (double) minecraft.getWindow().getWidth();
             case "viewHeight" -> (double) minecraft.getWindow().getHeight();
             case "aspectRatio" -> minecraft.getWindow().getHeight() == 0 ? 0.0
@@ -615,6 +625,12 @@ public final class VeyraRenderer {
 
     private static float shaderPackFloatUniform(String name) {
         Minecraft minecraft = Minecraft.getInstance();
+        if (name.equals("near")) {
+            return IRIS_NEAR_PLANE;
+        }
+        if (name.equals("far")) {
+            return farPlane();
+        }
         if (name.equals("viewWidth")) {
             return minecraft.getWindow().getWidth();
         }
@@ -646,6 +662,18 @@ public final class VeyraRenderer {
     }
 
     private static int shaderPackIntUniform(String name) {
+        if (name.equals("heldBlockLightValue")) {
+            return heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
+        }
+        if (name.equals("heldBlockLightValue2")) {
+            return heldBlockLightValue(net.minecraft.world.InteractionHand.OFF_HAND);
+        }
+        if (name.equals("heldItemId")) {
+            return heldItemId(net.minecraft.world.InteractionHand.MAIN_HAND);
+        }
+        if (name.equals("heldItemId2")) {
+            return heldItemId(net.minecraft.world.InteractionHand.OFF_HAND);
+        }
         FrameUniforms frame = shaderPackFrameUniforms;
         return switch (name) {
             case "frameCounter" -> frame.frameCounter();
@@ -663,6 +691,50 @@ public final class VeyraRenderer {
             case "is_burning" -> frame.isBurning() ? 1 : 0;
             default -> throw new IllegalArgumentException("Unknown shader pack integer uniform " + name + ".");
         };
+    }
+
+    /** Iris: registration-order id of the biome at the player's block position. */
+    private static int currentBiomeId(Minecraft minecraft) {
+        if (minecraft.player == null || minecraft.level == null) {
+            return 0;
+        }
+        return minecraft.level.getBiome(minecraft.player.blockPosition()).unwrapKey()
+                .map(key -> BiomeIds.id(key.identifier().toString())).orElse(0);
+    }
+
+    /** Iris reports a fixed 0.05 near plane. */
+    private static final float IRIS_NEAR_PLANE = 0.05F;
+
+    /** Iris' far uniform is the render distance in blocks. */
+    private static float farPlane() {
+        return Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0F;
+    }
+
+    /** Iris: the light emission of a held block item, otherwise 0. */
+    private static int heldBlockLightValue(net.minecraft.world.InteractionHand hand) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return 0;
+        }
+        net.minecraft.world.item.ItemStack stack = minecraft.player.getItemInHand(hand);
+        if (stack.getItem() instanceof net.minecraft.world.item.BlockItem blockItem) {
+            return blockItem.getBlock().defaultBlockState().getLightEmission();
+        }
+        return 0;
+    }
+
+    /** Iris: item.properties id of the held item's model (or registry id), -1 when unmapped. */
+    private static int heldItemId(net.minecraft.world.InteractionHand hand) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return ItemIdMap.UNMAPPED;
+        }
+        net.minecraft.world.item.ItemStack stack = minecraft.player.getItemInHand(hand);
+        net.minecraft.resources.Identifier model = stack.get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+        if (model == null) {
+            model = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+        }
+        return ItemIdMap.active().id(model.getNamespace() + ":" + model.getPath());
     }
 
     public static Optional<ShaderPack> selectedPack() {
@@ -1693,10 +1765,12 @@ public final class VeyraRenderer {
         BeaconBeamPipelineSet preparedBeaconBeams = null;
         GraphicsPipeline preparedClouds = null;
         CustomUniforms previousCustomUniforms = CustomUniforms.active();
+        ItemIdMap previousItemIds = ItemIdMap.active();
         try {
             pack.validatePipelineCapabilities();
             // Adapters size uniform blocks from the active definitions, so install them before compiling.
             CustomUniforms.activate(pack.readCustomUniforms());
+            ItemIdMap.activate(pack.readItemIds());
             registerCustomUniforms();
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
@@ -1888,6 +1962,7 @@ public final class VeyraRenderer {
         } catch (Exception exception) {
             if (repository.getSelected().orElse(null) != pack) {
                 CustomUniforms.activate(previousCustomUniforms);
+                ItemIdMap.activate(previousItemIds);
             }
             if (prepared != null) {
                 prepared.close();
@@ -1921,6 +1996,7 @@ public final class VeyraRenderer {
     public static String disable() {
         VeyraSpecularTextures.invalidate();
         CustomUniforms.activate(CustomUniforms.EMPTY);
+        ItemIdMap.activate(ItemIdMap.EMPTY);
         IOException saveFailure = null;
         try {
             repository.select(null);
@@ -4613,6 +4689,16 @@ public final class VeyraRenderer {
         List<UniformValue> values = new ArrayList<>(program.uniforms().size());
         for (String uniform : program.uniforms()) {
             values.add(switch (uniform) {
+                case "near" -> new UniformValue.FloatUniform(IRIS_NEAR_PLANE);
+                case "far" -> new UniformValue.FloatUniform(farPlane());
+                case "heldBlockLightValue" -> new UniformValue.IntUniform(
+                        heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND));
+                case "heldBlockLightValue2" -> new UniformValue.IntUniform(
+                        heldBlockLightValue(net.minecraft.world.InteractionHand.OFF_HAND));
+                case "heldItemId" -> new UniformValue.IntUniform(
+                        heldItemId(net.minecraft.world.InteractionHand.MAIN_HAND));
+                case "heldItemId2" -> new UniformValue.IntUniform(
+                        heldItemId(net.minecraft.world.InteractionHand.OFF_HAND));
                 case "viewWidth" -> new UniformValue.FloatUniform(width);
                 case "viewHeight" -> new UniformValue.FloatUniform(height);
                 case "aspectRatio" -> new UniformValue.FloatUniform((float) width / height);

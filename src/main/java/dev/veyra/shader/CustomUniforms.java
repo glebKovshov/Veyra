@@ -23,6 +23,7 @@ public final class CustomUniforms {
     public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of());
     /** Built-in scalar inputs an expression may reference; vector inputs are exposed by component. */
     public static final Set<String> BUILT_IN_INPUTS = Set.of(
+            "biome", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay", "moonPhase",
             "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "screenBrightness", "blindness",
@@ -216,12 +217,15 @@ public final class CustomUniforms {
 
     private record Reference(String name) implements Node {
         public double evaluate(Function<String, Double> inputs, double frameTime) {
+            Integer constant = BiomeIds.constant(name);
+            if (constant != null) return constant;
             Double value = inputs.apply(name);
             return value == null ? 0.0 : value;
         }
 
         public String missingInput(Set<String> defined) {
-            return defined.contains(name) || BUILT_IN_INPUTS.contains(name) ? null : name;
+            return defined.contains(name) || BUILT_IN_INPUTS.contains(name) || BiomeIds.constant(name) != null
+                    ? null : name;
         }
     }
 

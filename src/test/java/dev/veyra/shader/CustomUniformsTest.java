@@ -43,7 +43,7 @@ class CustomUniformsTest {
     @Test
     void parsesUniformsInOrderAndKeepsHelperVariablesPrivate() {
         CustomUniforms uniforms = CustomUniforms.parse(BSL_STYLE);
-        assertEquals(List.of("timeAngle", "shadowFade", "timeBrightness", "blindFactor", "framemod8", "underwater"),
+        assertEquals(List.of("timeAngle", "shadowFade", "timeBrightness", "blindFactor", "isDesert", "isCold", "framemod8", "underwater"),
                 uniforms.uniforms().stream().map(CustomUniforms.Uniform::name).toList());
         assertNull(uniforms.uniform("tAmin"));
         assertEquals(CustomUniforms.Type.INT, uniforms.uniform("framemod8").type());
@@ -72,11 +72,13 @@ class CustomUniformsTest {
     @Test
     void reportsUnavailableInputsVectorsAndDependents() {
         CustomUniforms uniforms = CustomUniforms.parse(BSL_STYLE);
-        assertNull(uniforms.uniform("isDesert"));
-        assertTrue(uniforms.unavailableReason("isDesert").contains("biome"));
-        assertTrue(uniforms.unavailableReason("isCold").contains("biome"));
+        // biome is an Iris input; numeric ids work, unknown BIOME_* names stay unavailable.
+        assertNotNull(uniforms.uniform("isDesert"));
+        assertNotNull(uniforms.uniform("isCold"));
+        assertTrue(CustomUniforms.parse("uniform.float.x=in(biome, BIOME_NOT_REGISTERED_HERE)\n")
+                .unavailableReason("x").contains("BIOME_NOT_REGISTERED_HERE"));
         assertTrue(uniforms.unavailableReason("skyTint").contains("vec3"));
-        CustomUniforms dependent = CustomUniforms.parse("variable.float.a=biome\nuniform.float.b=a * 2.0\n");
+        CustomUniforms dependent = CustomUniforms.parse("variable.float.a=lightning\nuniform.float.b=a * 2.0\n");
         assertTrue(dependent.unavailableReason("b").contains("unavailable 'a'"));
         assertNull(uniforms.unavailableReason("shadowFade"));
     }
@@ -126,6 +128,21 @@ class CustomUniformsTest {
     }
 
     @Test
+    void biomeConstantsFollowRegistrationOrder() {
+        BiomeIds.register("veyra_test:first_fixture_biome");
+        BiomeIds.register("veyra_test:second_fixture_biome");
+        int second = BiomeIds.id("veyra_test:second_fixture_biome");
+        assertEquals(BiomeIds.id("veyra_test:first_fixture_biome") + 1, second);
+        assertEquals(second, BiomeIds.constant("BIOME_SECOND_FIXTURE_BIOME"));
+        assertEquals(0, BiomeIds.id("veyra_test:unregistered"));
+        CustomUniforms uniforms = CustomUniforms.parse(
+                "uniform.float.match=if(in(biome, BIOME_SECOND_FIXTURE_BIOME), 1, 0) + PPT_SNOW\n");
+        uniforms.evaluate(Map.of("biome", (double) second)::get, 0.05);
+        assertEquals(3.0F, uniforms.floatValue("match"));
+        assertEquals(String.valueOf(second), GlslPreprocessor.environment().get("BIOME_SECOND_FIXTURE_BIOME"));
+    }
+
+    @Test
     void deepNestingIsBounded() {
         String deep = "(".repeat(500) + "1" + ")".repeat(500);
         CustomUniforms uniforms = CustomUniforms.parse("uniform.float.deep=" + deep + "\n");
@@ -146,8 +163,8 @@ class CustomUniformsTest {
         assertTrue(terrain.contains("    float shadowFade;"));
 
         IOException missing = assertThrows(IOException.class, () -> ShaderPackUniformAdapter.extract(
-                "uniform float isDesert;\nvoid main(){}\n", "gbuffers_entities"));
-        assertTrue(missing.getMessage().contains("biome"), missing.getMessage());
+                "uniform float skyTint;\nvoid main(){}\n", "gbuffers_entities"));
+        assertTrue(missing.getMessage().contains("vec3"), missing.getMessage());
         assertThrows(IOException.class, () -> ShaderPackUniformAdapter.extract(
                 "uniform int shadowFade;\nvoid main(){}\n", "gbuffers_entities"));
 

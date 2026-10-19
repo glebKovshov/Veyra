@@ -48,6 +48,12 @@ public final class TerrainShaderAdapter {
             Map.entry("sphericalVertexDistance", new Varying("float", 8)),
             Map.entry("cylindricalVertexDistance", new Varying("float", 9)));
     private static final List<ShaderUniform> SHADERPACK_UNIFORMS = List.of(
+            new ShaderUniform("near", "float", false),
+            new ShaderUniform("far", "float", false),
+            new ShaderUniform("heldBlockLightValue", "int", false),
+            new ShaderUniform("heldBlockLightValue2", "int", false),
+            new ShaderUniform("heldItemId", "int", false),
+            new ShaderUniform("heldItemId2", "int", false),
             new ShaderUniform("viewWidth", "float", false),
             new ShaderUniform("viewHeight", "float", false),
             new ShaderUniform("aspectRatio", "float", false),
