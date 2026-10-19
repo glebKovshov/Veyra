@@ -188,6 +188,7 @@ public final class TerrainShaderAdapter {
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         boolean noiseSamplerAvailable = usesNoiseSampler(adapted);
         ShadowColorSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
+        ShadowDepthSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
@@ -198,12 +199,12 @@ public final class TerrainShaderAdapter {
                     && !sampler.equals("specular")
                     && !colorInputs.containsKey(sampler)
                     && !(sampler.equals("depthtex1") && waterInputsAvailable)
-                    && !((sampler.equals("shadowtex0") || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
             if (!samplerType.equals("sampler2D")
-                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable
+                    && !((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) && shadowSamplerAvailable
                     && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException("gbuffers_terrain sampler '" + sampler + "' must use sampler2D.");
             }
@@ -311,6 +312,10 @@ public final class TerrainShaderAdapter {
         if (usesSpecularSampler(source)) {
             bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D VeyraSpecularSampler;\n"
                     + "#define specular VeyraSpecularSampler\n" + bridge;
+        }
+        if (ShadowDepthSampler.used(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowDepthSampler.NAME + ";\n"
+                    + "#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
         }
         if (ShadowColorSampler.used(source)) {
             bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowColorSampler.NAME + ";\n"

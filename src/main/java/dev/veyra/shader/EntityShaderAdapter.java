@@ -358,6 +358,7 @@ public final class EntityShaderAdapter {
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         boolean usesShadowSampler = usesShadowSampler(adapted);
         ShadowColorSampler.validate(source, shadowSamplerAvailable, 0);
+        ShadowDepthSampler.validate(source, shadowSamplerAvailable, 0);
         if (usesShadowSampler && !shadowSamplerAvailable) {
             throw new IOException(programName + " samples shadowtex0, but this shader pack has no supported shadow pass.");
         }
@@ -369,12 +370,12 @@ public final class EntityShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
-                    && !((sampler.equals("shadowtex0") || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
             if (!samplerType.equals("sampler2D")
-                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable
+                    && !((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) && shadowSamplerAvailable
                     && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
@@ -622,7 +623,7 @@ public final class EntityShaderAdapter {
                         ? "uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n" : "")
                 .replace("__VEYRA_SHADOW_SAMPLER__", usesShadowSampler
                         ? "uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n" : "")
-                .replace("__VEYRA_SHADOW_FUNCTIONS__", usesShadowSampler ? """
+                .replace("__VEYRA_SHADOW_FUNCTIONS__", usesShadowSampler || ShadowDepthSampler.used(source) ? """
                         float veyraEntityShadowCompare(sampler2D sourceSampler, vec3 sourceCoord) {
                             return step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
                         }
@@ -637,6 +638,9 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_FOG_BRIDGE__", fogUniforms.bridge());
         if (TerrainShaderAdapter.usesSpecularSampler(source)) {
             bridge = "uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n" + bridge;
+        }
+        if (ShadowDepthSampler.used(source)) {
+            bridge = "uniform sampler2D " + ShadowDepthSampler.NAME + ";\n#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
         }
         if (ShadowColorSampler.used(source)) {
             bridge = "uniform sampler2D " + ShadowColorSampler.NAME + ";\n#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;

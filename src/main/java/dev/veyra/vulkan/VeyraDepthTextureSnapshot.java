@@ -101,6 +101,35 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
         transition(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     }
 
+    /** Copy a completed offscreen depth attachment on the graphics queue. */
+    public void capture(VulkanImage source) {
+        if ((source.usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
+            throw new IllegalStateException("The source depth image does not support transfer reads.");
+        if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+        ensure(source.width, source.height, source.format);
+        VulkanImage destination = depthImage();
+        if (source.getId() == destination.getId()) throw new IllegalStateException("Depth snapshot aliases its source.");
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkFormatProperties properties = VkFormatProperties.calloc(stack);
+            VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, source.format, properties);
+            if ((properties.optimalTilingFeatures() & (VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
+                    != (VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
+                throw new IllegalStateException("The shadow depth format does not support image copies.");
+            var commands = Renderer.getCommandBuffer();
+            int previous = source.getCurrentLayout();
+            source.transitionImageLayout(stack, commands, VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            destination.transitionImageLayout(stack, commands, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            var region = org.lwjgl.vulkan.VkImageCopy.calloc(1, stack);
+            region.srcSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT).layerCount(1);
+            region.dstSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT).layerCount(1);
+            region.extent().set(source.width, source.height, 1);
+            VK10.vkCmdCopyImage(commands, source.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    destination.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region);
+            source.transitionImageLayout(stack, commands, previous);
+        }
+        transitionToSampling();
+    }
+
     /** Initialize actual image contents before any first-frame history sampling. */
     public void clearToFarDepth() {
         if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();

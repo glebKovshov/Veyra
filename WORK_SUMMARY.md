@@ -4,7 +4,15 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Актуальный срез: shadow color inputs — 2026-10-19
+## Текущая работа: separate shadowtex1 — 2026-10-19
+
+- Shadow draw order исправлен на opaque terrain → entity/block features → отдельный graphics-queue depth copy → translucent terrain с LOAD/STORE resume pass. Добавлен настоящий snapshot shadowtex1; native usage/format transfer support проверяются, layout barriers выполняются вне render pass. Ошибка shadow rendering теперь отключает shader rendering с диагностикой вместо продолжения с неполными данными.
+- Terrain/entity adapters принимают shadowtex1 sampler2D/sampler2DShadow, включая comparison helper, когда shadowtex0 не читается. Shadow feedback отклоняется. Terrain резервирует slot 10; auxiliary water allocation пропускает занятые slots 10/11, бюджет учитывает shadow color.
+- Snapshot views/images используют существующее fence retirement. При release дополнительно удаляются cached VkPipeline variants для retiring shadow render passes через completed-frame queue. Это пока не доказательство чистого всего Vulkan teardown.
+- Локально `test validateShaders build` success: **131 tests, 0 failures/errors/skips**, 36 examples preprocess / 33 direct SPIR-V. Matrix расширена до 9 fixtures: opaque shader пишет 0.75, shadow_water 0.25; основной water/entity shader требует одновременно 0.75 в shadowtex1 и 0.25 в shadowtex0. Alias/snapshot после water/default image не проходит.
+- Новый полный source audit и GPU CI ещё не проверены. Предыдущий подтверждённый checkpoint ниже сохранён. Post-program shadowtex1 ещё не подключён; полный real-pack pipeline не подтверждён, stable merge/release не готовы.
+
+## Предыдущий подтверждённый срез: shadow color inputs — 2026-10-19
 
 - Добавлено чтение существующего completed shadow color attachment через `shadowcolor0` и legacy `shadowcolor` в terrain/entity bridges. Linear/clamp соответствует default Iris color sampler; shadowtex1, дополнительные shadow colors, format/mipmap properties пока не реализованы.
 - Shadow-pass feedback отклоняется адаптерами. Terrain использует slot 11; вместе с этим sampler доступны максимум 5 auxiliary water images, шестой явно отклоняется до native binding. Entity использует фактический descriptor index. Color view заимствован у существующего shadow target; отдельное изображение не создаётся, cleanup очищает только owned binding identity.

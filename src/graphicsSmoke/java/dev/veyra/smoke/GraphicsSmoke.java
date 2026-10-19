@@ -38,7 +38,7 @@ public final class GraphicsSmoke {
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
-            boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity");
+            boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();

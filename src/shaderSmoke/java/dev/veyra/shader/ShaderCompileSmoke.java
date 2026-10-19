@@ -52,6 +52,12 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_entities", false, true);
             compile(compiler, options, entityShadow, "entity-shadow-sampler", true);
+            String entityOpaqueShadow = EntityShaderAdapter.adaptFragment("""
+                    uniform sampler2DShadow shadowtex1;
+                    float readDepth(sampler2DShadow sourceSampler) { return texture2DShadow(sourceSampler, vec3(0.5)); }
+                    void main() { gl_FragColor = vec4(readDepth(shadowtex1)); }
+                    """, "gbuffers_entities", false, true);
+            compile(compiler, options, entityOpaqueShadow, "entity-opaque-shadow-comparison", true);
             if (count == 0) throw new AssertionError("No example shaders found.");
             String inactive = ShaderIncludes.expand("final.fsh", "#if 0\n#include \"missing.glsl\"\n#endif\n", p -> Optional.empty());
             compile(compiler, options, "#version 450\n" + inactive + "layout(location=0) out vec4 color;\nvoid main(){color=vec4(1);}\n", "inactive-missing-include", true);

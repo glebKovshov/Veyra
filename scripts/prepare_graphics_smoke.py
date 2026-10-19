@@ -46,7 +46,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity'], default='geometry-mrt')
     fixture = parser.parse_args().fixture
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
     if fixture.startswith('water-'):

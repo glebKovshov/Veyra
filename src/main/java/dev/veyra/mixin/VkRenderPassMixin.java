@@ -26,7 +26,7 @@ public abstract class VkRenderPassMixin {
         if (active == null) return;
         var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
         if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra"))
-            VeyraShadowRenderer.bindEntityShadowColor(pass, pipeline);
+            { VeyraShadowRenderer.bindEntityShadowColor(pass, pipeline); VeyraShadowRenderer.bindEntityOpaqueDepth(pass, pipeline); }
         if (pipeline != null && pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME) != null) {
             VeyraNoiseTexture.bind(pass);
         }
