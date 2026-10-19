@@ -42,3 +42,11 @@ Verify in Minecraft 1.21.11 with Fabric Loader 0.18.4+ and VulkanMod 0.6.8: pack
 ## Reproduce
 
 Run `./gradlew --no-daemon build validateShaders packageExamplePacks` in a normal JDK 21 environment. Push a branch named `release/` plus `mod_version`, or a matching version tag, to run the gated Release workflow. It uploads the mod, sources, example packs, and SHA-256 checksums after all checks succeed.
+
+## Alpha release validation — 2026-10-19
+
+Tag `v0.2.0-alpha.1+mc1.21.11` points to `2b5acb0ddc823443e42733ae712803d78982d986`. The local alpha build and explicit JAR verifier pass. The complete Python source-audit runner was executed successfully on Windows: 12 default + 63 profile/dimension cases, 5,178 preprocessed sources, 18 accepted / 699 rejected geometry fragment/configuration cases. The new include limit introduces no failures in this matrix.
+
+The graphics prerequisite in [release run 39206709151](https://github.com/glebKovshov/Veyra/actions/runs/39206709151) passed on that exact tag. Its downloaded evidence reports 222,926 active magenta pixels, 0 with shaders disabled, 0 runtime validation errors and 10,031 teardown diagnostics. This confirms the synthetic MRT/composite fixture only. Popular-pack visual compatibility and clean device teardown remain unconfirmed.
+
+The already-published 0.1.1 line was independently rebuilt in a detached worktree and fast-forwarded into `main` at `e37f188`; GitHub confirms PR #1 merged. PR #2 remains draft for the incomplete 0.2 feature line.

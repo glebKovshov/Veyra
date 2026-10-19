@@ -188,3 +188,10 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Full pinned source audit завершён: 75 configurations, 5178/5178 preprocessed, 18 accepted / 699 rejected; expansion-limit failures 0. Checksums всех четырёх inputs совпали.
 - Готовая линия 0.1.1 после отдельного build/validateShaders/packageExamplePacks и проверки metadata/mixins интегрирована fast-forward в origin/main до e37f188. GitHub подтвердил PR #1 merged. Локальные артефакты сохранены.
 - Для публикации текущего проверяемого подмножества выбрана отдельная версия 0.2.0-alpha.1+mc1.21.11 и prerelease, stable 0.2.0 не объявляется. Release workflow автоматически ставит prerelease и latest=false для semver с суффиксом до build metadata. Backend blockers остаются.
+
+### Подтверждение alpha tag
+
+- Commit/tag: `2b5acb0` / `v0.2.0-alpha.1+mc1.21.11`. Локальная alpha сборка и explicit JAR verifier успешны.
+- Настоящий Python runner `scripts/run_shaderpack_source_audit.py` теперь успешно выполнен на Windows целиком: 12 default + 63 profile/dimension, 5178 stages, 18 accepted / 699 rejected. JSON arguments и gradlew.bat проверены фактическим запуском.
+- Graphics prerequisite release run `39206709151` успешен на точном alpha tag. Скачанный artifact: 222926 active magenta pixels / 0 disabled; runtime validation errors 0; teardown diagnostics 10031. Это synthetic fixture, не visual certification популярных паков.
+- Main `e37f188` также прошёл GitHub Build `39206618052`; PR #1 closed/merged. Feature PR #2 остаётся draft.
