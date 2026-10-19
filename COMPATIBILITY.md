@@ -1,5 +1,23 @@
 # Shaderpack compatibility: development 0.2
 
+## Iris uniforms and expression semantics (beta.6 candidate)
+
+- Iris' hardcoded `velocity` uniform and additional Iris common, dimension, player, celestial, and hardcoded custom uniforms are provided to the supported terrain, entity-family, and post uniform paths. Pack definitions override Iris hardcoded custom uniforms where Iris allows it.
+- Eligible non-opaque uniform declarations Iris does not register are lowered to their GLSL initializer or zero, matching their value under Iris instead of being mistaken for Veyra-provided inputs. Unsupported registered uniforms still reject the program.
+- Custom-uniform `smooth()` now follows Iris' `SmoothFloat`: fade arguments are half-lives in tenths of a second (default 1), zero follows immediately, and a constant first argument is OptiFine's id. `fmod` is floored as in Iris; `edge`, `log(base, x)`, `log10`, `exp10`, `random` and `randomInt` were added.
+- An undefined `BIOME_*` constant (Complementary r5.9.3 references `BIOME_SULFUR_CAVES`, which vanilla 1.21.11 does not register) fails in Iris too: Iris warns and never sets the uniform, so shaders read 0. Veyra now mirrors that for such definitions and their dependents and logs the same kind of warning. Inputs that Iris provides but Veyra does not still reject the program.
+- The offline source audit seeds vanilla biome ids from Minecraft's `Biomes` class in the same order `BiomesMixin` records at runtime, so `BIOME_*` constants no longer produce audit-only rejections.
+
+Refreshed pinned source audit (75 cases, all stages preprocessed): 18 geometry fragment programs accepted, 699 rejected; every case has `visualValidation: false`. Default Overworld blockers per program:
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 0/10, 0/10, 0/10 | terrain/water: missing `lmCoord` input; entity/block/hand/spidereyes: `currentRenderedItemId`; clouds: active `colortex0`; selected profiles: `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 1/9, 1/9, 1/9 | terrain/water: pack vertex varyings `color` / `mat`; entities: `entityColor`; hand: `isMainHand` varying; block: unsupported entity-bridge inputs; clouds: `texture` sampler | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent block/entity/hand geometry; water reads `colortex4` while it is an attachment; clouds: `texture` sampler | Not tested |
+
+Complementary terrain/water no longer stop at `heavyFog`, `velocity`, or biome constants; their next rejection is the `lmCoord` input that the terrain bridge does not provide. Uniform declarations that the adapters cannot bind are named in the diagnostic.
+
 ## Entity and block entity identifiers (beta.4)
 
 Veyra reads option-preprocessed Iris `entity.properties` and `block.properties`. Entity type mappings feed `entityId`; block IDs, partial state predicates and registered block tags feed `blockEntityId`. Block state rules follow source order, so the first matching selector wins. The renderer captures the identifier for each entity or block entity submission and routes its `RenderType` to a cached Vulkan pipeline variant with compile-time identifier constants. Unmapped values are `-1`.

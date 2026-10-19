@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0-beta.6 — candidate
+
+- Added Iris' hardcoded `velocity` uniform for terrain, entity-family and post programs; a pack's own `velocity` definition takes precedence, as for `shadowFade`.
+- Fixed pack-overridable built-ins after pack switches: selecting a pack that overrides `shadowFade` no longer leaves later packs' geometry programs reading 0.
+- Matched Iris custom-uniform semantics: `smooth()` half-lives in tenths of a second, floored `fmod`, and `edge`, `log(base, x)`, `log10`, `exp10`, `random`, `randomInt`.
+- Definitions that Iris itself cannot resolve because they reference an unregistered `BIOME_*` constant now stay 0 with a warning, as in Iris, instead of rejecting the program.
+- The pinned source audit now seeds vanilla biome ids from Minecraft's `Biomes` class, and terrain uniform rejections name the offending declaration.
+- Added `velocity` and a velocity-reading custom uniform to the `custom-uniforms` Lavapipe fixture.
+- Added Iris dimension, player, celestial, and hardcoded custom uniforms to supported geometry/post blocks, including pack-overridable hardcoded values and Iris defaults for uniforms Iris does not register.
+- Added focused regressions for Iris uniform declarations, custom-uniform inputs, smoothing, and fixed-time Nether/End time behavior.
+- The refreshed 75-case source audit remains source-only: 18 geometry fragment programs accepted and 699 rejected; the Complementary terrain/water blockers now identify the missing `lmCoord` input.
+
 ## 0.2.0-beta.5 — 2026-10-19 (prerelease)
 
 - Read and adapt `gbuffers_clouds.vsh` when a pack provides it, using VulkanMod's position/color cloud mesh and the supported `color` / `vertexDistance` outputs.

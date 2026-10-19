@@ -89,7 +89,9 @@ public final class ShaderPackUniformAdapter {
     /**
      * Iris patches entityId, blockEntityId and currentRenderedItemId only into programs whose vertex
      * format carries the entity attribute (entity/block-entity/hand overlay formats and text). Elsewhere
-     * the declarations remain unbound GL uniforms and read 0, which these programs receive here as well.
+     * Iris 1.21.11 CommonUniforms supplies fixed fallbacks: blockEntityId and currentRenderedItemId are
+     * -1 and entityColor is vec4(0). entityId follows CapturedRenderingState, which entity rendering
+     * resets to 0 after every entity, so programs outside that path read 0 in a populated world.
      */
     public static boolean isUnboundEntityIdentifier(String programName, String type, String name) {
         return type.equals(UNBOUND_ENTITY_VALUES.get(name))
@@ -103,12 +105,17 @@ public final class ShaderPackUniformAdapter {
                 && ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
     }
 
-    /** A zero-valued constant replacing an Iris-unbound entity uniform, or null when Iris binds it. */
+    /** The Iris fallback constant for an entity uniform outside entity programs, or null when Iris binds it. */
     public static String unboundEntityDeclaration(String programName, String type, String name) {
         if (!isUnboundEntityIdentifier(programName, type, name)) {
             return null;
         }
-        return "const " + type + " " + name + " = " + (type.equals("int") ? "0" : "vec4(0.0)") + ";\n";
+        String value = switch (name) {
+            case "blockEntityId", "currentRenderedItemId" -> "-1";
+            case "entityColor" -> "vec4(0.0)";
+            default -> "0";
+        };
+        return "const " + type + " " + name + " = " + value + ";\n";
     }
 
     public static List<String> matrixUniforms() {

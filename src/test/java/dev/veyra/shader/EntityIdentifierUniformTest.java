@@ -13,13 +13,13 @@ class EntityIdentifierUniformTest {
             """;
 
     @Test
-    void terrainAndCloudsReceiveIrisUnboundZero() throws IOException {
+    void terrainAndCloudsReceiveIrisFallbackValues() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment(SOURCE);
-        assertTrue(terrain.contains("const int blockEntityId = 0;"));
+        assertTrue(terrain.contains("const int blockEntityId = -1;"));
         assertTrue(terrain.contains("const int entityId = 0;"));
         assertFalse(terrain.contains("uniform int blockEntityId"));
         String clouds = CloudShaderAdapter.adaptFragment(SOURCE);
-        assertTrue(clouds.contains("const int blockEntityId = 0;"), clouds);
+        assertTrue(clouds.contains("const int blockEntityId = -1;"), clouds);
     }
 
     @Test

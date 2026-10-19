@@ -10,7 +10,30 @@ public final class ShaderPackAudit {
     private static String quote(String text) {
         return "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "\"";
     }
+    /**
+     * At runtime BiomesMixin numbers vanilla biomes in Biomes.register order, which defines Iris'
+     * biome ids and BIOME_* constants. Offline, read the same declaration order from Minecraft's
+     * Biomes class when the game jar is on the audit classpath; otherwise BIOME_* stay undefined.
+     */
+    private static void seedVanillaBiomeIds() {
+        try {
+            Class<?> biomes = Class.forName("net.minecraft.world.level.biome.Biomes");
+            int count = 0;
+            for (java.lang.reflect.Field field : biomes.getDeclaredFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())
+                        || !field.getType().getName().equals("net.minecraft.resources.ResourceKey")) continue;
+                Object key = field.get(null);
+                BiomeIds.register(key.getClass().getMethod("identifier").invoke(key).toString());
+                count++;
+            }
+            System.err.println("Seeded " + count + " vanilla biome ids from Minecraft's Biomes class.");
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            System.err.println("Minecraft's Biomes class is unavailable; BIOME_* constants stay undefined: " + exception);
+        }
+    }
+
     public static void main(String[] args) throws Exception {
+        seedVanillaBiomeIds();
         int dimension = 0;
         String profile = "";
         for (String argument : args) {

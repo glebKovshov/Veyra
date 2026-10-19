@@ -75,8 +75,20 @@ class CustomUniformsTest {
         // biome is an Iris input; numeric ids work, unknown BIOME_* names stay unavailable.
         assertNotNull(uniforms.uniform("isDesert"));
         assertNotNull(uniforms.uniform("isCold"));
-        assertTrue(CustomUniforms.parse("uniform.float.x=in(biome, BIOME_NOT_REGISTERED_HERE)\n")
-                .unavailableReason("x").contains("BIOME_NOT_REGISTERED_HERE"));
+        // Iris cannot resolve an unregistered biome constant either: it warns and the uniform reads 0.
+        CustomUniforms unregistered = CustomUniforms.parse("""
+                variable.float.inSulfur=smooth(56, if(in(biome, BIOME_NOT_REGISTERED_HERE), 1, 0), 15, 15)
+                uniform.float.x=inSulfur * 2.0 + 1.0
+                uniform.int.y=7
+                """);
+        assertNull(unregistered.unavailableReason("x"));
+        assertEquals(CustomUniforms.Type.FLOAT, unregistered.uniform("x").type());
+        assertTrue(unregistered.irisUnresolved().get("inSulfur").contains("BIOME_NOT_REGISTERED_HERE"));
+        assertTrue(unregistered.irisUnresolved().get("x").contains("inSulfur"));
+        assertFalse(unregistered.irisUnresolved().containsKey("y"));
+        unregistered.evaluate(Map.of("biome", 3.0)::get, 0.05);
+        assertEquals(0.0F, unregistered.floatValue("x"));
+        assertEquals(7, unregistered.intValue("y"));
         assertTrue(uniforms.unavailableReason("skyTint").contains("vec3"));
         CustomUniforms dependent = CustomUniforms.parse("variable.float.a=lightning\nuniform.float.b=a * 2.0\n");
         assertTrue(dependent.unavailableReason("b").contains("unavailable 'a'"));
@@ -127,15 +139,80 @@ class CustomUniformsTest {
     }
 
     @Test
-    void smoothApproachesTargetOverFadeTime() {
-        CustomUniforms uniforms = CustomUniforms.parse("uniform.float.s=smooth(1, frameCounter, 1, 1)\n");
+    void smoothUsesIrisHalfLivesInTenthsOfASecond() {
+        // Iris SmoothFloat: half-life = fade * 0.1 s, alpha = 1 - exp(-ln2 / halfLife * frameTime).
+        CustomUniforms uniforms = CustomUniforms.parse("uniform.float.s=smooth(1, frameCounter, 1, 10)\n");
         uniforms.evaluate(Map.of("frameCounter", 0.0)::get, 0.05);
         assertEquals(0.0F, uniforms.floatValue("s"));
-        uniforms.evaluate(Map.of("frameCounter", 1.0)::get, 0.5);
-        float half = uniforms.floatValue("s");
-        assertTrue(half > 0.8F && half < 0.95F, "after half the fade time " + half);
-        uniforms.evaluate(Map.of("frameCounter", 1.0)::get, 0.5);
-        assertEquals(1.0F, uniforms.floatValue("s"), 0.011F);
+        // Rising uses fadeUp = 1 (0.1 s half-life): 0.1 s halves the remaining distance.
+        uniforms.evaluate(Map.of("frameCounter", 1.0)::get, 0.1);
+        assertEquals(0.5F, uniforms.floatValue("s"), 1.0e-6F);
+        uniforms.evaluate(Map.of("frameCounter", 1.0)::get, 0.2);
+        assertEquals(0.875F, uniforms.floatValue("s"), 1.0e-6F);
+        // Falling uses fadeDown = 10 (1 s half-life).
+        uniforms.evaluate(Map.of("frameCounter", 0.0)::get, 1.0);
+        assertEquals(0.4375F, uniforms.floatValue("s"), 1.0e-6F);
+    }
+
+    @Test
+    void smoothArgumentFormsMatchIris() {
+        CustomUniforms uniforms = CustomUniforms.parse("""
+                uniform.float.defaultFade=smooth(frameCounter)
+                uniform.float.withId=smooth(7, frameCounter)
+                uniform.float.oneFade=smooth(frameCounter, 2)
+                uniform.float.immediate=smooth(frameCounter, 0, 0)
+                """);
+        uniforms.evaluate(Map.of("frameCounter", 0.0)::get, 0.05);
+        uniforms.evaluate(Map.of("frameCounter", 1.0)::get, 0.1);
+        assertEquals(0.5F, uniforms.floatValue("defaultFade"), 1.0e-6F);
+        // A constant first argument is OptiFine's id, so the default fade still applies.
+        assertEquals(0.5F, uniforms.floatValue("withId"), 1.0e-6F);
+        // A single fade argument is used for both directions: 0.2 s half-life.
+        assertEquals((float) (1.0 - Math.pow(0.5, 0.5)), uniforms.floatValue("oneFade"), 1.0e-6F);
+        assertEquals(1.0F, uniforms.floatValue("immediate"));
+    }
+
+    @Test
+    void irisArithmeticFunctions() {
+        CustomUniforms uniforms = CustomUniforms.parse("""
+                uniform.float.floorMod=fmod(-1, 4)
+                uniform.float.edgeLow=edge(0.5, 0.2)
+                uniform.float.edgeHigh=edge(0.5, 0.7)
+                uniform.float.logBase=log(2, 8)
+                uniform.float.common=log10(1000) + exp10(2)
+                uniform.float.rand=random()
+                uniform.float.randRange=random(2, 4)
+                uniform.int.randInt=randomInt(5)
+                uniform.int.randIntRange=randomInt(3, 6)
+                """);
+        assertTrue(uniforms.uniforms().size() == 9, uniforms.uniforms().toString());
+        uniforms.evaluate(Map.<String, Double>of()::get, 0.05);
+        assertEquals(3.0F, uniforms.floatValue("floorMod"));
+        assertEquals(0.0F, uniforms.floatValue("edgeLow"));
+        assertEquals(1.0F, uniforms.floatValue("edgeHigh"));
+        assertEquals(3.0F, uniforms.floatValue("logBase"), 1.0e-6F);
+        assertEquals(103.0F, uniforms.floatValue("common"), 1.0e-4F);
+        assertTrue(uniforms.floatValue("rand") >= 0.0F && uniforms.floatValue("rand") < 1.0F);
+        assertTrue(uniforms.floatValue("randRange") >= 2.0F && uniforms.floatValue("randRange") < 4.0F);
+        assertTrue(uniforms.intValue("randInt") >= 0 && uniforms.intValue("randInt") < 5);
+        assertTrue(uniforms.intValue("randIntRange") >= 3 && uniforms.intValue("randIntRange") < 6);
+    }
+
+    @Test
+    void velocityIsAPackOverridableIrisUniform() {
+        CustomUniforms overridden = CustomUniforms.parse("uniform.float.velocity=frameTime * 2.0\n");
+        assertNotNull(overridden.uniform("velocity"));
+        overridden.evaluate(Map.of("frameTime", 0.25)::get, 0.25);
+        assertEquals(0.5F, overridden.floatValue("velocity"));
+        assertTrue(CustomUniforms.parse("uniform.int.velocity=1\n").unavailableReason("velocity")
+                .contains("must remain a float"));
+        // Expressions may read the built-in value, as with Complementary's own velocity helpers.
+        assertNotNull(CustomUniforms.parse("uniform.float.moving=if(velocity > 0.01, 1, 0)\n").uniform("moving"));
+
+        CustomUniforms.activate(overridden);
+        long velocitySlots = TerrainShaderAdapter.shaderPackUniforms().stream()
+                .filter(uniform -> uniform.name().equals("velocity")).count();
+        assertEquals(1, velocitySlots, "a pack override must not add a second uniform block member");
     }
 
     @Test

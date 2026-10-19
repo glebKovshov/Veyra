@@ -169,7 +169,7 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|shadowFade|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|shadowFade|velocity|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth|atlasSize)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
@@ -198,10 +198,10 @@ public final class VeyraRenderer {
     private static final String DEPTH2_INPUT_NAME = "VeyraDepthTex2";
     private static final String DEPTH2_INPUT_SAMPLER = DEPTH2_INPUT_NAME + "Sampler";
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
-    private static final List<String> SUPPORTED_UNIFORMS = List.of(
+    private static final List<String> SUPPORTED_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.values()), List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "shadowFade", "playerMood", "biome_precipitation", "atlasSize", "lightningBoltPosition",
-            "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "darknessLightFactor", "shadowFade", "velocity", "playerMood", "biome_precipitation", "atlasSize",
+            "lightningBoltPosition", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
             "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
@@ -210,27 +210,28 @@ public final class VeyraRenderer {
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
             "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract",
-            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor");
+            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor"));
     private static final List<String> MATRIX_UNIFORMS = List.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse");
-    private static final List<String> VECTOR3_UNIFORMS = List.of(
+    private static final List<String> VECTOR3_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.VEC3), List.of(
             "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract",
-            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor");
+            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor"));
     private static final List<String> VECTOR4_UNIFORMS = List.of("lightningBoltPosition");
     private static final List<String> IVECTOR2_UNIFORMS = List.of("eyeBrightness", "eyeBrightnessSmooth", "atlasSize");
     private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
-    private static final List<String> BOOLEAN_UNIFORMS = List.of(
-            "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
-    private static final List<String> INTEGER_UNIFORMS = List.of(
+    private static final List<String> BOOLEAN_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.BOOL), List.of(
+            "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning"));
+    private static final List<String> INTEGER_UNIFORMS = withIrisExtras(
+            Set.of(IrisExtraUniforms.Kind.INT, IrisExtraUniforms.Kind.BOOL), List.of(
             "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "biome_precipitation",
             "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
-            "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
-    private static final List<String> DYNAMIC_UNIFORMS = List.of(
+            "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning"));
+    private static final List<String> DYNAMIC_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.values()), List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
             "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "lightningBoltPosition",
-            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "shadowFade", "rainStrength", "wetness", "thunderStrength",
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "shadowFade", "velocity", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -238,7 +239,12 @@ public final class VeyraRenderer {
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
             "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract",
-            "eyePosition", "relativeEyePosition");
+            "eyePosition", "relativeEyePosition"));
+    /** Post declarations of Iris extras; the generated uniform block provides them. */
+    private static final Pattern IRIS_EXTRA_UNIFORM_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:float|int|bool|vec3)\\s+(?:"
+                    + String.join("|", IrisExtraUniforms.definitions().stream().map(IrisExtraUniforms.Definition::name).toList())
+                    + ")\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Map<String, PipelineProgram> PIPELINE_CACHE = new HashMap<>();
     private static final Set<PipelineProgram> COMPILED_PIPELINES = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<EntityPipelineKey, RenderPipeline> ENTITY_PIPELINE_CACHE = new HashMap<>();
@@ -472,8 +478,15 @@ public final class VeyraRenderer {
 
     /** VulkanMod resolves uniform block members by name; custom names read the latest evaluated value. */
     private static void registerCustomUniforms() {
+        // Both activation paths end here; report definitions that stay 0 the way Iris warns about them.
+        CustomUniforms.active().irisUnresolved().forEach((name, reason) -> VeyraClient.LOGGER.warn(
+                "Custom uniform '{}' stays 0 because Iris cannot resolve it either: {}.", name, reason));
         for (CustomUniforms.Uniform uniform : CustomUniforms.active().uniforms()) {
             String name = uniform.name();
+            if (CustomUniforms.PACK_OVERRIDABLE.contains(name)) {
+                // The built-in supplier resolves the pack override itself and must survive pack switches.
+                continue;
+            }
             if (uniform.type() == CustomUniforms.Type.FLOAT) {
                 Uniforms.vec1f_uniformMap.put(name, () -> CustomUniforms.active().floatValue(name));
             } else {
@@ -495,6 +508,7 @@ public final class VeyraRenderer {
             case "far" -> (double) farPlane();
             case "darknessLightFactor" -> (double) darknessLightFactor;
             case "shadowFade" -> (double) frame.shadowFade();
+            case "velocity" -> (double) cameraVelocity(camera);
             case "playerMood" -> (double) playerMood();
             case "biome_precipitation" -> (double) biomePrecipitation();
             case "heldBlockLightValue" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -541,7 +555,7 @@ public final class VeyraRenderer {
             case "eyeBrightness.y" -> (double) camera.eyeBrightness().y;
             case "eyeBrightnessSmooth.x" -> (double) camera.eyeBrightnessSmooth().x;
             case "eyeBrightnessSmooth.y" -> (double) camera.eyeBrightnessSmooth().y;
-            default -> null;
+            default -> IrisExtraUniforms.expressionInput(name);
         };
     }
 
@@ -603,7 +617,13 @@ public final class VeyraRenderer {
             case "relativeEyePosition" -> uniforms.relativeEyePosition();
             case "playerLookVector" -> uniforms.playerLookVector();
             case "skyColor" -> uniforms.skyColor();
-            default -> throw new IllegalArgumentException("Unknown shader pack vector uniform " + name + ".");
+            default -> {
+                if (!IrisExtraUniforms.contains(name)) {
+                    throw new IllegalArgumentException("Unknown shader pack vector uniform " + name + ".");
+                }
+                float[] extra = IrisExtraUniforms.vector(name);
+                yield new Vector3f(extra[0], extra[1], extra[2]);
+            }
         };
         buffer.putFloat(0, value.x);
         buffer.putFloat(Float.BYTES, value.y);
@@ -696,12 +716,33 @@ public final class VeyraRenderer {
     }
 
     private static float shadowFadeUniform(FrameUniforms frame) {
+        return packOverridableFloat("shadowFade", frame.shadowFade());
+    }
+
+    /** Iris hardcoded custom uniforms yield to a shaders.properties definition with the same name. */
+    private static float packOverridableFloat(String name, float builtInValue) {
         CustomUniforms customUniforms = CustomUniforms.active();
-        return customUniforms.uniform("shadowFade") == null
-                ? frame.shadowFade() : customUniforms.floatValue("shadowFade");
+        return customUniforms.uniform(name) == null ? builtInValue : customUniforms.floatValue(name);
+    }
+
+    /**
+     * Iris' hardcoded velocity: the distance in blocks the camera moved since the previous frame.
+     * Integer and fractional parts are subtracted separately to keep precision far from the origin.
+     */
+    private static float cameraVelocity(CameraUniforms camera) {
+        double dx = (camera.cameraPositionInt().x - camera.previousCameraPositionInt().x)
+                + (double) (camera.cameraPositionFract().x - camera.previousCameraPositionFract().x);
+        double dy = (camera.cameraPositionInt().y - camera.previousCameraPositionInt().y)
+                + (double) (camera.cameraPositionFract().y - camera.previousCameraPositionFract().y);
+        double dz = (camera.cameraPositionInt().z - camera.previousCameraPositionInt().z)
+                + (double) (camera.cameraPositionFract().z - camera.previousCameraPositionFract().z);
+        return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     private static float shaderPackFloatUniform(String name) {
+        if (IrisExtraUniforms.contains(name)) {
+            return (float) irisExtraScalar(name);
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (name.equals("near")) {
             return IRIS_NEAR_PLANE;
@@ -732,6 +773,7 @@ public final class VeyraRenderer {
             case "frameTime" -> frame.frameTime();
             case "sunAngle" -> frame.sunAngle();
             case "shadowFade" -> shadowFadeUniform(frame);
+            case "velocity" -> packOverridableFloat("velocity", cameraVelocity(frame.camera()));
             case "rainStrength" -> frame.rainStrength();
             case "wetness" -> frame.wetness();
             case "thunderStrength" -> frame.thunderStrength();
@@ -747,6 +789,9 @@ public final class VeyraRenderer {
     }
 
     private static int shaderPackIntUniform(String name) {
+        if (IrisExtraUniforms.contains(name)) {
+            return (int) irisExtraScalar(name);
+        }
         if (name.equals("heldBlockLightValue")) {
             return heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
         }
@@ -827,6 +872,288 @@ public final class VeyraRenderer {
         };
     }
 
+    private static List<String> withIrisExtras(Set<IrisExtraUniforms.Kind> kinds, List<String> builtIns) {
+        List<String> names = new ArrayList<>(builtIns);
+        for (IrisExtraUniforms.Definition definition : IrisExtraUniforms.definitions()) {
+            if (kinds.contains(definition.kind()) && !names.contains(definition.name())) {
+                names.add(definition.name());
+            }
+        }
+        return List.copyOf(names);
+    }
+
+    /** Iris extras; hardcoded custom uniforms yield to a shaders.properties definition of the same name. */
+    private static double irisExtraScalar(String name) {
+        CustomUniforms customUniforms = CustomUniforms.active();
+        if (IrisExtraUniforms.HARDCODED_CUSTOM.contains(name) && customUniforms.uniform(name) != null) {
+            return customUniforms.floatValue(name);
+        }
+        return IrisExtraUniforms.scalar(name);
+    }
+
+    private static UniformValue irisExtraUniformValue(String name) {
+        IrisExtraUniforms.Definition definition = IrisExtraUniforms.definition(name);
+        return switch (definition.kind()) {
+            case FLOAT -> new UniformValue.FloatUniform((float) irisExtraScalar(name));
+            case INT, BOOL -> new UniformValue.IntUniform((int) irisExtraScalar(name));
+            case VEC3 -> {
+                float[] vector = IrisExtraUniforms.vector(name);
+                yield new UniformValue.Vec3Uniform(new Vector3f(vector[0], vector[1], vector[2]));
+            }
+        };
+    }
+
+    /** Iris WorldTimeUniforms: fixed-time dimensions other than the Nether and End report 0. */
+    private static int irisWorldTime(ClientLevel level, long dayTime) {
+        boolean netherOrEnd = level.dimension().equals(net.minecraft.world.level.Level.NETHER)
+                || level.dimension().equals(net.minecraft.world.level.Level.END);
+        return irisWorldTime(dayTime, level.dimensionType().hasFixedTime(), netherOrEnd);
+    }
+
+    static int irisWorldTime(long dayTime, boolean fixedTime, boolean netherOrEnd) {
+        if (!netherOrEnd && fixedTime) {
+            return 0;
+        }
+        return (int) (dayTime % 24000L);
+    }
+
+    /** Iris CelestialUniforms.getSunAngle: the attribute angle plus 90 degrees, wrapped to [0, 360]. */
+    private static float irisCelestialAngle(float attributeAngle) {
+        float angle = attributeAngle + 90.0F;
+        if (angle < 0.0F) {
+            angle += 360.0F;
+        } else if (angle > 360.0F) {
+            angle -= 360.0F;
+        }
+        return angle;
+    }
+
+    // Iris HardcodedCustomUniforms smoothing state; like Iris' per-pipeline SmoothedFloats it restarts
+    // with the world and with each shader pack selection.
+    private static final IrisSmoothedFloat IRIS_EYE_IN_CAVE = new IrisSmoothedFloat(6, 12);
+    private static final IrisSmoothedFloat IRIS_RAIN_STRENGTH_S = new IrisSmoothedFloat(15, 15);
+    private static final IrisSmoothedFloat IRIS_RAIN_STRENGTH_SHINING = new IrisSmoothedFloat(10, 11);
+    private static final IrisSmoothedFloat IRIS_RAIN_STRENGTH_S2 = new IrisSmoothedFloat(70, 1);
+    private static final IrisSmoothedFloat IRIS_DRY = new IrisSmoothedFloat(20, 10);
+    private static final IrisSmoothedFloat IRIS_RAINY = new IrisSmoothedFloat(20, 10);
+    private static final IrisSmoothedFloat IRIS_SNOWY = new IrisSmoothedFloat(20, 10);
+    private static final IrisSmoothedFloat IRIS_MOVED = new IrisSmoothedFloat(0, 31536000);
+    private static final IrisSmoothedFloat IRIS_STARTER = new IrisSmoothedFloat(20, 20);
+    private static final IrisSmoothedFloat IRIS_FRAME_TIME_SMOOTH = new IrisSmoothedFloat(5, 5);
+    private static final IrisSmoothedFloat IRIS_EYE_BRIGHTNESS_M = new IrisSmoothedFloat(5, 5);
+    private static final IrisSmoothedFloat IRIS_PRECIPITATION_RAIN = new IrisSmoothedFloat(6, 6);
+    private static final IrisSmoothedFloat IRIS_TOUCH_MY_BODY = new IrisSmoothedFloat(0, 0.1);
+    private static final IrisSmoothedFloat IRIS_SNEAK_SMOOTH = new IrisSmoothedFloat(2, 0.9);
+    private static final IrisSmoothedFloat IRIS_BURNING_SMOOTH = new IrisSmoothedFloat(1, 2);
+    private static final IrisSmoothedFloat IRIS_SMOOTH_SPEED = new IrisSmoothedFloat(1, 1.5);
+    private static ShaderPack endFlashShadowsPack;
+    private static boolean endFlashShadows;
+
+    private static void resetIrisExtraUniformState() {
+        for (IrisSmoothedFloat smoother : List.of(IRIS_EYE_IN_CAVE, IRIS_RAIN_STRENGTH_S, IRIS_RAIN_STRENGTH_SHINING,
+                IRIS_RAIN_STRENGTH_S2, IRIS_DRY, IRIS_RAINY, IRIS_SNOWY, IRIS_MOVED, IRIS_STARTER,
+                IRIS_FRAME_TIME_SMOOTH, IRIS_EYE_BRIGHTNESS_M, IRIS_PRECIPITATION_RAIN, IRIS_TOUCH_MY_BODY,
+                IRIS_SNEAK_SMOOTH, IRIS_BURNING_SMOOTH, IRIS_SMOOTH_SPEED)) {
+            smoother.reset();
+        }
+    }
+
+    private static boolean selectedEndFlashShadows() {
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack != endFlashShadowsPack) {
+            endFlashShadowsPack = pack;
+            try {
+                endFlashShadows = pack != null && pack.readEndFlashShadows();
+            } catch (IOException exception) {
+                endFlashShadows = false;
+                VeyraClient.LOGGER.warn("Could not read the endFlashShadows directive; using Iris' default.", exception);
+            }
+        }
+        return endFlashShadows;
+    }
+
+    /**
+     * Evaluates the Iris 1.21.11 uniforms in {@link IrisExtraUniforms} once per frame, following
+     * IrisExclusiveUniforms, CommonUniforms, CelestialUniforms and HardcodedCustomUniforms.
+     */
+    private static void updateIrisExtraUniforms(Minecraft minecraft, FrameUniforms frame, Vec3 cameraPosition) {
+        ClientLevel level = minecraft.level;
+        var player = minecraft.player;
+        net.minecraft.world.entity.Entity cameraEntity = minecraft.getCameraEntity();
+        float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        float frameSeconds = frame.frameTime();
+        Map<String, Double> scalars = new HashMap<>();
+        Map<String, float[]> vectors = new HashMap<>();
+
+        var dimension = level.dimensionType();
+        scalars.put("heavyFog", minecraft.gui.getBossOverlay().shouldCreateWorldFog() ? 1.0 : 0.0);
+        scalars.put("heightLimit", (double) dimension.height());
+        scalars.put("logicalHeightLimit", (double) dimension.logicalHeight());
+        scalars.put("hasCeiling", dimension.hasCeiling() ? 1.0 : 0.0);
+        scalars.put("hasSkylight", dimension.hasSkyLight() ? 1.0 : 0.0);
+        scalars.put("ambientLight", (double) dimension.ambientLight());
+        scalars.put("seaLevel", (double) level.getSeaLevel());
+        scalars.put("isElytraFlying", player.isFallFlying() ? 1.0 : 0.0);
+        scalars.put("feetInWater", player.isInShallowWater() ? 1.0 : 0.0);
+        scalars.put("inSwimmingAnimation", player.isSwimming() ? 1.0 : 0.0);
+        scalars.put("isRiding", player.isPassenger() ? 1.0 : 0.0);
+        net.minecraft.world.entity.Entity vehicle = player.getVehicle();
+        scalars.put("vehicleInWater", vehicle != null && vehicle.isInShallowWater() ? 1.0 : 0.0);
+        int vehicleId = 0;
+        if (vehicle != null && EntityIdMap.active().size() > 0) {
+            var vehicleKey = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(vehicle.getType());
+            vehicleId = EntityIdMap.active().id(vehicleKey.getNamespace() + ":" + vehicleKey.getPath());
+        }
+        scalars.put("vehicleId", (double) vehicleId);
+        boolean survival = minecraft.gameMode != null && minecraft.gameMode.getPlayerMode().isSurvival();
+        scalars.put("currentPlayerHealth", survival ? (double) (player.getHealth() / player.getMaxHealth()) : -1.0);
+        scalars.put("maxPlayerHealth", survival ? (double) player.getMaxHealth() : -1.0);
+        scalars.put("currentPlayerHunger", survival ? player.getFoodData().getFoodLevel() / 20.0 : -1.0);
+        scalars.put("maxPlayerHunger", 20.0);
+        scalars.put("currentPlayerArmor", survival ? player.getArmorValue() / 50.0 : -1.0);
+        scalars.put("maxPlayerArmor", 50.0);
+        scalars.put("currentPlayerAir", survival
+                ? (double) ((float) player.getAirSupply() / (float) player.getMaxAirSupply()) : -1.0);
+        scalars.put("maxPlayerAir", survival ? (double) player.getMaxAirSupply() : -1.0);
+        var cameraType = minecraft.options.getCameraType();
+        scalars.put("firstPersonCamera", cameraType == net.minecraft.client.CameraType.THIRD_PERSON_BACK
+                || cameraType == net.minecraft.client.CameraType.THIRD_PERSON_FRONT ? 0.0 : 1.0);
+        // Veyra outputs sRGB, Iris' default colour space (ordinal 0).
+        scalars.put("currentColorSpace", 0.0);
+        scalars.put("chunkFadeTimeInv", 1.0 / (minecraft.options.chunkSectionFadeInTime().get() * 1000.0));
+        var filtering = minecraft.options.textureFiltering().get();
+        scalars.put("textureFilteringMode", switch (filtering) {
+            case NONE -> 0.0;
+            case RGSS -> 1.0;
+            case ANISOTROPIC -> 2.0;
+        });
+        scalars.put("anisotropicFiltering", filtering == net.minecraft.client.TextureFilteringMethod.ANISOTROPIC
+                ? (double) minecraft.options.maxAnisotropyValue() : 0.0);
+        scalars.put("hideGUI", minecraft.options.hideGui ? 1.0 : 0.0);
+        scalars.put("isRightHanded", minecraft.options.mainHand().get() == net.minecraft.world.entity.HumanoidArm.RIGHT
+                ? 1.0 : 0.0);
+        scalars.put("pi", Math.PI);
+        // Distant Horizons is not available with VulkanMod; these are Iris' values without it.
+        scalars.put("dhFarPlane", 0.01);
+        scalars.put("dhNearPlane", 0.01);
+        scalars.put("dhRenderDistance", (double) minecraft.options.getEffectiveRenderDistance());
+
+        // Celestial bodies in view space, as CelestialUniforms builds them from gbufferModelView.
+        float sunAttribute = minecraft.gameRenderer.getMainCamera().attributeProbe()
+                .getValue(EnvironmentAttributes.SUN_ANGLE, partialTick);
+        float moonAttribute = minecraft.gameRenderer.getMainCamera().attributeProbe()
+                .getValue(EnvironmentAttributes.MOON_ANGLE, partialTick);
+        boolean day = irisCelestialAngle(sunAttribute) < 180.0F;
+        scalars.put("shadowAngle", (double) (irisCelestialAngle(day ? sunAttribute : moonAttribute) / 360.0F));
+        Matrix4f modelView = frame.matrices().gbufferModelView();
+        float sunPathRotation = VeyraShadowRenderer.sunPathRotation();
+        float[] sunPosition = celestialPosition(modelView, sunPathRotation, sunAttribute);
+        float[] moonPosition = celestialPosition(modelView, sunPathRotation, moonAttribute);
+        vectors.put("sunPosition", sunPosition);
+        vectors.put("moonPosition", moonPosition);
+        org.joml.Vector4f up = new Matrix4f(modelView)
+                .rotate(com.mojang.math.Axis.YP.rotationDegrees(-90.0F))
+                .transform(new org.joml.Vector4f(0.0F, 100.0F, 0.0F, 0.0F));
+        vectors.put("upPosition", new float[]{up.x, up.y, up.z});
+        boolean end = level.dimension().equals(net.minecraft.world.level.Level.END);
+        float[] endFlashPosition = new float[3];
+        if (end && level.endFlashState() != null) {
+            var flash = level.endFlashState();
+            org.joml.Vector4f position = new Matrix4f(modelView)
+                    .rotate(com.mojang.math.Axis.YP.rotationDegrees(180.0F - flash.getYAngle()))
+                    .rotate(com.mojang.math.Axis.XP.rotationDegrees(-90.0F - flash.getXAngle()))
+                    .transform(new org.joml.Vector4f(0.0F, 100.0F, 0.0F, 0.0F));
+            endFlashPosition = new float[]{position.x, position.y, position.z};
+        }
+        vectors.put("endFlashPosition", endFlashPosition);
+        vectors.put("shadowLightPosition", end && selectedEndFlashShadows() ? endFlashPosition
+                : day ? sunPosition : moonPosition);
+        Vec3 forward = cameraEntity != null ? cameraEntity.getForward() : Vec3.ZERO;
+        vectors.put("playerBodyVector", new float[]{(float) forward.x, (float) forward.y, (float) forward.z});
+        if (vehicle != null) {
+            Vec3 vehicleForward = vehicle.getForward();
+            Vec3 vehiclePosition = vehicle.getPosition(partialTick);
+            vectors.put("vehicleLookVector", new float[]{(float) vehicleForward.x, (float) vehicleForward.y,
+                    (float) vehicleForward.z});
+            vectors.put("relativeVehiclePosition", new float[]{(float) (cameraPosition.x - vehiclePosition.x),
+                    (float) (cameraPosition.y - vehiclePosition.y), (float) (cameraPosition.z - vehiclePosition.z)});
+        }
+
+        // HardcodedCustomUniforms.
+        int hardcodedDayTime = frame.worldTime();
+        double timeAngle = hardcodedDayTime / 24000.0;
+        scalars.put("timeAngle", timeAngle);
+        scalars.put("timeBrightness", Math.max(Math.sin(timeAngle * Math.PI * 2.0), 0.0));
+        scalars.put("moonBrightness", Math.max(Math.sin(timeAngle * Math.PI * -2.0), 0.0));
+        double rainStrength = frame.rainStrength();
+        double rainStrengthS = IRIS_RAIN_STRENGTH_S.update(rainStrength, frameSeconds);
+        scalars.put("rainStrengthS", rainStrengthS);
+        scalars.put("rainFactor", rainStrengthS);
+        scalars.put("rainStrengthShiningStars", IRIS_RAIN_STRENGTH_SHINING.update(rainStrength, frameSeconds));
+        scalars.put("rainStrengthS2", IRIS_RAIN_STRENGTH_S2.update(rainStrength, frameSeconds));
+        double blindFactorSqrt = Math.max(0.0, Math.min(1.0, frame.blindness() * 2.0 - 1.0));
+        scalars.put("blindFactor", blindFactorSqrt * blindFactorSqrt);
+        net.minecraft.core.BlockPos biomePosition = cameraEntity != null ? cameraEntity.blockPosition()
+                : player.blockPosition();
+        var biome = level.getBiome(biomePosition).value();
+        int precipitation = switch (biome.getPrecipitationAt(biomePosition, level.getSeaLevel())) {
+            case RAIN -> 1;
+            case SNOW -> 2;
+            default -> 0;
+        };
+        scalars.put("BiomeTemp", (double) biome.getBaseTemperature());
+        scalars.put("isDry", IRIS_DRY.update(precipitation == 0 ? 1.0 : 0.0, frameSeconds));
+        scalars.put("isRainy", IRIS_RAINY.update(precipitation == 1 ? 1.0 : 0.0, frameSeconds));
+        scalars.put("isSnowy", IRIS_SNOWY.update(precipitation == 2 ? 1.0 : 0.0, frameSeconds));
+        double eyeSkyBrightness = 0.0;
+        double eyeY = 0.0;
+        if (cameraEntity != null) {
+            Vec3 feet = cameraEntity.position();
+            eyeY = cameraEntity.getEyeY();
+            eyeSkyBrightness = level.getBrightness(net.minecraft.world.level.LightLayer.SKY,
+                    net.minecraft.core.BlockPos.containing(feet.x, eyeY, feet.z)) * 16.0;
+        }
+        double eyeInCave = IRIS_EYE_IN_CAVE.update(eyeY < 5.0 ? 1.0 - eyeSkyBrightness / 240.0 : 0.0, frameSeconds);
+        scalars.put("isEyeInCave", frame.isEyeInWater() == 0 ? eyeInCave : 0.0);
+        scalars.put("eyeBrightnessM", IRIS_EYE_BRIGHTNESS_M.update(eyeSkyBrightness / 240.0, frameSeconds));
+        scalars.put("frameTimeSmooth", IRIS_FRAME_TIME_SMOOTH.update(frameSeconds, frameSeconds));
+        CameraUniforms camera = frame.camera();
+        double movedX = camera.cameraPosition().x - camera.previousCameraPosition().x;
+        double movedY = camera.cameraPosition().y - camera.previousCameraPosition().y;
+        double movedZ = camera.cameraPosition().z - camera.previousCameraPosition().z;
+        double movedSum = Math.abs(movedX) + Math.abs(movedY) + Math.abs(movedZ);
+        double moved = IRIS_MOVED.update(movedSum > 0.0 && movedSum < 1.0 ? 1.0 : 0.0, frameSeconds);
+        scalars.put("starter", IRIS_STARTER.update(moved, frameSeconds));
+        double adjustedTime = Math.abs(((frame.worldTime() / 1000.0F + 6.0F) % 24.0F) - 12.0F);
+        double dayFactor = Math.max(0.0, Math.min(1.0, 5.4 - adjustedTime));
+        double nightFactor = Math.max(0.0, Math.min(1.0, adjustedTime - 6.0));
+        scalars.put("day", dayFactor);
+        scalars.put("night", nightFactor);
+        scalars.put("dawnDusk", 1.0 - dayFactor - nightFactor);
+        // Iris feeds the sun angle in degrees here, so this stays at 0 for most of the day, as in Iris.
+        scalars.put("shdFade", Math.max(0.0, Math.min(1.0,
+                1.0 - (Math.abs(Math.abs(irisCelestialAngle(sunAttribute) - 0.5) - 0.25) - 0.225) * 40.0)));
+        scalars.put("isPrecipitationRain", IRIS_PRECIPITATION_RAIN.update(
+                precipitation == 1 && cameraPosition.y < 96.0 ? 1.0 : 0.0, frameSeconds));
+        scalars.put("touchmybody", IRIS_TOUCH_MY_BODY.update(
+                player.hurtTime > 0 || player.deathTime > 0 ? 0.4 : 0.0, frameSeconds));
+        scalars.put("sneakSmooth", IRIS_SNEAK_SMOOTH.update(player.isCrouching() ? 1.0 : 0.0, frameSeconds));
+        scalars.put("burningSmooth", IRIS_BURNING_SMOOTH.update(player.isOnFire() ? 1.0 : 0.0, frameSeconds));
+        double speed = frameSeconds > 0.0F ? cameraVelocity(camera) / frameSeconds : 0.0;
+        scalars.put("effectStrength", 1.0 - Math.exp(-IRIS_SMOOTH_SPEED.update(speed, frameSeconds) * 0.003906));
+        IrisExtraUniforms.publish(scalars, vectors);
+    }
+
+    /** Iris CelestialUniforms.getCelestialPosition: (0, 100, 0, 1) through the sky rotation. */
+    private static float[] celestialPosition(Matrix4f modelView, float sunPathRotation, float attributeAngle) {
+        org.joml.Vector4f position = new Matrix4f(modelView)
+                .rotate(com.mojang.math.Axis.YP.rotationDegrees(-90.0F))
+                .rotate(com.mojang.math.Axis.ZP.rotationDegrees(sunPathRotation))
+                .rotate(com.mojang.math.Axis.XP.rotationDegrees(attributeAngle))
+                .transform(new org.joml.Vector4f(0.0F, 100.0F, 0.0F, 1.0F));
+        return new float[]{position.x, position.y, position.z};
+    }
+
     /** Iris reports a fixed 0.05 near plane. */
     private static final float IRIS_NEAR_PLANE = 0.05F;
 
@@ -878,6 +1205,7 @@ public final class VeyraRenderer {
         pipelineLevel = minecraft.level;
         frameMatricesInitialized = false;
         cameraUniformsInitialized = false;
+        resetIrisExtraUniformState();
         previousFrameNanos = 0L;
         frameTime = 0.0F;
         eyeBrightnessSmoothLevel = minecraft.level;
@@ -982,6 +1310,10 @@ public final class VeyraRenderer {
         if (minecraft.level != null && minecraft.player != null) {
             shaderPackFrameUniforms = updateFrameUniforms(minecraft);
             FrameUniforms frame = shaderPackFrameUniforms;
+            updateIrisExtraUniforms(minecraft, frame, cameraPosition);
+            SHADER_PACK_VECTOR_BUFFERS.forEach((name, buffer) -> {
+                if (IrisExtraUniforms.contains(name)) updateShaderPackVectorUniform(name, buffer, cameraUniforms);
+            });
             CustomUniforms.active().evaluate(name -> customUniformInput(name, frame), frame.frameTime());
         }
     }
@@ -4602,6 +4934,7 @@ public final class VeyraRenderer {
         body = DEPTH1_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH2_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_UNIFORM_DECLARATION.matcher(body).replaceAll("");
+        body = IRIS_EXTRA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = stripCustomUniformDeclarations(body);
         body = SUPPORTED_IVEC2_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
@@ -4980,6 +5313,8 @@ public final class VeyraRenderer {
                 case "frameCounter" -> new UniformValue.IntUniform(frameUniforms.frameCounter());
                 case "sunAngle" -> new UniformValue.FloatUniform(frameUniforms.sunAngle());
                 case "shadowFade" -> new UniformValue.FloatUniform(shadowFadeUniform(frameUniforms));
+                case "velocity" -> new UniformValue.FloatUniform(
+                        packOverridableFloat("velocity", cameraVelocity(frameUniforms.camera())));
                 case "rainStrength" -> new UniformValue.FloatUniform(frameUniforms.rainStrength());
                 case "wetness" -> new UniformValue.FloatUniform(frameUniforms.wetness());
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
@@ -5023,7 +5358,8 @@ public final class VeyraRenderer {
                 case "previousCameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPositionFract());
                 case "eyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().eyePosition());
                 case "relativeEyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().relativeEyePosition());
-                default -> customUniformValue(uniform);
+                default -> IrisExtraUniforms.contains(uniform) ? irisExtraUniformValue(uniform)
+                        : customUniformValue(uniform);
             });
         }
         return List.copyOf(values);
@@ -5126,7 +5462,7 @@ public final class VeyraRenderer {
     private static FrameUniforms updateFrameUniforms(Minecraft minecraft) {
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         long dayTime = minecraft.level.getDayTime();
-        int worldTime = (int) Math.floorMod(dayTime, 24000L);
+        int worldTime = irisWorldTime(minecraft.level, dayTime);
         MoonPhase moonPhaseValue = minecraft.level.environmentAttributes()
                 .getDimensionValue(EnvironmentAttributes.MOON_PHASE);
         int moonPhase = moonPhaseValue.index();
@@ -5134,13 +5470,14 @@ public final class VeyraRenderer {
                 .getDimensionValue(EnvironmentAttributes.CLOUD_HEIGHT);
         var endFlashState = minecraft.level.endFlashState();
         float endFlashIntensity = endFlashState == null ? 0.0F : endFlashState.getIntensity(partialTick);
-        float sunAngle = (worldTime + partialTick) / 24000.0F;
         float currentSunAngle = minecraft.gameRenderer.getMainCamera().attributeProbe()
                 .getValue(EnvironmentAttributes.SUN_ANGLE, partialTick);
+        // Iris CelestialUniforms: the sun attribute rotated by 90 degrees, as a fraction of a turn.
+        float sunAngle = irisCelestialAngle(currentSunAngle) / 360.0F;
         float currentMoonAngle = minecraft.gameRenderer.getMainCamera().attributeProbe()
                 .getValue(EnvironmentAttributes.MOON_ANGLE, partialTick);
         float shadowFade = IrisShadowFade.calculate(currentSunAngle, currentMoonAngle);
-        int worldDay = (int) Math.floorDiv(dayTime, 24000L);
+        int worldDay = (int) (dayTime / 24000L);
         int bedrockLevel = minecraft.level.getMinY();
         float rainStrength = minecraft.level.getRainLevel(partialTick);
         float thunderStrength = minecraft.level.getThunderLevel(partialTick);

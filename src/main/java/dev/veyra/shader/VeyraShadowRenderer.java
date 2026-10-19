@@ -187,6 +187,11 @@ public final class VeyraShadowRenderer {
         return new Matrix4f(shadowProjection);
     }
 
+    /** The pack's sunPathRotation directive, shared with the celestial uniforms. */
+    public static float sunPathRotation() {
+        return shadowSettings.sunPathRotation();
+    }
+
     public static void configure(ShadowSettings settings) {
         if (shadowSettings.resolution() != settings.resolution()) {
             release();

@@ -361,6 +361,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
     }
 
+    /** Iris' endFlashShadows directive: End shadows follow the end flash instead of the sun or moon. */
+    public boolean readEndFlashShadows() throws IOException {
+        Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        return Boolean.parseBoolean(properties.getProperty("endFlashShadows", "false").strip());
+    }
+
     /** Reads item.properties ids, preprocessed with the pack options like shaders.properties. */
     public ItemIdMap readItemIds() throws IOException {
         return ItemIdMap.parse(readIdProperties("item.properties"));
@@ -1089,6 +1095,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (cached != null) return cached;
         String processed = GlslPreprocessor.process(actualFile, ShaderIncludes.expand(actualFile, source,
                 included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))));
+        // Uniforms Iris never sets read their initializer or 0 there; mirror that with constants.
+        Set<String> customUniforms = readCustomUniforms().uniforms().stream()
+                .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        processed = IrisUnsetUniforms.apply(processed, customUniforms);
         configuration.cacheProcessed(actualFile, processed);
         return processed;
     }
