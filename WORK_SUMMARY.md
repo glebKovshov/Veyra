@@ -13,6 +13,7 @@
 - Новый полный source audit и GPU CI ещё не проверены. Предыдущий подтверждённый checkpoint ниже сохранён. Post-program shadowtex1 ещё не подключён; полный real-pack pipeline не подтверждён, stable merge/release не готовы.
 - Первый graphics run `39217197994` (`69d2047`) завершился failure. Скачаны artifacts 12170007737/12170340994: новые fixtures дают 0 signal, runtime VUID errors 1174/326. Найдены две причины: fixtures не включали `shadowTranslucent=true`; entity producer pass при выключенной translucency оставлял **shadowtex0** (handle 5861..., не snapshot) в DEPTH_STENCIL_ATTACHMENT layout. Добавлены fixture properties и завершающие graphics-queue read-only transitions обоих shadow attachments. Требуется повторный CI.
 - После прерывания старый local audit handle отсутствует, Java процессов нет, report остаётся от 10:28; это не свежий depth audit. Новый локальный audit следует выполнить один раз, не считать старый JSON подтверждением новых adapters.
+- При переносе translucent terrain после entity features добавлено обязательное восстановление main MVP в outer finally: до изменения порядка это делал entity phase, теперь он больше не последний. Новый local audit запущен после подтверждённого завершения старого процесса.
 
 ## Предыдущий подтверждённый срез: shadow color inputs — 2026-10-19
 

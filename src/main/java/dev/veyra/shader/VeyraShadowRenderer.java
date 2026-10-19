@@ -292,6 +292,7 @@ public final class VeyraShadowRenderer {
             if (shadowRenderPassStarted) {
                 renderer.endRenderPass();
             }
+            VRenderSystem.applyMVP(mainModelView, mainProjection);
             if (cameraRotationChanged) {
                 ((CameraAccessor) (Object) camera).veyra$setRotation(originalYaw, originalPitch);
                 try {
