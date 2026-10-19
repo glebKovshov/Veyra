@@ -31,7 +31,7 @@ class ShaderAdapterTest {
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);
                 } else if (name.startsWith("gbuffers_entities")) {
-                    adapted = EntityShaderAdapter.adaptFragment(source);
+                    adapted = EntityShaderAdapter.adaptFragment(source, name.substring(0, name.length()-4), false, Files.exists(path.getParent().resolve("shadow.fsh")));
                 } else {
                     adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
                 }

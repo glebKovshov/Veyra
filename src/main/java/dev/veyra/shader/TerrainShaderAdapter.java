@@ -187,6 +187,7 @@ public final class TerrainShaderAdapter {
         adapted = SHADOW_MATRIX_UNIFORM.matcher(adapted).replaceAll("");
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         boolean noiseSamplerAvailable = usesNoiseSampler(adapted);
+        ShadowColorSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
 
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
@@ -197,7 +198,7 @@ public final class TerrainShaderAdapter {
                     && !sampler.equals("specular")
                     && !colorInputs.containsKey(sampler)
                     && !(sampler.equals("depthtex1") && waterInputsAvailable)
-                    && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
+                    && !((sampler.equals("shadowtex0") || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
@@ -310,6 +311,10 @@ public final class TerrainShaderAdapter {
         if (usesSpecularSampler(source)) {
             bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D VeyraSpecularSampler;\n"
                     + "#define specular VeyraSpecularSampler\n" + bridge;
+        }
+        if (ShadowColorSampler.used(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowColorSampler.NAME + ";\n"
+                    + "#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
         }
         StringBuilder colorBridge = new StringBuilder();
         for (int index : GeometryColorSamplers.indices(colorInputs)) {

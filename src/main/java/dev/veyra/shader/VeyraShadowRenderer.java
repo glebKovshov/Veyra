@@ -60,6 +60,7 @@ public final class VeyraShadowRenderer {
     private static Framebuffer framebuffer;
     private static RenderPass renderPass;
     private static GpuTextureView depthTextureView;
+    private static GpuTextureView colorBinding;
     private static GpuSampler shadowSampler;
     private static RenderBuffers shadowRenderBuffers;
     private static SubmitNodeStorage shadowSubmitNodeStorage;
@@ -98,6 +99,35 @@ public final class VeyraShadowRenderer {
 
     public static GpuTextureView shadowDepthTextureView() {
         return target == null ? null : target.getDepthTextureView();
+    }
+
+    public static void bindTerrainShadowColor(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
+        if (descriptor == null) return;
+        var view = shadowColorTextureView();
+        if (rendering || view == null || view.isClosed())
+            throw new IllegalStateException("shadowcolor0 requires the completed shadow color attachment.");
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false; // The producing render pass owns the transition.
+        colorBinding = view;
+        ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage()
+                .setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
+        VTextureSelector.bindTexture(descriptor.imageIdx,
+                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+    }
+
+    public static void bindEntityShadowColor(VkRenderPass pass, GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
+        if (descriptor == null) return;
+        var view = shadowColorTextureView();
+        if (rendering || view == null || view.isClosed())
+            throw new IllegalStateException("shadowcolor0 requires the completed shadow color attachment.");
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false;
+        pass.bindTexture(ShadowColorSampler.NAME, view, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+        VTextureSelector.bindTexture(descriptor.imageIdx,
+                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
     }
 
     /** Binds the generated raw depth map to Iris entity programs using VulkanMod's reserved sampler slot 3. */
@@ -236,6 +266,14 @@ public final class VeyraShadowRenderer {
             rendering = false;
         }
         VRenderSystem.setShaderTexture(3, null);
+        if (colorBinding != null) {
+            if (VRenderSystem.getShaderTexture(ShadowColorSampler.TERRAIN_SLOT) == colorBinding)
+                VRenderSystem.setShaderTexture(ShadowColorSampler.TERRAIN_SLOT, null);
+            var image = ((net.vulkanmod.render.engine.VkGpuTexture) colorBinding.texture()).getVulkanImage();
+            if (VTextureSelector.getImage(ShadowColorSampler.TERRAIN_SLOT) == image)
+                VTextureSelector.bindTexture(ShadowColorSampler.TERRAIN_SLOT, VTextureSelector.getWhiteTexture());
+            colorBinding = null;
+        }
         depthTextureView = null;
         if (shadowSampler != null) {
             shadowSampler.close();

@@ -48,6 +48,7 @@ public final class VeyraGeometryTargets {
     public static void unregister(GraphicsPipeline pipeline) { layouts.remove(pipeline); blends.remove(pipeline); }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
+        if (layouts.containsKey(pipeline)) dev.veyra.shader.VeyraShadowRenderer.bindTerrainShadowColor(pipeline);
         VeyraNoiseTexture.bind(pipeline);
         if (layouts.containsKey(pipeline) || pipeline.name.startsWith("veyra_shadow_"))
             VeyraSpecularTextures.bindTerrain(pipeline);

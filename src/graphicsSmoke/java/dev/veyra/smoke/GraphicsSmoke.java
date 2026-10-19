@@ -37,7 +37,8 @@ public final class GraphicsSmoke {
             if (++ticks > 2400) throw new IllegalStateException("Timed out waiting for the validation world/readback; screen=" + client.screen);
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
-            boolean entityFixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt")).equals("specular-entity");
+            String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
+            boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();

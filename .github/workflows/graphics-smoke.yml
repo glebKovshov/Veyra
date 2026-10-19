@@ -20,6 +20,7 @@ on:
       - 'examples/water-opaque-depth/**'
       - 'examples/water-color-inputs/**'
       - 'examples/specular-*/**'
+      - 'examples/shadow-color-*/**'
       - 'build.gradle'
 
 permissions:
@@ -30,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity]
+        fixture: [geometry-mrt, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:

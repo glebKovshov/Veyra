@@ -4,7 +4,15 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Актуальный срез: static specular materials — 2026-10-19
+## Текущая работа: shadow color inputs — 2026-10-19
+
+- Добавлено чтение существующего completed shadow color attachment через `shadowcolor0` и legacy `shadowcolor` в terrain/entity bridges. Linear/clamp соответствует default Iris color sampler; shadowtex1, дополнительные shadow colors, format/mipmap properties пока не реализованы.
+- Shadow-pass feedback отклоняется адаптерами. Terrain использует slot 11; вместе с этим sampler доступны максимум 5 auxiliary water images, шестой явно отклоняется до native binding. Entity использует фактический descriptor index. Color view заимствован у существующего shadow target; отдельное изображение не создаётся, cleanup очищает только owned binding identity.
+- Локально `test validateShaders build` success; shaderc: 31 examples preprocess / 28 direct SPIR-V. Добавлены regression tests на alias, отсутствие shadow pass/feedback, sampler type, unused declarations и slot collision.
+- Graphics matrix расширена до 7 fixtures: original shadow-color-terrain и shadow-color-entity должны прочитать цвет, записанный shadow shader; white/zero fallback не проходит. Entity использует camera-relative cow. Новый GPU CI и полный source audit ещё не проверены; не считать эту реализацию runtime-ready до их завершения.
+- Предыдущий этап ниже остаётся последним полностью подтверждённым checkpoint. Stable merge/release не готовы, цель активна.
+
+## Предыдущий подтверждённый срез: static specular materials — 2026-10-19
 
 - Runtime/test HEAD `3c1d749`: Build push/PR `39214797686` / `39214805186` success; скачанные XML подтверждают **115 tests, 0 failures/errors/skips**, 28 example preprocesses / 25 direct SPIR-V compilations. Скачанный mod JAR artifact 12168259361 прошёл verifier.
 - Graphics push/PR `39214797662` / `39214805071` success, все **5 fixtures**. Скачанные exact-commit evidence: MRT **223595/0**, water-depth **222757/0**, water-color **222757/0**, specular-atlas **222914/0**, specular-entity **18532/0** active/disabled magenta pixels. Runtime validation errors **0 у всех**. Entity active screenshot просмотрен; проверка требует одновременно реального material и отличающегося albedo.
