@@ -1,13 +1,17 @@
 package dev.veyra.shader;
 
+import dev.veyra.vulkan.VeyraNoiseTexture;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Adapts the color-only cloud inputs exposed by VulkanMod to a small Iris fragment interface. */
+/** Adapts supported scene-color and noise inputs to a small Iris cloud fragment interface. */
 public final class CloudShaderAdapter {
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
@@ -22,10 +26,19 @@ public final class CloudShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
     private static final Pattern GL_FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]");
-    private static final Pattern UNSUPPORTED_CLOUD_INPUT = Pattern.compile(
-            "\\b(?:coord0|texcoord\\w*|lmcoord|lightmap|normal|mc_Entity|gl_Fog\\w*)\\b");
+    private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern TEXTURE_SAMPLE = Pattern.compile(
+            "\\b(texture[A-Za-z0-9_]*|texelFetch)\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*,");
     private static final Pattern UNSUPPORTED_TEXTURE = Pattern.compile(
             "\\b(?:texture|texture2D|textureLod|texelFetch)\\s*\\(");
+    private static final Pattern LEGACY_TEXTURE_2D = Pattern.compile("\\btexture2D\\b");
+    private static final Set<String> SCENE_COLOR_SAMPLERS = Set.of("colortex0", "gcolor", "Sampler0", "InSampler");
+    private static final Set<String> SUPPORTED_TEXTURE_FUNCTIONS = Set.of(
+            "texture", "texture2D", "textureLod", "texture2DLod", "textureSize");
+    private static final String NOISE_SAMPLER = "noisetex";
+    private static final Pattern UNSUPPORTED_CLOUD_INPUT = Pattern.compile(
+            "\\b(?:coord0|texcoord\\w*|lmcoord|lightmap|normal|mc_Entity|gl_Fog\\w*)\\b");
     private static final Pattern CLOUD_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|out)\\s+(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_CLOUD_VERTEX_OUTPUT = Pattern.compile(
@@ -221,6 +234,8 @@ public final class CloudShaderAdapter {
         IrisFogUniformAdapter.AdaptedShader fogUniforms =
                 IrisFogUniformAdapter.extract(adapted, "gbuffers_clouds", true);
         adapted = fogUniforms.source();
+        SceneColorInput sceneColorInput = sceneColorInput(adapted);
+        adapted = sceneColorInput.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, "gbuffers_clouds");
         adapted = shaderPackUniforms.source();
@@ -229,8 +244,14 @@ public final class CloudShaderAdapter {
         if (UNSUPPORTED_CLOUD_INPUT.matcher(uncommented).find()) {
             throw new IOException("gbuffers_clouds uses texture coordinates, normals, or fog inputs that VulkanMod does not provide for clouds.");
         }
-        if (UNSUPPORTED_TEXTURE.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_clouds cannot sample textures because VulkanMod builds clouds from colored geometry.");
+        Matcher textureSample = TEXTURE_SAMPLE.matcher(uncommented);
+        while (textureSample.find()) {
+            if (!SUPPORTED_TEXTURE_FUNCTIONS.contains(textureSample.group(1))) {
+                throw new IOException("gbuffers_clouds supports only texture, texture2D, textureLod, texture2DLod, and textureSize sampling calls.");
+            }
+            if (!sceneColorInput.samplers().contains(textureSample.group(2))) {
+                throw new IOException("gbuffers_clouds can sample only the completed scene color or noisetex through Veyra's cloud bridge.");
+            }
         }
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
             throw new IOException("gbuffers_clouds custom uniforms are not supported yet; use the provided cloud color input.");
@@ -295,6 +316,18 @@ public final class CloudShaderAdapter {
             result.append(extension).append('\n');
         }
         result.append(FRAGMENT_BRIDGE.replace("veyraCloudFragColor;", outputName + ";"));
+        if (!sceneColorInput.sceneColorSamplers().isEmpty()) {
+            result.append("layout(binding = 2) uniform sampler2D VeyraCloudSceneSampler;\n");
+            for (String sampler : sceneColorInput.sceneColorSamplers()) {
+                result.append("#define ").append(sampler).append(" VeyraCloudSceneSampler\n");
+            }
+        }
+        if (sceneColorInput.usesNoiseSampler()) {
+            result.append("layout(binding = 3) uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
+                    .append("#define ").append(NOISE_SAMPLER).append(' ').append(VeyraNoiseTexture.SAMPLER_NAME).append('\n');
+        }
+        adapted = adapted.replaceAll("\\btexture2DLod\\b", "textureLod");
+        adapted = LEGACY_TEXTURE_2D.matcher(adapted).replaceAll("texture");
         Map<String, ShaderPackUniformAdapter.UniformField> uniformFields = new java.util.LinkedHashMap<>();
         for (ShaderPackUniformAdapter.UniformField field : fogUniforms.fields()) {
             uniformFields.put(field.name(), field);
@@ -317,11 +350,57 @@ public final class CloudShaderAdapter {
         }
         result.append(fogUniforms.bridge());
         result.append(shaderPackUniforms.macros());
-        return new AdaptedFragment(result.append(adapted).toString(), List.copyOf(uniformFields.values()));
+        return new AdaptedFragment(result.append(adapted).toString(), List.copyOf(uniformFields.values()),
+                !sceneColorInput.sceneColorSamplers().isEmpty(), sceneColorInput.usesNoiseSampler());
     }
 
-    public record AdaptedFragment(String source, List<ShaderPackUniformAdapter.UniformField> uniformFields) {
+    private static SceneColorInput sceneColorInput(String source) throws IOException {
+        source = UnusedSamplerDeclarations.removeUnused(source);
+        String uncommented = maskComments(source);
+        Matcher declarations = SAMPLER_DECLARATION.matcher(uncommented);
+        Set<String> samplers = new LinkedHashSet<>();
+        Set<String> sceneColorSamplers = new LinkedHashSet<>();
+        boolean usesNoiseSampler = false;
+        StringBuilder withoutSamplers = new StringBuilder(source);
+        while (declarations.find()) {
+            String type = declarations.group(1);
+            String name = declarations.group(2);
+            if (!SCENE_COLOR_SAMPLERS.contains(name) && !name.equals(NOISE_SAMPLER)) {
+                throw new IOException("gbuffers_clouds active sampler '" + name
+                        + "' is not supported; cloud shaders can sample scene color or noisetex.");
+            }
+            if (!type.equals("sampler2D")) {
+                throw new IOException("gbuffers_clouds sampler '" + name + "' must use sampler2D.");
+            }
+            if (!samplers.add(name)) {
+                throw new IOException("gbuffers_clouds declares sampler '" + name + "' more than once.");
+            }
+            if (SCENE_COLOR_SAMPLERS.contains(name)) sceneColorSamplers.add(name);
+            else usesNoiseSampler = true;
+            for (int index = declarations.start(); index < declarations.end(); index++) {
+                char character = withoutSamplers.charAt(index);
+                if (character != '\r' && character != '\n') withoutSamplers.setCharAt(index, ' ');
+            }
+        }
+        Matcher samples = TEXTURE_SAMPLE.matcher(maskComments(withoutSamplers.toString()));
+        while (samples.find()) {
+            if (!SUPPORTED_TEXTURE_FUNCTIONS.contains(samples.group(1))) {
+                throw new IOException("gbuffers_clouds supports only texture, texture2D, textureLod, texture2DLod, and textureSize sampling calls.");
+            }
+            if (!samplers.contains(samples.group(2))) {
+                throw new IOException("gbuffers_clouds can sample only the completed scene color or noisetex through Veyra's cloud bridge.");
+            }
+        }
+        return new SceneColorInput(withoutSamplers.toString(), Set.copyOf(sceneColorSamplers),
+                Set.copyOf(samplers), usesNoiseSampler);
     }
+
+    public record AdaptedFragment(String source, List<ShaderPackUniformAdapter.UniformField> uniformFields,
+                                  boolean usesSceneColorSampler, boolean usesNoiseSampler) {
+    }
+
+    private record SceneColorInput(String source, Set<String> sceneColorSamplers, Set<String> samplers,
+                                   boolean usesNoiseSampler) { }
 
     private record Varying(String type, int location) {
     }

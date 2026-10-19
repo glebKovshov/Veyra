@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.2.0-beta.6 — candidate
+## 0.2.0-beta.7 — candidate
+
+- Add Iris cloud inputs for `colortex0` scene-color sampling and the existing Vulkan-backed `noisetex`, including legacy `texture2DLod` reads lowered to Vulkan GLSL `textureLod`. Veyra snapshots scene color before clouds draw to avoid sampling its active color attachment.
+- Remove unused global sampler declarations before cloud adapter validation; an unread `colortex0` declaration in a shared uniforms file no longer blocks cloud loading.
+- Add an original `cloud-colortex0` example and a Lavapipe fixture that checks capture, legacy `noisetex` LOD sampling, and the blue-sky magenta signal.
+- Keep other cloud samplers, texture coordinates, and sampling functions explicit.
+
+## 0.2.0-beta.6 — 2026-10-19 (prerelease)
 
 - Added Iris' hardcoded `velocity` uniform for terrain, entity-family and post programs; a pack's own `velocity` definition takes precedence, as for `shadowFade`.
 - Fixed pack-overridable built-ins after pack switches: selecting a pack that overrides `shadowFade` no longer leaves later packs' geometry programs reading 0.

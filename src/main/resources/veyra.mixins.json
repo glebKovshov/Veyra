@@ -16,6 +16,7 @@
     "LevelRendererMixin",
     "WorldRendererMixin",
     "VkRenderPassMixin",
+    "VulkanCloudRendererMixin",
     "VkCommandEncoderMixin",
     "VeyraUniformsMixin",
     "accessor.MinecraftAccessor",

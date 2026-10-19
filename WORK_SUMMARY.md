@@ -1,10 +1,19 @@
 # Veyra — передача контекста разработки
 
-Проверено: **2026-10-19**. Репозиторий: `https://github.com/glebKovshov/Veyra`. Это рабочая сводка для следующего агента, а не заявление о релизной готовности.
+Проверено: **2026-10-20**. Репозиторий: `https://github.com/glebKovshov/Veyra`. Это рабочая сводка для следующего агента, а не заявление о релизной готовности.
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Текущее состояние после beta.5 — 2026-10-19 (вечер)
+## Текущее состояние: beta.7 candidate — 2026-10-20
+
+- Последний опубликованный prerelease — **beta.6**, tag `v0.2.0-beta.6+mc1.21.11`, commit `871cb79d1618d8eb9b3de5681edcc7f58a172965`. PR #8, Build `39319780312` и Release `39319780416` завершены успешно; installable JAR (555,025 bytes) имеет SHA-256 `e1146170f016fb5d37b919fdde638587da7cf880bc44edbccb3bcead82b9a06d`.
+- Текущая ветка `fix/cloud-unused-samplers` основана прямо на опубликованном `origin/main`; удалённых веток с уникальными неперенесёнными коммитами нет. В рабочем дереве лежит продолжение beta.7: cloud scene-color snapshot для `colortex0`/алиасов, облачная поддержка `noisetex`, адаптация cloud descriptor bindings, cloud renderer mixin и Lavapipe fixture `cloud-colortex0`. Незавершённый stash `WIP cloud colortex0 scene snapshot` сохранён и не изменялся; новый snapshot-класс перенесён в рабочее дерево.
+- До последней LOD-правки завершился Gradle `test validateShaders build packageExamplePacks`; после правки он выполнен повторно успешно: **185 JUnit tests, 0 failures/errors/skips**, 40 примеров шейдеров обработано, 37 прямо скомпилировано в Vulkan SPIR-V. Beta.7 JAR прошёл `scripts/verify_jar.py`; локальный файл 564,498 bytes, SHA-256 `2f7c4b6dc04704253cf3b10522727d4335b1adfde34c10764fdc0c8536d075cc` (это локальная сборка, не хэш будущего GitHub asset).
+- Полный source audit четырёх закреплённых паков завершился после исправления `texture2DLod` → `textureLod`: 12 defaults + 63 profile/dimension cases, все 5,178 stages preprocessed, 72 geometry fragments accepted / 645 rejected. Complementary облачные программы теперь проходят адаптер для наблюдённых `colortex0` и `noisetex` LOD reads; BSL всё ещё отклонён из-за active sampler `texture`, Sildur — из-за cloud inputs. Default/profile JSON в `validation/` перегенерированы; все 75 записей имеют `visualValidation=false`.
+- `VALIDATION.md`, `COMPATIBILITY.md`, README, CHANGELOG и RELEASE_NOTES отражают beta.7 candidate и ограничения. Далее: итоговая проверка diff/status, закоммитить только явный список project files, push, открыть и связать PR; дождаться Build/source audit и **13** Lavapipe fixtures, исправить доказанные сбои, затем merge и опубликовать beta.7 tag/release, скачать именно опубликованный `.jar` и сверить его с release checksum.
+- `GOAL.md` всё ещё не выполнен полностью: реальные third-party shaderpacks и физический GPU не визуально проверены, полная Iris parity отсутствует. beta.7 остаётся experimental prerelease, не stable release. Пользовательские скриншоты, `assets/`, `logs/`, дампы, `GOAL.md` и `scripts/analyze_vulkan_shutdown.py` остаются нетронутыми и не должны попадать в staging.
+
+## Историческое состояние после beta.5 — 2026-10-19 (вечер)
 
 - Опубликованный последний prerelease — **beta.5** (`main` = `b19f96e`); история beta.2–beta.5 ниже в разделах «Beta.2 опубликована» … «Beta.5 cloud vertex bridge». Эти выпуски сделала параллельная T3-сессия `[GPT] Veyra`; она прервана пользователем в 22:11, работу продолжает эта сессия.
 - **Незавершённая работа той сессии сохранена:** облачный `colortex0` через snapshot сцены (адаптер облаков готов, в рендерере начат). Она в `git stash` («WIP cloud colortex0 scene snapshot …», сделан с ветки `feature/cloud-scene-color-input`), копии patch и нового `VeyraColorTextureSnapshot.java` лежат в `%TEMP%\veyra-wip-backup`. Не удалять до переноса в ветку.

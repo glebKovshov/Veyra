@@ -39,6 +39,7 @@ public final class GraphicsSmoke {
             worldTicks++;
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
+            boolean cloudFixture = fixture.equals("cloud-colortex0");
             boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -59,7 +60,7 @@ public final class GraphicsSmoke {
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
             client.options.hideGui = true;
-            client.player.setXRot(entityFixture ? 15.0F : 35.0F);
+            client.player.setXRot(entityFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
@@ -68,6 +69,8 @@ public final class GraphicsSmoke {
             } else if (!vanillaBaseline && stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
+                if (cloudFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
+                    throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
                 pending = true;
                 requested = true; captureActive = true;
             } else if (!vanillaBaseline && stage == 1 && worldTicks >= baselineAt) {
