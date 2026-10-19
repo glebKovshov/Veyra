@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-beta.7 — candidate
+## 0.2.0-beta.7 — 2026-10-20 (prerelease)
 
 - Add Iris cloud inputs for `colortex0` scene-color sampling and the existing Vulkan-backed `noisetex`, including legacy `texture2DLod` reads lowered to Vulkan GLSL `textureLod`. Veyra snapshots scene color before clouds draw to avoid sampling its active color attachment.
 - Remove unused global sampler declarations before cloud adapter validation; an unread `colortex0` declaration in a shared uniforms file no longer blocks cloud loading.

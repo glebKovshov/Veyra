@@ -1,5 +1,11 @@
 # 0.2 development validation status
 
+## Beta.7 PR validation — 2026-10-20
+
+PR #9 commit `83a05d73b5a50266623cd395ed74714caee070d5` passed the [Build](https://github.com/glebKovshov/Veyra/actions/runs/39330757396), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39330757293), and [13-fixture Lavapipe graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39330757123). The cloud fixture reported 52,412 active magenta pixels / 0 with shaders disabled and 0 runtime Vulkan validation errors. The source audit covers 75 default/profile/dimension cases and 5,178 sources; `visualValidation=false` for every entry.
+
+Locally, JDK 21.0.12.1 ran `test validateShaders build packageExamplePacks` successfully: **187 JUnit tests, zero failures/errors/skips**, 40 example shaders processed and 37 compiled directly to Vulkan SPIR-V. `scripts/verify_jar.py` verified the beta.7 JAR (565,132 bytes; SHA-256 `7154992b52b02b29f4619cbeedef78cb84fbffe2f9c2f79e3c37791ded96aa1f`). This is the local build hash, not the published asset hash. Synthetic checks do not verify third-party pack visuals on a physical GPU or full Iris parity.
+
 ## 0.2.0-beta.3 candidate — local checks — 2026-10-19
 
 On `feature/cloud-fog-uniforms`, `test --rerun-tasks validateShaders build packageExamplePacks` passed on Temurin JDK 21.0.12.1: **161 JUnit tests, 0 failures/errors/skips**; shaderc preprocessed 39 example shaders and compiled 36 to Vulkan SPIR-V, including the new cloud fog fixture. The pinned source audit passed SHA-512 checks for all four source archives and covered 75 default/profile/dimension cases / 5,178 sources; 18 fragments were accepted and 699 rejected. `fogColor` no longer appears as a cloud adapter error; other pack blockers remain. `visualValidation` is false in every audit entry.

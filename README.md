@@ -17,7 +17,7 @@ Terrain, entity-family and post programs can sample the completed shadow pass co
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.
-2. For the experimental 0.2 subset, use the [0.2.0-beta.7 prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.7%2Bmc1.21.11) after it is published. Put its mod JAR (not the `-sources.jar`) in the instance's `mods` folder. [Stable 0.1.1](https://github.com/glebKovshov/Veyra/releases/tag/v0.1.1%2Bmc1.21.11) remains a separate release. Read the known compatibility limits before installing.
+2. For the experimental 0.2 subset, use the [0.2.0-beta.7 prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.7%2Bmc1.21.11). Put its mod JAR (not the `-sources.jar`) in the instance's `mods` folder. [Stable 0.1.1](https://github.com/glebKovshov/Veyra/releases/tag/v0.1.1%2Bmc1.21.11) remains a separate release. Read the known compatibility limits before installing.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
 
