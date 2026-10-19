@@ -5,7 +5,7 @@
 - Read Iris `entity.properties` and `block.properties` with shader-pack option preprocessing, including entity IDs, block state predicates, and registered block tags.
 - Routed entity and block-entity submissions to cached Vulkan pipeline variants with mapped `entityId` and `blockEntityId` constants; unmapped identifiers use `-1`.
 - Added parser, option-loading, precedence, tag, state-filter, and shader-adapter regression coverage.
-- This remains an experimental subset. The pinned shaderpack audit, graphics smoke, and third-party-pack visual validation are pending for this candidate; see `COMPATIBILITY.md` and `VALIDATION.md`.
+- The pinned shaderpack source audit and all 12 Lavapipe graphics fixtures pass for this candidate. Third-party-pack visual validation remains outstanding; see `COMPATIBILITY.md` and `VALIDATION.md`.
 
 ## 0.2.0-beta.3 — 2026-10-19 (prerelease)
 

@@ -4,7 +4,7 @@
 
 Veyra reads option-preprocessed Iris `entity.properties` and `block.properties`. Entity type mappings feed `entityId`; block IDs, partial state predicates and registered block tags feed `blockEntityId`. Block state rules follow source order, so the first matching selector wins. The renderer captures the identifier for each entity or block entity submission and routes its `RenderType` to a cached Vulkan pipeline variant with compile-time identifier constants. Unmapped values are `-1`.
 
-Unit tests cover parsing, namespace defaults, duplicate precedence, conditional properties, tags, block-state predicates and shader constants. This does not establish that a third-party pack renders correctly. Iris' built-in legacy block ID table is not loaded when `block.properties` is absent; such states remain unmapped. The pinned external source audit and graphics smoke are pending for this candidate, and no real-pack visual validation is claimed.
+Unit tests cover parsing, namespace defaults, duplicate precedence, conditional properties, tags, block-state predicates and shader constants. This does not establish that a third-party pack renders correctly. Iris' built-in legacy block ID table is not loaded when `block.properties` is absent; such states remain unmapped. The beta.4 source audit and all 12 synthetic Lavapipe graphics fixtures pass, but no real-pack visual validation is claimed.
 
 ## Cloud fog uniforms
 
@@ -44,6 +44,10 @@ The adapter checks cover terrain, water, entity/block/hand-family and cloud frag
 The exact source URLs and SHA-512 checksums are in [validation/shaderpack-inputs.json](validation/shaderpack-inputs.json); declared profile selections are listed in [validation/shaderpack-profile-matrix.json](validation/shaderpack-profile-matrix.json). Default results and profile results are in [validation/shaderpack-source-audit.json](validation/shaderpack-source-audit.json) and [validation/shaderpack-profile-audit.json](validation/shaderpack-profile-audit.json). CI downloads the archives temporarily and uploads audit JSON, checksums and logs; the packs remain under their authors' licenses and are not included in Veyra.
 
 The declared-profile matrix covers 24 dimension cases for each Complementary edition and 15 for BSL (63 cases total); all 4,429 profile-selected stage sources preprocess. Across all 75 cases, the geometry adapters accept 18 and reject 699 fragment-program/configuration combinations. The accepted cases are BSL only; its other tested geometry fragments still fail adapter checks. Active compute preflight rejects 9 of 24 profile/dimension cases for each Complementary edition. BSL's five profiles keep the inventoried compute stage inactive; Sildur's declares no profiles in this input. All 75 cases have `visualValidation: false`. This covers declared profiles, not arbitrary option combinations.
+
+### Beta.4 CI source audit
+
+PR #5's [source audit run](https://github.com/glebKovshov/Veyra/actions/runs/39300268808) passed for the same four pinned packs: 12 default cases and 63 declared-profile/dimension cases, with 18 geometry fragment programs accepted and 699 rejected. The aggregate does not establish complete pipeline support; remaining sampler, attachment, compute and geometry interfaces still prevent full-pack confirmation. All 12 Lavapipe fixtures passed in [graphics run](https://github.com/glebKovshov/Veyra/actions/runs/39300269051), but they use synthetic fixtures rather than third-party packs. Every pinned pack remains `Not tested` in-game.
 
 ## Reproduce source checks
 
