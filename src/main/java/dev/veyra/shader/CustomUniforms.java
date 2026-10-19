@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 public final class CustomUniforms {
     public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of(), Map.of());
     /** Built-in scalar inputs an expression may reference; vector inputs are exposed by component. */
-    public static final Set<String> BUILT_IN_INPUTS = Set.of(
+    public static final Set<String> BUILT_IN_INPUTS = withIrisExtras(Set.of(
             "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "shadowFade", "velocity", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay", "moonPhase",
@@ -31,12 +31,20 @@ public final class CustomUniforms {
             "is_on_ground", "is_hurt", "is_invisible", "is_burning",
             "cameraPosition.x", "cameraPosition.y", "cameraPosition.z",
             "previousCameraPosition.x", "previousCameraPosition.y", "previousCameraPosition.z",
-            "eyeBrightness.x", "eyeBrightness.y", "eyeBrightnessSmooth.x", "eyeBrightnessSmooth.y");
+            "eyeBrightness.x", "eyeBrightness.y", "eyeBrightnessSmooth.x", "eyeBrightnessSmooth.y"),
+            IrisExtraUniforms.expressionInputs());
     /**
      * Iris "hardcoded custom uniforms" that Veyra also provides as float built-ins. A shaders.properties
      * definition with the same name (BSL defines shadowFade) takes precedence over the built-in value.
      */
-    public static final Set<String> PACK_OVERRIDABLE = Set.of("shadowFade", "velocity");
+    public static final Set<String> PACK_OVERRIDABLE = withIrisExtras(Set.of("shadowFade", "velocity"),
+            IrisExtraUniforms.HARDCODED_CUSTOM);
+
+    private static Set<String> withIrisExtras(Set<String> names, Set<String> extras) {
+        Set<String> union = new java.util.HashSet<>(names);
+        union.addAll(extras);
+        return Set.copyOf(union);
+    }
     private static final Pattern DEFINITION = Pattern.compile(
             "(uniform|variable)\\.(float|int|bool|vec2|vec3|vec4)\\.([A-Za-z_][A-Za-z0-9_]*)\\s*[=:]\\s*(.*)",
             Pattern.DOTALL);
@@ -68,6 +76,8 @@ public final class CustomUniforms {
     private final List<Definition> definitions;
     private final Map<String, String> unavailable;
     private final Map<String, String> irisUnresolved;
+    // Renderer suppliers look uniforms up on every uniform-buffer update.
+    private final Map<String, Uniform> uniformIndex = new HashMap<>();
     private final Map<String, Double> values = new HashMap<>();
 
     private CustomUniforms(List<Definition> definitions, Map<String, String> unavailable,
@@ -75,6 +85,11 @@ public final class CustomUniforms {
         this.definitions = definitions;
         this.unavailable = unavailable;
         this.irisUnresolved = irisUnresolved;
+        for (Definition definition : definitions) {
+            if (definition.uniform()) {
+                uniformIndex.put(definition.name(), new Uniform(definition.name(), definition.type()));
+            }
+        }
     }
 
     public static CustomUniforms active() {
@@ -168,12 +183,7 @@ public final class CustomUniforms {
     }
 
     public Uniform uniform(String name) {
-        for (Definition definition : definitions) {
-            if (definition.uniform() && definition.name().equals(name)) {
-                return new Uniform(definition.name(), definition.type());
-            }
-        }
-        return null;
+        return uniformIndex.get(name);
     }
 
     /** Explains why a declared custom uniform cannot be supplied, or returns null. */
@@ -307,8 +317,7 @@ public final class CustomUniforms {
     private static final class Call implements Node {
         private final String name;
         private final List<Node> arguments;
-        private boolean smoothed;
-        private double smoothValue;
+        private final IrisSmoothedFloat smoother = new IrisSmoothedFloat(1.0, 1.0);
 
         Call(String name, List<Node> arguments) {
             this.name = name;
@@ -442,20 +451,7 @@ public final class CustomUniforms {
             int fades = arguments.size() - offset - 1;
             double fadeUp = fades >= 1 ? arg(offset + 1, inputs, frameTime) : 1.0;
             double fadeDown = fades >= 2 ? arg(offset + 2, inputs, frameTime) : fadeUp;
-            if (!smoothed) {
-                smoothed = true;
-                smoothValue = target;
-                return target;
-            }
-            double halfLifeSeconds = (target > smoothValue ? fadeUp : fadeDown) * 0.1;
-            if (halfLifeSeconds <= 0.0) {
-                smoothValue = target;
-            } else if (frameTime > 0.0) {
-                double decay = Math.log(2.0) / halfLifeSeconds;
-                double smoothing = 1.0 - Math.exp(-decay * frameTime);
-                smoothValue += (target - smoothValue) * smoothing;
-            }
-            return smoothValue;
+            return smoother.update(target, frameTime, fadeUp, fadeDown);
         }
 
         public String missingInput(Set<String> defined) {

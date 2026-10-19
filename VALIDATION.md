@@ -197,3 +197,15 @@ Tag `v0.2.0-beta.4+mc1.21.11` points to `2fce9f7ed764f9cd62ba7feaa0d931e9b3b6ae0
 The [beta.4 GitHub prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.4%2Bmc1.21.11) includes the installable [veyra-0.2.0-beta.4+mc1.21.11.jar](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.4%2Bmc1.21.11/veyra-0.2.0-beta.4%2Bmc1.21.11.jar), source JAR, example-packs ZIP, and [SHA256SUMS.txt](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.4%2Bmc1.21.11/SHA256SUMS.txt). The installable JAR was downloaded again: 527,737 bytes, SHA-256 `dd2230e13f64c1797477ab689dc3fdd44e4da9e82c9ab5abdadf7c283cc97a03`, matching the published checksum manifest. ZIP inspection confirmed the entity/block ID-map classes and dispatcher mixin are present and the smoke harness is absent.
 
 The prerelease remains experimental. Lavapipe covers synthetic fixtures only; no third-party pack was visually validated on a physical GPU.
+
+### Published beta.5 artifact
+
+Tag `v0.2.0-beta.5+mc1.21.11` points to release commit `7e5fd09c42338cf5802e63b9519d3548b8456230`. Release workflow [39306047963](https://github.com/glebKovshov/Veyra/actions/runs/39306047963) passed its pinned source audit, all 12 Lavapipe fixtures, Gradle build/tests, and JAR verifier. The published [beta.5 GitHub prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.5%2Bmc1.21.11) contains the installable JAR, sources, example packs, and checksums. Its installable JAR is 531,535 bytes with SHA-256 `badc8f9c49449abab1a1a9d8bf6b02937e19196f86466696bbbbcce61661cee7`, matching the published checksum manifest.
+
+### Beta.6 local candidate — 2026-10-19
+
+On `feature/iris-uniform-parity` at base commit `d87b167`, the current local candidate passes `test --rerun-tasks validateShaders build packageExamplePacks` on JDK 21: 179 JUnit tests, 0 failures/errors/skips; 39 example shaders processed, 36 compiled directly to Vulkan SPIR-V, plus the existing entity, cloud, conditional-include, and dataflow fixtures. Review against Iris 1.21.11 source found that hardcoded `timeAngle` needed to reuse Iris-compatible `worldTime` in fixed-time Nether/End dimensions; this was corrected and covered by a regression test.
+
+`python scripts/run_shaderpack_source_audit.py` passes for 12 default and 63 profile/dimension cases. Its 75 generated records match the checked-in default/profile audit JSON: 5,178 preprocessed stages, 18 accepted / 699 rejected geometry fragment programs, and `visualValidation=false` for every record. `python scripts/verify_jar.py build/libs/veyra-0.2.0-beta.6+mc1.21.11.jar` passes; candidate JAR is 555,043 bytes, SHA-256 `8e2efffdba789d31714cb002424cde769a4a6af1c2286a764339379e2f574659`.
+
+GitHub CI, PR merge, and beta.6 publication are still pending. No complete third-party pack or physical-GPU appearance is verified. Cloud texture inputs/`colortex0`, `currentRenderedItemId`, selected compute, Sildur attachment feedback, other sampler behavior, and several geometry interfaces remain blockers.

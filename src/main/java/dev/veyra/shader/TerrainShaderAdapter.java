@@ -47,7 +47,7 @@ public final class TerrainShaderAdapter {
             Map.entry("normal", new Varying("vec3", 7)),
             Map.entry("sphericalVertexDistance", new Varying("float", 8)),
             Map.entry("cylindricalVertexDistance", new Varying("float", 9)));
-    private static final List<ShaderUniform> SHADERPACK_UNIFORMS = List.of(
+    private static final List<ShaderUniform> SHADERPACK_UNIFORMS = withIrisExtras(List.of(
             new ShaderUniform("near", "float", false),
             new ShaderUniform("far", "float", false),
             new ShaderUniform("darknessLightFactor", "float", false),
@@ -109,7 +109,7 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("gbufferPreviousModelView", "mat4", false),
             new ShaderUniform("gbufferPreviousProjection", "mat4", false),
             new ShaderUniform("shadowModelViewInverse", "mat4", false),
-            new ShaderUniform("shadowProjectionInverse", "mat4", false));
+            new ShaderUniform("shadowProjectionInverse", "mat4", false)));
 
     private static final String FRAGMENT_BRIDGE = """
             layout(binding = 1) uniform VeyraTerrainUniformBuffer {
@@ -387,6 +387,18 @@ public final class TerrainShaderAdapter {
                 .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())
                 .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName));
         return result.append(adapted).toString();
+    }
+
+    /** Appends the per-frame Iris uniforms evaluated by the renderer (see IrisExtraUniforms). */
+    private static List<ShaderUniform> withIrisExtras(List<ShaderUniform> builtIns) {
+        List<ShaderUniform> uniforms = new ArrayList<>(builtIns);
+        for (IrisExtraUniforms.Definition definition : IrisExtraUniforms.definitions()) {
+            if (uniforms.stream().noneMatch(uniform -> uniform.name().equals(definition.name()))) {
+                uniforms.add(new ShaderUniform(definition.name(), definition.kind().glsl(),
+                        definition.kind() == IrisExtraUniforms.Kind.BOOL));
+            }
+        }
+        return List.copyOf(uniforms);
     }
 
     /** Built-in Iris uniforms followed by the active shader pack's custom uniforms. */

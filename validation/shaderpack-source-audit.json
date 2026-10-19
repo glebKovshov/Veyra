@@ -23,8 +23,8 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform 'currentRenderedItemId' is not supported yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -52,8 +52,8 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform 'currentRenderedItemId' is not supported yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -132,8 +132,8 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform 'currentRenderedItemId' is not supported yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -161,8 +161,8 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform 'currentRenderedItemId' is not supported yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -241,8 +241,8 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform 'currentRenderedItemId' is not supported yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -270,8 +270,8 @@
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform 'currentRenderedItemId' is not supported yet.",
       "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform 'currentRenderedItemId' is not supported yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain has an unsupported uniform declaration 'uniform bool heavyFog = false;'; supported Iris scalar/matrix uniforms and the built-in samplers are available."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'lmCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
