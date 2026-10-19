@@ -1,6 +1,27 @@
 # 0.2 development validation status
 
-## Separate shadow depth validation (after alpha.1)
+## Post shadow inputs and borrowed-depth ID fix (after alpha.1)
+
+Runtime commit `317fb00b3a7387134826317320b4b9947fddf887` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39249394264), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39249400344), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39249394235), [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39249400249) and [source audit](https://github.com/glebKovshov/Veyra/actions/runs/39249400296). Downloaded XML confirms **139 tests, zero failures/errors/skips**. shaderc preprocesses 38 examples and compiles 35 directly to SPIR-V, plus post/geometry comparison helpers and conditional/dataflow checks. The downloaded CI mod JAR passes the verifier.
+
+| Fixture | Active / disabled magenta pixels | Runtime errors | Teardown diagnostics |
+| --- | --- | --- | --- |
+| Terrain MRT | 222757 / 0 | 0 | 10031 |
+| Water opaque depth | 222757 / 0 | 0 | 10049 |
+| Water color inputs | 222757 / 0 | 0 | 10050 |
+| Specular atlas | 222577 / 0 | 0 | 10031 |
+| Specular entity | 18410 / 0 | 0 | 10035 |
+| Shadow color terrain | 222496 / 0 | 0 | 10032 |
+| Shadow color entity | 18293 / 0 | 0 | 10356 |
+| Separate shadow depth, water | 226902 / 0 | 0 | 10370 |
+| Separate shadow depth, entity | 16358 / 0 | 0 | 10053 |
+| Four-phase post shadow chain | 230400 / 0 | 0 | 10034 |
+
+All ten exact-commit graphics artifacts were downloaded. The new active/disabled screenshots were inspected. Prepare/deferred/composite/final each require authored shadow color and separate depths, then pass sentinel data through colortex4/5/6. Modern float and legacy vec4 helpers, unused noisetex headers and 60,000 blank lines per post source are included. The first run failed without VUID errors: descriptor evidence showed the opaque-depth sampler reading Light Texture. Correcting reversed usage/native-ID arguments in the borrowed VkGpuTexture constructor makes all four phases bind the actual snapshot. The predicate and 2000-pixel threshold were preserved.
+
+All 75 downloaded source-audit records match local and committed reports: 5,178 sources, 18 accepted / 699 rejected, visualValidation=false throughout. That audit preprocesses selected stages and checks geometry adapters; it does not validate complete post pipelines. The original GPU chain covers this post path separately. Teardown ownership, physical GPU/real-pack visuals and lifecycle stress remain incomplete; stable integration/release is not ready.
+
+## Historical separate shadow depth validation (after alpha.1)
 
 Runtime commit `cca001973c906da89f461c30998e121a88e27405` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39246874678), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39246882115) and [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39246874812). Downloaded CI XML confirms **131 tests, zero failures/errors/skips**; the downloaded mod JAR passes the verifier. shaderc preprocesses 36 examples and compiles 33 directly to SPIR-V, plus both shadow comparison helper fixtures and existing conditional/dataflow checks.
 

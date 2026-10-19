@@ -2,6 +2,10 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Added post-stage shadowtex1 and shadowcolor0/shadowcolor inputs, with explicit metadata, color alias deduplication, depth/color filtering and a combined twelve-sampler budget.
+- Preserved modern float and legacy vec4 comparison-helper semantics in post shaders; added a four-phase prepare/deferred/composite/final readback chain.
+- Fixed swapped usage/native texture ID arguments in borrowed depth views. Standard post binding could otherwise leave a stale light texture selected; alias cleanup also used the wrong numeric ID.
+- Bounded post/vertex declaration scans across long blank regions; the new runtime fixture includes 60,000 blank lines per post stage and an unused noisetex header.
 - Added a separate pre-translucent `shadowtex1` image for terrain/entity programs, copied on the graphics queue after opaque terrain and entity/block features. Translucent shadow terrain now resumes the existing target with LOAD/STORE.
 - Fixed final shadow depth layout when entity feature passes leave it as an attachment, restored main matrices after shadow translucency, and retire cached pipeline variants for released shadow passes at frame completion.
 - Added water/entity Vulkan fixtures that require different authored depths from shadowtex0 and shadowtex1; missing/aliased/late snapshots cannot pass.
@@ -49,7 +53,7 @@
 - Added explicit errors for unsupported required Iris features and active compute, geometry, tessellation or begin stages.
 - Added a checksum-pinned external shaderpack source-audit workflow for four public packs and their declared profiles, embedded JCPP license notices, distributable checks and CI test-report artifacts.
 - Updated GitHub Actions to Node 24 action releases, pinned hosted runners to Ubuntu 24.04, and selected Gradle's open-source basic cache provider.
-- Remaining release blockers include active PBR/depth/shadow sampler reads, pack-specific uniforms, arbitrary geometry vertex inputs, MRT for the other geometry bridges, compute/tessellation execution, and real client/Vulkan pack validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
+- Remaining release blockers include normal/animated PBR maps, wider sampler/property semantics, per-draw IDs and other pack uniforms, arbitrary geometry vertex inputs, MRT for the other geometry bridges, compute/tessellation execution, cleanup/stress and real-pack Vulkan validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
 
 ## 0.1.1
 
