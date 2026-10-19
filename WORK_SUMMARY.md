@@ -8,7 +8,9 @@
 
 - Teardown audit завершён: registry snapshot совпадает с vanilla baseline (46/667/97), Veyra-named объектов нет; ~10031 diagnostics относятся к VulkanMod и присутствуют без shaderpack.
 - Версия поднята до `0.2.0-beta.1+mc1.21.11` (prerelease, не stable/не Iris parity). Локально JDK 21: `clean test validateShaders build packageExamplePacks` success, **139 tests / 0 failures/errors/skips**, verify_jar прошёл.
-- RELEASE_NOTES.md, README, CHANGELOG обновлены. Далее: push → PR #2 ready+merge в main → tag `v0.2.0-beta.1+mc1.21.11` → Release workflow публикует JAR.
+- **Опубликовано.** PR #2 смержен в main (merge commit `c4dcde4`). Lightweight tag `v0.2.0-beta.1+mc1.21.11` → `c4dcde4` (первый annotated tag провалил SHA-check publish step в run 39253625564; заменён). Release run https://github.com/glebKovshov/Veyra/actions/runs/39254383192 — success (source audit, 11 Lavapipe fixtures, build/tests, verify_jar, publish).
+- Release (prerelease): https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.1%2Bmc1.21.11 ; JAR скачан заново, SHA-256 совпадает с SHA256SUMS.txt.
+- RELEASE_NOTES.md, README, CHANGELOG обновлены. Ранее запланировано: push → PR #2 ready+merge в main → tag `v0.2.0-beta.1+mc1.21.11` → Release workflow публикует JAR.
 - Следующие backend задачи после beta.1: per-draw entityId/blockEntityId, shadowFade, произвольные geometry vertex stages, non-terrain MRT, проверка на физическом GPU и реальных паках.
 
 ## Текущая работа: teardown ownership audit — 2026-10-19
