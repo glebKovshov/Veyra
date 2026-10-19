@@ -4,7 +4,14 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Актуальный срез: post shadow inputs + borrowed depth ID fix — 2026-10-19
+## Текущая работа: teardown ownership audit — 2026-10-19
+
+- Добавлен original vanilla-baseline без выбранного shaderpack, с readback после 240 world ticks. Он требует отсутствие selected pack/rendering и отсутствие shader signal; predicates остальных 10 fixtures не изменены.
+- Test-only shutdown mixins снимают native registry после vkDeviceWaitIdle и перед allocator destruction: buffer/image handles и names, pipeline layouts/variants, descriptor pools/sets, pending frame operations/frees. Workflow требует оба JSON, чтобы диагностика не могла молча пропасть. Diagnostic classes исключены из release JAR.
+- В pinned VulkanMod `VkDebugLabel` и `Vulkan.setDebugLabel` — no-op; CLI renderDebugLabels распознаётся Minecraft, но здесь не даёт объектных имён. Поэтому выбран explicit JSON handle→owner trace.
+- Локально `test build` success с compileGraphicsSmokeJava. Новый GPU baseline/registry trace ещё не проверен. Сначала сопоставить оставшиеся VUID с snapshots, затем исправлять доказанные cleanup defects; не приписывать все objects Veyra или backend по одному count.
+
+## Предыдущий подтверждённый срез: post shadow inputs + borrowed depth ID fix — 2026-10-19
 
 - Runtime HEAD **317fb00b3a7387134826317320b4b9947fddf887**. Build push/PR **39249394264 / 39249400344** success. Скачанные CI XML artifact **12184757885** подтверждают **139 tests, 0 failures/errors/skips**, shaderc **38 examples preprocess / 35 direct SPIR-V**, plus post comparison fixture. Скачанный mod JAR artifact **12185470779** прошёл verifier.
 - Graphics push/PR **39249394235 / 39249400249** success, все **10 fixtures**. Все exact-commit artifacts скачаны. MRT **222757/0**, water-depth **222757/0**, water-color **222757/0**, specular-atlas **222577/0**, specular-entity **18410/0**, shadow-color-terrain **222496/0**, shadow-color-entity **18293/0**, separate-depth water **226902/0**, entity **16358/0**, post-shadow-chain **230400/0**. Runtime validation errors **0 у всех**. Новые active/disabled кадры просмотрены.

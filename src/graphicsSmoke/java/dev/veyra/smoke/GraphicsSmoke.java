@@ -23,7 +23,7 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted;
+    private static boolean entityFixtureStarted, vanillaBaseline;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -38,6 +38,7 @@ public final class GraphicsSmoke {
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
+            vanillaBaseline = fixture.equals("vanilla-baseline");
             boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -60,7 +61,11 @@ public final class GraphicsSmoke {
             client.options.hideGui = true;
             client.player.setXRot(entityFixture ? 15.0F : 35.0F);
             client.player.setYRot(45.0F);
-            if (stage == 0 && worldTicks >= 160) {
+            if (vanillaBaseline && worldTicks >= 240) {
+                if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
+                    throw new IllegalStateException("Vanilla baseline unexpectedly selected a shaderpack");
+                pending = true; requested = true; captureActive = false;
+            } else if (stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
                 pending = true;
@@ -143,7 +148,9 @@ public final class GraphicsSmoke {
             }
             int count = colored;
             completion = () -> {
-                if (active) {
+                if (vanillaBaseline) {
+                    finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
+                } else if (active) {
                     activePixels = count;
                     VeyraRenderer.disable();
                     baselineAt = worldTicks + 80;
