@@ -4554,7 +4554,8 @@ public final class VeyraRenderer {
         int moonPhase = moonPhaseValue.index();
         float cloudHeight = minecraft.level.environmentAttributes()
                 .getDimensionValue(EnvironmentAttributes.CLOUD_HEIGHT);
-        float endFlashIntensity = minecraft.level.endFlashState().getIntensity(partialTick);
+        var endFlashState = minecraft.level.endFlashState();
+        float endFlashIntensity = endFlashState == null ? 0.0F : endFlashState.getIntensity(partialTick);
         float sunAngle = (worldTime + partialTick) / 24000.0F;
         int worldDay = (int) Math.floorDiv(dayTime, 24000L);
         int bedrockLevel = minecraft.level.getMinY();
