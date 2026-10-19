@@ -77,6 +77,7 @@ import org.joml.Matrix4fc;
 import org.joml.Vector2i;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
+import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkFormatProperties;
 import org.lwjgl.vulkan.VK10;
@@ -169,7 +170,7 @@ public final class VeyraRenderer {
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:playerLookVector|skyColor|eyePosition|relativeEyePosition|cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3|vec4)\\s+(?:lightningBoltPosition|playerLookVector|skyColor|eyePosition|relativeEyePosition|cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![012]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
@@ -194,7 +195,8 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "playerMood", "biome_precipitation", "atlasSize", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "darknessLightFactor", "playerMood", "biome_precipitation", "atlasSize", "lightningBoltPosition",
+            "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
             "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
@@ -211,6 +213,7 @@ public final class VeyraRenderer {
     private static final List<String> VECTOR3_UNIFORMS = List.of(
             "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract",
             "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor");
+    private static final List<String> VECTOR4_UNIFORMS = List.of("lightningBoltPosition");
     private static final List<String> IVECTOR2_UNIFORMS = List.of("eyeBrightness", "eyeBrightnessSmooth", "atlasSize");
     private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
@@ -221,7 +224,8 @@ public final class VeyraRenderer {
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
-            "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
+            "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "lightningBoltPosition",
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -413,6 +417,8 @@ public final class VeyraRenderer {
                 Uniforms.vec1f_uniformMap.put(uniform.name(), () -> shaderPackFloatUniform(uniform.name()));
             } else if (uniform.sourceType().equals("vec3")) {
                 registerShaderPackVectorUniform(uniform.name());
+            } else if (uniform.sourceType().equals("vec4")) {
+                registerShaderPackVector4Uniform(uniform.name());
             } else if (uniform.sourceType().equals("ivec2")) {
                 registerShaderPackIntegerVector2Uniform(uniform.name());
             } else if (uniform.sourceType().equals("ivec3")) {
@@ -517,6 +523,43 @@ public final class VeyraRenderer {
             case "eyeBrightnessSmooth.y" -> (double) camera.eyeBrightnessSmooth().y;
             default -> null;
         };
+    }
+
+    private static final Map<String, MappedBuffer> SHADER_PACK_VECTOR4_BUFFERS = new HashMap<>();
+
+    private static void registerShaderPackVector4Uniform(String name) {
+        MappedBuffer buffer = new MappedBuffer(4 * Float.BYTES);
+        SHADER_PACK_VECTOR4_BUFFERS.put(name, buffer);
+        Uniforms.vec4f_uniformMap.put(name, () -> buffer);
+    }
+
+    private static void updateShaderPackVector4Uniforms(Vector4f lightningBolt) {
+        SHADER_PACK_VECTOR4_BUFFERS.forEach((name, buffer) -> {
+            Vector4f value = switch (name) {
+                case "lightningBoltPosition" -> lightningBolt;
+                default -> throw new IllegalArgumentException("Unknown shader pack vec4 uniform " + name + ".");
+            };
+            buffer.putFloat(0, value.x);
+            buffer.putFloat(Float.BYTES, value.y);
+            buffer.putFloat(Float.BYTES * 2, value.z);
+            buffer.putFloat(Float.BYTES * 3, value.w);
+        });
+    }
+
+    /** Iris: a rendered lightning bolt's position relative to the camera with w = 1, otherwise zero. */
+    private static Vector4f lightningBoltPosition(Minecraft minecraft, Vec3 cameraPosition) {
+        if (minecraft.level == null) {
+            return new Vector4f();
+        }
+        float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        for (net.minecraft.world.entity.Entity entity : minecraft.level.entitiesForRendering()) {
+            if (entity instanceof net.minecraft.world.entity.LightningBolt bolt) {
+                Vec3 position = bolt.getPosition(partialTick);
+                return new Vector4f((float) (position.x - cameraPosition.x), (float) (position.y - cameraPosition.y),
+                        (float) (position.z - cameraPosition.z), 1.0F);
+            }
+        }
+        return new Vector4f();
     }
 
     private static void registerShaderPackVectorUniform(String name) {
@@ -902,9 +945,11 @@ public final class VeyraRenderer {
         cameraUniforms = new CameraUniforms(
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition(),
-                brightness, smoothedBrightness, eyePosition, relativeEyePosition, playerLookVector, skyColor);
+                brightness, smoothedBrightness, eyePosition, relativeEyePosition, playerLookVector, skyColor,
+                lightningBoltPosition(minecraft, cameraPosition));
         cameraUniformsInitialized = true;
         updateShaderPackVectorUniforms(cameraUniforms);
+        updateShaderPackVector4Uniforms(cameraUniforms.lightningBoltPosition());
         updateShaderPackIntegerVector2Uniforms(cameraUniforms);
         updateShaderPackIntegerVectorUniforms(cameraUniforms);
         if (minecraft.level != null && minecraft.player != null) {
@@ -2536,6 +2581,9 @@ public final class VeyraRenderer {
         }
         if (IVECTOR2_UNIFORMS.contains(uniform)) {
             return "ivec2";
+        }
+        if (VECTOR4_UNIFORMS.contains(uniform)) {
+            return "vec4";
         }
         if (IVECTOR3_UNIFORMS.contains(uniform)) {
             return "ivec3";
@@ -4768,6 +4816,7 @@ public final class VeyraRenderer {
                 case "biome_precipitation" -> new UniformValue.IntUniform(biomePrecipitation());
                 case "playerLookVector" -> new UniformValue.Vec3Uniform(frameUniforms.camera().playerLookVector());
                 case "skyColor" -> new UniformValue.Vec3Uniform(frameUniforms.camera().skyColor());
+                case "lightningBoltPosition" -> new UniformValue.Vec4Uniform(frameUniforms.camera().lightningBoltPosition());
                 case "heldBlockLightValue" -> new UniformValue.IntUniform(
                         heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND));
                 case "heldBlockLightValue2" -> new UniformValue.IntUniform(
@@ -5470,11 +5519,11 @@ public final class VeyraRenderer {
                                   Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
                                   Vector3f previousCameraPositionFract, Vector2i eyeBrightness, Vector2i eyeBrightnessSmooth,
                                   Vector3f eyePosition, Vector3f relativeEyePosition,
-                                  Vector3f playerLookVector, Vector3f skyColor) {
+                                  Vector3f playerLookVector, Vector3f skyColor, Vector4f lightningBoltPosition) {
         private static final CameraUniforms ZERO = new CameraUniforms(
                 new Vector3f(), new Vector3i(), new Vector3f(),
                 new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i(), new Vector2i(),
-                new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f());
+                new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f(), new Vector4f());
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,

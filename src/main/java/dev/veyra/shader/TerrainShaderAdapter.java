@@ -56,6 +56,7 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("playerLookVector", "vec3", false),
             new ShaderUniform("skyColor", "vec3", false),
             new ShaderUniform("atlasSize", "ivec2", false),
+            new ShaderUniform("lightningBoltPosition", "vec4", false),
             new ShaderUniform("heldBlockLightValue", "int", false),
             new ShaderUniform("heldBlockLightValue2", "int", false),
             new ShaderUniform("heldItemId", "int", false),
