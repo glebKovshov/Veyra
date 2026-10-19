@@ -4,7 +4,7 @@
 
 The geometry bridges now read resource-pack `_s.png` specular maps for terrain/shadow atlases and standalone entity textures. Atlas rectangles follow the live albedo sprites, including edge padding. Data use straight UNORM channels, with linear or LabPBR category-aware mipmaps selected by `optifine/texture.properties`. Missing maps use the zero specular default. Animated material maps and normal maps remain unsupported; animated specular inputs produce an explicit error. General Iris filtering/mipmap settings are incomplete.
 
-The current local 75-case source audit at candidate parent `d7036d9` includes the scalar custom-uniform and `shadowFade` changes. It preprocesses 5,178 sources; geometry adapters accept 18 and reject 699 cases. `shadowFade` is no longer a BSL blocker. The matrix is source-only and does not establish popular-pack visual compatibility. Original atlas/entity fixtures validate material data separately.
+At release commit `4be1bba`, the 75-case source audit preprocesses 5,178 sources; geometry adapters accept 18 and reject 699 cases. `shadowFade` is no longer a BSL blocker. The matrix is source-only and does not establish popular-pack visual compatibility. Original atlas/entity fixtures validate material data separately.
 
 ## Completed shadow color inputs
 
@@ -20,7 +20,7 @@ Prepare, deferred, composite and final programs read actual shadowtex0/shadowtex
 
 ## Verified source checkpoint
 
-This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The pinned archives were checked locally for this candidate: 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. GitHub CI evidence for this candidate will be recorded after its workflows finish.
+This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The pinned archives were checked for release commit `4be1bba`: 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. The gated source audit and 12 synthetic Lavapipe fixtures passed in the [beta.2 release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39289684005); neither result is third-party-pack visual validation.
 
 | Pack | Version | Options / profiles | Default stages preprocessed, Overworld / Nether / End | Default geometry fragments accepted / attempted | Current source blockers | In-game pack result |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -48,9 +48,9 @@ Download the exact input versions legally from their source and verify the recor
 
 The profile audit option selects one declared profile. The default matrix and separate profile report distinguish those selections; neither establishes that arbitrary options or complete pipelines render correctly. The same pinned source audit can be rerun from the repository's GitHub Actions workflow.
 
-## Remaining release checks
+## Unverified integration checks
 
-GitHub CI's [Lavapipe client run 39183912225](https://github.com/glebKovshov/Veyra/actions/runs/39183912225) passed Veyra's synthetic terrain-MRT/composite fixture: the active frame contained 222,319 magenta pixels and the shaders-disabled baseline contained 0. Runtime Vulkan validation errors were 0. At process teardown, VulkanMod/Minecraft reports 10,031 `VUID-vkDestroyDevice-device-05137` child-object diagnostics; ownership has not been identified, so clean device teardown is not established. The fixture does not render any third-party pack. Physical GPU testing, F6 UI interaction, popular-pack visual compatibility, water/sky/light/transparency, resize, resource reload, world/dimension/pack switching and sustained GPU-memory checks remain unverified. The published 0.1.1 release predates this development branch; no main-branch release claiming Iris parity has been published.
+The [beta.2 release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39289684005) passed all 12 Lavapipe fixtures with runtime Vulkan validation checks enabled. These fixtures exercise Veyra's synthetic render paths and do not render any third-party pack. Physical GPU testing, F6 UI interaction, popular-pack visual compatibility, water/sky/light/transparency, resize, resource reload, world/dimension/pack switching and sustained GPU-memory checks remain unverified. Release `0.2.0-beta.2` is a prerelease and makes no full Iris parity claim.
 
 ## Water opaque-depth bridge (after alpha.1)
 
