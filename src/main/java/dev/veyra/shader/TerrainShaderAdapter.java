@@ -51,6 +51,7 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("near", "float", false),
             new ShaderUniform("far", "float", false),
             new ShaderUniform("darknessLightFactor", "float", false),
+            new ShaderUniform("shadowFade", "float", false),
             new ShaderUniform("playerMood", "float", false),
             new ShaderUniform("biome_precipitation", "int", false),
             new ShaderUniform("playerLookVector", "vec3", false),
@@ -389,6 +390,9 @@ public final class TerrainShaderAdapter {
         }
         List<ShaderUniform> uniforms = new ArrayList<>(SHADERPACK_UNIFORMS);
         for (CustomUniforms.Uniform uniform : custom) {
+            if (SHADERPACK_UNIFORMS.stream().anyMatch(builtIn -> builtIn.name().equals(uniform.name()))) {
+                continue;
+            }
             uniforms.add(new ShaderUniform(uniform.name(), uniform.type().glsl(),
                     uniform.type() == CustomUniforms.Type.BOOL));
         }

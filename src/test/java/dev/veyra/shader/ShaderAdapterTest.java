@@ -70,6 +70,22 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsIrisShadowFadeUniformForTerrainAndPostPrograms() throws IOException {
+        String terrain = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                uniform float shadowFade;
+                void main() { gl_FragColor = vec4(shadowFade); }
+                """);
+        assertTrue(terrain.contains("float shadowFade;"));
+        assertFalse(terrain.contains("uniform float shadowFade;"));
+
+        ShaderPackUniformAdapter.AdaptedShader post = ShaderPackUniformAdapter.extract(
+                "uniform float shadowFade;\nvoid main() { }\n", "composite");
+        assertTrue(post.declarations().contains("uniform float shadowFade;"));
+        assertTrue(post.fields().contains(new ShaderPackUniformAdapter.UniformField("float", "shadowFade")));
+    }
+
+    @Test
     void adaptsIrisDimensionUniformsForTerrainAndPostPrograms() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 #version 120

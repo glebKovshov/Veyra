@@ -23,7 +23,7 @@ public final class CustomUniforms {
     public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of());
     /** Built-in scalar inputs an expression may reference; vector inputs are exposed by component. */
     public static final Set<String> BUILT_IN_INPUTS = Set.of(
-            "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
+            "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "shadowFade", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay", "moonPhase",
             "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "screenBrightness", "blindness",
@@ -92,7 +92,9 @@ public final class CustomUniforms {
             known.remove(name);
             definitions.removeIf(definition -> definition.name().equals(name));
             unavailable.remove(name);
-            if (BUILT_IN_INPUTS.contains(name)) {
+            // BSL defines its own expression for shadowFade in shaders.properties. Keep that pack
+            // override compatible while still exposing Iris' frame value when it is not overridden.
+            if (BUILT_IN_INPUTS.contains(name) && !name.equals("shadowFade")) {
                 unavailable.put(name, "it would replace a built-in uniform");
                 continue;
             }

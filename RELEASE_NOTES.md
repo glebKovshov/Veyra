@@ -1,35 +1,31 @@
-# Veyra 0.2.0-beta.1 — experimental supported subset
+# Veyra 0.2.0-beta.2 — experimental prerelease
 
-This is a **beta prerelease**, not Iris parity and not a stable release. Stable 0.1.1 remains available. Complementary, BSL and Sildur's still have known source incompatibilities and are **not** certified playable.
+This is an experimental supported subset of Iris shader-pack behavior on VulkanMod. It is not a stable release and does not claim full Iris parity. Stable 0.1.1 remains available. The pinned compatibility audit still finds active blockers in all four tested third-party packs; none is certified playable.
 
 ## Installation
 
 - Minecraft **1.21.11**, Fabric Loader **0.18.4+**, VulkanMod **0.6.8**, Java **21+**.
-- Put `veyra-0.2.0-beta.1+mc1.21.11.jar` in the instance's `mods/` folder alongside VulkanMod. Do not install the sources JAR. VulkanMod bundles its required Fabric modules; the build uses Fabric API 0.140.0+1.21.11.
-- Extract the optional example-pack archive into `shaderpacks/`, or add a supported pack folder/ZIP. Press **F6**, select the pack and use **Configure / Apply** for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
+- Install `veyra-0.2.0-beta.2+mc1.21.11.jar` in the instance's `mods/` folder alongside VulkanMod. Do not install the sources JAR. VulkanMod bundles its required Fabric modules; the development build uses Fabric API 0.140.0+1.21.11.
+- Optional example packs can be extracted into `shaderpacks/`. Press **F6**, select a pack, then use **Configure / Apply** for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
 
-## Changes since 0.2.0-alpha.1
+## Changes since beta.1
 
-- `gbuffers_water` can read copied opaque depth (`depthtex1`) and up to six auxiliary `colortex1..15` buffers (plus legacy aliases), using the current ping-pong side after deferred.
-- Static resource-pack `_s.png` specular maps for terrain, shadow and entity programs (linear/LabPBR mipmaps).
-- Completed shadow color (`shadowcolor0` / `shadowcolor`) and a separate pre-translucent `shadowtex1` for terrain, entity and post programs.
-- Fixed real native defects: optional descriptor binding gaps, borrowed main-depth table binding, swapped usage/texture-ID arguments in borrowed depth views, final shadow depth layout after entity passes, quadratic declaration scans on long blank regions.
-- Shutdown ownership trace: before allocator destruction no Veyra-named buffers, images, pipelines or pending retirements remain; the object registry matches a vanilla VulkanMod baseline.
+- Evaluate supported scalar `uniform.*` and `variable.*` expressions from `shaders.properties` for terrain and post programs.
+- Add Iris uniforms for near/far planes, held item and block light, biome precipitation, player mood/look vector, sky color, atlas size, lightning bolt position, darkness light factor and shadow fade. Preserve a pack-defined `shadowFade` expression when present; use the Iris-compatible sun/moon calculation otherwise.
+- Add `relativeEyePosition` and `eyePosition` to the supported post-uniform set. Supply Iris-unbound `entityId`, `blockEntityId`, and `currentRenderedItemId` as zero outside entity-attribute programs; actual per-draw IDs remain unsupported.
+- Fix `ivec2` post-uniform blocks and only treat `entityColor` as Iris-unbound outside overlay programs.
 
-See CHANGELOG.md for the full history.
+## Verification
 
-## Evidence and limitations
+- Clean JDK 21 `clean test validateShaders build packageExamplePacks` passes with **159 JUnit tests**, zero failures/errors/skips; shaderc preprocesses 39 example shaders and compiles 36 directly to Vulkan SPIR-V. The JAR verifier passes.
+- The pinned source-only matrix preprocesses 5,178 selected sources across 75 default/profile/dimension cases; adapters accept 18 and reject 699 geometry fragment combinations. These results are adapter checks, not complete pipeline or visual validation.
+- Release publication is gated on GitHub Build, source-audit and software-Vulkan graphics workflows. The graphics fixtures are synthetic and do not certify popular packs or physical-GPU behavior.
 
-- Local JDK 21 and CI: **139 JUnit tests**, 0 failures/errors/skips; shaderc **38** example sources preprocessed / **35** direct SPIR-V compilations; JAR verifier passes.
-- Lavapipe (software Vulkan) graphics CI: **11 fixtures** (MRT, water depth/color, specular atlas/entity, shadow color terrain/entity, separate shadow depth water/entity, post shadow chain, vanilla baseline) pass with **0 runtime validation errors**. These are original synthetic fixtures, not popular packs.
-- Whole-process teardown reports ~10,031 VulkanMod child-object diagnostics **also with no shader pack selected** (vanilla baseline); with Veyra fixtures the count differs by a few objects, none Veyra-named. Clean VulkanMod teardown is not claimed.
-- Pinned source audit: 75 configurations, 5,178 sources, 18 accepted / 699 rejected geometry cases (adapter coverage, not in-game rendering).
+## Known limits
 
-| Pack | Source audit | Visual compatibility |
-| --- | --- | --- |
-| Complementary Reimagined r5.9.3 | rejected (blockEntityId etc.) | Not verified |
-| Complementary Unbound r5.9.3 | rejected (blockEntityId etc.) | Not verified |
-| BSL 10.1.8 | partly accepted; entityId/blockEntityId/shadowFade missing | Not verified |
-| Sildur's Vibrant 2.02 Extreme | rejected (color feedback, geometry inputs) | Not verified |
+- Complementary Reimagined and Unbound still require `blockEntityId`, `velocity`, and cloud `fogColor`; selected profiles also use unsupported compute stages.
+- BSL still requires per-draw `entityId`/`blockEntityId`; its source-only audit also cannot resolve the registered `BIOME_DESERT` input used by `isDesert`, and its cloud fragment declares a texture uniform.
+- Sildur's still needs `colortex4` in non-terrain geometry and defined water attachment feedback behavior; its cloud fragment also declares a texture uniform.
+- Normal maps, animated material maps, broader sampler/property behavior, arbitrary geometry vertex inputs, non-terrain MRT, compute/tessellation execution, physical-GPU checks and real-pack visual validation remain incomplete.
 
-Not implemented: per-draw entityId/blockEntityId, shadowFade, arbitrary geometry vertex stages, non-terrain MRT, normal maps, animated specular, compute/tessellation execution. Unsupported active features produce diagnostics instead of fake output. No physical GPU or native UI test was performed for this release.
+Unsupported active features produce diagnostics instead of fake output. See [COMPATIBILITY.md](COMPATIBILITY.md), [VALIDATION.md](VALIDATION.md), and [CHANGELOG.md](CHANGELOG.md) for details and evidence.

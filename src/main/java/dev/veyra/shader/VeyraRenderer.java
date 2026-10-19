@@ -164,7 +164,7 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|shadowFade|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth|atlasSize)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
@@ -195,7 +195,7 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "playerMood", "biome_precipitation", "atlasSize", "lightningBoltPosition",
+            "darknessLightFactor", "shadowFade", "playerMood", "biome_precipitation", "atlasSize", "lightningBoltPosition",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
@@ -225,7 +225,7 @@ public final class VeyraRenderer {
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
             "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "lightningBoltPosition",
-            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
+            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "shadowFade", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -475,6 +475,7 @@ public final class VeyraRenderer {
             case "near" -> (double) IRIS_NEAR_PLANE;
             case "far" -> (double) farPlane();
             case "darknessLightFactor" -> (double) darknessLightFactor;
+            case "shadowFade" -> (double) frame.shadowFade();
             case "playerMood" -> (double) playerMood();
             case "biome_precipitation" -> (double) biomePrecipitation();
             case "heldBlockLightValue" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -4832,6 +4833,9 @@ public final class VeyraRenderer {
                 case "frameTime" -> new UniformValue.FloatUniform(frameUniforms.frameTime());
                 case "frameCounter" -> new UniformValue.IntUniform(frameUniforms.frameCounter());
                 case "sunAngle" -> new UniformValue.FloatUniform(frameUniforms.sunAngle());
+                case "shadowFade" -> new UniformValue.FloatUniform(
+                        CustomUniforms.active().uniform("shadowFade") == null
+                                ? frameUniforms.shadowFade() : CustomUniforms.active().floatValue("shadowFade"));
                 case "rainStrength" -> new UniformValue.FloatUniform(frameUniforms.rainStrength());
                 case "wetness" -> new UniformValue.FloatUniform(frameUniforms.wetness());
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());
@@ -4987,6 +4991,11 @@ public final class VeyraRenderer {
         var endFlashState = minecraft.level.endFlashState();
         float endFlashIntensity = endFlashState == null ? 0.0F : endFlashState.getIntensity(partialTick);
         float sunAngle = (worldTime + partialTick) / 24000.0F;
+        float currentSunAngle = minecraft.gameRenderer.getMainCamera().attributeProbe()
+                .getValue(EnvironmentAttributes.SUN_ANGLE, partialTick);
+        float currentMoonAngle = minecraft.gameRenderer.getMainCamera().attributeProbe()
+                .getValue(EnvironmentAttributes.MOON_ANGLE, partialTick);
+        float shadowFade = IrisShadowFade.calculate(currentSunAngle, currentMoonAngle);
         int worldDay = (int) Math.floorDiv(dayTime, 24000L);
         int bedrockLevel = minecraft.level.getMinY();
         float rainStrength = minecraft.level.getRainLevel(partialTick);
@@ -5005,7 +5014,7 @@ public final class VeyraRenderer {
                 ? player.getEffectBlendFactor(net.minecraft.world.effect.MobEffects.DARKNESS, partialTick) : 0.0F;
         int isEyeInWater = player.isEyeInFluid(FluidTags.WATER) ? 1
                 : player.isEyeInFluid(FluidTags.LAVA) ? 2 : player.isInPowderSnow ? 3 : 0;
-        return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, rainStrength, wetness,
+        return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, shadowFade, rainStrength, wetness,
                 thunderStrength, worldTime, worldDay, moonPhase, bedrockLevel, cloudHeight, endFlashIntensity,
                 (float) player.getEyeY(),
                 (float) (double) minecraft.options.gamma().get(), blindness, nightVision, darknessFactor,
@@ -5489,7 +5498,7 @@ public final class VeyraRenderer {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
-                                 float sunAngle, float rainStrength, float wetness, float thunderStrength,
+                                 float sunAngle, float shadowFade, float rainStrength, float wetness, float thunderStrength,
                                  int worldTime, int worldDay, int moonPhase, int bedrockLevel,
                                  float cloudHeight, float endFlashIntensity,
                                  float eyeAltitude, float screenBrightness,
@@ -5498,7 +5507,7 @@ public final class VeyraRenderer {
                                  boolean isOnGround, boolean isHurt, boolean isInvisible, boolean isBurning,
                                  FrameMatrices matrices, CameraUniforms camera) {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
-                0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
+                0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
                 false, false, false, false, false, false, false, FrameMatrices.IDENTITY, CameraUniforms.ZERO);
     }
 

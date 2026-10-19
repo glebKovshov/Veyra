@@ -169,7 +169,8 @@ class CustomUniformsTest {
                 "uniform int shadowFade;\nvoid main(){}\n", "gbuffers_entities"));
 
         CustomUniforms.activate(CustomUniforms.EMPTY);
-        assertThrows(IOException.class, () -> ShaderPackUniformAdapter.extract(
-                "uniform float shadowFade;\nvoid main(){}\n", "gbuffers_entities"));
+        ShaderPackUniformAdapter.AdaptedShader irisDefault = ShaderPackUniformAdapter.extract(
+                "uniform float shadowFade;\nvoid main(){}\n", "gbuffers_entities");
+        assertTrue(irisDefault.fields().contains(new ShaderPackUniformAdapter.UniformField("float", "shadowFade")));
     }
 }

@@ -4,7 +4,7 @@
 
 The geometry bridges now read resource-pack `_s.png` specular maps for terrain/shadow atlases and standalone entity textures. Atlas rectangles follow the live albedo sprites, including edge padding. Data use straight UNORM channels, with linear or LabPBR category-aware mipmaps selected by `optifine/texture.properties`. Missing maps use the zero specular default. Animated material maps and normal maps remain unsupported; animated specular inputs produce an explicit error. General Iris filtering/mipmap settings are incomplete.
 
-The complete local 75-case source audit matches the downloaded exact-commit CI report for `317fb00`. Complementary now reaches `blockEntityId`; total acceptance remains 18/717. Original atlas/entity fixtures validate material data separately from third-party shaderpacks; they do not establish popular-pack visual compatibility.
+The current local 75-case source audit at candidate parent `d7036d9` includes the scalar custom-uniform and `shadowFade` changes. It preprocesses 5,178 sources; geometry adapters accept 18 and reject 699 cases. `shadowFade` is no longer a BSL blocker. The matrix is source-only and does not establish popular-pack visual compatibility. Original atlas/entity fixtures validate material data separately.
 
 ## Completed shadow color inputs
 
@@ -20,13 +20,13 @@ Prepare, deferred, composite and final programs read actual shadowtex0/shadowtex
 
 ## Verified source checkpoint
 
-This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The pinned archives were checked by the [CI source-audit run](https://github.com/glebKovshov/Veyra/actions/runs/39249400296) at commit `317fb00b3a7387134826317320b4b9947fddf887`: 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game.
+This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The pinned archives were checked locally for this candidate: 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. GitHub CI evidence for this candidate will be recorded after its workflows finish.
 
 | Pack | Version | Options / profiles | Default stages preprocessed, Overworld / Nether / End | Default geometry fragments accepted / attempted | Current source blockers | In-game pack result |
 | --- | --- | --- | --- | --- | --- | --- |
-| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Custom `blockEntityId` in geometry programs; `shadowcomp.csh` compute in selected profiles | Not tested |
-| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Custom `blockEntityId` in geometry programs; `shadowcomp.csh` compute in selected profiles | Not tested |
-| BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | 1 / 9 | Custom `entityId`, `blockEntityId`, and `shadowFade` uniforms; cloud `texture` uniform | Not tested |
+| Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Custom `blockEntityId`, terrain/water `velocity`, cloud `fogColor`; `shadowcomp.csh` compute in selected profiles | Not tested |
+| Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Custom `blockEntityId`, terrain/water `velocity`, cloud `fogColor`; `shadowcomp.csh` compute in selected profiles | Not tested |
+| BSL | 10.1.8 | 383 / 5 | 63/63, 59/59, 63/63 | 1 / 9 | Custom `entityId` / `blockEntityId`; cloud `texture` uniform; source-only evaluator lacks registered `BIOME_DESERT` for `isDesert` | Not tested |
 | Sildur's Vibrant | 2.02 Extreme | 115 / 0 | 42/42, 42/42, 42/42 | 0 / 5 | `colortex4` in translucent entity/block/hand geometry; water reads colortex4 while it is also an attachment (feedback); cloud custom uniform `texture` | Not tested |
 
 The adapter checks cover terrain, water, entity/block/hand-family and cloud fragments. The BSL entity fragment using Iris' `varying vec4 color` is accepted and bridged to VulkanMod's vertex color. `noisetex` is accepted across this source matrix, and the BSL cloud `eyeBrightnessSmooth` blocker is resolved in the current code. `shadowtex0` is now exposed to supported entity, block entity, hand, and text programs when a pack provides a shadow pass; Veyra binds the actual shadow depth view through VulkanMod's `Sampler3` slot. `sampler2DShadow` helper parameters are lowered to the raw-depth sampler used by Veyra's software comparison bridge. A separate pre-translucent shadowtex1 is exposed to supported terrain/entity-family and post fragments. Unused sampler declarations, including `colortex0` when the shader never reads it, are removed before adapter validation; active reads from unsupported samplers still reject that program. These source results do not confirm sampler descriptors, lighting, image layouts, or rendered output. Other unsupported custom uniforms and samplers remain; see each row's generated rejection details in the machine-readable report.
@@ -54,7 +54,7 @@ GitHub CI's [Lavapipe client run 39183912225](https://github.com/glebKovshov/Vey
 
 ## Water opaque-depth bridge (after alpha.1)
 
-`gbuffers_water` now samples the separately captured `depthtex1` image with nearest/clamp addressing. Opaque and shadow terrain still reject this sampler. Before auxiliary-color inputs were added, Complementary water sources advanced to `gaux2` (legacy alias for `colortex5`); total acceptance remains 18/717 because other active resources are still unsupported.
+`gbuffers_water` now samples the separately captured `depthtex1` image with nearest/clamp addressing. Opaque and shadow terrain still reject this sampler. Before auxiliary-color inputs were added, Complementary water sources advanced to `gaux2` (legacy alias for `colortex5`); total acceptance at that historical checkpoint remains 18/717 because other active resources are still unsupported.
 
 At `51c5875`, [graphics run 39208570838](https://github.com/glebKovshov/Veyra/actions/runs/39208570838) passed both original fixtures: MRT 222,983/0 magenta pixels and water-depth 222,757/0, with zero runtime validation errors. The water predicate requires opaque depth behind the water fragment and rejects far-depth clears. Teardown remains unresolved (10,031 diagnostics for MRT, 10,050 for water; the additional 19 are VkPipeline objects, ownership unproven). This is synthetic runtime evidence, not third-party-pack visual compatibility. These changes are newer than the published alpha.1 tag.
 
@@ -64,4 +64,4 @@ Water geometry now reads up to six distinct auxiliary colortex1..15 images, incl
 
 The original water-color-inputs fixture writes colortex4 in opaque MRT, changes colortex5's ping-pong side in deferred, and checks a half-resolution read-only colortex7 clear value. Its first software Vulkan run passed with 222,757 magenta pixels versus 0 disabled and no runtime validation errors. The existing MRT and water-depth checks also passed. Current exact-commit evidence is recorded in VALIDATION.md; this is not a third-party-pack result.
 
-The complete local 75-case source matrix exactly matches downloaded CI run 39249400296. Complementary water now advances from shadowtex1 to blockEntityId; BSL water advances to shadowtex1 or shadowFade. Sildur's water requires defined image-feedback behavior in addition to the still-missing colortex4 inputs in other geometry bridges. Overall acceptance is still 18/717.
+The complete local 75-case source matrix exactly matches downloaded CI run 39249400296 at that historical checkpoint: 5,178 sources, 18 accepted / 699 rejected. Complementary water advances from `shadowtex1` to `blockEntityId`; BSL water advances from `shadowtex1` to `shadowFade`. Sildur's water requires defined image-feedback behavior in addition to the still-missing `colortex4` inputs in other geometry bridges.
