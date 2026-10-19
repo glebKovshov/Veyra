@@ -61,6 +61,15 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = vec4(readDepth(shadowtex1)); }
                     """, "gbuffers_entities", false, true);
             compile(compiler, options, entityOpaqueShadow, "entity-opaque-shadow-comparison", true);
+            String entityIdentifiers = EntityShaderAdapter.adaptFragment("""
+                    #version 120
+                    uniform int entityId;
+                    uniform int blockEntityId;
+                    void main() {
+                        gl_FragColor = vec4(float(entityId), float(blockEntityId), 0.0, 1.0);
+                    }
+                    """, "gbuffers_entities", false, false, 12, 83);
+            compile(compiler, options, entityIdentifiers, "entity-identifiers", true);
             String cloudFog = CloudShaderAdapter.adaptFragment("""
                     uniform vec3 fogColor;
                     uniform float fogStart;
@@ -90,7 +99,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-shadow and cloud-fog fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-ID, entity-shadow and cloud-fog fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

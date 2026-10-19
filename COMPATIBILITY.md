@@ -1,5 +1,11 @@
 # Shaderpack compatibility: development 0.2
 
+## Entity and block entity identifiers (beta.4 candidate)
+
+Veyra reads option-preprocessed Iris `entity.properties` and `block.properties`. Entity type mappings feed `entityId`; block IDs, partial state predicates and registered block tags feed `blockEntityId`. Block state rules follow source order, so the first matching selector wins. The renderer captures the identifier for each entity or block entity submission and routes its `RenderType` to a cached Vulkan pipeline variant with compile-time identifier constants. Unmapped values are `-1`.
+
+Unit tests cover parsing, namespace defaults, duplicate precedence, conditional properties, tags, block-state predicates and shader constants. This does not establish that a third-party pack renders correctly. Iris' built-in legacy block ID table is not loaded when `block.properties` is absent; such states remain unmapped. The pinned external source audit and graphics smoke are pending for this candidate, and no real-pack visual validation is claimed.
+
 ## Cloud fog uniforms
 
 Cloud fragments now map Iris `fogColor`, `fogStart`, and `fogEnd` to VulkanMod 0.6.8's live `FogColor`, `FogEnvironmentalStart`, and `FogEnvironmentalEnd` uniform providers. Veyra extends both stages' binding-1 uniform block and pipeline configuration for only the fields a pack declares. Unit and shaderc fixtures cover the GLSL mapping; the pinned 75-case source audit has no remaining cloud `fogColor` adapter rejection. This does not add cloud texture sampling, texture coordinates, extra outputs, or visual validation.
@@ -22,11 +28,11 @@ Terrain and entity-family fragments can read `shadowtex1` as sampler2D or sample
 
 Prepare, deferred, composite and final programs read actual shadowtex0/shadowtex1 and shadowcolor0/shadowcolor views. Color aliases share one descriptor. Unused declarations do not reserve resources; invalid sampler types, duplicates, missing shadow passes, unsupported shadow names and more than twelve total descriptors produce errors before drawing. The original four-phase GPU fixture passes sentinel data through colortex4/5/6 and requires distinct depth values plus authored shadow color at every phase. It covers modern float and legacy vec4 comparison helpers, an unused noisetex header and 60,000 blank lines per post source. Wider texture operations, mip/filter properties and the context-dependent shadow alias remain incomplete. These synthetic checks do not establish third-party-pack visual support.
 
-## Verified source checkpoint
+## Beta.3 source checkpoint (historical)
 
-This is a **source-only compatibility audit**. It does not compile complete shaderpack pipelines or render third-party packs. The refreshed pinned archives cover 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. The beta.2 release workflow passed 12 synthetic Lavapipe fixtures; neither the older runtime result nor this source audit is third-party-pack visual validation.
+This is the beta.3 **source-only compatibility audit** and is retained as a historical baseline. It does not compile complete shaderpack pipelines or render third-party packs. The refreshed pinned archives cover 12 default configurations and 63 declared-profile/dimension configurations. All 5,178 selected stage sources were discovered and preprocessed. The adapters accepted 18 and rejected 699 geometry fragment/configuration combinations. None of the listed packs has a complete pipeline confirmed in-game. The beta.4 candidate adds entity ID maps; the pinned audit is being re-run for that code. Neither this historical source audit nor synthetic Lavapipe fixtures are third-party-pack visual validation.
 
-| Pack | Version | Options / profiles | Default stages preprocessed, Overworld / Nether / End | Default geometry fragments accepted / attempted | Current source blockers | In-game pack result |
+| Pack | Version | Options / profiles | Default stages preprocessed, Overworld / Nether / End | Default geometry fragments accepted / attempted | Blockers at beta.3 | In-game pack result |
 | --- | --- | --- | --- | --- | --- | --- |
 | Complementary Reimagined | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Custom `blockEntityId`, terrain/water `velocity`, active cloud `colortex0`; `shadowcomp.csh` compute in selected profiles. Cloud `fogColor` is mapped. | Not tested |
 | Complementary Unbound | r5.9.3 | 403 / 8 | 73/73, 73/73, 73/73 | 0 / 10 | Custom `blockEntityId`, terrain/water `velocity`, active cloud `colortex0`; `shadowcomp.csh` compute in selected profiles. Cloud `fogColor` is mapped. | Not tested |
