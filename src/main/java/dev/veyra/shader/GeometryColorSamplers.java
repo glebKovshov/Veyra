@@ -15,7 +15,7 @@ public final class GeometryColorSamplers {
     private static final List<String> LEGACY = List.of(
             "gcolor", "gdepth", "gnormal", "composite", "gaux1", "gaux2", "gaux3", "gaux4");
     private static final Pattern DECLARATION = Pattern.compile(
-            "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+(\\w+)\\s*;");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+(\\w+)\\s*;");
 
     private GeometryColorSamplers() { }
 

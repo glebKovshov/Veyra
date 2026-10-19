@@ -72,4 +72,13 @@ class GeometryColorSamplersTest {
         assertFalse(adapted.contains("VeyraNoiseSampler"));
         assertTrue(adapted.contains("layout(binding = 5) uniform sampler2D VeyraGeometryColor5Sampler;"));
     }
+
+    @Test void handlesPreprocessorBlankLinesWithoutQuadraticSearch() {
+        String source = "uniform sampler2D colortex5;\n" + "\n".repeat(60_000)
+                + "void main(){gl_FragColor=texture2D(colortex5,vec2(0.5));}\n";
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+            assertEquals(Map.of("colortex5", 5), GeometryColorSamplers.read(source));
+            assertTrue(TerrainShaderAdapter.adaptFragment(source, false, true).contains("VeyraGeometryColor5Sampler"));
+        });
+    }
 }

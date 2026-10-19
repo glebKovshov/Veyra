@@ -255,3 +255,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 
 - `c4106f6`: Graphics push run 39209768717 прошёл все три fixtures: MRT 222857/0, water-depth 222757/0, water-color-inputs 222757/0 magenta; у всех runtime validation errors 0. Новый fixture реально проверил color4 из opaque MRT, color5 с актуальной deferred ping-pong стороны и инициализированный half-resolution color7.
 - При review обнаружена дополнительная несовместимость определения noisetex: runtime учитывал unused declaration, а адаптер удалял её, что сдвигало следующие descriptor bindings. `usesNoiseSampler` теперь исключает unused declarations. Добавлены regression и такой неиспользуемый sampler в GPU fixture. Повторный точный GPU прогон обязателен.
+
+### Ограничение regex при полном source audit
+
+- Локальный audit process оставался живым (Java pid 14796, main CPU ~239s). JDK jstack показал RUNNABLE внутри `GeometryColorSamplers.read`, Pattern BmpCharPropertyGreedy/Caret на leading `^\s*`. Это доказанная квадратичная обработка длинных блоков пустых строк после preprocessing, не timeout-наблюдение и не внешний blocker.
+- Начальный whitespace ограничен `[\t ]*`; такой же guard исправлен в terrain unsupported-uniform scan. Regression использует 60000 пустых строк и generous 5-second bound; проходит вместе с build/test/shaderc.
+- Именно этот собственный Java audit остановлен после диагностики; прежние CI source audits c4106f6/bf5037f отменены, новый полный прогон запущен на исправленной версии. Незавершённый первый audit не считать результатом матрицы.
