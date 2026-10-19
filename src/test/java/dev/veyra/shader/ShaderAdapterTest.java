@@ -83,6 +83,27 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void reportsTheSpecificUnsupportedTerrainInput() {
+        for (String input : List.of("mc_Entity", "mc_midTexCoord", "midTexCoord", "viewPos", "viewNormal", "tangent", "at_tangent")) {
+            IOException error = assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(
+                    "void main() { gl_FragColor = vec4(" + input + "); }\n"));
+            assertTrue(error.getMessage().contains("input '" + input + "'"), error.getMessage());
+        }
+    }
+
+    @Test
+    void keepsLegacyTerrainFragmentDataOutputsSupported() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                /* DRAWBUFFERS:0 */
+                void main() { gl_FragData[0] = vec4(1.0); }
+                """);
+
+        assertTrue(adapted.contains("veyraFragData0 = vec4(1.0);"));
+        assertFalse(adapted.contains("gl_FragData"));
+    }
+
+    @Test
     void adaptsIrisMoonPhaseUniformForGeometryPrograms() throws IOException {
         String adapted = CloudShaderAdapter.adaptFragment("""
                 #version 120

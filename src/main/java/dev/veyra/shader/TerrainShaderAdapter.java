@@ -28,7 +28,7 @@ public final class TerrainShaderAdapter {
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
     private static final Pattern UNSUPPORTED_GBUFFER_INPUT = Pattern.compile(
-            "\\b(?:gl_FragData|mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
+            "\\b(mc_Entity|mc_midTexCoord|midTexCoord|viewPos|viewNormal|tangent|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
@@ -311,8 +311,10 @@ public final class TerrainShaderAdapter {
             throw new IOException("gbuffers_terrain requires vec4 fragment outputs with supported locations.");
         }
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
-        if (UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented).find()) {
-            throw new IOException("gbuffers_terrain uses entity metadata, view-space positions, or tangents that are not provided by Veyra's terrain bridge yet.");
+        Matcher unsupportedInput = UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented);
+        if (unsupportedInput.find()) {
+            String name = unsupportedInput.group(1);
+            throw new IOException("gbuffers_terrain input '" + name + "' is not provided by Veyra's terrain bridge yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException("gbuffers_terrain uses a texture sampling function that Veyra's terrain bridge does not support yet.");
