@@ -12,5 +12,9 @@ void main() {
         discard;
     }
 
-    gl_FragColor = vec4(fract(abs(viewPos) * 0.125), albedo.a);
+    bool validViewPosition = all(lessThan(abs(viewPos), vec3(256.0)))
+            && dot(viewPos, viewPos) > 0.0625;
+    gl_FragColor = validViewPosition
+            ? vec4(1.0, 0.0, 1.0, albedo.a)
+            : vec4(0.0, 1.0, 0.0, albedo.a);
 }

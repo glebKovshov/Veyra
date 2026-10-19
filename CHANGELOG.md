@@ -3,7 +3,7 @@
 ## 0.2.0-beta.9 — 2026-10-20 (prerelease)
 
 - Bridge terrain-family Iris `viewPos` from VulkanMod's camera-relative vertex position and the current `gbufferModelView` matrix, preserving the configured uniform-buffer layout.
-- Add the terrain case to `geometry-view-space`, plus JUnit and direct SPIR-V regressions for the fragment and adapted vertex stages.
+- Add the terrain case to `geometry-view-space`, plus JUnit, direct SPIR-V and Lavapipe readback regressions for the fragment and adapted vertex stages.
 - Refresh the pinned source-audit reports: BSL terrain now passes the source adapter in default and declared-profile cases; BSL water still requires `mat`, and Complementary still requires `mc_midTexCoord`.
 
 ## 0.2.0-beta.8 — 2026-10-20 (prerelease)

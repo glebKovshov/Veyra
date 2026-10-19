@@ -11,14 +11,15 @@ This prerelease extends Veyra's supported Iris shader-pack subset on VulkanMod. 
 ## Changes since beta.8
 
 - Bridge terrain-family Iris `viewPos` from VulkanMod's camera-relative terrain position and the current `gbufferModelView` matrix. The shared VulkanMod terrain vertex format stays unchanged.
-- Add a terrain view-position case to `geometry-view-space` and JUnit/shaderc regressions for fragment input mapping and vertex-stage compilation.
+- Add a terrain view-position case to `geometry-view-space` and JUnit/shaderc regressions for fragment input mapping and vertex-stage compilation. An active/disabled Lavapipe readback fixture checks the terrain signal.
 - Refresh the pinned source audit: BSL terrain passes source adaptation; BSL water still requires `mat`, and Complementary terrain/water still require `mc_midTexCoord`.
 
 ## Verification
 
 - Local JDK 21 full `test validateShaders build packageExamplePacks --rerun-tasks` passed: **194 JUnit tests**, 42 shader examples processed, and 39 compiled directly to Vulkan SPIR-V. The beta.9 candidate JAR passes the distributable-content verifier.
 - The pinned source-only audit covers 12 defaults and 63 declared profile/dimension cases across 5,178 preprocessed stages; **90** geometry fragments are accepted and **627** rejected. Every case has `visualValidation=false`.
-- Synthetic Lavapipe CI and the beta.9 Release workflow results will be recorded after the candidate is integrated and run on GitHub. Source and shaderc results do not establish third-party pack appearance.
+- PR #16 Build ([run 39341485722](https://github.com/glebKovshov/Veyra/actions/runs/39341485722)), source audit ([run 39341485708](https://github.com/glebKovshov/Veyra/actions/runs/39341485708)) and 13-fixture graphics matrix ([run 39341485927](https://github.com/glebKovshov/Veyra/actions/runs/39341485927)) passed on code commit `4c19643`. The source artifact's 75 records and pinned input hashes match the local audit exactly. A feature-specific `geometry-view-space` readback fixture is now added and will run in the updated PR.
+- Source and shaderc results do not establish third-party pack appearance.
 - No physical-GPU or real-pack visual result is claimed.
 
 ## Known limits
