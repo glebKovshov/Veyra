@@ -163,13 +163,13 @@ public final class VeyraRenderer {
             "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
-    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:eyePosition|relativeEyePosition|cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3)\\s+(?:playerLookVector|skyColor|eyePosition|relativeEyePosition|cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
     private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![012]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
@@ -194,7 +194,7 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "darknessLightFactor", "playerMood", "biome_precipitation", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
             "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
@@ -203,23 +203,24 @@ public final class VeyraRenderer {
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse", "cameraPosition", "cameraPositionInt",
             "cameraPositionFract", "previousCameraPosition", "previousCameraPositionInt", "previousCameraPositionFract",
-            "eyePosition", "relativeEyePosition");
+            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor");
     private static final List<String> MATRIX_UNIFORMS = List.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
             "shadowProjection", "shadowProjectionInverse");
     private static final List<String> VECTOR3_UNIFORMS = List.of(
             "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract",
-            "eyePosition", "relativeEyePosition");
+            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor");
     private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> INTEGER_UNIFORMS = List.of(
-            "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
+            "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "biome_precipitation",
+            "frameCounter", "worldTime", "worldDay", "moonPhase", "bedrockLevel", "isEyeInWater", "isSpectator", "is_sneaking",
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
-            "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
+            "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -467,6 +468,8 @@ public final class VeyraRenderer {
             case "near" -> (double) IRIS_NEAR_PLANE;
             case "far" -> (double) farPlane();
             case "darknessLightFactor" -> (double) darknessLightFactor;
+            case "playerMood" -> (double) playerMood();
+            case "biome_precipitation" -> (double) biomePrecipitation();
             case "heldBlockLightValue" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND);
             case "heldBlockLightValue2" -> (double) heldBlockLightValue(net.minecraft.world.InteractionHand.OFF_HAND);
             case "heldItemId" -> (double) heldItemId(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -534,6 +537,8 @@ public final class VeyraRenderer {
             case "previousCameraPositionFract" -> uniforms.previousCameraPositionFract();
             case "eyePosition" -> uniforms.eyePosition();
             case "relativeEyePosition" -> uniforms.relativeEyePosition();
+            case "playerLookVector" -> uniforms.playerLookVector();
+            case "skyColor" -> uniforms.skyColor();
             default -> throw new IllegalArgumentException("Unknown shader pack vector uniform " + name + ".");
         };
         buffer.putFloat(0, value.x);
@@ -636,6 +641,9 @@ public final class VeyraRenderer {
         if (name.equals("darknessLightFactor")) {
             return darknessLightFactor;
         }
+        if (name.equals("playerMood")) {
+            return playerMood();
+        }
         if (name.equals("viewWidth")) {
             return minecraft.getWindow().getWidth();
         }
@@ -672,6 +680,9 @@ public final class VeyraRenderer {
         }
         if (name.equals("heldBlockLightValue2")) {
             return heldBlockLightValue(net.minecraft.world.InteractionHand.OFF_HAND);
+        }
+        if (name.equals("biome_precipitation")) {
+            return biomePrecipitation();
         }
         if (name.equals("heldItemId")) {
             return heldItemId(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -712,6 +723,28 @@ public final class VeyraRenderer {
     /** Called from the lightmap update with Iris' darknessLightFactor. */
     public static void captureDarknessLightFactor(float value) {
         darknessLightFactor = value;
+    }
+
+    /** Iris: the local player's cave-sound mood in [0, 1]. */
+    private static float playerMood() {
+        if (!(Minecraft.getInstance().getCameraEntity() instanceof net.minecraft.client.player.LocalPlayer player)) {
+            return 0.0F;
+        }
+        return Math.clamp(player.getCurrentMood(), 0.0F, 1.0F);
+    }
+
+    /** Iris: 0 none, 1 rain, 2 snow for the biome at the player's position. */
+    private static int biomePrecipitation() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            return 0;
+        }
+        net.minecraft.core.BlockPos position = minecraft.player.blockPosition();
+        return switch (minecraft.level.getBiome(position).value().getPrecipitationAt(position, minecraft.level.getSeaLevel())) {
+            case NONE -> 0;
+            case RAIN -> 1;
+            case SNOW -> 2;
+        };
     }
 
     /** Iris reports a fixed 0.05 near plane. */
@@ -834,6 +867,20 @@ public final class VeyraRenderer {
         Vector3f eyePosition = new Vector3f();
         Vector3f relativeEyePosition = new Vector3f();
         net.minecraft.world.entity.Entity cameraEntity = minecraft.getCameraEntity();
+        float lookPartialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        // Iris: playerLookVector from a living camera entity; skyColor from the camera's environment probe.
+        Vector3f playerLookVector = new Vector3f();
+        if (cameraEntity instanceof net.minecraft.world.entity.LivingEntity living) {
+            Vec3 look = living.getViewVector(lookPartialTick);
+            playerLookVector.set((float) look.x, (float) look.y, (float) look.z);
+        }
+        Vector3f skyColor = new Vector3f();
+        if (minecraft.level != null && cameraEntity != null) {
+            int sky = minecraft.gameRenderer.getMainCamera().attributeProbe().getValue(
+                    EnvironmentAttributes.SKY_COLOR, lookPartialTick);
+            skyColor.set(net.minecraft.util.ARGB.redFloat(sky), net.minecraft.util.ARGB.greenFloat(sky),
+                    net.minecraft.util.ARGB.blueFloat(sky));
+        }
         if (cameraEntity != null) {
             Vec3 eye = cameraEntity.getEyePosition(minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false));
             eyePosition.set((float) eye.x, (float) eye.y, (float) eye.z);
@@ -845,7 +892,7 @@ public final class VeyraRenderer {
         cameraUniforms = new CameraUniforms(
                 currentCameraPosition.position(), currentCameraPosition.integerPosition(), currentCameraPosition.fractionalPosition(),
                 previousCameraPosition.position(), previousCameraPosition.integerPosition(), previousCameraPosition.fractionalPosition(),
-                brightness, smoothedBrightness, eyePosition, relativeEyePosition);
+                brightness, smoothedBrightness, eyePosition, relativeEyePosition, playerLookVector, skyColor);
         cameraUniformsInitialized = true;
         updateShaderPackVectorUniforms(cameraUniforms);
         updateShaderPackIntegerVector2Uniforms(cameraUniforms);
@@ -4704,6 +4751,10 @@ public final class VeyraRenderer {
                 case "near" -> new UniformValue.FloatUniform(IRIS_NEAR_PLANE);
                 case "far" -> new UniformValue.FloatUniform(farPlane());
                 case "darknessLightFactor" -> new UniformValue.FloatUniform(darknessLightFactor);
+                case "playerMood" -> new UniformValue.FloatUniform(playerMood());
+                case "biome_precipitation" -> new UniformValue.IntUniform(biomePrecipitation());
+                case "playerLookVector" -> new UniformValue.Vec3Uniform(frameUniforms.camera().playerLookVector());
+                case "skyColor" -> new UniformValue.Vec3Uniform(frameUniforms.camera().skyColor());
                 case "heldBlockLightValue" -> new UniformValue.IntUniform(
                         heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND));
                 case "heldBlockLightValue2" -> new UniformValue.IntUniform(
@@ -5404,11 +5455,12 @@ public final class VeyraRenderer {
     private record CameraUniforms(Vector3f cameraPosition, Vector3i cameraPositionInt, Vector3f cameraPositionFract,
                                   Vector3f previousCameraPosition, Vector3i previousCameraPositionInt,
                                   Vector3f previousCameraPositionFract, Vector2i eyeBrightness, Vector2i eyeBrightnessSmooth,
-                                  Vector3f eyePosition, Vector3f relativeEyePosition) {
+                                  Vector3f eyePosition, Vector3f relativeEyePosition,
+                                  Vector3f playerLookVector, Vector3f skyColor) {
         private static final CameraUniforms ZERO = new CameraUniforms(
                 new Vector3f(), new Vector3i(), new Vector3f(),
                 new Vector3f(), new Vector3i(), new Vector3f(), new Vector2i(), new Vector2i(),
-                new Vector3f(), new Vector3f());
+                new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f());
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,

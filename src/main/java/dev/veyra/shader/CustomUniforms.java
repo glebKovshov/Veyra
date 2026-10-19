@@ -23,7 +23,7 @@ public final class CustomUniforms {
     public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of());
     /** Built-in scalar inputs an expression may reference; vector inputs are exposed by component. */
     public static final Set<String> BUILT_IN_INPUTS = Set.of(
-            "biome", "darknessLightFactor", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
+            "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
             "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay", "moonPhase",
             "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "screenBrightness", "blindness",
