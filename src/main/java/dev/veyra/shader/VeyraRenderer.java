@@ -2510,6 +2510,8 @@ public final class VeyraRenderer {
         var descriptor = pipeline.getImageDescriptor("VeyraDepthTex1Sampler");
         if (descriptor == null) return;
         var view = (net.vulkanmod.render.engine.VkTextureView) depthTex1Snapshot.sampledView();
+        view.texture().getVulkanImage().setSampler(
+                net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
         // WorldRenderer refreshes the indexed native table from VRenderSystem after pipeline bind.
         // Keep both tables on the same live view, including after a resize or previous post draw.
         VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
