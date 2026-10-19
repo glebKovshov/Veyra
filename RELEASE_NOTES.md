@@ -18,7 +18,7 @@ This release extends Veyra's supported Iris shader-pack subset on VulkanMod. It 
 ## Verification
 
 - Local JDK 21 `test validateShaders build packageExamplePacks` passes: 187 JUnit tests, 40 example shaders processed, and 37 compiled directly to Vulkan SPIR-V. The installable JAR passes the distributable-content verifier.
-- Pull-request CI passed the pinned shaderpack source audit and all 13 synthetic Lavapipe graphics fixtures. The cloud fixture produced 52,412 magenta pixels with shaders enabled and 0 after disabling them, with no runtime Vulkan validation errors. The source audit is not a full-pack compilation or visual test.
+- The [beta.7 Release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39331562077) passed the pinned shaderpack source audit, all 13 synthetic Lavapipe graphics fixtures, build/tests, and JAR verification before publication. The cloud fixture produced 52,412 magenta pixels with shaders enabled and 0 after disabling them, with no runtime Vulkan validation errors. The source audit is not a full-pack compilation or visual test.
 - Third-party pack visuals on a physical GPU, resizing during a live cloud pass, and long-session resource stress have not been validated.
 
 ## Known limits

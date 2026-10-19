@@ -1,10 +1,10 @@
 # 0.2 development validation status
 
-## Beta.7 PR validation — 2026-10-20
+## Beta.7 published prerelease — 2026-10-20
 
-PR #9 commit `83a05d73b5a50266623cd395ed74714caee070d5` passed the [Build](https://github.com/glebKovshov/Veyra/actions/runs/39330757396), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39330757293), and [13-fixture Lavapipe graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39330757123). The cloud fixture reported 52,412 active magenta pixels / 0 with shaders disabled and 0 runtime Vulkan validation errors. The source audit covers 75 default/profile/dimension cases and 5,178 sources; `visualValidation=false` for every entry.
+PR #9 merged as `da44c16aaf5188e369a3902affbf46beefb896c4`. The [Release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39331562077) passed pinned source audit, all 13 Lavapipe graphics fixtures, build/tests, distributable verification and publication. The [beta.7 prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.7%2Bmc1.21.11) includes `veyra-0.2.0-beta.7+mc1.21.11.jar` (565,114 bytes), SHA-256 `da1d89e77a582f6b5332bda72cf0d4fbe5d3b60da18003d190ac0f5a5485144b`. The downloaded JAR passed `scripts/verify_jar.py`; its hash matches the published `SHA256SUMS.txt`.
 
-Locally, JDK 21.0.12.1 ran `test validateShaders build packageExamplePacks` successfully: **187 JUnit tests, zero failures/errors/skips**, 40 example shaders processed and 37 compiled directly to Vulkan SPIR-V. `scripts/verify_jar.py` verified the beta.7 JAR (565,132 bytes; SHA-256 `7154992b52b02b29f4619cbeedef78cb84fbffe2f9c2f79e3c37791ded96aa1f`). This is the local build hash, not the published asset hash. Synthetic checks do not verify third-party pack visuals on a physical GPU or full Iris parity.
+The pinned source audit covers 75 default/profile/dimension cases and 5,178 sources; `visualValidation=false` for every entry. All 13 Lavapipe fixtures pass. The cloud fixture reported 52,412 active magenta pixels / 0 with shaders disabled and 0 runtime Vulkan validation errors. Locally, JDK 21.0.12.1 ran `test validateShaders build packageExamplePacks` successfully: **187 JUnit tests, zero failures/errors/skips**, 40 example shaders processed and 37 compiled directly to Vulkan SPIR-V. Synthetic checks do not verify third-party pack visuals on a physical GPU or full Iris parity.
 
 ## 0.2.0-beta.3 candidate — local checks — 2026-10-19
 
