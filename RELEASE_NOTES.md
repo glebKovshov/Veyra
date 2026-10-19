@@ -18,7 +18,7 @@ This is an experimental supported subset of Iris shader-pack behavior on VulkanM
 ## Verification
 
 - Local JDK 21 verification passes: `test --rerun-tasks validateShaders build packageExamplePacks`; 169 JUnit tests passed with zero failures/errors/skips. Shaderc processed 39 example stages, compiled 36 directly to SPIR-V, and compiled the cloud vertex fixture.
-- GitHub Build, source-audit and Lavapipe graphics checks are run for the release candidate before publishing.
+- PR #6 GitHub [Build](https://github.com/glebKovshov/Veyra/actions/runs/39304264561), [source audit](https://github.com/glebKovshov/Veyra/actions/runs/39304264461), and [graphics smoke](https://github.com/glebKovshov/Veyra/actions/runs/39304264453) passed. The release workflow will validate the merged tagged commit before publishing.
 - These results cover unit, source and synthetic runtime fixtures. They do not validate complete third-party pack pipelines or visuals on a physical GPU.
 
 ## Known limits

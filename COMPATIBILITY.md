@@ -53,6 +53,10 @@ The declared-profile matrix covers 24 dimension cases for each Complementary edi
 
 PR #5's [source audit run](https://github.com/glebKovshov/Veyra/actions/runs/39300268808) passed for the same four pinned packs: 12 default cases and 63 declared-profile/dimension cases, with 18 geometry fragment programs accepted and 699 rejected. The aggregate does not establish complete pipeline support; remaining sampler, attachment, compute and geometry interfaces still prevent full-pack confirmation. All 12 Lavapipe fixtures passed in [graphics run](https://github.com/glebKovshov/Veyra/actions/runs/39300269051), but they use synthetic fixtures rather than third-party packs. Every pinned pack remains `Not tested` in-game.
 
+### Beta.5 candidate CI
+
+PR #6's [Build](https://github.com/glebKovshov/Veyra/actions/runs/39304264561), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39304264461), and [graphics smoke](https://github.com/glebKovshov/Veyra/actions/runs/39304264453) passed. The audit again covered 12 default and 63 declared-profile/dimension cases, accepting 18 and rejecting 699 geometry fragment programs. It does not evaluate complete cloud vertex/fragment pipelines. All 12 Lavapipe fixtures passed as synthetic runtime tests; every pinned pack remains `Not tested` in-game.
+
 ## Reproduce source checks
 
 Download the exact input versions legally from their source and verify the recorded checksums. With JDK 21, run:

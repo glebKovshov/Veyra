@@ -454,12 +454,13 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - The broad `GOAL.md` remains incomplete: third-party packs have not been visually verified on a physical GPU, and source blockers remain for cloud textures/`colortex0`, velocity, selected compute and render-target feedback. Continue with those interfaces and validate rendered pack output before any stable/full-parity claim.
 
 
-### Beta.5 cloud vertex bridge — implementation in progress (2026-10-19)
+### Beta.5 cloud vertex bridge — PR checks passed; merge/release pending (2026-10-19)
 
 - Continued from the actual beta.4 `main` commit on a new `feature/cloud-vertex-shader` branch; tracked files were clean before editing, and all pre-existing untracked screenshots, logs, assets, and analysis files remain untouched.
 - `ShaderPack.readCloudVertex()` now loads option-processed `gbuffers_clouds.vsh` and expands includes. `CloudShaderAdapter` adapts the supported `POSITION_COLOR` interface, mapping `gl_Vertex`, `gl_Color`, `gl_ModelViewProjectionMatrix` and `ftransform()`, with `color` and `vertexDistance` outputs. VulkanMod's default cloud color/distance are initialized before the pack's vertex body.
 - Cloud vertex inputs/outputs that VulkanMod cannot provide, texture access, and custom vertex uniforms are rejected explicitly. This does not resolve active cloud `colortex0`, cloud textures/UVs, velocity, selected compute, or third-party-pack appearance.
 - Added a cloud vertex example, ZIP/include-loading and adapter regressions, and a shaderc fixture compiling the adapted vertex shader to Vulkan SPIR-V.
 - Full local beta.5 candidate verification passed on JDK 21: `test --rerun-tasks validateShaders build packageExamplePacks`; 169 JUnit tests, 0 failures/errors/skips; 39 example stages processed, 36 compiled directly to SPIR-V, plus the cloud vertex fixture. The distributable `veyra-0.2.0-beta.5+mc1.21.11.jar` is a valid ZIP with expected mod classes and no smoke harness; 531,553 bytes, SHA-256 `1ec25a62811d1e2808536439d0b41f4f47a23878c1398e9a0ba7eabea779eb61e`.
-- GitHub CI gates, PR merge, Release, and downloaded published-artifact verification are still pending. Local tests use shaderc and unit fixtures; they do not claim a third-party pack was rendered.
+- PR #6 ([Add limited cloud vertex shader support](https://github.com/glebKovshov/Veyra/pull/6)) is linked to this T3 thread. Head `8f402f60a967e56332879f3385a10e8c8d18761a` passed Build [39304264561], pinned source audit [39304264461], and graphics smoke [39304264453]. The source audit again covered 12 defaults and 63 declared-profile/dimension cases, accepting 18 and rejecting 699 geometry fragments; all 12 synthetic Lavapipe fixtures passed. No third-party pack was visually tested.
+- PR merge, release-tag workflow, published JAR download/hash verification, and final `main` status are still pending.
 - Corrected the stale beta.3-era compatibility paragraph that said the beta.4 pinned audit was still pending. README, compatibility notes, changelog and release notes now describe the limited cloud vertex support and its restrictions.
