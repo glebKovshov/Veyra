@@ -70,6 +70,77 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void removesUnusedGlobalCloudSamplerDeclarations() throws IOException {
+        String adapted = CloudShaderAdapter.adaptFragment("""
+                #version 120
+                uniform sampler2D colortex0;
+                varying vec4 color;
+                void main() { gl_FragColor = color; }
+                """);
+
+        assertFalse(adapted.contains("colortex0"));
+        assertTrue(adapted.contains("gl_FragColor = color;"));
+    }
+
+    @Test
+    void adaptsCloudSceneColorSampling() throws IOException {
+        CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D colortex0;
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / vec2(textureSize(colortex0, 0));
+                    gl_FragColor = vec4(texture2D(colortex0, uv).rgb, 1.0);
+                }
+                """);
+
+        assertTrue(adapted.usesSceneColorSampler());
+        assertTrue(adapted.source().contains("layout(binding = 2) uniform sampler2D VeyraCloudSceneSampler;"));
+        assertTrue(adapted.source().contains("#define colortex0 VeyraCloudSceneSampler"));
+        assertTrue(adapted.source().contains("texture(colortex0, uv)"));
+        assertFalse(adapted.source().contains("texture2D("));
+        assertFalse(adapted.source().contains("uniform sampler2D colortex0;"));
+    }
+
+    @Test
+    void adaptsCloudNoiseTextureSampling() throws IOException {
+        CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D noisetex;
+                void main() { gl_FragColor = texture2D(noisetex, vec2(0.5)); }
+                """);
+
+        assertFalse(adapted.usesSceneColorSampler());
+        assertTrue(adapted.usesNoiseSampler());
+        assertTrue(adapted.source().contains("layout(binding = 3) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(adapted.source().contains("#define noisetex VeyraNoiseSampler"));
+        assertTrue(adapted.source().contains("texture(noisetex, vec2(0.5))"));
+        assertFalse(adapted.source().contains("uniform sampler2D noisetex;"));
+    }
+
+    @Test
+    void lowersLegacyCloudNoiseTextureLodSampling() throws IOException {
+        CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D noisetex;
+                void main() { gl_FragColor = texture2DLod(noisetex, vec2(0.5), 0.0); }
+                """);
+
+        assertTrue(adapted.usesNoiseSampler());
+        assertTrue(adapted.source().contains("textureLod(noisetex, vec2(0.5), 0.0)"));
+        assertFalse(adapted.source().contains("texture2DLod("));
+    }
+
+    @Test
+    void rejectsActiveCloudSamplersOtherThanSceneColorAndNoise() {
+        IOException error = assertThrows(IOException.class, () -> CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D gaux1;
+                void main() { gl_FragColor = texture2D(gaux1, vec2(0.5)); }
+                """));
+        assertTrue(error.getMessage().contains("gaux1"));
+    }
+
+    @Test
     void adaptsCloudVertexShaderToVulkanModPositionColorInputs() throws IOException {
         String vulkanModVertex = """
                 #version 450

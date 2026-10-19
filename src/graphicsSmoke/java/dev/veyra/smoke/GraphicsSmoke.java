@@ -17,13 +17,13 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Exercise a real client/world and measure the fixture's auxiliary color output against a baseline. */
+/** Exercise a real client/world and measure the fixture's shader output against a baseline. */
 public final class GraphicsSmoke {
     private static int ticks, worldTicks, stage, activePixels, baselineAt;
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted, vanillaBaseline;
+    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -39,6 +39,7 @@ public final class GraphicsSmoke {
             worldTicks++;
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
+            cloudFixture = fixture.equals("cloud-colortex0");
             boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -59,7 +60,7 @@ public final class GraphicsSmoke {
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
             client.options.hideGui = true;
-            client.player.setXRot(entityFixture ? 15.0F : 35.0F);
+            client.player.setXRot(entityFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
@@ -68,6 +69,8 @@ public final class GraphicsSmoke {
             } else if (!vanillaBaseline && stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
+                if (cloudFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
+                    throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
                 pending = true;
                 requested = true; captureActive = true;
             } else if (!vanillaBaseline && stage == 1 && worldTicks >= baselineAt) {
@@ -89,7 +92,8 @@ public final class GraphicsSmoke {
             var source = renderer.getMainPass().getMainFramebuffer().getColorAttachment();
             if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
                 throw new IllegalStateException("Surface image does not support frame readback");
-            var auxiliary = VeyraRenderer.isRenderingEnabled() ? VeyraRenderer.geometryColorAttachment(1) : null;
+            var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture
+                    ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
                         dev.veyra.shader.CustomUniforms.active().floatValue(custom.name()), dev.veyra.shader.CustomUniforms.active().intValue(custom.name()));

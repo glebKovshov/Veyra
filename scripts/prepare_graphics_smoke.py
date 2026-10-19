@@ -46,7 +46,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'vanilla-baseline'], default='geometry-mrt')
     fixture = parser.parse_args().fixture
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
     if fixture.startswith('water-'):
@@ -117,7 +117,7 @@ def main():
         properties.parent.mkdir(parents=True, exist_ok=True)
         properties.write_text('format=lab-pbr/1.3\n', encoding='utf-8')
         extra_options = 'resourcePacks:["vanilla","file/veyra-material-fixture"]\n'
-    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
+    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
     print(f"Prepared original Minecraft 1.21.11 flat world and {fixture} fixture")
 
 

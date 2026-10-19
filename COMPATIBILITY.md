@@ -1,6 +1,6 @@
 # Shaderpack compatibility: development 0.2
 
-## Iris uniforms and expression semantics (beta.6 candidate)
+## Iris uniforms and expression semantics (beta.6)
 
 - Iris' hardcoded `velocity` uniform and additional Iris common, dimension, player, celestial, and hardcoded custom uniforms are provided to the supported terrain, entity-family, and post uniform paths. Pack definitions override Iris hardcoded custom uniforms where Iris allows it.
 - Eligible non-opaque uniform declarations Iris does not register are lowered to their GLSL initializer or zero, matching their value under Iris instead of being mistaken for Veyra-provided inputs. Unsupported registered uniforms still reject the program.
@@ -8,15 +8,15 @@
 - An undefined `BIOME_*` constant (Complementary r5.9.3 references `BIOME_SULFUR_CAVES`, which vanilla 1.21.11 does not register) fails in Iris too: Iris warns and never sets the uniform, so shaders read 0. Veyra now mirrors that for such definitions and their dependents and logs the same kind of warning. Inputs that Iris provides but Veyra does not still reject the program.
 - The offline source audit seeds vanilla biome ids from Minecraft's `Biomes` class in the same order `BiomesMixin` records at runtime, so `BIOME_*` constants no longer produce audit-only rejections.
 
-Refreshed pinned source audit (75 cases, all stages preprocessed): 18 geometry fragment programs accepted, 699 rejected; every case has `visualValidation: false`. Default Overworld blockers per program:
+Refreshed pinned source audit (75 cases, all 5,178 stages preprocessed): 72 geometry fragment programs accepted, 645 rejected; every case has `visualValidation: false`. Default Overworld blockers per program:
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 0/10, 0/10, 0/10 | terrain/water: missing `lmCoord` input; entity/block/hand/spidereyes: `currentRenderedItemId`; clouds: active `colortex0`; selected profiles: `shadowcomp.csh` compute | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 1/10, 1/10, 1/10 | terrain/water: missing `lmCoord` input; entity/block/hand/spidereyes: `currentRenderedItemId`; cloud adapter accepts observed `colortex0` and `noisetex` reads; selected profiles: `shadowcomp.csh` compute | Not tested |
 | BSL 10.1.8 | 1/9, 1/9, 1/9 | terrain/water: pack vertex varyings `color` / `mat`; entities: `entityColor`; hand: `isMainHand` varying; block: unsupported entity-bridge inputs; clouds: `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent block/entity/hand geometry; water reads `colortex4` while it is an attachment; clouds: `texture` sampler | Not tested |
 
-Complementary terrain/water no longer stop at `heavyFog`, `velocity`, or biome constants; their next rejection is the `lmCoord` input that the terrain bridge does not provide. Uniform declarations that the adapters cannot bind are named in the diagnostic.
+Complementary terrain/water no longer stop at `heavyFog`, `velocity`, or biome constants; their next rejection is the `lmCoord` input that the terrain bridge does not provide. The cloud adapter bridges the scene-color and noisetex sampling calls observed in the pinned default programs. Uniform declarations that the adapters cannot bind are named in the diagnostic.
 
 ## Entity and block entity identifiers (beta.4)
 
@@ -24,9 +24,15 @@ Veyra reads option-preprocessed Iris `entity.properties` and `block.properties`.
 
 Unit tests cover parsing, namespace defaults, duplicate precedence, conditional properties, tags, block-state predicates and shader constants. This does not establish that a third-party pack renders correctly. Iris' built-in legacy block ID table is not loaded when `block.properties` is absent; such states remain unmapped. The beta.4 source audit and all 12 synthetic Lavapipe graphics fixtures pass, but no real-pack visual validation is claimed.
 
+## Cloud scene-color sampler (beta.7 candidate)
+
+Cloud fragments can directly read the completed scene color through `colortex0` and the `gcolor`, `Sampler0`, or `InSampler` aliases using `texture`, `texture2D`, `textureLod`, or legacy `texture2DLod`; `textureSize` is also available. Veyra copies the main color image into a separate sampled image before clouds draw, restores the scene layout, then binds the snapshot to the cloud pipeline. This avoids reading the color attachment while clouds are writing it. A resize or format change recreates the snapshot. The existing Vulkan-backed `noisetex` is also available in the cloud fragment stage, including LOD reads. Unused global sampler declarations are stripped before validation, so declarations that are not read no longer reject the cloud pass.
+
+The original `examples/cloud-colortex0` fixture samples a known sky color and also makes an active LOD read from `noisetex`; it changes cloud output only when the copied color is blue and the normalized noise read is valid. The Lavapipe fixture checks capture and rendered signal. This validates the Veyra bridge with a synthetic shader, not a complete third-party pack. Other cloud samplers, texture coordinates, and sampling functions beyond `texture`, `texture2D`, `textureLod`, `texture2DLod`, and `textureSize` remain unsupported; capture also requires a transferable main color image.
+
 ## Cloud fog uniforms
 
-Cloud fragments now map Iris `fogColor`, `fogStart`, and `fogEnd` to VulkanMod 0.6.8's live `FogColor`, `FogEnvironmentalStart`, and `FogEnvironmentalEnd` uniform providers. Veyra extends both stages' binding-1 uniform block and pipeline configuration for only the fields a pack declares. Unit and shaderc fixtures cover the GLSL mapping; the pinned 75-case source audit has no remaining cloud `fogColor` adapter rejection. This does not add cloud texture sampling, texture coordinates, extra outputs, or visual validation.
+Cloud fragments now map Iris `fogColor`, `fogStart`, and `fogEnd` to VulkanMod 0.6.8's live `FogColor`, `FogEnvironmentalStart`, and `FogEnvironmentalEnd` uniform providers. Veyra extends both stages' binding-1 uniform block and pipeline configuration for only the fields a pack declares. Unit and shaderc fixtures cover the GLSL mapping; the pinned 75-case source audit has no remaining cloud `fogColor` adapter rejection. This does not add cloud texture coordinates, extra outputs, or full-pack visual validation.
 
 ## Cloud vertex shader (beta.5 candidate)
 
@@ -36,7 +42,7 @@ When a pack provides `gbuffers_clouds.vsh`, Veyra now adapts it against VulkanMo
 
 The geometry bridges now read resource-pack `_s.png` specular maps for terrain/shadow atlases and standalone entity textures. Atlas rectangles follow the live albedo sprites, including edge padding. Data use straight UNORM channels, with linear or LabPBR category-aware mipmaps selected by `optifine/texture.properties`. Missing maps use the zero specular default. Animated material maps and normal maps remain unsupported; animated specular inputs produce an explicit error. General Iris filtering/mipmap settings are incomplete.
 
-The post-beta.2 pinned source audit preprocesses 5,178 sources across 75 default/profile/dimension cases; geometry adapters accept 18 and reject 699 cases. `shadowFade` is no longer a BSL blocker. Cloud `fogColor` is mapped, but other blockers remain. The matrix is source-only and does not establish popular-pack visual compatibility. Original atlas/entity fixtures validate material data separately.
+The current pinned source audit preprocesses 5,178 sources across 75 default/profile/dimension cases; geometry adapters accept 72 and reject 645 cases. The additional accepted cases come from Complementary's cloud scene-color and noise sampling subset. `shadowFade` is no longer a BSL blocker. Cloud `fogColor` is mapped, but other blockers remain. The matrix is source-only and does not establish popular-pack visual compatibility. Original atlas/entity fixtures validate material data separately.
 
 ## Completed shadow color inputs
 

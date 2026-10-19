@@ -1,5 +1,11 @@
 # 0.2 development validation status
 
+## Beta.7 PR validation — 2026-10-20
+
+PR #9 commit `83a05d73b5a50266623cd395ed74714caee070d5` passed the [Build](https://github.com/glebKovshov/Veyra/actions/runs/39330757396), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39330757293), and [13-fixture Lavapipe graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39330757123). The cloud fixture reported 52,412 active magenta pixels / 0 with shaders disabled and 0 runtime Vulkan validation errors. The source audit covers 75 default/profile/dimension cases and 5,178 sources; `visualValidation=false` for every entry.
+
+Locally, JDK 21.0.12.1 ran `test validateShaders build packageExamplePacks` successfully: **187 JUnit tests, zero failures/errors/skips**, 40 example shaders processed and 37 compiled directly to Vulkan SPIR-V. `scripts/verify_jar.py` verified the beta.7 JAR (565,132 bytes; SHA-256 `7154992b52b02b29f4619cbeedef78cb84fbffe2f9c2f79e3c37791ded96aa1f`). This is the local build hash, not the published asset hash. Synthetic checks do not verify third-party pack visuals on a physical GPU or full Iris parity.
+
 ## 0.2.0-beta.3 candidate — local checks — 2026-10-19
 
 On `feature/cloud-fog-uniforms`, `test --rerun-tasks validateShaders build packageExamplePacks` passed on Temurin JDK 21.0.12.1: **161 JUnit tests, 0 failures/errors/skips**; shaderc preprocessed 39 example shaders and compiled 36 to Vulkan SPIR-V, including the new cloud fog fixture. The pinned source audit passed SHA-512 checks for all four source archives and covered 75 default/profile/dimension cases / 5,178 sources; 18 fragments were accepted and 699 rejected. `fogColor` no longer appears as a cloud adapter error; other pack blockers remain. `visualValidation` is false in every audit entry.
@@ -202,10 +208,16 @@ The prerelease remains experimental. Lavapipe covers synthetic fixtures only; no
 
 Tag `v0.2.0-beta.5+mc1.21.11` points to release commit `7e5fd09c42338cf5802e63b9519d3548b8456230`. Release workflow [39306047963](https://github.com/glebKovshov/Veyra/actions/runs/39306047963) passed its pinned source audit, all 12 Lavapipe fixtures, Gradle build/tests, and JAR verifier. The published [beta.5 GitHub prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.5%2Bmc1.21.11) contains the installable JAR, sources, example packs, and checksums. Its installable JAR is 531,535 bytes with SHA-256 `badc8f9c49449abab1a1a9d8bf6b02937e19196f86466696bbbbcce61661cee7`, matching the published checksum manifest.
 
-### Beta.6 local candidate — 2026-10-19
+### Published beta.6 artifact — 2026-10-20
 
-On `feature/iris-uniform-parity` at base commit `d87b167`, the current local candidate passes `test --rerun-tasks validateShaders build packageExamplePacks` on JDK 21: 179 JUnit tests, 0 failures/errors/skips; 39 example shaders processed, 36 compiled directly to Vulkan SPIR-V, plus the existing entity, cloud, conditional-include, and dataflow fixtures. Review against Iris 1.21.11 source found that hardcoded `timeAngle` needed to reuse Iris-compatible `worldTime` in fixed-time Nether/End dimensions; this was corrected and covered by a regression test.
+PR #8 merged to `main` at `871cb79d1618d8eb9b3de5681edcc7f58a172965`. Its Build run [39319780312](https://github.com/glebKovshov/Veyra/actions/runs/39319780312) and beta.6 Release run [39319780416](https://github.com/glebKovshov/Veyra/actions/runs/39319780416) passed. The release run includes the pinned source audit, all 12 Lavapipe graphics fixtures, Gradle build/tests, and the JAR verifier.
 
-`python scripts/run_shaderpack_source_audit.py` passes for 12 default and 63 profile/dimension cases. Its 75 generated records match the checked-in default/profile audit JSON: 5,178 preprocessed stages, 18 accepted / 699 rejected geometry fragment programs, and `visualValidation=false` for every record. `python scripts/verify_jar.py build/libs/veyra-0.2.0-beta.6+mc1.21.11.jar` passes; candidate JAR is 555,043 bytes, SHA-256 `8e2efffdba789d31714cb002424cde769a4a6af1c2286a764339379e2f574659`.
+Tag `v0.2.0-beta.6+mc1.21.11` points to that commit. The published [beta.6 prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.6%2Bmc1.21.11) has an installable JAR of 555,025 bytes with SHA-256 `e1146170f016fb5d37b919fdde638587da7cf880bc44edbccb3bcead82b9a06d`, matching its `SHA256SUMS.txt`.
 
-GitHub CI, PR merge, and beta.6 publication are still pending. No complete third-party pack or physical-GPU appearance is verified. Cloud texture inputs/`colortex0`, `currentRenderedItemId`, selected compute, Sildur attachment feedback, other sampler behavior, and several geometry interfaces remain blockers.
+### Beta.7 local candidate — 2026-10-20
+
+The working branch continues from the published beta.6 commit. On JDK 21, `test validateShaders build packageExamplePacks` passed after the cloud scene-color snapshot, active `noisetex` support, and legacy `texture2DLod` lowering were in place: **185 JUnit tests, 0 failures/errors/skips**. Shader validation processed 40 example sources and compiled 37 directly to Vulkan SPIR-V. The installable beta.7 candidate passes `scripts/verify_jar.py`; the local JAR is 564,498 bytes with SHA-256 `2f7c4b6dc04704253cf3b10522727d4335b1adfde34c10764fdc0c8536d075cc`.
+
+The refreshed pinned source audit covers 12 default and 63 declared-profile/dimension cases. All 5,178 stages preprocess; geometry adapters accept 72 and reject 645 fragments. Complementary cloud programs' observed `colortex0` and `noisetex` LOD sampling now pass the source adapter. BSL cloud sampling and Sildur cloud inputs remain unsupported. Every record still has `visualValidation=false`, so no complete third-party pack is certified. The default and profile JSON in `validation/` were regenerated from the same report.
+
+The `cloud-colortex0` graphics test is a synthetic fixture. PR checks, all 13 Lavapipe fixtures, merge, and beta.7 publication are pending. Neither the source-only audit nor synthetic fixtures establish complete pack compatibility or physical-GPU appearance.
