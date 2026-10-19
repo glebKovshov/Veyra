@@ -62,6 +62,9 @@ public final class CloudShaderAdapter {
         }
         adapted = extensionMatcher.replaceAll("");
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
+        IrisFogUniformAdapter.AdaptedShader fogUniforms =
+                IrisFogUniformAdapter.extract(adapted, "gbuffers_clouds", true);
+        adapted = fogUniforms.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, "gbuffers_clouds");
         adapted = shaderPackUniforms.source();
@@ -136,17 +139,29 @@ public final class CloudShaderAdapter {
             result.append(extension).append('\n');
         }
         result.append(FRAGMENT_BRIDGE.replace("veyraCloudFragColor;", outputName + ";"));
-        if (!shaderPackUniforms.fields().isEmpty()) {
+        Map<String, ShaderPackUniformAdapter.UniformField> uniformFields = new java.util.LinkedHashMap<>();
+        for (ShaderPackUniformAdapter.UniformField field : fogUniforms.fields()) {
+            uniformFields.put(field.name(), field);
+        }
+        for (ShaderPackUniformAdapter.UniformField field : shaderPackUniforms.fields()) {
+            ShaderPackUniformAdapter.UniformField previous = uniformFields.putIfAbsent(field.name(), field);
+            if (previous != null && !previous.equals(field)) {
+                throw new IOException("gbuffers_clouds declares incompatible uniform buffer fields named '"
+                        + field.name() + "'.");
+            }
+        }
+        if (!uniformFields.isEmpty()) {
             result.append("layout(binding = 1) uniform VeyraCloudUniformBuffer {\n")
                     .append("    vec4 ColorModulator;\n")
                     .append("    float FogCloudsEnd;\n");
-            for (ShaderPackUniformAdapter.UniformField field : shaderPackUniforms.fields()) {
+            for (ShaderPackUniformAdapter.UniformField field : uniformFields.values()) {
                 result.append("    ").append(field.type()).append(' ').append(field.name()).append(";\n");
             }
             result.append("};\n");
         }
+        result.append(fogUniforms.bridge());
         result.append(shaderPackUniforms.macros());
-        return new AdaptedFragment(result.append(adapted).toString(), shaderPackUniforms.fields());
+        return new AdaptedFragment(result.append(adapted).toString(), List.copyOf(uniformFields.values()));
     }
 
     public record AdaptedFragment(String source, List<ShaderPackUniformAdapter.UniformField> uniformFields) {

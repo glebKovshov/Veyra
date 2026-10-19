@@ -1,5 +1,11 @@
 # 0.2 development validation status
 
+## 0.2.0-beta.3 candidate — local checks — 2026-10-19
+
+On `feature/cloud-fog-uniforms`, `test --rerun-tasks validateShaders build packageExamplePacks` passed on Temurin JDK 21.0.12.1: **161 JUnit tests, 0 failures/errors/skips**; shaderc preprocessed 39 example shaders and compiled 36 to Vulkan SPIR-V, including the new cloud fog fixture. The pinned source audit passed SHA-512 checks for all four source archives and covered 75 default/profile/dimension cases / 5,178 sources; 18 fragments were accepted and 699 rejected. `fogColor` no longer appears as a cloud adapter error; other pack blockers remain. `visualValidation` is false in every audit entry.
+
+The beta.3 candidate JAR was inspected against the release verifier's content checks: 510,745 bytes, SHA-256 `06647cc838563ca7b562b9b522741bbbabe78fba820ba15a2978407ae6675be3`, Minecraft 1.21.11 / VulkanMod 0.6.8. This was a local PowerShell equivalent of `scripts/verify_jar.py`; the Windows workspace has no Python interpreter. GitHub PR Build/source-audit/graphics checks and release publication are pending. No third-party pack or physical GPU was visually tested.
+
 ## 0.2.0-beta.2 release — 2026-10-19
 
 PR #3 merged as `4be1bbaf7324b80b8aab09368e8c9e2b908e2eda`; lightweight tag `v0.2.0-beta.2+mc1.21.11` points to that commit. The [Release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39289684005) completed source audit, all 12 Lavapipe fixtures, build/tests, distributable verification and publication. GitHub lists the [published prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.2%2Bmc1.21.11).
@@ -161,3 +167,8 @@ The graphics prerequisite in [release run 39206709151](https://github.com/glebKo
 The already-published 0.1.1 line was independently rebuilt in a detached worktree and fast-forwarded into `main` at `e37f188`; GitHub confirms PR #1 merged. PR #2 remains draft for the incomplete 0.2 feature line.
 
 The alpha prerelease is now [published](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-alpha.1%2Bmc1.21.11); the complete release workflow succeeded. All three published assets were downloaded again and matched the published SHA-256 checksums. The downloaded installable JAR passed `scripts/verify_jar.py`; its SHA-256 is `e421f600972bd7d6e8ed509d7c4a0f134c440c7a4faefab2d75679230c7552a6`. This remains an experimental supported subset, not stable full-Iris compatibility.
+
+
+### GitHub CI for beta.3 candidate
+
+PR #4 at commit `566e059c433bd64a14184a5d0e6dd66d394bff7d` passed the GitHub Build workflow ([39294368264](https://github.com/glebKovshov/Veyra/actions/runs/39294368264)), all 12 Lavapipe graphics smoke fixtures ([39294368250](https://github.com/glebKovshov/Veyra/actions/runs/39294368250)), and the pinned shaderpack source audit ([39294367864](https://github.com/glebKovshov/Veyra/actions/runs/39294367864)). Real shaderpack visual validation remains outstanding.

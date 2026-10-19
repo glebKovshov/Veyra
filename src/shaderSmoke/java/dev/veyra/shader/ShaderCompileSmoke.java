@@ -61,6 +61,16 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = vec4(readDepth(shadowtex1)); }
                     """, "gbuffers_entities", false, true);
             compile(compiler, options, entityOpaqueShadow, "entity-opaque-shadow-comparison", true);
+            String cloudFog = CloudShaderAdapter.adaptFragment("""
+                    uniform vec3 fogColor;
+                    uniform float fogStart;
+                    uniform float fogEnd;
+                    void main() {
+                        float fog = clamp((fogEnd - 1.0) / max(fogEnd - fogStart, 1.0), 0.0, 1.0);
+                        gl_FragColor = vec4(mix(vec3(0.25), fogColor, fog), 1.0);
+                    }
+                    """);
+            compile(compiler, options, cloudFog, "cloud-fog-uniforms", true);
             String postShadowSource = "uniform sampler2DShadow shadowtex1;\n"
                     + "float compare(sampler2DShadow depthMap){return texture(depthMap,vec3(0.5));}\n"
                     + "layout(location=0) out vec4 outColor;void main(){outColor=vec4(texture(shadowtex1,vec3(0.5))+compare(shadowtex1))+shadow2D(shadowtex1,vec3(0.5));}\n";
@@ -80,7 +90,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks and the entity shadow-sampler fixture passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity-shadow and cloud-fog fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

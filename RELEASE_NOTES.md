@@ -1,14 +1,19 @@
-# Veyra 0.2.0-beta.2 — experimental prerelease
+# Veyra 0.2.0-beta.3 — experimental prerelease
 
 This is an experimental supported subset of Iris shader-pack behavior on VulkanMod. It is not a stable release and does not claim full Iris parity. Stable 0.1.1 remains available. The pinned compatibility audit still finds active blockers in all four tested third-party packs; none is certified playable.
 
 ## Installation
 
 - Minecraft **1.21.11**, Fabric Loader **0.18.4+**, VulkanMod **0.6.8**, Java **21+**.
-- Install `veyra-0.2.0-beta.2+mc1.21.11.jar` in the instance's `mods/` folder alongside VulkanMod. Do not install the sources JAR. VulkanMod bundles its required Fabric modules; the development build uses Fabric API 0.140.0+1.21.11.
+- Install `veyra-0.2.0-beta.3+mc1.21.11.jar` in the instance's `mods/` folder alongside VulkanMod. Do not install the sources JAR. VulkanMod bundles its required Fabric modules; the development build uses Fabric API 0.140.0+1.21.11.
 - Optional example packs can be extracted into `shaderpacks/`. Press **F6**, select a pack, then use **Configure / Apply** for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
 
-## Changes since beta.1
+## Changes since beta.2
+
+- Map Iris cloud `fogColor`, `fogStart`, and `fogEnd` to VulkanMod's live fog uniforms through the cloud fragment and vertex uniform buffers.
+- Keep the cloud texture, texture-coordinate, and multi-output limits explicit. The pinned source audit still finds active errors in all four tested packs; none is certified playable.
+
+## Earlier beta.2 changes
 
 - Evaluate supported scalar `uniform.*` and `variable.*` expressions from `shaders.properties` for terrain and post programs.
 - Add Iris uniforms for near/far planes, held item and block light, biome precipitation, player mood/look vector, sky color, atlas size, lightning bolt position, darkness light factor and shadow fade. Preserve a pack-defined `shadowFade` expression when present; use the Iris-compatible sun/moon calculation otherwise.
@@ -17,13 +22,13 @@ This is an experimental supported subset of Iris shader-pack behavior on VulkanM
 
 ## Verification
 
-- Clean JDK 21 `clean test validateShaders build packageExamplePacks` passes with **159 JUnit tests**, zero failures/errors/skips; shaderc preprocesses 39 example shaders and compiles 36 directly to Vulkan SPIR-V. The JAR verifier passes.
+- JDK 21 `test validateShaders build packageExamplePacks` passes with **161 JUnit tests**, zero failures/errors/skips; shaderc preprocesses 39 example shaders and compiles 36 directly to Vulkan SPIR-V, plus the cloud fog fixture. The distributable JAR contents pass verification.
 - The pinned source-only matrix preprocesses 5,178 selected sources across 75 default/profile/dimension cases; adapters accept 18 and reject 699 geometry fragment combinations. These results are adapter checks, not complete pipeline or visual validation.
 - Release publication is gated on GitHub Build, source-audit and software-Vulkan graphics workflows. The graphics fixtures are synthetic and do not certify popular packs or physical-GPU behavior.
 
 ## Known limits
 
-- Complementary Reimagined and Unbound still require `blockEntityId`, `velocity`, and cloud `fogColor`; selected profiles also use unsupported compute stages.
+- Complementary Reimagined and Unbound still require `blockEntityId` and `velocity`, read unsupported `colortex0` from clouds, and use unsupported compute stages in selected profiles. The `fogColor` uniform itself is now mapped.
 - BSL still requires per-draw `entityId`/`blockEntityId`; its source-only audit also cannot resolve the registered `BIOME_DESERT` input used by `isDesert`, and its cloud fragment declares a texture uniform.
 - Sildur's still needs `colortex4` in non-terrain geometry and defined water attachment feedback behavior; its cloud fragment also declares a texture uniform.
 - Normal maps, animated material maps, broader sampler/property behavior, arbitrary geometry vertex inputs, non-terrain MRT, compute/tessellation execution, physical-GPU checks and real-pack visual validation remain incomplete.

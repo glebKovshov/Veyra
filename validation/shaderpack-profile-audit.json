@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "pack":  "ComplementaryReimagined_r5.9.3.zip",
         "discovered":  true,
@@ -17,14 +17,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -46,14 +46,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -75,14 +75,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -104,14 +104,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -133,14 +133,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -162,14 +162,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -191,14 +191,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -220,14 +220,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -249,14 +249,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -278,14 +278,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -307,14 +307,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -336,14 +336,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -365,14 +365,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -394,14 +394,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -423,14 +423,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -452,14 +452,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -484,9 +484,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -511,9 +511,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -538,9 +538,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -565,9 +565,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -592,9 +592,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isDesert\u0027 from shaders.properties is unavailable: input \u0027BIOME_DESERT\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -616,14 +616,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -645,14 +645,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -674,14 +674,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -703,14 +703,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -732,14 +732,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -761,14 +761,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -790,14 +790,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -819,14 +819,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -848,14 +848,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -877,14 +877,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -906,14 +906,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -935,14 +935,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -964,14 +964,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -993,14 +993,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1022,14 +1022,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1051,14 +1051,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1083,9 +1083,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -1110,9 +1110,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -1137,9 +1137,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -1164,9 +1164,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -1191,9 +1191,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027isValley\u0027 from shaders.properties is unavailable: input \u0027BIOME_SOUL_SAND_VALLEY\u0027 is not provided by Veyra."
                    ],
         "visualValidation":  false
     },
@@ -1215,14 +1215,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1244,14 +1244,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1273,14 +1273,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1302,14 +1302,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1331,14 +1331,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1360,14 +1360,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1389,14 +1389,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1418,14 +1418,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1447,14 +1447,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1476,14 +1476,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1505,14 +1505,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1534,14 +1534,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1563,14 +1563,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1592,14 +1592,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1621,14 +1621,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1650,14 +1650,14 @@
         "errors":  [
                        "gbuffers_block.fsh adapter: gbuffers_block custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027blockEntityId\u0027 is not supported yet.",
+                       "gbuffers_clouds.fsh adapter: gbuffers_clouds custom uniform \u0027colortex0\u0027 is not supported yet.",
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027blockEntityId\u0027 is not supported yet.",
                        "gbuffers_spidereyes.fsh adapter: gbuffers_spidereyes custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027blockEntityId\u0027 is not supported yet."
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027velocity\u0027 is not supported yet."
                    ],
         "visualValidation":  false
     },
@@ -1682,9 +1682,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027color\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
     },
@@ -1709,9 +1709,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027color\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
     },
@@ -1736,9 +1736,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027color\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
     },
@@ -1763,9 +1763,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027color\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
     },
@@ -1790,9 +1790,9 @@
                        "gbuffers_entities.fsh adapter: gbuffers_entities custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_glowing.fsh adapter: gbuffers_entities_glowing custom uniform \u0027entityId\u0027 is not supported yet.",
                        "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent custom uniform \u0027entityId\u0027 is not supported yet.",
-                       "gbuffers_hand.fsh adapter: gbuffers_hand custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_terrain.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet.",
-                       "gbuffers_water.fsh adapter: gbuffers_terrain custom uniform \u0027shadowFade\u0027 is not supported yet."
+                       "gbuffers_hand.fsh adapter: gbuffers_hand input \u0027isMainHand\u0027 is not provided by Veyra\u0027s entity bridge yet.",
+                       "gbuffers_terrain.fsh adapter: gbuffers_terrain input \u0027color\u0027 is not provided by Veyra\u0027s terrain bridge yet.",
+                       "gbuffers_water.fsh adapter: gbuffers_terrain input \u0027mat\u0027 is not provided by Veyra\u0027s terrain bridge yet."
                    ],
         "visualValidation":  false
     }
