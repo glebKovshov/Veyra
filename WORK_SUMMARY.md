@@ -11,6 +11,13 @@
 - На PR HEAD `83a05d7` Build `39330757396`, source audit `39330757293` и Graphics smoke `39330757123` прошли. Все 13 fixtures успешны; cloud signal — 52,412 magenta pixels active / 0 disabled, runtime Vulkan validation errors — 0. Source audit четырёх закреплённых паков обработал 75 default/profile/dimension cases и 5,178 sources; 72 geometry fragments приняты / 645 отклонены, все записи имеют `visualValidation=false`. Beta.7 по-прежнему experimental prerelease: реальные third-party shaderpacks на физическом GPU и полная Iris parity не подтверждены.
 - `GOAL.md` всё ещё не выполнен полностью: реальные third-party shaderpacks и физический GPU не визуально проверены, полная Iris parity отсутствует. beta.7 — prerelease, не stable release. Пользовательские скриншоты, `assets/`, `logs/`, дампы, `GOAL.md` и `scripts/analyze_vulkan_shutdown.py` остаются нетронутыми и не должны попадать в staging.
 
+## Продолжение после beta.7: terrain `lmCoord` — 2026-10-20
+
+- В новой ветке `feature/iris-terrain-lmcoord`, ответвлённой от `main` `a9b11f9`, добавлен alias Iris `lmCoord` к уже рассчитанному VulkanMod lightmap input (`veyraLightmapCoord`, location 5). Остальные имена (`lmcoord`, `lightMapCoord`) не менялись.
+- Добавлен regression-тест на удаление исходного varying и его замену на location 5. На JDK 21.0.12.1 прошёл полный `test validateShaders build packageExamplePacks`: **188 тестов, 0 failures/errors/skips**, 40 примеров обработано, 37 скомпилировано прямо в Vulkan SPIR-V; distributable verifier прошёл.
+- Полный pinned third-party source audit и GPU-графические fixtures после этого изменения ещё не прогонялись. Предыдущая compatibility matrix — до alias и не обновлена по новому источнику. Проверки на физическом GPU и визуальной совместимости реальных паков нет; это изменение не подтверждает игровую совместимость.
+- Следующий шаг: получить результаты CI source audit и 13 Lavapipe fixtures на PR; только после audit обновить матрицу и выбрать следующий конкретный blocker. `GOAL.md` остаётся незавершённым.
+
 ## Историческое состояние после beta.5 — 2026-10-19 (вечер)
 
 - Опубликованный последний prerelease — **beta.5** (`main` = `b19f96e`); история beta.2–beta.5 ниже в разделах «Beta.2 опубликована» … «Beta.5 cloud vertex bridge». Эти выпуски сделала параллельная T3-сессия `[GPT] Veyra`; она прервана пользователем в 22:11, работу продолжает эта сессия.

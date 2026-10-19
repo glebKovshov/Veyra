@@ -57,6 +57,19 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void adaptsCamelCaseLightmapCoordToTerrainLightmapInput() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec2 lmCoord;
+                void main() { gl_FragColor = vec4(lmCoord, 0.0, 1.0); }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 5) in vec2 veyraLightmapCoord;"));
+        assertTrue(adapted.contains("#define lmCoord veyraLightmapCoord"));
+        assertFalse(adapted.contains("varying vec2 lmCoord;"));
+    }
+
+    @Test
     void adaptsIrisMoonPhaseUniformForGeometryPrograms() throws IOException {
         String adapted = CloudShaderAdapter.adaptFragment("""
                 #version 120
