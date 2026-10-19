@@ -4,7 +4,16 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Актуальный срез: water color inputs — 2026-10-19
+## Текущая работа: resource-pack specular — 2026-10-19
+
+- Commit `c4e7406` добавляет настоящие static `_s.png` из активных resource packs: standalone entity textures и atlas с живыми sprite rectangles/padding. Отсутствующая карта получает zero default; повреждённая/animated карта выдаёт явную диагностику. Normal maps и animation ещё не реализованы.
+- Terrain/shadow/entity bridges получают отдельный specular descriptor; entity использует фактический native image index. Cache ограничен 512 MiB/256 base textures, reload/disable/shutdown используют frame retirement.
+- UNORM data сохраняют четыре канала, включая RGB при alpha=0. Mipmap chain совпадает с albedo, поддержаны linear и category-aware LabPBR specular mipmaps. Добавлены CPU regression tests.
+- Локально `test validateShaders build` прошли: **115 tests, 0 failures/errors**, 28 example preprocesses / 25 direct SPIR-V compilations; JAR verifier прошёл. Это ещё не доказательство runtime корректности.
+- Graphics matrix расширена двумя original fixtures: atlas проверяет настоящий material и mip level 2, entity проверяет material текстуры cow. Порог 2000 magenta pixels и disabled baseline сохранены. GPU CI и свежий полный source audit ещё выполняются; не считать их зелёными до просмотра результатов.
+- PR #2 остаётся draft, stable merge/release не готовы. Существующий опубликованный alpha.1 не содержит этих изменений.
+
+## Предыдущий подтверждённый срез: water color inputs — 2026-10-19
 
 - Runtime code HEAD `ef6fb4413d4ec8831e8b3c92fae2c9db6467bd46`. Push/PR Build success: 39210665983 / 39210672564. Скачанные CI XML подтверждают **106 tests, 0 failures/errors/skipped**; 25 example preprocesses / 22 direct SPIR-V compilations. Скачанный CI mod JAR повторно прошёл `scripts/verify_jar.py`.
 - Push/PR Graphics success: 39210665863 / 39210672561. Все три fixtures проходят. MRT 222784/0 magenta, water-depth 222757/0, water-color-inputs 222757/0; runtime validation errors **0 у всех**. Exact-commit active/disabled water-color кадры скачаны и просмотрены.
