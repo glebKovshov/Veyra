@@ -527,4 +527,13 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - JDK 21 rerun passed: 194 JUnit tests (0 failures/errors/skips), 42 example shaders processed, 39 direct Vulkan SPIR-V compilations, and build/packageExamplePacks succeeded. scripts/verify_jar.py passed for the explicit beta.9 candidate JAR (565,229 bytes; SHA-256 d8812d4c0388f59e56a8f67a34f04ccd5e8e5e4a54bd44eee0be17ed85f11309). Older beta.5–beta.8 distributables remained intact in build/libs.
 - On PR #16 code head 0d12735832c1837935274a7e82d97b8af8c9bd38, Build run 39343008623, source audit run 39343008507, and all 14 Lavapipe fixtures run 39343008628 passed. The geometry-view-space readback measured 222,792 active magenta pixels and 0 with shaders disabled; runtime Vulkan validation errors were 0. The CI source artifact matched all 75 local records and all four pinned input SHA-512 values exactly: 90 accepted / 627 rejected, visualValidation=false in every case.
 - Shutdown evidence still contains 10,031 VUID-vkDestroyDevice-device-05137 diagnostics, equal in count and category to the same-run vanilla baseline. Runtime diagnostics are zero; before allocator destruction both snapshots show 46 buffers / 667 images / 97 pipelines and no Veyra-named objects. This is not a clean-teardown claim.
-- PR #16 is linked and remains open pending the release-notes update and beta.9 merge/publication. No physical-GPU or third-party-pack visual result is claimed.
+- PR #16 is linked and merged as 3ac3f16b25fe16c9c5c78967f30c9cc1650f8c51. Beta.9 is published; the remaining GOAL.md work still includes physical-GPU and third-party-pack visual validation.
+
+## Beta.9 release — 2026-10-20
+
+- PR #16 merged to main as 3ac3f16b25fe16c9c5c78967f30c9cc1650f8c51. Lightweight tag v0.2.0-beta.9+mc1.21.11 points to that commit.
+- Release workflow 39344144615 succeeded: pinned source audit, all 14 Lavapipe fixtures, build/tests, distributable verifier, and GitHub Release publication. Tag Build 39344144580 also passed.
+- Published prerelease: https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.9%2Bmc1.21.11
+- Downloaded release JAR: 565,211 bytes, SHA-256 9c773e71622e21f0c5af3328849e84a1de02cf720ad62ceaadeeb45edfd73dcd. The digest matches SHA256SUMS.txt and scripts/verify_jar.py passes on the downloaded asset.
+- The synthetic viewPos fixture passed at 222,792 active magenta pixels / 0 disabled, with zero runtime Vulkan validation errors. Process shutdown still emits 10,031 vkDestroyDevice diagnostics, matching the same-run vanilla baseline; this is not a clean-teardown claim.
+- The release remains experimental. No physical-GPU third-party shaderpack visuals or full Iris parity are claimed; see GOAL.md for remaining scope.
