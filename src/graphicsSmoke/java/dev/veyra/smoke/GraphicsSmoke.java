@@ -65,12 +65,12 @@ public final class GraphicsSmoke {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
                     throw new IllegalStateException("Vanilla baseline unexpectedly selected a shaderpack");
                 pending = true; requested = true; captureActive = false;
-            } else if (stage == 0 && worldTicks >= 160) {
+            } else if (!vanillaBaseline && stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
                 pending = true;
                 requested = true; captureActive = true;
-            } else if (stage == 1 && worldTicks >= baselineAt) {
+            } else if (!vanillaBaseline && stage == 1 && worldTicks >= baselineAt) {
                 pending = true;
                 requested = true; captureActive = false;
             }

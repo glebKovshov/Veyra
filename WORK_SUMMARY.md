@@ -366,3 +366,8 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Исправленный локальный runner завершил все 75 configurations / 5178 stage sources; 18 accepted / 699 rejected. Complementary water теперь отклоняется по specular, BSL water по shadowtex1 (Overworld/End) или shadowFade (Nether). Sildur water читает colortex4, одновременно присутствующий в attachments; остаётся явный feedback blocker, не работающий pack.
 - Cleanup теперь хранит identity конкретных color view/image, которые Veyra положил в native/VRenderSystem slots, и очищает только совпадающие записи. Чужие/неиспользованные slots не сбрасываются. Images по-прежнему принадлежат существующим color targets и освобождаются прежним lifecycle.
 - Native Computer Use перепроверен: тот же `native pipe is unavailable ... os error 2`; physical GPU/UI test не выполнен. Это не мешает продолжению backend задач и не является основанием объявлять всю цель blocked.
+
+### Сравнение teardown с vanilla baseline (2026-10-19)
+
+- Shutdown registry snapshot (run 39251324398) перед уничтожением allocator: в Veyra water fixture и в vanilla baseline одинаково 46 buffers / 667 images / 97 pipelines, очереди retirement пусты; ни одного объекта с именем Veyra не осталось. Undestroyed objects: 10050 (Veyra) против 10031 (baseline); основная масса — descriptor sets VulkanMod `animate_sprite_blit`/interpolate и неуничтоженные VulkanMod buffers/images. Вывод: teardown diagnostics принадлежат VulkanMod 0.6.8, не Veyra; разница в 19 объектов ещё не атрибутирована.
+- Baseline run сам по себе завершился ложным failure: в smoke harness stage-0 проверка shader pipeline (tick 160) срабатывала раньше baseline ветки (tick 240). Исправлено исключением baseline из stage-0/1 веток; повторный CI прогон необходим.
