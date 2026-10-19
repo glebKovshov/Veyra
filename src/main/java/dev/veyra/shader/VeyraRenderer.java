@@ -2098,6 +2098,8 @@ public final class VeyraRenderer {
         for (String name : pack.terrainPrograms()) {
             var fragment = pack.readTerrainFragment(name);
             if (fragment.isPresent()) {
+                if (name.equals("gbuffers_water"))
+                    colorTargetIndices.addAll(GeometryColorSamplers.indices(GeometryColorSamplers.read(fragment.get())));
                 for (int index : FragmentOutputs.parse(fragment.get()).targets()) {
                     if (index == 0) continue;
                     colorTargetIndices.add(index);
@@ -2405,6 +2407,8 @@ public final class VeyraRenderer {
                 boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
                 boolean usesOpaqueDepthSampler = programName.equals("gbuffers_water")
                         && TerrainShaderAdapter.usesOpaqueDepthSampler(fragmentSource);
+                Set<Integer> colorInputs = programName.equals("gbuffers_water")
+                        ? GeometryColorSamplers.indices(GeometryColorSamplers.read(fragmentSource)) : Set.of();
                 if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 FragmentOutputs outputLayout = FragmentOutputs.parse(fragmentSource);
                 fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
@@ -2412,7 +2416,7 @@ public final class VeyraRenderer {
 
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
-                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler, usesOpaqueDepthSampler));
+                builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler, usesOpaqueDepthSampler, colorInputs));
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
@@ -2424,6 +2428,11 @@ public final class VeyraRenderer {
                 if (opaqueDepth != null) {
                     opaqueDepth.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                     opaqueDepth.isReadOnlyLayout = false;
+                }
+                for (int index : colorInputs) {
+                    var descriptor = pipeline.getImageDescriptor(GeometryColorSamplers.samplerName(index));
+                    descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    descriptor.isReadOnlyLayout = false;
                 }
                 for (UBO ubo : pipeline.getBuffers()) {
                     ubo.setUseGlobalBuffer(true);
@@ -2461,11 +2470,11 @@ public final class VeyraRenderer {
     }
 
     private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable) {
-        return terrainPipelineConfig(shadowSamplerAvailable, noiseSamplerAvailable, false);
+        return terrainPipelineConfig(shadowSamplerAvailable, noiseSamplerAvailable, false, Set.of());
     }
 
     private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable,
-                                                       boolean opaqueDepthSamplerAvailable) {
+                                                       boolean opaqueDepthSamplerAvailable, Set<Integer> colorInputs) {
         PipelineConfig.UB.Builder terrainUniforms = PipelineConfig.UB.builder(
                         1, org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_ALL_GRAPHICS)
                 .addUniform("vec4", "FogColor")
@@ -2500,8 +2509,11 @@ public final class VeyraRenderer {
             config.addImageDescriptor(nextBinding++, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4);
         }
         if (opaqueDepthSamplerAvailable) {
-            config.addImageDescriptor(nextBinding, "sampler2D", "VeyraDepthTex1Sampler", 5);
+            config.addImageDescriptor(nextBinding++, "sampler2D", "VeyraDepthTex1Sampler", 5);
         }
+        int imageSlot = GeometryColorSamplers.FIRST_IMAGE_SLOT;
+        for (int index : new java.util.TreeSet<>(colorInputs))
+            config.addImageDescriptor(nextBinding++, "sampler2D", GeometryColorSamplers.samplerName(index), imageSlot++);
         return config.build();
     }
 
@@ -4722,6 +4734,10 @@ public final class VeyraRenderer {
 
     private static void releaseColorTargets() {
         VeyraGeometryTargets.releaseTargets();
+        for (int slot = GeometryColorSamplers.FIRST_IMAGE_SLOT;
+             slot < GeometryColorSamplers.FIRST_IMAGE_SLOT + GeometryColorSamplers.MAX_INPUTS; slot++) {
+            VRenderSystem.setShaderTexture(slot, null);
+        }
         colorTargets.values().forEach(pair -> {
             pair.targetA().destroyBuffers();
             pair.targetB().destroyBuffers();
@@ -4732,12 +4748,40 @@ public final class VeyraRenderer {
     }
 
     public static net.vulkanmod.vulkan.texture.VulkanImage geometryColorAttachment(int index) {
+        return ((VkGpuTexture) geometryColorTarget(index).getColorTexture()).getVulkanImage();
+    }
+
+    private static RenderTarget geometryColorTarget(int index) {
         ColorTargetPair pair = colorTargets.get(index);
         if (pair == null) throw new IllegalStateException("Geometry colortex" + index + " has not been allocated.");
         Identifier side = currentColorTargets.get(index);
         if (side == null) throw new IllegalStateException("Geometry color buffers have not been initialized for this frame.");
-        RenderTarget target = colorTargetAId(index).equals(side) ? pair.targetA() : pair.targetB();
-        return ((VkGpuTexture) target.getColorTexture()).getVulkanImage();
+        return colorTargetAId(index).equals(side) ? pair.targetA() : pair.targetB();
+    }
+
+    /** End attachment writes before sampling the current color-buffer sides in water geometry. */
+    public static boolean prepareTerrainColorSamplers(GraphicsPipeline pipeline) {
+        Renderer renderer = Renderer.getInstance();
+        boolean endedPass = false;
+        for (int index = 1; index <= MAX_COLORTEX_INDEX; index++) {
+            var descriptor = pipeline.getImageDescriptor(GeometryColorSamplers.samplerName(index));
+            if (descriptor == null) continue;
+            var target = geometryColorTarget(index);
+            var image = ((VkGpuTexture) target.getColorTexture()).getVulkanImage();
+            if (image.getCurrentLayout() != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+                if (renderer.getBoundRenderPass() != null) {
+                    renderer.endRenderPass();
+                    endedPass = true;
+                }
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    image.transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                }
+            }
+            image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+            VRenderSystem.setShaderTexture(descriptor.imageIdx, target.getColorTextureView());
+            net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx, image);
+        }
+        return endedPass;
     }
 
     private static void ensureColorTargets(int width, int height, Set<Integer> indices,

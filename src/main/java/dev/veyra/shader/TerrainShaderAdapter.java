@@ -170,8 +170,9 @@ public final class TerrainShaderAdapter {
         return adaptFragment(source, shadowSamplerAvailable, false);
     }
 
-    /** Opaque depth is available only after the copy preceding translucent terrain. */
-    public static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean opaqueDepthAvailable) throws IOException {
+    /** Water inputs are available after the opaque copy and deferred phase. */
+    public static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable) throws IOException {
+        Map<String, Integer> colorInputs = waterInputsAvailable ? GeometryColorSamplers.read(source) : Map.of();
         FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
         source = fragmentOutputs.rewriteLegacy(source);
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
@@ -193,7 +194,8 @@ public final class TerrainShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
                     && !sampler.equals("noisetex")
-                    && !(sampler.equals("depthtex1") && opaqueDepthAvailable)
+                    && !colorInputs.containsKey(sampler)
+                    && !(sampler.equals("depthtex1") && waterInputsAvailable)
                     && !(sampler.equals("shadowtex0") && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
@@ -297,11 +299,21 @@ public final class TerrainShaderAdapter {
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
                         + fogUniforms.bridge() + "#define texture Sampler0");
-        if (opaqueDepthAvailable && usesOpaqueDepthSampler(source)) {
+        boolean usesDepth = waterInputsAvailable && usesOpaqueDepthSampler(source);
+        if (usesDepth) {
             int depthBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0);
             bridge = "layout(binding = " + depthBinding + ") uniform sampler2D VeyraDepthTex1Sampler;\n"
                     + "#define depthtex1 VeyraDepthTex1Sampler\n" + bridge;
         }
+        int colorBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0) + (usesDepth ? 1 : 0);
+        StringBuilder colorBridge = new StringBuilder();
+        for (int index : GeometryColorSamplers.indices(colorInputs)) {
+            colorBridge.append("layout(binding = ").append(colorBinding++).append(") uniform sampler2D ")
+                    .append(GeometryColorSamplers.samplerName(index)).append(";\n");
+        }
+        colorInputs.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(input -> colorBridge
+                .append("#define ").append(input.getKey()).append(' ').append(GeometryColorSamplers.samplerName(input.getValue())).append('\n'));
+        bridge = colorBridge + bridge;
         if (declaredVaryings.contains("normal")) {
             bridge = bridge.replace("#define texture Sampler0", """
                     vec3 veyraTerrainNormal() {

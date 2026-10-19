@@ -240,3 +240,13 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Artifact run 39208129962 показал runtime Vulkan layout errors. В descriptor evidence depth-copy sampler `Sampler1Sampler` с native index 0 указывал на **собственный Color attachment snapshot**, а не borrowed main depth view. Это диагностированный binding defect существующего depth-copy пути; random magenta не считается подтверждением.
 - `VkRenderPassMixin` расширен на основной borrowed depth sampler, с namespace guard для Veyra, явной native image table привязкой и layout ownership. Snapshot samplers сохраняют тот же путь. Повторный GPU test обязателен; threshold не уменьшался.
 - CI теперь сохраняет validation error files и при неудачном readback result, до итоговых assertions.
+
+## Продолжение — auxiliary water color inputs (2026-10-19)
+
+Предыдущий goal turn: progress (depthtex1 water backend + два исправленных native defects подтверждены реальным Lavapipe readback). На старте tracked tree чистое, HEAD 728b254; основная стабильная цель остаётся активной.
+
+- Добавляется `GeometryColorSamplers`: water `colortex1..15` и legacy gdepth/gnormal/composite/gaux1..4, dedup aliases, максимум 6 distinct images в свободных native slots 6..11. Scene colortex0 и read/attachment feedback отклоняются до draw: для них нужна отдельная snapshot/ping-pong модель, Vulkan feedback не имитируется.
+- GLSL и PipelineConfig используют согласованные непрерывные binding numbers после optional shadow/noise/depth descriptors. Читаемые targets включены в существующее выделение/clear/format/size lifecycle, включая read-only targets без geometry/post writes.
+- Water читает текущую ping-pong сторону после deferred. Переход attachment -> sampling записывается на graphics command buffer вне render pass; scene/MRT восстанавливается с сохранением viewport/scissor. Индексированные таблицы VulkanMod получают актуальный view; resize/reload не меняют shared resource ownership.
+- Добавлен оригинальный `water-color-inputs` graphics fixture: opaque MRT colortex4/5, deferred смена стороны 5, modern/legacy aliases и half-resolution read-only colortex7 с заданной очисткой. Старые MRT и water-depth fixtures сохранены. GPU результат ещё ожидается; не считать локальную компиляцию runtime доказательством.
+- Локально build/test/validateShaders проходят: 104 tests без failures/errors/skips; 25 source preprocesses / 22 direct SPIR-V compilations. JAR verifier проходит. Source audit и GPU matrix предстоят.

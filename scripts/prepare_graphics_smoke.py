@@ -35,12 +35,12 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'water-opaque-depth', 'water-color-inputs'], default='geometry-mrt')
     fixture = parser.parse_args().fixture
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
-    if fixture == 'water-opaque-depth':
+    if fixture.startswith('water-'):
         layers.append((1, 'minecraft:water'))
-    spawn_y = -58 if fixture == 'water-opaque-depth' else -59
+    spawn_y = -58 if fixture.startswith('water-') else -59
     root = pathlib.Path("run-graphics-smoke")
     world = root / "saves/VeyraValidation"
     world.mkdir(parents=True, exist_ok=True)

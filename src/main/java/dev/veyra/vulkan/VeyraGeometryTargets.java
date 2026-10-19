@@ -53,12 +53,17 @@ public final class VeyraGeometryTargets {
         Renderer renderer = Renderer.getInstance();
         FragmentOutputs layout = layouts.get(pipeline);
         Framebuffer bound = renderer.getBoundFramebuffer();
-        if (layout == null || layout.sceneOnly()) {
+        if (layout == null) {
             if (bound instanceof VeyraMrtFramebuffer) resumeScene(renderer);
             return;
         }
         if (!(bound instanceof VeyraMrtFramebuffer)) scene = bound;
         if (scene == null) throw new IllegalStateException("Geometry color targets require an active scene render pass.");
+        boolean endedForSampling = VeyraRenderer.prepareTerrainColorSamplers(pipeline);
+        if (layout.sceneOnly()) {
+            if (bound instanceof VeyraMrtFramebuffer || endedForSampling) resumeScene(renderer);
+            return;
+        }
         List<VulkanImage> colors = new ArrayList<>();
         for (int target : layout.targets()) colors.add(target == 0 ? scene.getColorAttachment() : VeyraRenderer.geometryColorAttachment(target));
         Key key = new Key(List.copyOf(colors), scene.getDepthAttachment());
