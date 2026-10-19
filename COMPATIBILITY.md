@@ -53,9 +53,11 @@ The declared-profile matrix covers 24 dimension cases for each Complementary edi
 
 PR #5's [source audit run](https://github.com/glebKovshov/Veyra/actions/runs/39300268808) passed for the same four pinned packs: 12 default cases and 63 declared-profile/dimension cases, with 18 geometry fragment programs accepted and 699 rejected. The aggregate does not establish complete pipeline support; remaining sampler, attachment, compute and geometry interfaces still prevent full-pack confirmation. All 12 Lavapipe fixtures passed in [graphics run](https://github.com/glebKovshov/Veyra/actions/runs/39300269051), but they use synthetic fixtures rather than third-party packs. Every pinned pack remains `Not tested` in-game.
 
-### Beta.5 candidate CI
+### Beta.5 CI and release
 
 PR #6's final [Build](https://github.com/glebKovshov/Veyra/actions/runs/39305176030), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39305175917), and [graphics smoke](https://github.com/glebKovshov/Veyra/actions/runs/39305175988) passed before merge. The audit again covered 12 default and 63 declared-profile/dimension cases, accepting 18 and rejecting 699 geometry fragment programs. It does not evaluate complete cloud vertex/fragment pipelines. All 12 Lavapipe fixtures passed as synthetic runtime tests; every pinned pack remains `Not tested` in-game.
+
+Beta.5's [tag Release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39306047963) passed the same source/runtime gates, built and verified the distributable, then published [the prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.5%2Bmc1.21.11). This release does not certify a third-party shaderpack as playable.
 
 ## Reproduce source checks
 
