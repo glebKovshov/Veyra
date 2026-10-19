@@ -45,8 +45,9 @@ public final class VeyraDepthTextureView extends VkTextureView {
         }
 
         private DepthSampleTexture(VkGpuTexture source, SampledDepth sampledDepth) {
-            super(sampledDepth.textureId(), source.getLabel(), source.getFormat(), source.getWidth(0),
-                    source.getHeight(0), source.getDepthOrLayers(), source.getMipLevels(), source.usage(),
+            // VulkanMod's constructor takes usage first and the native texture ID after mip levels.
+            super(source.usage(), source.getLabel(), source.getFormat(), source.getWidth(0),
+                    source.getHeight(0), source.getDepthOrLayers(), source.getMipLevels(), sampledDepth.textureId(),
                     VkGlTexture.getTexture(sampledDepth.textureId()));
             textureId = sampledDepth.textureId();
             depthImageView = sampledDepth.imageView();
