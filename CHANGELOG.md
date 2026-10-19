@@ -2,6 +2,11 @@
 
 ## 0.2.0 — unreleased development branch
 
+- Added auxiliary color sampling to water geometry, including legacy aliases, post-deferred buffer sides, read-only target initialization and graphics-ordered sampling barriers. Same-attachment feedback is rejected.
+- Added a water-color-inputs Vulkan readback case alongside the existing MRT and water-depth fixtures.
+- Aligned active noisetex detection between runtime descriptors and the GLSL bridge; unused header declarations no longer shift later bindings.
+- Bounded sampler/uniform declaration scans across long preprocessor blank regions, with a 60,000-line regression.
+
 - Added copied opaque depth sampling to `gbuffers_water`, with shared post/terrain snapshot ownership and a dedicated software Vulkan readback fixture.
 - Fixed optional terrain descriptor binding gaps when shadow/noise samplers are absent, including noise-only terrain layouts.
 - Fixed borrowed main-depth native table binding in the depth-copy pass; the water fixture exposed sampling of its own color attachment and Vulkan layout errors.

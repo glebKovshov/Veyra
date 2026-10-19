@@ -4,7 +4,20 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Актуальный срез после water depth fix — 2026-10-19
+## Актуальный срез: water color inputs — 2026-10-19
+
+- Runtime code HEAD `ef6fb4413d4ec8831e8b3c92fae2c9db6467bd46`. Push/PR Build success: 39210665983 / 39210672564. Скачанные CI XML подтверждают **106 tests, 0 failures/errors/skipped**; 25 example preprocesses / 22 direct SPIR-V compilations. Скачанный CI mod JAR повторно прошёл `scripts/verify_jar.py`.
+- Push/PR Graphics success: 39210665863 / 39210672561. Все три fixtures проходят. MRT 222784/0 magenta, water-depth 222757/0, water-color-inputs 222757/0; runtime validation errors **0 у всех**. Exact-commit active/disabled water-color кадры скачаны и просмотрены.
+- Water `colortex1..15` / legacy gdepth/gnormal/composite/gaux1..4 реализованы для максимум 6 distinct images в slots 6..11. Aliases дедуплицируются, bindings идут непрерывно после shadow/noise/depth. Read-only inputs выделяются/очищаются существующим lifecycle; reduced-size read-only target проверен. Current buffer side берётся после deferred; barriers на graphics command buffer вне render pass; dynamic viewport/scissor сохранены. Cleanup очищает только owned table entries по identity.
+- Новый fixture доказывает opaque MRT -> read, deferred ping-pong -> read и initial half-resolution clear -> read. Неиспользуемый noisetex header также включён: runtime/GLSL detection согласованы. Квадратичный scan на preprocessing blank lines исправлен после jstack diagnosis; regression на 60000 строк проходит. Полный локальный audit после fix занял 2m 2s.
+- Source push/PR success: 39210665829 / 39210672681. **Все 75 локальных записей совпали как JSON-данные со скачанным exact-commit CI report**: 5178 sources, 18 accepted / 699 rejected, visualValidation=false у всех. Обновлены оба committed reports. Complementary water теперь упирается в specular, BSL water в shadowtex1/shadowFade. Sildur water требует чтения colortex4, одновременно attached к draw: пока явный feedback blocker; другие geometry bridges ещё не имеют этих color inputs.
+- Teardown НЕ чистый. В данном точном push run: MRT **10031**, water-depth **10049**, water-color-inputs **10370** diagnostics. Значения варьируются между runs; не приписывать всё Veyra или VulkanMod без ownership trace. Runtime-green не означает отсутствие leaks.
+- Native Computer Use повторно недоступен (`native pipe ... os error 2`). Physical GPU/UI, popular-pack visual compatibility и длительный lifecycle stress не подтверждены. Backend work может продолжаться; вся цель не blocked и не complete.
+- `main` остаётся e37f188/0.1.1, PR #2 draft. Alpha.1 release/tag по-прежнему на старом 2b5acb0; эти fixes доступны только в feature/CI development artifact. Стабильный релиз не объявлен готовым.
+- Следующие приоритеты: PBR specular atlas/material inputs, отдельная opaque shadowtex1, pack-specific uniforms; определить корректную Iris/Vulkan семантику water same-attachment feedback и расширить color inputs на нужные entity/hand bridges. Затем real-pack end-to-end, физический GPU, ownership/stress проверки, stable integration/release.
+
+Ниже сохранена история предыдущих этапов.
+## История: water depth fix — 2026-10-19
 
 - Последний runtime code commit: `51c5875949259444b465409828ad19cbd6557006`. Build push `39208570869` и PR `39208577331` — success. 96 JUnit tests, 0 failures/errors/skips; shaderc 23 example preprocesses / 20 direct SPIR-V compilations; JAR verifier проходит.
 - Graphics push `39208570838` и PR `39208577387` — success, оба matrix cases. MRT: 222983 active / 0 disabled magenta pixels, runtime validation errors 0. Water opaque-depth: 222757 / 0, runtime validation errors 0. Скачанные кадры просмотрены; water signal занимает поверхность, а не случайные пиксели.

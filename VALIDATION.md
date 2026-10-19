@@ -1,6 +1,15 @@
 # 0.2 development validation status
 
-## Current water-depth validation (after alpha.1)
+## Current water-color validation (after alpha.1)
+
+Runtime code `ef6fb4413d4ec8831e8b3c92fae2c9db6467bd46` passes [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39210665983), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39210672564), [push graphics](https://github.com/glebKovshov/Veyra/actions/runs/39210665863), [PR graphics](https://github.com/glebKovshov/Veyra/actions/runs/39210672561), [push source audit](https://github.com/glebKovshov/Veyra/actions/runs/39210665829) and [PR source audit](https://github.com/glebKovshov/Veyra/actions/runs/39210672681).
+
+Downloaded CI reports confirm 106 JUnit tests with zero failures/errors/skips. shaderc preprocesses 25 example sources and compiles 22 directly to Vulkan SPIR-V, plus the existing compiler fixtures. The downloaded mod JAR passes the distributable verifier. All 75 downloaded source-audit records exactly match the complete local run (5,178 sources, 18 accepted / 699 rejected); both committed reports have been refreshed.
+
+In the exact push graphics run, MRT gives 222,784/0 active/disabled magenta pixels, water-depth 222,757/0 and water-color-inputs 222,757/0; all have zero runtime validation errors. The new fixture requires opaque MRT colortex4, the post-deferred ping-pong side of colortex5, both modern/legacy aliases, and a half-resolution read-only colortex7 with its declared clear value. It also declares an unused noisetex to catch descriptor-binding drift. Active/disabled screenshots were inspected.
+
+Teardown diagnostics are 10,031 / 10,049 / 10,370 respectively, and vary across runs. Ownership remains unresolved. The native Computer Use pipe is still unavailable; physical GPU/UI and third-party-pack visual support are unverified. PBR inputs, the second shadow depth map, other geometry color-input bridges and defined attachment-feedback behavior remain blockers. Stable 0.2 is not ready; published alpha.1 predates these changes.
+## Historical water-depth validation (after alpha.1)
 
 Runtime code commit `51c5875949259444b465409828ad19cbd6557006` passes the [push Build](https://github.com/glebKovshov/Veyra/actions/runs/39208570869), [PR Build](https://github.com/glebKovshov/Veyra/actions/runs/39208577331), [push graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39208570838) and [PR graphics matrix](https://github.com/glebKovshov/Veyra/actions/runs/39208577387).
 

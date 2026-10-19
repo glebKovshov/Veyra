@@ -55,6 +55,8 @@ The currently supported formats are `R8`, `RGBA8`, `R16F`, `RGBA16F`, and `R32F`
 
 On the development branch after alpha.1, `gbuffers_water` can also read `depthtex1` using nearest/clamp sampling. Other geometry stages still reject it. `examples/water-opaque-depth` checks the copied opaque floor behind a water surface through MRT and a final pass. Its software Vulkan readback passes; popular-pack water compatibility and physical-GPU behavior remain unverified. The published alpha.1 does not contain this newer bridge.
 
+Water geometry on the same development branch can read up to six distinct auxiliary `colortex1..15` buffers and their legacy aliases (`gdepth`, `gnormal`, `composite`, `gaux1..4`). Bindings use the current side after deferred; `examples/water-color-inputs` exercises opaque MRT, a deferred ping-pong switch and a half-resolution read-only input. Sampling a buffer also attached to that water draw is rejected. Other geometry bridges, scene-color snapshots and general mipmap/sampler properties remain incomplete. This is newer than alpha.1.
+
 ## Noise texture sampler
 
 The Iris `noisetex` sampler is backed by a generated Vulkan texture and is available to supported terrain, shadow, entity, hand, block, sign, and post programs. Its default size is 256 by 256. Set `const int noiseTextureResolution` in `shaders.properties` to choose a square size from 1 to 4096. Veyra binds the sampler with linear filtering and repeat addressing.
