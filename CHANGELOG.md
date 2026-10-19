@@ -25,7 +25,7 @@
 - Corrected swapchain image usage metadata and requested transfer-source usage only where the surface supports it. Ordered sampled color-image transitions in the main frame graph after their producers.
 - Added a development-only real Minecraft world/readback harness using software Vulkan in CI. Runtime results remain separate from unit/build success.
 - Added explicit errors for unsupported required Iris features and active compute, geometry, tessellation or begin stages.
-- Added a checksum-pinned external shaderpack source-audit workflow for four public packs and their declared profiles, embedded JCPP license notices, distributable checks and CI test-report artifacts. The current branch has 87 regression tests.
+- Added a checksum-pinned external shaderpack source-audit workflow for four public packs and their declared profiles, embedded JCPP license notices, distributable checks and CI test-report artifacts. The current branch has 89 regression tests.
 - Updated GitHub Actions to Node 24 action releases, pinned hosted runners to Ubuntu 24.04, and selected Gradle's open-source basic cache provider.
 - Remaining release blockers include active PBR/depth/shadow sampler reads, pack-specific uniforms, arbitrary geometry vertex inputs, MRT for the other geometry bridges, compute/tessellation execution, and real client/Vulkan pack validation. See COMPATIBILITY.md; this is not a stable full-Iris release.
 
