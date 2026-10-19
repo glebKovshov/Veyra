@@ -165,7 +165,7 @@ public final class VeyraRenderer {
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_IVEC2_UNIFORM_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?ivec2\\s+(?:eyeBrightness|eyeBrightnessSmooth|atlasSize)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_MATRIX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?mat4\\s+(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|shadowProjection|shadowProjectionInverse)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
@@ -194,7 +194,7 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "playerMood", "biome_precipitation", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
+            "darknessLightFactor", "playerMood", "biome_precipitation", "atlasSize", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
             "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor", "isEyeInWater",
@@ -211,6 +211,7 @@ public final class VeyraRenderer {
     private static final List<String> VECTOR3_UNIFORMS = List.of(
             "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract",
             "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor");
+    private static final List<String> IVECTOR2_UNIFORMS = List.of("eyeBrightness", "eyeBrightnessSmooth", "atlasSize");
     private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
     private static final List<String> BOOLEAN_UNIFORMS = List.of(
             "isSpectator", "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
@@ -220,7 +221,7 @@ public final class VeyraRenderer {
             "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning");
     private static final List<String> DYNAMIC_UNIFORMS = List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
-            "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
+            "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
             "is_sneaking", "is_sprinting", "is_on_ground", "is_hurt", "is_invisible", "is_burning",
@@ -567,6 +568,7 @@ public final class VeyraRenderer {
         Vector2i value = switch (name) {
             case "eyeBrightness" -> uniforms.eyeBrightness();
             case "eyeBrightnessSmooth" -> uniforms.eyeBrightnessSmooth();
+            case "atlasSize" -> new Vector2i(blockAtlasWidth, blockAtlasHeight);
             default -> throw new IllegalArgumentException("Unknown shader pack integer vector uniform " + name + ".");
         };
         buffer.putInt(0, value.x);
@@ -719,6 +721,14 @@ public final class VeyraRenderer {
     }
 
     private static volatile float darknessLightFactor;
+    private static volatile int blockAtlasWidth;
+    private static volatile int blockAtlasHeight;
+
+    /** Iris' atlasSize is the size of the pipeline albedo texture, the block atlas. */
+    public static void captureBlockAtlasSize(int width, int height) {
+        blockAtlasWidth = width;
+        blockAtlasHeight = height;
+    }
 
     /** Called from the lightmap update with Iris' darknessLightFactor. */
     public static void captureDarknessLightFactor(float value) {
@@ -2523,6 +2533,9 @@ public final class VeyraRenderer {
         }
         if (MATRIX_UNIFORMS.contains(uniform)) {
             return "mat4";
+        }
+        if (IVECTOR2_UNIFORMS.contains(uniform)) {
+            return "ivec2";
         }
         if (IVECTOR3_UNIFORMS.contains(uniform)) {
             return "ivec3";
@@ -4782,6 +4795,7 @@ public final class VeyraRenderer {
                 case "eyeAltitude" -> new UniformValue.FloatUniform(frameUniforms.eyeAltitude());
                 case "eyeBrightness" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightness());
                 case "eyeBrightnessSmooth" -> new ShaderPackIVec2Uniform(frameUniforms.camera().eyeBrightnessSmooth());
+                case "atlasSize" -> new ShaderPackIVec2Uniform(new Vector2i(blockAtlasWidth, blockAtlasHeight));
                 case "screenBrightness" -> new UniformValue.FloatUniform(frameUniforms.screenBrightness());
                 case "blindness" -> new UniformValue.FloatUniform(frameUniforms.blindness());
                 case "nightVision" -> new UniformValue.FloatUniform(frameUniforms.nightVision());
