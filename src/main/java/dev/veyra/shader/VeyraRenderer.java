@@ -1765,11 +1765,12 @@ public final class VeyraRenderer {
         if (pipeline == null || !cloudPipelineUsesSceneColor) return;
 
         try {
-            GpuTexture colorTexture = Renderer.getInstance().getMainPass().getColorAttachment();
-            if (!(colorTexture instanceof VkGpuTexture vulkanTexture) || vulkanTexture.isClosed()) {
-                throw new IllegalStateException("The main scene color attachment is not a live VulkanMod image.");
+            var mainFramebuffer = Renderer.getInstance().getMainPass().getMainFramebuffer();
+            if (mainFramebuffer == null || mainFramebuffer.getColorAttachment() == null) {
+                throw new IllegalStateException("The cloud colortex0 scene framebuffer is unavailable.");
             }
-            cloudSceneColorSnapshot.capture(vulkanTexture.getVulkanImage());
+            VulkanImage colorImage = mainFramebuffer.getColorAttachment();
+            cloudSceneColorSnapshot.capture(colorImage);
             cloudSceneColorCaptured = true;
         } catch (Exception exception) {
             lastError = shortError(exception);
