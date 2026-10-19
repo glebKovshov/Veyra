@@ -676,6 +676,12 @@ public final class VeyraRenderer {
         return new Matrix4f().scale(1.0F, 1.0F, EntityShaderAdapter.MC_HAND_DEPTH).mul(projection);
     }
 
+    private static float shadowFadeUniform(FrameUniforms frame) {
+        CustomUniforms customUniforms = CustomUniforms.active();
+        return customUniforms.uniform("shadowFade") == null
+                ? frame.shadowFade() : customUniforms.floatValue("shadowFade");
+    }
+
     private static float shaderPackFloatUniform(String name) {
         Minecraft minecraft = Minecraft.getInstance();
         if (name.equals("near")) {
@@ -706,6 +712,7 @@ public final class VeyraRenderer {
             case "frameTimeCounter" -> frame.frameTimeCounter();
             case "frameTime" -> frame.frameTime();
             case "sunAngle" -> frame.sunAngle();
+            case "shadowFade" -> shadowFadeUniform(frame);
             case "rainStrength" -> frame.rainStrength();
             case "wetness" -> frame.wetness();
             case "thunderStrength" -> frame.thunderStrength();
@@ -4833,9 +4840,7 @@ public final class VeyraRenderer {
                 case "frameTime" -> new UniformValue.FloatUniform(frameUniforms.frameTime());
                 case "frameCounter" -> new UniformValue.IntUniform(frameUniforms.frameCounter());
                 case "sunAngle" -> new UniformValue.FloatUniform(frameUniforms.sunAngle());
-                case "shadowFade" -> new UniformValue.FloatUniform(
-                        CustomUniforms.active().uniform("shadowFade") == null
-                                ? frameUniforms.shadowFade() : CustomUniforms.active().floatValue("shadowFade"));
+                case "shadowFade" -> new UniformValue.FloatUniform(shadowFadeUniform(frameUniforms));
                 case "rainStrength" -> new UniformValue.FloatUniform(frameUniforms.rainStrength());
                 case "wetness" -> new UniformValue.FloatUniform(frameUniforms.wetness());
                 case "thunderStrength" -> new UniformValue.FloatUniform(frameUniforms.thunderStrength());

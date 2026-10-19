@@ -89,11 +89,13 @@ class CustomUniformsTest {
                 uniform.float.bad=clamp(1.0, 2.0
                 uniform.float.unknownFunction=noise(1.0)
                 uniform.float.sunAngle=0.5
+                uniform.int.shadowFade=1
                 """);
         assertTrue(uniforms.uniforms().isEmpty());
         assertTrue(uniforms.unavailableReason("bad").startsWith("invalid expression"));
         assertTrue(uniforms.unavailableReason("unknownFunction").contains("noise"));
         assertTrue(uniforms.unavailableReason("sunAngle").contains("built-in"));
+        assertTrue(uniforms.unavailableReason("shadowFade").contains("must remain a float"));
     }
 
     @Test

@@ -121,6 +121,10 @@ public final class CustomUniforms {
                 continue;
             }
             Type type = Type.valueOf(typeName.toUpperCase(java.util.Locale.ROOT));
+            if (name.equals("shadowFade") && type != Type.FLOAT) {
+                unavailable.put(name, "the built-in shadowFade uniform must remain a float");
+                continue;
+            }
             definitions.add(new Definition(name, type, uniform, expression));
             known.put(name, type);
         }
