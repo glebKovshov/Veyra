@@ -55,7 +55,7 @@ PR #5's [source audit run](https://github.com/glebKovshov/Veyra/actions/runs/393
 
 ### Beta.5 candidate CI
 
-PR #6's [Build](https://github.com/glebKovshov/Veyra/actions/runs/39304264561), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39304264461), and [graphics smoke](https://github.com/glebKovshov/Veyra/actions/runs/39304264453) passed. The audit again covered 12 default and 63 declared-profile/dimension cases, accepting 18 and rejecting 699 geometry fragment programs. It does not evaluate complete cloud vertex/fragment pipelines. All 12 Lavapipe fixtures passed as synthetic runtime tests; every pinned pack remains `Not tested` in-game.
+PR #6's final [Build](https://github.com/glebKovshov/Veyra/actions/runs/39305176030), [pinned source audit](https://github.com/glebKovshov/Veyra/actions/runs/39305175917), and [graphics smoke](https://github.com/glebKovshov/Veyra/actions/runs/39305175988) passed before merge. The audit again covered 12 default and 63 declared-profile/dimension cases, accepting 18 and rejecting 699 geometry fragment programs. It does not evaluate complete cloud vertex/fragment pipelines. All 12 Lavapipe fixtures passed as synthetic runtime tests; every pinned pack remains `Not tested` in-game.
 
 ## Reproduce source checks
 
