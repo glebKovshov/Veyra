@@ -11,7 +11,7 @@ Post programs are scheduled at separate world boundaries: `prepare` after shadow
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.
-2. The latest public [GitHub Release](https://github.com/glebKovshov/Veyra/releases) predates this feature branch. To test the unreleased branch, download the development JAR from its [latest successful Build workflow artifact](https://github.com/glebKovshov/Veyra/actions/runs/39183912218) (not the `-sources.jar`) and put it in the instance's `mods` folder.
+2. The latest public [GitHub Release](https://github.com/glebKovshov/Veyra/releases) predates this feature branch. To test the unreleased branch, download the development JAR from its [latest successful Build workflow artifact](https://github.com/glebKovshov/Veyra/actions/runs/39184371378) (not the `-sources.jar`) and put it in the instance's `mods` folder.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
 
