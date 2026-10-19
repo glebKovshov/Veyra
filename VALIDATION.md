@@ -189,3 +189,11 @@ The local candidate `veyra-0.2.0-beta.4+mc1.21.11.jar` is 527,755 bytes, SHA-256
 ### Beta.4 PR verification and merge — 2026-10-19
 
 PR #5 ([Add Iris entity and block entity identifiers](https://github.com/glebKovshov/Veyra/pull/5)) passed its Build run [39300268861](https://github.com/glebKovshov/Veyra/actions/runs/39300268861), pinned source audit [39300268808](https://github.com/glebKovshov/Veyra/actions/runs/39300268808), and all 12 Lavapipe graphics fixtures [39300269051](https://github.com/glebKovshov/Veyra/actions/runs/39300269051). The audit reports 12 default and 63 declared-profile/dimension cases, with 18 geometry fragment programs accepted and 699 rejected. The PR merged to `main` as `f3ca6b0bae84efbde979b46b16767e7d175371c6`. These checks validate Veyra's supported source subset and synthetic render paths; no third-party pack was visually validated.
+
+### Published beta.4 artifact
+
+Tag `v0.2.0-beta.4+mc1.21.11` points to `2fce9f7ed764f9cd62ba7feaa0d931e9b3b6ae07`. The final [release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39301135037) passed its source audit, all 12 graphics fixtures, `./gradlew build validateShaders packageExamplePacks`, and `scripts/verify_jar.py`; the tag Build [39301135146](https://github.com/glebKovshov/Veyra/actions/runs/39301135146) also passed.
+
+The [beta.4 GitHub prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.4%2Bmc1.21.11) includes the installable [veyra-0.2.0-beta.4+mc1.21.11.jar](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.4%2Bmc1.21.11/veyra-0.2.0-beta.4%2Bmc1.21.11.jar), source JAR, example-packs ZIP, and [SHA256SUMS.txt](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.4%2Bmc1.21.11/SHA256SUMS.txt). The installable JAR was downloaded again: 527,737 bytes, SHA-256 `dd2230e13f64c1797477ab689dc3fdd44e4da9e82c9ab5abdadf7c283cc97a03`, matching the published checksum manifest. ZIP inspection confirmed the entity/block ID-map classes and dispatcher mixin are present and the smoke harness is absent.
+
+The prerelease remains experimental. Lavapipe covers synthetic fixtures only; no third-party pack was visually validated on a physical GPU.
