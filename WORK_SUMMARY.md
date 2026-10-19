@@ -250,3 +250,8 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Water читает текущую ping-pong сторону после deferred. Переход attachment -> sampling записывается на graphics command buffer вне render pass; scene/MRT восстанавливается с сохранением viewport/scissor. Индексированные таблицы VulkanMod получают актуальный view; resize/reload не меняют shared resource ownership.
 - Добавлен оригинальный `water-color-inputs` graphics fixture: opaque MRT colortex4/5, deferred смена стороны 5, modern/legacy aliases и half-resolution read-only colortex7 с заданной очисткой. Старые MRT и water-depth fixtures сохранены. GPU результат ещё ожидается; не считать локальную компиляцию runtime доказательством.
 - Локально build/test/validateShaders проходят: 104 tests без failures/errors/skips; 25 source preprocesses / 22 direct SPIR-V compilations. JAR verifier проходит. Source audit и GPU matrix предстоят.
+
+### Первый color-input GPU прогон
+
+- `c4106f6`: Graphics push run 39209768717 прошёл все три fixtures: MRT 222857/0, water-depth 222757/0, water-color-inputs 222757/0 magenta; у всех runtime validation errors 0. Новый fixture реально проверил color4 из opaque MRT, color5 с актуальной deferred ping-pong стороны и инициализированный half-resolution color7.
+- При review обнаружена дополнительная несовместимость определения noisetex: runtime учитывал unused declaration, а адаптер удалял её, что сдвигало следующие descriptor bindings. `usesNoiseSampler` теперь исключает unused declarations. Добавлены regression и такой неиспользуемый sampler в GPU fixture. Повторный точный GPU прогон обязателен.

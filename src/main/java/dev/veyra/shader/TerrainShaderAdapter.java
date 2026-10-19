@@ -356,7 +356,8 @@ public final class TerrainShaderAdapter {
     }
 
     public static boolean usesNoiseSampler(String source) {
-        return NOISETEX_REFERENCE.matcher(COMMENTS.matcher(source == null ? "" : source).replaceAll(""))
+        return NOISETEX_REFERENCE.matcher(UnusedSamplerDeclarations.removeUnused(
+                        COMMENTS.matcher(source == null ? "" : source).replaceAll("")))
                 .find();
     }
 

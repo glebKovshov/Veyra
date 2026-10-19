@@ -4,6 +4,8 @@ uniform sampler2D gaux1;
 uniform sampler2D gaux2;
 uniform sampler2D colortex5;
 uniform sampler2D colortex7;
+// Common pack headers declare noise even when the selected profile never reads it.
+uniform sampler2D noisetex;
 uniform float viewWidth;
 uniform float viewHeight;
 const vec4 colortex7ClearColor = vec4(0.25, 0.5, 0.75, 1.0);

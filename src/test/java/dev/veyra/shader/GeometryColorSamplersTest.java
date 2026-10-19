@@ -63,4 +63,13 @@ class GeometryColorSamplersTest {
         assertTrue(adapted.contains("layout(binding = 8) uniform sampler2D VeyraGeometryColor4Sampler;"));
         assertTrue(adapted.contains("layout(binding = 9) uniform sampler2D VeyraGeometryColor5Sampler;"));
     }
+
+    @Test void unusedNoiseDoesNotShiftRuntimeColorBindings() throws IOException {
+        String source = "uniform sampler2D noisetex;\nuniform sampler2D colortex5;\n"
+                + "void main(){gl_FragColor=texture2D(colortex5,vec2(0.5));}\n";
+        assertFalse(TerrainShaderAdapter.usesNoiseSampler(source));
+        String adapted = TerrainShaderAdapter.adaptFragment(source, false, true);
+        assertFalse(adapted.contains("VeyraNoiseSampler"));
+        assertTrue(adapted.contains("layout(binding = 5) uniform sampler2D VeyraGeometryColor5Sampler;"));
+    }
 }
