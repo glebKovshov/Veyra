@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.24 - 2026-10-20 (experimental prerelease)
+
+- Execute supported terrain `gbuffers_terrain`, `_solid`, `_cutout`, and `_water` vertex shaders after VulkanMod terrain setup. Bridge supported legacy terrain inputs, `noisetex`, and checked scalar/vector/matrix vertex-to-fragment varyings. Keep packed tangent layout compatible with VulkanMod 0.6.8 generic float attributes.
+- Add regression coverage for terrain vertex execution, varying linking, unsupported inputs, and the scalar tangent attributes. PR #59 passed Build and source audit plus all 24/24 Lavapipe graphics fixtures.
+- Publish [Veyra 0.2.0-beta.24+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.24%2Bmc1.21.11) after release-prep PR #60. Release workflow passed source audit, all 24 graphics fixtures, versioned build/tests, and distributable verification. The downloaded install JAR is 642,978 bytes, SHA-256 `edaaa23fe9b4bd5c4a6bfed210b12b407fc983260059c095db5eb32f3bbdd40e`; it matches `SHA256SUMS.txt` and passes `scripts/verify_jar.py`.
+- The pinned audit covers 4 shaderpack archives / 75 cases / 5,178 stages, accepting 705 and rejecting 12 geometry fragments. All 75 whole-pack cases still stop at unsupported non-terrain `gbuffers_armor_glint.vsh`; every record has `visualValidation=false`. No full third-party pack visual or physical-GPU validation is claimed.
+
 ## 0.2.0-beta.23 - 2026-10-20 (prerelease)
 
 - Reject active non-cloud `gbuffers_*.vsh` stages with a clear capability error when their fragment program exists; Veyra still uses VulkanMod's built-in terrain/entity vertex stages.
