@@ -1,6 +1,6 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.14 candidate
+# Shaderpack compatibility: Veyra 0.2.0-beta.14 prerelease
 
-## Pinned source audit (beta.14 candidate)
+## Pinned source audit (beta.14 prerelease)
 
 The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **486** geometry fragment programs and rejects **231**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
 
@@ -10,7 +10,7 @@ The pinned audit covers 75 default/profile/dimension cases and all 5,178 preproc
 | BSL 10.1.8 | 7/9, 7/9, 7/9 | water: `mat`; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
-## Entity-family multiple render targets (beta.14 candidate)
+## Entity-family multiple render targets (beta.14 prerelease)
 
 Entity, first-person hand, block-entity, and sign-text fragments can route supported explicit and legacy outputs to native color attachments. This extends the existing Vulkan MRT path to these geometry families; it does not add general MRT support to every geometry bridge or certify a complete third-party pack.
 
