@@ -1,30 +1,22 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.14 prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.15 prerelease
 
-## Pinned source audit (beta.14 prerelease)
+## Pinned source audit (beta.15 prerelease)
 
-The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **486** geometry fragment programs and rejects **231**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
+The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **432** geometry fragment programs and rejects **285**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 7/10, 7/10, 7/10 | translucent block/entities: unsupported inputs; water: `viewVector`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
-| BSL 10.1.8 | 7/9, 7/9, 7/9 | water: `mat`; clouds: active `texture` sampler | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 6/10, 6/10, 6/10 | terrain/water: `absMidCoordPos`; translucent block/entities: unsupported inputs; selected profiles: `shadowcomp.csh` compute stage | Not tested |
+| BSL 10.1.8 | 6/9, 6/9, 6/9 | terrain: `recolor`; water: `dist`; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
-## Terrain tangent-space and material inputs (PRs #26 and #27 candidate; not released)
+## Terrain tangent-space and material inputs (beta.15 prerelease)
 
-The beta.14 source audit rejected Complementary water at `viewVector`. PR #26 reconstructs a view-space terrain tangent frame from fragment derivatives of view position and UV, then adapts Iris `normal`, `tangent`, `binormal`, and `viewVector`. Comma-separated and interpolation-qualified varying declarations are normalized before validation. The frame is initialized in a wrapper before the shader-pack fragment `main`, keeping derivative evaluation outside shader-pack control flow. This reconstruction targets planar terrain faces; custom geometry with authored per-vertex tangents is not covered.
+The beta.14 source audit rejected Complementary water at `viewVector`. Beta.15 reconstructs a view-space terrain tangent frame from fragment derivatives of view position and UV, then adapts Iris `normal`, `tangent`, `binormal`, and `viewVector`. Comma-separated and interpolation-qualified varying declarations are normalized before validation. The frame is initialized in a wrapper before the shader-pack fragment `main`, keeping derivative evaluation outside shader-pack control flow. This reconstruction targets planar terrain faces; custom geometry with authored per-vertex tangents is not covered.
 
-PR #27 appends Iris `block.properties` IDs and the `mc_Entity` render-type marker to VulkanMod's compressed terrain vertices. The terrain adapter accepts `mat` as `int` or `float`, plus `mc_Entity` as `vec2`; the fluid marker is `1.0` and the non-fluid marker is `-1.0`. Mapping changes rebuild terrain sections after a pack is selected. The parser handles repeated block-ID lines, comma-separated property values, block tags, and the current direct-block-over-tag priority.
+Beta.15 appends Iris `block.properties` IDs and the `mc_Entity` render-type marker to VulkanMod's compressed terrain vertices. The terrain adapter accepts `mat` as `int` or `float`, plus `mc_Entity` as `vec2`; the fluid marker is `1.0` and the non-fluid marker is `-1.0`. Mapping changes rebuild terrain sections after a pack is selected. The parser handles repeated block-ID lines, comma-separated property values, block tags, and Iris 1.8+ direct-block-over-tag priority.
 
-| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Current blockers in this audit |
-| --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 6/10, 6/10, 6/10 | Terrain/water `absMidCoordPos`, translucent block/entity inputs; selected profiles require `shadowcomp.csh` compute |
-| BSL 10.1.8 | 6/9, 6/9, 6/9 | Terrain `recolor`, water `dist`, active cloud `texture` sampler |
-| Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; attachment feedback in water; unsupported cloud inputs |
-
-Build run [39380266764](https://github.com/glebKovshov/Veyra/actions/runs/39380266764) passed `test`, `validateShaders`, `build`, and distributable verification on head `18b89dc66ad444c4026c40f35a5b6358f89bab33`. Its JUnit artifact contains 226 tests with 0 failures, 0 errors, and 0 skipped. Graphics run [39380266741](https://github.com/glebKovshov/Veyra/actions/runs/39380266741) passed all 19 Lavapipe fixtures. The new terrain-ID fixture read back 223,059 active magenta pixels and 0 when disabled; the water-ID fixture read back 226,902 active magenta pixels and 0 when disabled. Both had zero runtime validation errors before shutdown; each still reported 10,050 teardown validation diagnostics. These synthetic checks do not render a third-party pack.
-
-Source audit [39380266860](https://github.com/glebKovshov/Veyra/actions/runs/39380266860) passed 75 cases across 4 pinned packs and 5,178 preprocessed stages: 432 geometry fragments accepted / 285 rejected. All 75 records have `visualValidation=false`. `mat` and `mc_Entity` are no longer the surfaced terrain blockers; remaining examples include `absMidCoordPos`, `recolor`, `dist`, unsupported translucent block/entity inputs, cloud `texture`, compute, and attachment feedback. The table at the top is the published beta.14 snapshot; these PR #26/#27 results are a candidate and are not released.
+On PR head `85232d104a33bc8b9d8bada3012ef97c0063148b` (merged as `24ca7756fbef228fdf25ecede8a0f0e66772bec7`), Build [39381177655](https://github.com/glebKovshov/Veyra/actions/runs/39381177655) passed 226 tests with 0 failures, 0 errors, and 0 skipped. Graphics [39381177589](https://github.com/glebKovshov/Veyra/actions/runs/39381177589) passed all 19 Lavapipe fixtures. Terrain-ID readback was 223,648 active / 0 disabled magenta pixels; water-ID was 226,902 / 0 disabled. Both reported 0 runtime validation errors, with 10,031 and 10,049 teardown diagnostics respectively. Source audit [39381177592](https://github.com/glebKovshov/Veyra/actions/runs/39381177592) covered 75 cases, 4 pinned packs, and 5,178 stages: 432 geometry fragments accepted / 285 rejected, with `visualValidation=false` in every record. These are synthetic/source-level results only; no third-party pack or physical GPU has been visually validated.
 
 ## Entity-family multiple render targets (beta.14 prerelease)
 
