@@ -1573,9 +1573,10 @@ public final class VeyraRenderer {
         int itemId = currentRenderedItemIdentifier(stack);
         if (Boolean.getBoolean("veyra.graphicsSmoke") && stack != null && !stack.isEmpty()) {
             String item = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-            if (GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("submit:" + item + ":" + itemId)) {
+            boolean handRendering = isHandRendering();
+            if (GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("submit:" + item + ":" + itemId + ":" + handRendering)) {
                 VeyraClient.LOGGER.info("Graphics smoke item submission: {} maps to currentRenderedItemId={}, handRendering={}",
-                        item, itemId, isHandRendering());
+                        item, itemId, handRendering);
             }
         }
         RENDERED_ITEM_IDENTIFIER_CONTEXT.get().push(itemId);
@@ -1605,6 +1606,13 @@ public final class VeyraRenderer {
         Deque<Integer> itemIdentifiers = RENDERED_ITEM_IDENTIFIER_CONTEXT.get();
         boolean item = !itemIdentifiers.isEmpty();
         int itemId = item ? itemIdentifiers.peek() : ItemIdMap.UNMAPPED;
+        if (Boolean.getBoolean("veyra.graphicsSmoke") && item && isHandRendering()) {
+            String pipeline = originalType == null ? "<null>" : originalType.pipeline().getLocation().toString();
+            if (GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("hand-request:" + itemId + ":" + pipeline)) {
+                VeyraClient.LOGGER.info("Graphics smoke hand route request: itemId={} pipeline={} entityPipeline={}",
+                        itemId, pipeline, originalType != null && isEntityRenderPipeline(originalType.pipeline()));
+            }
+        }
         if (!blockEntity && !entity && !(item && isHandRendering())) return originalType;
         RenderPipeline original = originalType.pipeline();
         if (VeyraShadowRenderer.isRendering()) {
