@@ -9,14 +9,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -101,14 +99,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -157,14 +153,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -249,14 +243,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -395,14 +387,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -487,14 +477,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -543,14 +531,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -635,14 +621,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -781,14 +765,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -873,14 +855,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -929,14 +909,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1021,14 +999,12 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 9,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 10,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1157,4 +1133,4 @@
     "errors": [],
     "visualValidation": false
   }
-]\n
+]

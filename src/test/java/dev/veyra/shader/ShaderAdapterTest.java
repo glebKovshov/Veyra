@@ -89,7 +89,8 @@ class ShaderAdapterTest {
                 #version 120
                 varying vec3 viewPos;
                 varying float dist;
-                void main() { gl_FragColor = vec4(abs(viewPos) / 64.0, 1.0); }
+                varying vec4 spriteBounds;
+                void main() { gl_FragColor = vec4(abs(viewPos) / 64.0, 1.0) + spriteBounds * 0.0; }
                 """);
         String vertex = TerrainShaderAdapter.adaptVertex("""
                 #version 460
@@ -111,7 +112,9 @@ class ShaderAdapterTest {
         assertTrue(fragment.contains("layout(location = 10) in vec3 veyraViewPosition;"));
         assertTrue(fragment.contains("#define viewPos veyraViewPosition"));
         assertTrue(fragment.contains("layout(location = 16) in float veyraTerrainDistance;"));
+        assertTrue(fragment.contains("layout(location = 19) in vec4 veyraSpriteBounds;"));
         assertTrue(fragment.contains("#define dist veyraTerrainDistance"));
+        assertTrue(fragment.contains("#define spriteBounds veyraSpriteBounds"));
         assertFalse(fragment.contains("varying vec3 viewPos;"));
         assertFalse(fragment.contains("varying float dist;"));
         assertTrue(vertex.contains("layout (location = 10) out vec3 veyraViewPosition;"));
@@ -128,6 +131,7 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
         assertTrue(vertex.contains("layout (location = 14) out flat vec2 veyraAbsMidCoordPos;"));
         assertTrue(vertex.contains("layout (location = 15) out flat vec2 veyraMidCoord;"));
+        assertTrue(vertex.contains("layout (location = 19) out vec4 veyraSpriteBounds;"));
         assertTrue(vertex.contains("mat4 textureMatrix;"));
         assertTrue(vertex.contains("texCoord0 = (textureMatrix * vec4(veyraRawTexCoord, 0.0, 1.0)).xy;"));
         assertTrue(vertex.contains("veyraMidCoord = (textureMatrix * vec4(veyraRawMidTexCoord, 0.0, 1.0)).xy;"));
@@ -136,6 +140,8 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("veyraAbsMidCoordPos = abs(veyraMidCoordOffset);"));
         assertTrue(vertex.contains("veyraBslTexCoord = vec4(sign(veyraMidCoordOffset) * 0.5 + 0.5, 0.0, 0.0);"));
         assertTrue(vertex.contains("veyraBslTexCoordAM = vec4(min(texCoord0, veyraMidCoord - veyraMidCoordOffset), abs(veyraMidCoordOffset) * 2.0);"));
+        assertTrue(vertex.contains("const vec2 veyraSpriteRadius = abs(texCoord0 - veyraMidCoord);"));
+        assertTrue(vertex.contains("veyraSpriteBounds = vec4(veyraMidCoord - veyraSpriteRadius, veyraMidCoord + veyraSpriteRadius);"));
         assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
     }
 
