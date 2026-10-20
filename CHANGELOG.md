@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.22 - 2026-10-20 (prerelease)
+
+- Add auxiliary `colortex1..15` sampling to supported water and entity-family geometry, up to six unique inputs per program.
+- When a sampled color target is also a draw attachment, copy its current contents to a separate Vulkan image before drawing; keep the original target writable and resume the render pass correctly.
+- Add water and entity feedback examples and Lavapipe coverage. All 22 graphics fixtures pass; the entity feedback readback measured 18,648 active magenta pixels, 0 disabled pixels, and 0 runtime Vulkan validation errors. Vulkan teardown diagnostics remain.
+- Refresh the pinned source audit: 705 geometry fragments accepted / 12 rejected across 75 records and 5,178 stages. Remaining Sildur rejections need pack-specific `LightC`; selected Complementary profiles still need the unsupported `shadowcomp.csh` compute stage. No complete third-party pack visuals are validated.
+
 ## 0.2.0-beta.21 - 2026-10-20 (prerelease)
 
 - Prune cloud vertex helper functions that are unreachable from shaderpack `main()`, while preserving rejection of unsupported helpers that remain reachable.

@@ -4,12 +4,22 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Current status: beta.21 published as experimental prerelease; stable goal incomplete - 2026-10-20
+## Current status: beta.22 release candidate; publication pending; stable goal incomplete - 2026-10-20
 
 - Latest release: [Veyra 0.2.0-beta.21+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.21%2Bmc1.21.11), an experimental prerelease at annotated tag `v0.2.0-beta.21+mc1.21.11`. Release-prep PR [#47](https://github.com/glebKovshov/Veyra/pull/47) merged at `9d9821cc1fdfbbe6e5bd1baf3b5147b6c23605d6`.
 - Release workflow [39427536453](https://github.com/glebKovshov/Veyra/actions/runs/39427536453) passed on attempt 2: pinned source audit, **21/21** Lavapipe fixtures, release build, distributable verification, and publication. Tag Build [39427536475](https://github.com/glebKovshov/Veyra/actions/runs/39427536475) also passed. The first attempt hit a runner-side 403 from the Microsoft package feed during Vulkan setup; the one affected fixture passed on rerun.
 - Downloaded beta.21 JAR: **614,256 bytes**, SHA-256 `754588737164b4fbe9a5ac025bf1aeef4635bc6a9008c999c6f27fc93632cb1f`. Its hash matches published `SHA256SUMS.txt`; `scripts/verify_jar.py` confirms Minecraft 1.21.11, VulkanMod 0.6.8, and mod `0.2.0-beta.21+mc1.21.11`. The release also contains sources and example-pack archives.
 - The published beta.21 audit checkpoint covered 4 packs / 75 cases / 5,178 stages: **693 accepted / 24 rejected** geometry fragments. The branch-level refresh below supersedes those source metrics; all audit records still have `visualValidation=false`.
+
+## Beta.22 candidate progress - 2026-10-20
+
+- Verified the live repository at `main` / `origin/main`, merge commit `bc253f51ece852688b5b26b59b877effea7ff091`. PR [#51](https://github.com/glebKovshov/Veyra/pull/51) is merged; GitHub currently has no open PRs. No remote branch contains commits ahead of `origin/main`. The published release is still beta.21; beta.22 tag does not exist yet.
+- PR #51 adds up to six auxiliary `colortex1..15` color samplers to supported water and entity-family geometry. When a sampled target is also a draw attachment, the active pass ends and Veyra copies the current image to a separate sampled snapshot, preserving the source as a writable output. A same-framebuffer render-pass resume bug was fixed. This documented snapshot model is not a claim of identical Iris same-image feedback scheduling.
+- PR #51 final head passed Build [39437938448](https://github.com/glebKovshov/Veyra/actions/runs/39437938448), source audit [39437938433](https://github.com/glebKovshov/Veyra/actions/runs/39437938433), and Graphics smoke [39437939525](https://github.com/glebKovshov/Veyra/actions/runs/39437939525): **22/22** Lavapipe fixtures. Entity feedback read back **18,648 active magenta pixels**, 0 disabled pixels, and 0 runtime Vulkan validation errors; shutdown diagnostics remain.
+- Current pinned audit: 4 archives / 75 default-profile-dimension records / 5,178 preprocessed stages; **705 accepted / 12 rejected** geometry fragments. All rows have `visualValidation=false`. The 12 failures are Sildur `LightC` in four translucent geometry programs across three dimensions; Veyra does not compile those pack-specific geometry vertex stages. Selected Complementary `shadowcomp.csh` compute remains unsupported.
+- Forced JDK 21 `build validateShaders packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passed on the beta.22 candidate: **243 tests, 0 failures/errors/skips**, 53 example shaders preprocessed, and 50 compiled to Vulkan SPIR-V. The example-pack ZIP contains all five `entity-colortex-feedback` files.
+- `scripts/verify_jar.py` passed on the exact local `veyra-0.2.0-beta.22+mc1.21.11.jar`: **617,151 bytes**, SHA-256 `4fe98bd26c0d7127dee7b3f43141024766e8cc33e75bf51f94f36e4fe7b90950`. This is a local release candidate; the published asset still needs tag-workflow verification.
+- Beta.22 candidate publication and exact tagged artifact verification are pending. Stable release remains incomplete: no third-party pack has been visually validated, no physical-GPU results are available, and Vulkan teardown diagnostics persist.
 
 ## Merged Complementary spriteBounds bridge — PR #50 — 2026-10-20
 
