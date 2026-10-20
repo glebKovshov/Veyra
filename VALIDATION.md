@@ -1,5 +1,17 @@
 # Veyra 0.2 validation status
 
+## Beta.15 experimental prerelease — 2026-10-20
+
+Published [Veyra 0.2.0-beta.15+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.15%2Bmc1.21.11) from annotated tag `v0.2.0-beta.15+mc1.21.11` at commit `b3b6d0e0d46efb62a22e3769509f785e6961481e`. Release workflow [39382531868](https://github.com/glebKovshov/Veyra/actions/runs/39382531868) passed all source, graphics, build, and publication jobs.
+
+Tag Build run [39382531862](https://github.com/glebKovshov/Veyra/actions/runs/39382531862) passed with **226 tests, 0 failures, 0 errors, and 0 skipped**, `validateShaders`, build, and JAR verification. The source-audit artifact [12246036591](https://github.com/glebKovshov/Veyra/actions/runs/39382531868/artifacts/12246036591) covers 75 cases, 4 pinned packs, and 5,178 stages: 432 geometry fragments accepted / 285 rejected. All records have `visualValidation=false`.
+
+All 19 Lavapipe fixtures passed. Terrain-ID readback was 223,462 active magenta pixels / 0 disabled; water-ID was 226,902 / 0. Both had 0 runtime validation errors before shutdown; teardown still emitted 10,031 and 10,050 validation diagnostics respectively. These are synthetic fixtures, not real shaderpack visuals.
+
+Downloaded release asset `veyra-0.2.0-beta.15+mc1.21.11.jar`: **590,815 bytes**, SHA-256 `179a299d6b2c3d436e675fb022f4618a7dee74318deb07a2e36315eb9a49341d`. It matches `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.15+mc1.21.11. The sources JAR and example-packs ZIP are also published.
+
+No physical-GPU or third-party shaderpack visual result is claimed. Beta.15 is experimental; clean Vulkan teardown and the stable-release goal remain unresolved.
+
 ## Beta.14 experimental prerelease — 2026-10-20
 
 Published [Veyra 0.2.0-beta.14+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.14%2Bmc1.21.11) from annotated tag `v0.2.0-beta.14+mc1.21.11` at commit `8aae40b333f47ebfef2929bb5100f7a689ee1f9f`. Release workflow [39375080267](https://github.com/glebKovshov/Veyra/actions/runs/39375080267) passed its pinned source audit, all 17 Lavapipe fixtures, `build validateShaders packageExamplePacks`, distributable verification, and publication.
