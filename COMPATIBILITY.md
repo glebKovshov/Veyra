@@ -10,11 +10,13 @@ The PR head passed Build [39437938448](https://github.com/glebKovshov/Veyra/acti
 
 The pinned audit covers 4 archives, 75 default/profile/dimension records, and 5,178 preprocessed stages: **705 accepted / 12 rejected** geometry fragments. Every record has `visualValidation: false`. The 12 rejections are four Sildur programs repeated across three dimensions; they require its pack-specific `LightC` varying. Selected Complementary profiles still require the unsupported `shadowcomp.csh` compute stage. No complete third-party pack or physical GPU has been visually validated.
 
+The audit checks fragment-source adaptation; it does not establish that a complete pack can run. In the current audit, all 75 default/profile/dimension records report a non-empty `capabilityError`; the first blocker is an active non-cloud `gbuffers_*.vsh` stage. Veyra rejects these during capability validation because the terrain and entity paths still use VulkanMod's built-in vertex shaders. This prevents those pack vertex programs from being silently ignored. The existing cloud and fullscreen post vertex adapters remain available; general geometry vertex-stage execution is still unsupported. These pack-level capability errors are separate from the 12 fragment-adapter rejections above.
+
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | Selected profiles: unsupported `shadowcomp.csh` compute stage | Not tested |
-| BSL 10.1.8 | 9/9, 9/9, 9/9 | No default geometry-fragment source blocker in the pinned audit | Full pack not tested |
-| Sildur's Vibrant 2.02 Extreme | 3/15, 3/15, 3/15 | `LightC` in four translucent geometry programs | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | Active non-cloud `gbuffers_*.vsh` stages are unsupported; selected profiles also need `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | Active non-cloud `gbuffers_*.vsh` stages are unsupported; no default geometry-fragment source blocker in the pinned audit | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 3/15, 3/15, 3/15 | Active non-cloud `gbuffers_*.vsh` stages are unsupported; `LightC` also needs its pack-specific vertex result | Not tested |
 
 ## Beta.21 experimental prerelease - published (2026-10-20)
 
