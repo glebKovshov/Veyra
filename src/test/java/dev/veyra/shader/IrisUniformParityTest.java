@@ -96,11 +96,15 @@ class IrisUniformParityTest {
         assertTrue(terrain.contains("    int heightLimit;"));
         assertTrue(terrain.contains("    vec3 sunPosition;"));
         assertTrue(terrain.contains("    float timeAngle;"));
+        assertTrue(terrain.contains("    mat4 textureMatrix;"));
+        assertFalse(terrain.contains("uniform mat4 textureMatrix;"));
 
         ShaderPackUniformAdapter.AdaptedShader entity = ShaderPackUniformAdapter.extract(
-                "uniform vec3 shadowLightPosition;\nuniform bool isRightHanded;\nvoid main(){}\n", "gbuffers_entities");
+                "uniform vec3 shadowLightPosition;\nuniform bool isRightHanded;\n"
+                        + "uniform mat4 textureMatrix;\nvoid main(){}\n", "gbuffers_entities");
         assertTrue(entity.fields().contains(new ShaderPackUniformAdapter.UniformField("vec3", "shadowLightPosition")));
         assertTrue(entity.fields().contains(new ShaderPackUniformAdapter.UniformField("int", "veyra_isRightHanded")));
+        assertTrue(entity.fields().contains(new ShaderPackUniformAdapter.UniformField("mat4", "textureMatrix")));
 
         // A pack override of a hardcoded custom uniform keeps a single block member.
         CustomUniforms.activate(CustomUniforms.parse("uniform.float.timeAngle=worldTime / 24000.0\n"));

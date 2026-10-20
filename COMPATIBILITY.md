@@ -1,5 +1,11 @@
 # Shaderpack compatibility: Veyra 0.2.0-beta.16 prerelease
 
+## Unreleased terrain-midpoint source candidate (post-beta.16)
+
+The local audit of the current `feature/terrain-midcoord-input` source, using the same four SHA-512-pinned archives, covered 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepted **528** geometry fragment programs and rejected **189**; every record still has `visualValidation: false`. These numbers describe this unmerged source candidate, not the published beta.16 JAR.
+
+The candidate adds the flat `midCoord` terrain input and applies VulkanMod's current texture matrix to the midpoint and terrain UV before deriving `signMidCoordPos` and `absMidCoordPos`. Complementary Reimagined and Unbound r5.9.3 now accept **8/10** default geometry fragments in Overworld, Nether, and End, up from 7/10. Their remaining default blockers are unsupported translucent block/entity inputs; selected profiles still require the unimplemented `shadowcomp.csh` compute stage. BSL remains at 6/9 and Sildur's Vibrant at 0/5. No third-party pack has been visually validated, and the candidate's PR graphics checks are pending.
+
 ## Pinned source audit (beta.16 prerelease)
 
 The release audit [#39387855512](https://github.com/glebKovshov/Veyra/actions/runs/39387855512), artifact [12248416739](https://github.com/glebKovshov/Veyra/actions/runs/39387855512/artifacts/12248416739), covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **486** geometry fragment programs and rejects **231**; every case has `visualValidation: false`. This is a source compatibility check, not proof of a complete shaderpack pipeline or rendered output.
