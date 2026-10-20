@@ -446,6 +446,34 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void mapsLegacyFogMembersToMinecraftFogBlock() throws IOException {
+        IrisFogUniformAdapter.AdaptedShader adapted = IrisFogUniformAdapter.extract("""
+                // An unused legacy field in a comment must not block adaptation: gl_Fog.density
+                vec4 oldFogColor = gl_Fog.color;
+                float fogStart = gl_Fog.start;
+                float fogEnd = gl_Fog.end;
+                float fogScale = gl_Fog.scale;
+                """, "gbuffers_entities");
+
+        assertFalse(ShaderSource.maskBlockAndLineComments(adapted.source()).contains("gl_Fog"));
+        assertTrue(adapted.source().contains("vec4 oldFogColor = FogColor;"));
+        assertTrue(adapted.source().contains("float fogStart = FogEnvironmentalStart;"));
+        assertTrue(adapted.source().contains("float fogEnd = FogEnvironmentalEnd;"));
+        assertTrue(adapted.source().contains("1.0 / (FogEnvironmentalEnd - FogEnvironmentalStart)"));
+        assertTrue(adapted.bridge().contains("layout(std140) uniform Fog"));
+        assertTrue(adapted.bridge().contains("float FogEnvironmentalStart;"));
+        assertTrue(adapted.bridge().contains("float FogEnvironmentalEnd;"));
+        assertTrue(adapted.fields().isEmpty());
+    }
+
+    @Test
+    void rejectsLegacyFogDensityWithoutAValidatedRuntimeValue() {
+        IOException error = assertThrows(IOException.class, () -> IrisFogUniformAdapter.extract(
+                "float density = gl_Fog.density;", "gbuffers_entities"));
+        assertTrue(error.getMessage().contains("gl_Fog.density"), error.getMessage());
+    }
+
+    @Test
     void adaptsIrisShadowFadeUniformForTerrainAndPostPrograms() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 #version 120
