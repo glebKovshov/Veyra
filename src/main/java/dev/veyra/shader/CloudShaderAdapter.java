@@ -37,7 +37,9 @@ public final class CloudShaderAdapter {
     private static final Set<String> SCENE_COLOR_SAMPLERS = Set.of("colortex0", "gcolor", "Sampler0", "InSampler");
     private static final Set<String> SUPPORTED_TEXTURE_FUNCTIONS = Set.of(
             "texture", "texture2D", "textureLod", "texture2DLod", "textureSize");
+    private static final String CLOUD_SCENE_SAMPLER_NAME = "VeyraCloudSceneSampler";
     private static final String NOISE_SAMPLER = "noisetex";
+    private static final int DEFAULT_FIRST_IMAGE_BINDING = 2;
     private static final Pattern UNSUPPORTED_CLOUD_INPUT = Pattern.compile(
             "(?i)\\b(?:coord0|lmcoord|lightmap|mc_Entity|gl_Fog\\w*)\\b");
     private static final Pattern CLOUD_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
@@ -291,6 +293,15 @@ public final class CloudShaderAdapter {
     public static AdaptedFragment adapt(String source,
                                         List<ShaderPackUniformAdapter.UniformField> additionalUniformFields)
             throws IOException {
+        return adapt(source, additionalUniformFields, DEFAULT_FIRST_IMAGE_BINDING);
+    }
+
+    public static AdaptedFragment adapt(String source,
+                                        List<ShaderPackUniformAdapter.UniformField> additionalUniformFields,
+                                        int firstImageBinding) throws IOException {
+        if (firstImageBinding < 0) {
+            throw new IllegalArgumentException("The first cloud image binding must not be negative.");
+        }
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
@@ -307,6 +318,17 @@ public final class CloudShaderAdapter {
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, "gbuffers_clouds");
         adapted = shaderPackUniforms.source();
+        Map<String, Integer> samplerBindings = new java.util.LinkedHashMap<>();
+        int nextImageBinding = firstImageBinding;
+        if (!sceneColorInput.sceneColorSamplers().isEmpty()) {
+            samplerBindings.put(CLOUD_SCENE_SAMPLER_NAME, nextImageBinding++);
+        }
+        if (sceneColorInput.usesNoiseSampler()) {
+            samplerBindings.put(VeyraNoiseTexture.SAMPLER_NAME, nextImageBinding++);
+        }
+        if (sceneColorInput.usesCloudTexture()) {
+            samplerBindings.put(VeyraCloudTexture.SAMPLER_NAME, nextImageBinding);
+        }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_CLOUD_INPUT.matcher(uncommented).find()) {
@@ -400,17 +422,20 @@ public final class CloudShaderAdapter {
                     .append("#define ").append(name).append(' ').append(inputName).append('\n');
         }
         if (!sceneColorInput.sceneColorSamplers().isEmpty()) {
-            result.append("layout(binding = 2) uniform sampler2D VeyraCloudSceneSampler;\n");
+            result.append("layout(binding = ").append(samplerBindings.get(CLOUD_SCENE_SAMPLER_NAME))
+                    .append(") uniform sampler2D ").append(CLOUD_SCENE_SAMPLER_NAME).append(";\n");
             for (String sampler : sceneColorInput.sceneColorSamplers()) {
                 result.append("#define ").append(sampler).append(" VeyraCloudSceneSampler\n");
             }
         }
         if (sceneColorInput.usesNoiseSampler()) {
-            result.append("layout(binding = 3) uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
+            result.append("layout(binding = ").append(samplerBindings.get(VeyraNoiseTexture.SAMPLER_NAME))
+                    .append(") uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
                     .append("#define ").append(NOISE_SAMPLER).append(' ').append(VeyraNoiseTexture.SAMPLER_NAME).append('\n');
         }
         if (sceneColorInput.usesCloudTexture()) {
-            result.append("layout(binding = 4) uniform sampler2D ").append(VeyraCloudTexture.SAMPLER_NAME).append(";\n");
+            result.append("layout(binding = ").append(samplerBindings.get(VeyraCloudTexture.SAMPLER_NAME))
+                    .append(") uniform sampler2D ").append(VeyraCloudTexture.SAMPLER_NAME).append(";\n");
             adapted = replaceSamplerArgument(adapted, "texture", VeyraCloudTexture.SAMPLER_NAME);
         }
         adapted = adapted.replaceAll("\\btexture2DLod\\b", "textureLod");
@@ -446,7 +471,7 @@ public final class CloudShaderAdapter {
         result.append(shaderPackUniforms.macros());
         return new AdaptedFragment(result.append(adapted).toString(), List.copyOf(uniformFields.values()),
                 !sceneColorInput.sceneColorSamplers().isEmpty(), sceneColorInput.usesNoiseSampler(),
-                sceneColorInput.usesCloudTexture(), Set.copyOf(varyings));
+                sceneColorInput.usesCloudTexture(), Set.copyOf(varyings), Map.copyOf(samplerBindings));
     }
 
     private static String replaceSamplerArgument(String source, String sampler, String replacement) {
@@ -500,7 +525,8 @@ public final class CloudShaderAdapter {
 
     public record AdaptedFragment(String source, List<ShaderPackUniformAdapter.UniformField> uniformFields,
                                   boolean usesSceneColorSampler, boolean usesNoiseSampler,
-                                  boolean usesCloudTexture, Set<String> varyings) {
+                                  boolean usesCloudTexture, Set<String> varyings,
+                                  Map<String, Integer> samplerBindings) {
     }
 
     public record AdaptedVertex(String source, List<ShaderPackUniformAdapter.UniformField> uniformFields,

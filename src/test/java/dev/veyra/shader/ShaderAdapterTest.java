@@ -391,7 +391,7 @@ class ShaderAdapterTest {
 
         assertFalse(adapted.usesSceneColorSampler());
         assertTrue(adapted.usesNoiseSampler());
-        assertTrue(adapted.source().contains("layout(binding = 3) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(adapted.source().contains("layout(binding = 2) uniform sampler2D VeyraNoiseSampler;"));
         assertTrue(adapted.source().contains("#define noisetex VeyraNoiseSampler"));
         assertTrue(adapted.source().contains("texture(noisetex, vec2(0.5))"));
         assertFalse(adapted.source().contains("uniform sampler2D noisetex;"));
@@ -408,6 +408,28 @@ class ShaderAdapterTest {
         assertTrue(adapted.usesNoiseSampler());
         assertTrue(adapted.source().contains("textureLod(noisetex, vec2(0.5), 0.0)"));
         assertFalse(adapted.source().contains("texture2DLod("));
+    }
+
+    @Test
+    void assignsContiguousBindingsToActiveCloudSamplers() throws IOException {
+        CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D colortex0;
+                uniform sampler2D noisetex;
+                uniform sampler2D texture;
+                void main() {
+                    vec2 uv = vec2(0.5);
+                    gl_FragColor = texture2D(colortex0, uv)
+                            + texture2D(noisetex, uv) + texture2D(texture, uv);
+                }
+                """);
+
+        assertTrue(adapted.source().contains("layout(binding = 2) uniform sampler2D VeyraCloudSceneSampler;"));
+        assertTrue(adapted.source().contains("layout(binding = 3) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(adapted.source().contains("layout(binding = 4) uniform sampler2D VeyraCloudTextureSampler;"));
+        assertEquals(2, adapted.samplerBindings().get("VeyraCloudSceneSampler"));
+        assertEquals(3, adapted.samplerBindings().get("VeyraNoiseSampler"));
+        assertEquals(4, adapted.samplerBindings().get("VeyraCloudTextureSampler"));
     }
 
     @Test
@@ -514,7 +536,7 @@ class ShaderAdapterTest {
         assertTrue(vertex.source().contains("uniform mat4 textureMatrix;")
                 || vertex.uniformFields().stream().anyMatch(field -> field.name().equals("textureMatrix")));
         assertTrue(fragment.usesCloudTexture());
-        assertTrue(fragment.source().contains("layout(binding = 4) uniform sampler2D VeyraCloudTextureSampler;"));
+        assertTrue(fragment.source().contains("layout(binding = 2) uniform sampler2D VeyraCloudTextureSampler;"));
         assertTrue(fragment.source().contains("texture(VeyraCloudTextureSampler, texCoord)"));
         assertTrue(fragment.source().contains("layout(location = 6) in vec3 veyraCloudEastVec;"));
         assertTrue(fragment.uniformFields().containsAll(vertex.uniformFields()));

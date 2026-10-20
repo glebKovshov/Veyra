@@ -3615,9 +3615,12 @@ public final class VeyraRenderer {
         }
         String source = pack.readCloudFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_clouds.fsh."));
+        PipelineConfig config = PipelineConfig.fromJson("clouds", ShaderLoadUtil.getJsonConfig(shaderPath, "clouds"));
+        int firstImageBinding = firstCloudImageBinding(config);
         List<ShaderPackUniformAdapter.UniformField> vertexUniformFields = adaptedVertex == null
                 ? List.of() : adaptedVertex.uniformFields();
-        CloudShaderAdapter.AdaptedFragment adaptedFragment = CloudShaderAdapter.adapt(source, vertexUniformFields);
+        CloudShaderAdapter.AdaptedFragment adaptedFragment = CloudShaderAdapter.adapt(
+                source, vertexUniformFields, firstImageBinding);
         for (String varyingName : adaptedFragment.varyings()) {
             if (CloudShaderAdapter.isExtendedVarying(varyingName)
                     && (adaptedVertex == null || !adaptedVertex.varyings().contains(varyingName))) {
@@ -3633,7 +3636,6 @@ public final class VeyraRenderer {
             VeyraCloudTexture.ensure();
         }
         String fragmentSource = adaptedFragment.source();
-        PipelineConfig config = PipelineConfig.fromJson("clouds", ShaderLoadUtil.getJsonConfig(shaderPath, "clouds"));
         if (!adaptedFragment.uniformFields().isEmpty()) {
             vertexSource = addCloudUniformFields(vertexSource, adaptedFragment.uniformFields());
             config = addCloudUniformBufferFields(config, adaptedFragment.uniformFields());
@@ -3642,28 +3644,31 @@ public final class VeyraRenderer {
                 || adaptedFragment.usesCloudTexture()) {
             List<PipelineConfig.ImageDescriptorInfo> descriptors = new ArrayList<>(config.imageDescriptors);
             if (adaptedFragment.usesSceneColorSampler()) {
-                if (descriptors.stream().anyMatch(descriptor -> descriptor.binding() == 2
+                int binding = adaptedFragment.samplerBindings().get(CLOUD_SCENE_SAMPLER_NAME);
+                if (descriptors.stream().anyMatch(descriptor -> descriptor.binding() == binding
                         || descriptor.name().equals(CLOUD_SCENE_SAMPLER_NAME))) {
                     throw new IOException("VulkanMod's cloud pipeline already uses the scene-color descriptor binding.");
                 }
                 descriptors.add(new PipelineConfig.ImageDescriptorInfo(
-                        2, "sampler2D", CLOUD_SCENE_SAMPLER_NAME, CLOUD_SCENE_TEXTURE_SLOT));
+                        binding, "sampler2D", CLOUD_SCENE_SAMPLER_NAME, CLOUD_SCENE_TEXTURE_SLOT));
             }
             if (adaptedFragment.usesNoiseSampler()) {
-                if (descriptors.stream().anyMatch(descriptor -> descriptor.binding() == 3
+                int binding = adaptedFragment.samplerBindings().get(VeyraNoiseTexture.SAMPLER_NAME);
+                if (descriptors.stream().anyMatch(descriptor -> descriptor.binding() == binding
                         || descriptor.name().equals(VeyraNoiseTexture.SAMPLER_NAME))) {
                     throw new IOException("VulkanMod's cloud pipeline already uses the noise texture descriptor binding.");
                 }
                 descriptors.add(new PipelineConfig.ImageDescriptorInfo(
-                        3, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4));
+                        binding, "sampler2D", VeyraNoiseTexture.SAMPLER_NAME, 4));
             }
             if (adaptedFragment.usesCloudTexture()) {
-                if (descriptors.stream().anyMatch(descriptor -> descriptor.binding() == 4
+                int binding = adaptedFragment.samplerBindings().get(VeyraCloudTexture.SAMPLER_NAME);
+                if (descriptors.stream().anyMatch(descriptor -> descriptor.binding() == binding
                         || descriptor.name().equals(VeyraCloudTexture.SAMPLER_NAME))) {
                     throw new IOException("VulkanMod's cloud pipeline already uses the cloud-texture descriptor binding.");
                 }
                 descriptors.add(new PipelineConfig.ImageDescriptorInfo(
-                        4, "sampler2D", VeyraCloudTexture.SAMPLER_NAME, 5));
+                        binding, "sampler2D", VeyraCloudTexture.SAMPLER_NAME, 5));
             }
             config = new PipelineConfig(config.shaderPaths, config.ubs, descriptors, config.pushConstantsInfo);
         }
@@ -3683,6 +3688,31 @@ public final class VeyraRenderer {
             ubo.setUseGlobalBuffer(true);
         }
         return pipeline;
+    }
+
+    /** VulkanMod allocates descriptor-layout slots by descriptor count, then indexes them by binding. */
+    private static int firstCloudImageBinding(PipelineConfig config) throws IOException {
+        int descriptorCount = config.ubs.size() + config.imageDescriptors.size();
+        Set<Integer> bindings = new HashSet<>();
+        for (PipelineConfig.UB uniformBuffer : config.ubs) {
+            if (!bindings.add(uniformBuffer.binding)) {
+                throw new IOException("VulkanMod's cloud pipeline declares duplicate descriptor bindings.");
+            }
+        }
+        for (PipelineConfig.ImageDescriptorInfo descriptor : config.imageDescriptors) {
+            if (!bindings.add(descriptor.binding())) {
+                throw new IOException("VulkanMod's cloud pipeline declares duplicate descriptor bindings.");
+            }
+        }
+        if (bindings.size() != descriptorCount) {
+            throw new IOException("VulkanMod's cloud pipeline has an incomplete descriptor binding layout.");
+        }
+        for (int binding = 0; binding < descriptorCount; binding++) {
+            if (!bindings.contains(binding)) {
+                throw new IOException("VulkanMod's cloud pipeline has a non-contiguous descriptor binding layout.");
+            }
+        }
+        return descriptorCount;
     }
 
     private static String addCloudUniformFields(
