@@ -24,6 +24,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import dev.veyra.VeyraClient;
 import dev.veyra.vulkan.VeyraPipelineResources;
 import dev.veyra.vulkan.VeyraGeometryTargets;
+import dev.veyra.vulkan.VeyraDeviceFeatures;
 import dev.veyra.mixin.accessor.MinecraftAccessor;
 import dev.veyra.mixin.accessor.PostPassAccessor;
 import dev.veyra.mixin.accessor.RenderSetupAccessor;
