@@ -16,7 +16,7 @@ public class ShaderCompileSmoke {
         try {
             try (var files = Files.walk(Path.of("examples"))) {
                 for (Path path : files.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().matches(
-                        "gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|clouds)\\.fsh")).sorted().toList()) {
+                        "gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|hand|clouds)\\.fsh")).sorted().toList()) {
                     String name = path.getFileName().toString();
                     String source = ShaderIncludes.expand(name, Files.readString(path), included -> {
                         Path file = path.getParent().resolve(included);
@@ -27,7 +27,9 @@ public class ShaderCompileSmoke {
                     CustomUniforms.activate(Files.exists(properties)
                             ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                     String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
-                            : name.startsWith("gbuffers_entities") ? EntityShaderAdapter.adaptFragment(source, name.substring(0, name.length()-4), false, Files.exists(path.getParent().resolve("shadow.fsh")))
+                            : name.startsWith("gbuffers_entities") || name.equals("gbuffers_hand.fsh")
+                            ? EntityShaderAdapter.adaptFragment(source, name.substring(0, name.length()-4),
+                            name.equals("gbuffers_hand.fsh"), Files.exists(path.getParent().resolve("shadow.fsh")))
                             : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);

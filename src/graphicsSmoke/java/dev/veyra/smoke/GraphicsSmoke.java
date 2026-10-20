@@ -58,31 +58,14 @@ public final class GraphicsSmoke {
                 server.execute(() -> {
                     try {
                         if (currentRenderedItemFixture) {
-                            // Wait until the local player has finished joining before using its
-                            // position. Keep both items near the center of the fixed 45-degree view.
-                            double frontX = -Math.sqrt(0.5) * 4.0;
-                            double frontZ = Math.sqrt(0.5) * 4.0;
-                            double sideX = Math.sqrt(0.5) * 0.65;
-                            double sideZ = Math.sqrt(0.5) * 0.65;
-                            double itemY = playerY + 0.5;
-                            var diamond = new net.minecraft.world.entity.item.ItemEntity(server.overworld(),
-                                    playerX + frontX - sideX, itemY, playerZ + frontZ - sideZ,
+                            var player = server.getPlayerList().getPlayer(client.player.getUUID());
+                            if (player == null) throw new IllegalStateException("Could not find the smoke-test player");
+                            player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
                                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND));
-                            diamond.setNoGravity(true);
-                            diamond.setNeverPickUp();
-                            if (!server.overworld().addFreshEntity(diamond))
-                                throw new IllegalStateException("Could not add the diamond item fixture entity");
-                            var stone = new net.minecraft.world.entity.item.ItemEntity(server.overworld(),
-                                    playerX + frontX + sideX, itemY, playerZ + frontZ + sideZ,
+                            player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND,
                                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STONE));
-                            stone.setNoGravity(true);
-                            stone.setNeverPickUp();
-                            if (!server.overworld().addFreshEntity(stone))
-                                throw new IllegalStateException("Could not add the stone item fixture entity");
                             LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                                    "Spawned currentRenderedItemId fixture items at diamond=({}, {}, {}), stone=({}, {}, {})",
-                                    diamond.getX(), diamond.getY(), diamond.getZ(),
-                                    stone.getX(), stone.getY(), stone.getZ());
+                                    "Equipped currentRenderedItemId fixture items: diamond mainhand, stone offhand");
                         } else {
                             var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                             if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
@@ -95,7 +78,7 @@ public final class GraphicsSmoke {
                 });
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
-            client.options.hideGui = true;
+            client.options.hideGui = !currentRenderedItemFixture;
             client.player.setXRot(entityFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
