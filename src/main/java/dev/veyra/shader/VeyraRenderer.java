@@ -2498,7 +2498,6 @@ public final class VeyraRenderer {
             EntityIdMap.activate(pack.readEntityIds());
             BlockIdMap nextBlockIds = pack.readBlockIds();
             boolean blockMappingsChanged = !previousBlockIds.sameMappings(nextBlockIds);
-            BlockIdMap.activate(nextBlockIds);
             registerCustomUniforms();
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
@@ -2552,6 +2551,7 @@ public final class VeyraRenderer {
                 preparedClouds = compileCloudPipeline(pack);
             }
             repository.select(pack);
+            BlockIdMap.activate(nextBlockIds);
             VeyraShadowRenderer.configure(preparedShadowSettings);
             boolean terrainRebuilt = updateTerrainLayerMode(pack);
             if (blockMappingsChanged && !terrainRebuilt) rebuildTerrainSections();
