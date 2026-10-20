@@ -65,7 +65,7 @@ public final class VeyraGeometryTargets {
             dev.veyra.shader.VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline);
         }
         VeyraNoiseTexture.bind(pipeline);
-        if (layout != null || pipeline.name.startsWith("veyra_shadow_"))
+        if (terrain || pipeline.name.startsWith("veyra_shadow_"))
             VeyraSpecularTextures.bindTerrain(pipeline);
         if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
         Renderer renderer = Renderer.getInstance();
