@@ -30,11 +30,12 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture;
+            glintMrtFixture, basicVertexFixture, beaconBeamFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
-            disabledBasicMrtPixels;
+            disabledBasicMrtPixels, activeBeaconBeamGreenPixels, disabledBeaconBeamGreenPixels,
+            activeBeaconBeamMrtPixels, disabledBeaconBeamMrtPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -65,11 +66,12 @@ public final class GraphicsSmoke {
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
             basicVertexFixture = fixture.equals("basic-vertex-execution");
+            beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
             boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture;
-            if (entityFixture && !entityFixtureStarted && worldTicks >= 20
+            if ((entityFixture || beaconBeamFixture) && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();
@@ -78,7 +80,16 @@ public final class GraphicsSmoke {
                 double playerX = client.player.getX(), playerY = client.player.getY(), playerZ = client.player.getZ();
                 server.execute(() -> {
                     try {
-                        if (itemFixture) {
+                        if (beaconBeamFixture) {
+                            var beacon = net.minecraft.core.BlockPos.containing(playerX - 4.0, playerY, playerZ + 4.0);
+                            for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++) {
+                                server.overworld().setBlock(beacon.below().offset(x, 0, z),
+                                        net.minecraft.world.level.block.Blocks.IRON_BLOCK.defaultBlockState(), 3);
+                            }
+                            server.overworld().setBlock(beacon,
+                                    net.minecraft.world.level.block.Blocks.BEACON.defaultBlockState(), 3);
+                            LoggerFactory.getLogger("veyra-graphics-smoke").info("Placed a complete beacon pyramid at {}", beacon);
+                        } else if (itemFixture) {
                             var player = server.getPlayerList().getPlayer(client.player.getUUID());
                             if (player == null) throw new IllegalStateException("Could not find the smoke-test player");
                             player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
@@ -114,7 +125,7 @@ public final class GraphicsSmoke {
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
             client.options.hideGui = !itemFixture;
-            client.player.setXRot(entityFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
+            client.player.setXRot(entityFixture || beaconBeamFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
@@ -154,7 +165,7 @@ public final class GraphicsSmoke {
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
-                    && !glintMrtFixture && !basicVertexFixture
+                    && !glintMrtFixture && !basicVertexFixture && !beaconBeamFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -179,13 +190,13 @@ public final class GraphicsSmoke {
                 glintMrtReadback = new Buffer("Veyra glint MRT evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
                 glintMrtReadback.createBuffer((long) width * height * 4);
             }
-            var basicMrtSource = basicVertexFixture && captureActive
+            var basicMrtSource = (basicVertexFixture || beaconBeamFixture) && captureActive
                     ? VeyraRenderer.geometryColorAttachment(6) : null;
             if (basicMrtSource != null) {
                 if (basicMrtSource.width != width || basicMrtSource.height != height
                         || basicMrtSource.format != VK_FORMAT_R8G8B8A8_UNORM
                         || (basicMrtSource.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
-                    throw new IllegalStateException("basic MRT colortex6 is not a readable RGBA8 transfer source");
+                    throw new IllegalStateException("geometry MRT colortex6 is not a readable RGBA8 transfer source");
                 }
                 basicMrtReadback = new Buffer("Veyra basic MRT evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
                 basicMrtReadback.createBuffer((long) width * height * 4);
@@ -299,7 +310,8 @@ public final class GraphicsSmoke {
                 }
             }
             if (basicMrtImage != null) {
-                basicMrtImage.writeToFile(output.resolve("basic-vertex-mrt-colortex6.png"));
+                basicMrtImage.writeToFile(output.resolve(beaconBeamFixture
+                        ? "beaconbeam-vertex-mrt-colortex6.png" : "basic-vertex-mrt-colortex6.png"));
                 for (int y = 0; y < basicMrtImage.getHeight(); y++) for (int x = 0; x < basicMrtImage.getWidth(); x++) {
                     int pixel = basicMrtImage.getPixel(x, y);
                     int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
@@ -311,7 +323,7 @@ public final class GraphicsSmoke {
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
-                if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture)
+                if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture || beaconBeamFixture)
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
@@ -330,6 +342,10 @@ public final class GraphicsSmoke {
                     activeGlintMrtPixels = glintMrtPixelCount;
                     activeBasicGreenPixels = renderedItemGreenCount;
                     activeBasicMrtPixels = basicMrtPixelCount;
+                    if (beaconBeamFixture) {
+                        activeBeaconBeamGreenPixels = renderedItemGreenCount;
+                        activeBeaconBeamMrtPixels = basicMrtPixelCount;
+                    }
                     if (glintMrtFixture) {
                         finish(client, activeGlintGreenPixels < 100 || activeGlintMrtPixels < 100
                                 ? new IllegalStateException("The glint MRT outputs were absent: scene green="
@@ -346,9 +362,21 @@ public final class GraphicsSmoke {
                     disabledGlintGreenPixels = renderedItemGreenCount;
                     disabledBasicGreenPixels = renderedItemGreenCount;
                     disabledBasicMrtPixels = basicMrtPixelCount;
+                    if (beaconBeamFixture) {
+                        disabledBeaconBeamGreenPixels = renderedItemGreenCount;
+                        disabledBeaconBeamMrtPixels = basicMrtPixelCount;
+                    }
                     int minPixels = currentRenderedItemFixture ? 100 : 2000;
                     Throwable failure;
-                    if (basicVertexFixture) {
+                    if (beaconBeamFixture) {
+                        failure = activeBeaconBeamGreenPixels < 100 || activeBeaconBeamMrtPixels < 100
+                                || disabledBeaconBeamGreenPixels * 4 >= activeBeaconBeamGreenPixels
+                                || disabledBeaconBeamMrtPixels * 4 >= activeBeaconBeamMrtPixels
+                                ? new IllegalStateException("The beacon vertex/MRT signal was absent or unchanged: scene active/disabled="
+                                + activeBeaconBeamGreenPixels + "/" + disabledBeaconBeamGreenPixels
+                                + ", colortex6 active/disabled=" + activeBeaconBeamMrtPixels + "/"
+                                + disabledBeaconBeamMrtPixels) : null;
+                    } else if (basicVertexFixture) {
                         failure = activeBasicGreenPixels < 100 || activeBasicMrtPixels < 100
                                 || disabledBasicGreenPixels * 4 >= activeBasicGreenPixels
                                 || disabledBasicMrtPixels * 4 >= activeBasicMrtPixels
@@ -399,6 +427,10 @@ public final class GraphicsSmoke {
                     + ",\"disabledBasicGreenPixels\":" + disabledBasicGreenPixels
                     + ",\"activeBasicMrtPixels\":" + activeBasicMrtPixels
                     + ",\"disabledBasicMrtPixels\":" + disabledBasicMrtPixels
+                    + ",\"activeBeaconBeamGreenPixels\":" + activeBeaconBeamGreenPixels
+                    + ",\"disabledBeaconBeamGreenPixels\":" + disabledBeaconBeamGreenPixels
+                    + ",\"activeBeaconBeamMrtPixels\":" + activeBeaconBeamMrtPixels
+                    + ",\"disabledBeaconBeamMrtPixels\":" + disabledBeaconBeamMrtPixels
                     + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);

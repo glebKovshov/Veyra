@@ -19,6 +19,7 @@ on:
       - 'examples/glint-vertex-execution/**'
       - 'examples/glint-mrt-outputs/**'
       - 'examples/basic-vertex-execution/**'
+      - 'examples/beaconbeam-vertex-execution/**'
       - 'examples/cloud-texture-inputs/**'
       - 'examples/cloud-model-view/**'
       - 'build.gradle'
@@ -44,6 +45,7 @@ on:
       - 'examples/glint-vertex-execution/**'
       - 'examples/glint-mrt-outputs/**'
       - 'examples/basic-vertex-execution/**'
+      - 'examples/beaconbeam-vertex-execution/**'
       - 'examples/cloud-texture-inputs/**'
       - 'examples/cloud-model-view/**'
       - 'scripts/prepare_graphics_smoke.py'
@@ -61,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, beaconbeam-vertex-execution, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
