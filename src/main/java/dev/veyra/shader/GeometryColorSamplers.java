@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-/** Auxiliary color inputs available at the translucent terrain boundary. */
+/** Auxiliary color inputs available to supported geometry programs. */
 public final class GeometryColorSamplers {
     public static final int FIRST_IMAGE_SLOT = 6;
     public static final int MAX_INPUTS = 6; // VulkanMod 0.6.8 has twelve indexed texture slots.
@@ -32,17 +32,12 @@ public final class GeometryColorSamplers {
             }
             if (index < 0) continue;
             if (index == 0 || index > 15)
-                throw new IOException("Water geometry can sample colortex1..15; scene color feedback requires a separate snapshot: " + name);
+                throw new IOException("Geometry can sample colortex1..15; scene color is not a geometry input: " + name);
             if (!matcher.group(1).equals("sampler2D")) throw new IOException(name + " must use sampler2D.");
             inputs.put(name, index);
         }
         Set<Integer> indices = indices(inputs);
-        if (indices.size() > MAX_INPUTS) throw new IOException("Water geometry exceeds VulkanMod's six auxiliary color sampler slots.");
-        FragmentOutputs outputs = FragmentOutputs.parse(source);
-        for (int index : indices) {
-            if (outputs.targets().contains(index))
-                throw new IOException("Water geometry samples colortex" + index + " while it is also a framebuffer attachment; image feedback is not supported.");
-        }
+        if (indices.size() > MAX_INPUTS) throw new IOException("Geometry exceeds VulkanMod's six auxiliary color sampler slots.");
         return Map.copyOf(inputs);
     }
 

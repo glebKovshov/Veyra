@@ -1,4 +1,8 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.21 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.21 published; current branch is unreleased
+
+## Current branch audit (unreleased, 2026-10-20)
+
+The merged `main` plus the current geometry colortex-input branch was audited locally against the same four pinned archives: 75 default/profile/dimension records and 5,178 preprocessed stages. The adapters accept **705** and reject **12** geometry fragment/configuration cases. This improves the beta.21 checkpoint's 693/24 by resolving the 12 Complementary terrain `spriteBounds` cases from PR [#50](https://github.com/glebKovshov/Veyra/pull/50). The 12 remaining adapter rejections are Sildur's `LightC` custom vertex varying in four translucent geometry fragments across three dimensions. The current branch adds water and entity-family colortex inputs with explicit Vulkan feedback snapshots, but Sildur's fragments still reject at `LightC`; its default acceptance remains 3/15. Complementary `shadowcomp.csh` in selected profiles remains unsupported. Every audit row has `visualValidation: false`. The new bridge has passed local build/tests and shader compilation; Vulkan runtime smoke is pending CI. No third-party shaderpack visual or physical-GPU result is claimed.
 
 ## Beta.21 experimental prerelease - published (2026-10-20)
 

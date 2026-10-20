@@ -76,7 +76,8 @@ public final class VeyraGeometryTargets {
         }
         if (!(bound instanceof VeyraMrtFramebuffer)) scene = bound;
         if (scene == null) throw new IllegalStateException("Geometry color targets require an active scene render pass.");
-        boolean endedForSampling = terrain && VeyraRenderer.prepareTerrainColorSamplers(pipeline);
+        boolean pipelineChanged = renderer.getBoundPipeline() != pipeline;
+        boolean endedForSampling = VeyraRenderer.prepareGeometryColorSamplers(pipeline, layout, pipelineChanged);
         if (layout.sceneOnly()) {
             if (bound instanceof VeyraMrtFramebuffer || endedForSampling) resumeScene(renderer);
             return;
@@ -103,7 +104,7 @@ public final class VeyraGeometryTargets {
     }
 
     private static void beginPreservingDynamicState(Renderer renderer, RenderPass pass, Framebuffer target) {
-        if (renderer.getBoundFramebuffer() == target) return;
+        if (renderer.getBoundFramebuffer() == target && renderer.getBoundRenderPass() == pass) return;
         // This runs after VkCommandEncoder has applied the draw's viewport/scissor. The normal
         // beginRenderPass API resets both to the full framebuffer and would erase that state.
         renderer.endRenderPass();

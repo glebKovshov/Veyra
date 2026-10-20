@@ -26,7 +26,7 @@ public final class GraphicsSmoke {
     private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, waterMaterialFixture,
-            entityMrtFixture, currentRenderedItemFixture;
+            entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels;
     private static volatile Throwable entityFixtureFailure;
@@ -52,10 +52,11 @@ public final class GraphicsSmoke {
             terrainMaterialFixture = fixture.equals("terrain-block-id");
             waterMaterialFixture = fixture.equals("water-block-id");
             entityMrtFixture = fixture.equals("entity-mrt");
+            entityColorFeedbackFixture = fixture.equals("entity-colortex-feedback");
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
-                    || entityMrtFixture;
+                    || entityColorFeedbackFixture || entityMrtFixture;
             if (entityFixture && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -124,11 +125,11 @@ public final class GraphicsSmoke {
             var source = renderer.getMainPass().getMainFramebuffer().getColorAttachment();
             if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
                 throw new IllegalStateException("Surface image does not support frame readback");
-            // These fixtures declare no auxiliary MRT target and validate their signals in the
-            // presented colortex0 image. Keep the existing colortex1 check for other fixtures.
+            // These fixtures validate their diagnostic signal in the presented colortex0 image.
+            // The entity feedback fixture also writes colortex4, but does not use it as its signal.
             var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
-                    && !currentRenderedItemFixture
+                    && !entityColorFeedbackFixture && !currentRenderedItemFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),

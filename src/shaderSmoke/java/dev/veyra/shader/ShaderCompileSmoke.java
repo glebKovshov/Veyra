@@ -28,8 +28,10 @@ public class ShaderCompileSmoke {
                             ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                     String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
                             : name.startsWith("gbuffers_entities") || name.equals("gbuffers_hand.fsh")
-                            ? EntityShaderAdapter.adaptFragment(source, name.substring(0, name.length()-4),
-                            name.equals("gbuffers_hand.fsh"), Files.exists(path.getParent().resolve("shadow.fsh")))
+                            ? EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
+                            name.equals("gbuffers_hand.fsh"), Files.exists(path.getParent().resolve("shadow.fsh")),
+                            -1, -1, ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
+                                    name.substring(0, name.length()-4)), false)
                             : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);
@@ -113,6 +115,18 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_entities");
             compile(compiler, options, entityLegacyMrt, "entity-legacy-multiple-render-targets", true);
+            String entityColorFeedback = EntityShaderAdapter.adaptGeometryFragment("""
+                    #version 120
+                    /* RENDERTARGETS:0,4 */
+                    uniform sampler2D colortex4;
+                    void main() {
+                        vec4 previous = texture2D(colortex4, vec2(0.5));
+                        gl_FragData[0] = previous;
+                        gl_FragData[1] = previous;
+                    }
+                    """, "gbuffers_entities", false, false, -1, -1,
+                    ItemIdMap.UNMAPPED, true, false);
+            compile(compiler, options, entityColorFeedback, "entity-colortex-feedback-snapshot", true);
             Path mainHandFixture = Path.of("examples/current-rendered-item-id/shaders/gbuffers_hand.fsh");
             String mainHandPackSource = GlslPreprocessor.process(
                     mainHandFixture.getFileName().toString(), Files.readString(mainHandFixture));

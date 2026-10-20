@@ -162,7 +162,16 @@ public final class EntityShaderAdapter {
                                 int currentRenderedItemId, boolean entityColorAvailable,
                                 boolean isMainHand) throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
-                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand);
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, false);
+    }
+
+    /** Adapts a geometry shader that samples auxiliary colortex buffers through Vulkan snapshots. */
+    public static String adaptGeometryFragment(String source, String programName, boolean handPass,
+                                               boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                               int currentRenderedItemId, boolean entityColorAvailable,
+                                               boolean isMainHand) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, true);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -489,14 +498,14 @@ public final class EntityShaderAdapter {
                                         int entityId, int blockEntityId,
                                         int currentRenderedItemId, boolean entityColorAvailable) throws IOException {
         return adaptFragment(source, programName, textPipeline, handPass, shadowSamplerAvailable,
-                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, false);
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, false, false);
     }
 
     private static String adaptFragment(String source, String programName, boolean textPipeline,
                                         boolean handPass, boolean shadowSamplerAvailable,
                                         int entityId, int blockEntityId,
                                         int currentRenderedItemId, boolean entityColorAvailable,
-                                        boolean isMainHand) throws IOException {
+                                        boolean isMainHand, boolean geometryColorInputsAvailable) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -519,9 +528,12 @@ public final class EntityShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        Map<String, Integer> geometryColorInputs = geometryColorInputsAvailable
+                ? GeometryColorSamplers.read(source) : Map.of();
         boolean usesShadowSampler = usesShadowSampler(adapted);
-        ShadowColorSampler.validate(source, shadowSamplerAvailable, 0);
-        ShadowDepthSampler.validate(source, shadowSamplerAvailable, 0);
+        int geometryColorInputCount = GeometryColorSamplers.indices(geometryColorInputs).size();
+        ShadowColorSampler.validate(source, shadowSamplerAvailable, geometryColorInputCount);
+        ShadowDepthSampler.validate(source, shadowSamplerAvailable, geometryColorInputCount);
         if (usesShadowSampler && !shadowSamplerAvailable) {
             throw new IOException(programName + " samples shadowtex0, but this shader pack has no supported shadow pass.");
         }
@@ -533,6 +545,7 @@ public final class EntityShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
+                    && !geometryColorInputs.containsKey(sampler)
                     && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
@@ -815,6 +828,15 @@ public final class EntityShaderAdapter {
         if (ShadowColorSampler.used(source)) {
             bridge = "uniform sampler2D " + ShadowColorSampler.NAME + ";\n#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
         }
+        StringBuilder geometryColorBridge = new StringBuilder();
+        for (int index : GeometryColorSamplers.indices(geometryColorInputs)) {
+            geometryColorBridge.append("uniform sampler2D ")
+                    .append(GeometryColorSamplers.samplerName(index)).append(";\n");
+        }
+        geometryColorInputs.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(input ->
+                geometryColorBridge.append("#define ").append(input.getKey()).append(' ')
+                        .append(GeometryColorSamplers.samplerName(input.getValue())).append('\n'));
+        bridge = geometryColorBridge + bridge;
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
