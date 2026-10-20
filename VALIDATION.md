@@ -1,4 +1,14 @@
-# 0.2 development validation status
+# Veyra 0.2 validation status
+
+## Beta.14 candidate checks — 2026-10-20
+
+PR #23 merged into main as 590d38b2de93761e1146fea5f2b1e06b00fba8d3 from checked head 38a4089504cdedbc2be9ba0964aa6991394cd5cb. Its Build run [39373977134](https://github.com/glebKovshov/Veyra/actions/runs/39373977134) passed build, shader validation, and distributable verification; JUnit reports contain **220 tests, 0 failures, 0 errors, and 0 skipped**. It processed 48 example shaders and compiled 45 directly to Vulkan SPIR-V.
+
+Graphics run [39373977059](https://github.com/glebKovshov/Veyra/actions/runs/39373977059) passed all 17 Lavapipe fixtures. Entity MRT read back 18,532 active magenta pixels through `colortex1`; specular-entity read back 18,293. Runtime Vulkan validation errors were 0. Process teardown still emitted 10,035 validation diagnostics.
+
+Pinned source audit run [39373977114](https://github.com/glebKovshov/Veyra/actions/runs/39373977114) passed for 4 packs, 12 default cases, 63 declared-profile/dimension cases, and 5,178 stages: 486 geometry fragments accepted / 231 rejected. All 75 records have `visualValidation=false`. This is source compatibility evidence; the four packs remain not visually validated in-game.
+
+These are PR checks before the release version bump. The beta.14 tag workflow must rebuild and verify the final-version JAR before publication; no beta.14 artifact is published yet.
 
 ## Beta.13 experimental release — 2026-10-20
 

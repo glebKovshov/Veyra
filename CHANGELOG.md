@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.14 - 2026-10-20 (prerelease)
+
+- Add native multiple color attachments for supported entity, first-person hand, block-entity, and sign-text geometry, retaining explicit and legacy output mappings.
+- Preserve entity-specific specular material binding while registering entity-family MRT pipelines.
+- Adapt entity output declarations for VulkanMod 0.6.8's GLSL parser and add Lavapipe readback coverage through colortex1.
+- Refresh the pinned source audit: 486 geometry fragments accepted and 231 rejected across 75 cases / 5,178 preprocessed stages. No third-party pack is visually validated.
+
 ## 0.2.0-beta.13 - 2026-10-20 (prerelease)
 
 - Add Iris `isMainHand` specialization for first-person hand fragments, with separate cached main-hand and offhand pipeline variants.

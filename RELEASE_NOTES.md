@@ -1,31 +1,33 @@
-# Veyra 0.2.0-beta.13+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.14+mc1.21.11 - experimental prerelease
 
-This experimental prerelease adds limited Iris first-person hand compatibility. It does not claim full Iris parity, stable-release readiness, or that third-party shaderpacks render correctly.
+This experimental prerelease extends Veyra's native Vulkan multiple-render-target path to selected entity geometry. It does not claim full Iris parity, stable-release readiness, or correct rendering of complete third-party shaderpacks.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, Java 21 or newer.
-- Install `veyra-0.2.0-beta.13+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
+- Install `veyra-0.2.0-beta.14+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
 - Optional example packs can be extracted into `shaderpacks`. Press F6, select a pack, then use Configure / Apply for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
 
-## Changes since beta.12
+## Changes since beta.13
 
-- Accept Iris `varying float isMainHand` in first-person hand programs and select cached variants for the logical main hand (`1.0`) and offhand (`0.0`).
-- Split comma-separated legacy varying declarations and bridge BSL `sunVec` to Iris `sunPosition`, with `upVec` and `eastVec` derived from the current `gbufferModelView` axes.
-- Refresh the pinned source audit after these changes. BSL's default hand, entity, and block fragment programs now pass source adaptation; other BSL blockers remain.
+- Add native multiple render targets for supported entity, first-person hand, block-entity, and sign-text fragments, preserving explicit GLSL locations and legacy DRAWBUFFERS/RENDERTARGETS mappings.
+- Route entity-family pipeline layouts and blend settings through the existing Vulkan output path, allocate referenced scene-sized targets, and unregister retired pipeline metadata.
+- Preserve entity-specific specular texture binding; terrain atlas binding now applies only to terrain and shadow pipelines.
+- Work around VulkanMod 0.6.8's layout-token parser by expanding output declarations from one-line macros in the GLSL compiler.
+- Add unit, shaderc, and Lavapipe `entity-mrt` readback coverage.
 
 ## Validation
 
-- For checked code head `092c611e5a445f3fd958d7db22f5889e2622d9f0`, GitHub Build run [39368301651](https://github.com/glebKovshov/Veyra/actions/runs/39368301651) passed `build validateShaders`: 214 JUnit tests, 0 failures, 0 errors, and 0 skipped; 47 example shaders preprocessed and 44 compiled directly to Vulkan SPIR-V. The BSL-style hand direction fixture compiled to SPIR-V.
-- Graphics smoke run [39368301683](https://github.com/glebKovshov/Veyra/actions/runs/39368301683) passed all 16 Lavapipe fixtures. The synthetic hand/item fixture rendered 32,321 main-hand magenta pixels for item ID 42 and 14,102 offhand green pixels for item ID 43; both signals were 0 with shaders disabled. Runtime Vulkan validation errors were 0. Process shutdown still emitted 10,036 device-destruction diagnostics.
-- Pinned source audit run [39368301649](https://github.com/glebKovshov/Veyra/actions/runs/39368301649) passed across 4 packs, 12 default cases, 63 declared-profile/dimension cases, and 5,178 preprocessed stages: 234 geometry fragments accepted and 483 rejected. Every record has `visualValidation=false`.
-- The tag release workflow reruns the pinned audit, graphics suite, build/tests, and distributable verifier before publication. Synthetic fixtures do not establish third-party pack appearance or physical-GPU compatibility.
+- On checked code head 38a4089504cdedbc2be9ba0964aa6991394cd5cb, Build run [39373977134](https://github.com/glebKovshov/Veyra/actions/runs/39373977134) passed `build validateShaders` and distributable verification. The uploaded JUnit reports contain 220 tests, 0 failures, 0 errors, and 0 skipped; 48 example shaders were processed and 45 compiled directly to Vulkan SPIR-V.
+- Graphics smoke run [39373977059](https://github.com/glebKovshov/Veyra/actions/runs/39373977059) passed all 17 Lavapipe fixtures. The entity MRT fixture read back 18,532 active magenta pixels through `colortex1`; specular-entity read back 18,293. Runtime Vulkan validation errors were 0. Process teardown still emitted 10,035 validation diagnostics.
+- Pinned source audit run [39373977114](https://github.com/glebKovshov/Veyra/actions/runs/39373977114) passed across 4 pinned packs, 12 default cases, 63 declared-profile/dimension cases, and 5,178 preprocessed stages: 486 geometry fragments accepted and 231 rejected. Every record has `visualValidation=false`.
+- The tag release workflow repeats source audit, graphics smoke, build/tests, and distributable verification before publishing. Synthetic fixtures do not establish third-party pack appearance or physical-GPU compatibility.
 
 ## Known limits
 
-- Complementary Reimagined and Unbound still need outputs beyond color attachment 0 in block/entity/hand programs, unsupported inputs for translucent programs, `viewVector` in water, and compute execution in selected profiles.
-- BSL 10.1.8 accepts 5/9 default geometry fragments in each tested dimension. Its water `mat`, active cloud `texture` sampler, and glowing/translucent entity outputs beyond attachment 0 remain unsupported.
-- Sildur's still requires `colortex4` inputs, attachment-feedback behavior, and cloud inputs VulkanMod does not provide.
-- Iris armor-trim and cape IDs, general non-terrain MRT, compute/tessellation, physical-GPU validation, third-party-pack visual validation, and full Iris parity remain incomplete.
+- Complementary Reimagined and Unbound accept 7/10 default geometry fragments in each tested dimension. Translucent block/entity inputs, water `viewVector`, and active `shadowcomp.csh` compute programs in selected profiles remain unsupported.
+- BSL 10.1.8 accepts 7/9 default geometry fragments in each tested dimension. Its water `mat` input and active cloud `texture` sampler remain unsupported.
+- Sildur's Vibrant 2.02 Extreme accepts 0/5 default geometry fragments; `colortex4` inputs, attachment feedback, and cloud inputs remain unsupported.
+- General entity-family output compatibility, other geometry MRT, compute/tessellation, physical-GPU testing, third-party-pack visual validation, and full Iris parity remain incomplete.
 
-Unsupported active features are diagnosed rather than rendered with invented values. See `COMPATIBILITY.md` and `VALIDATION.md` for the pinned source results and current scope.
+Unsupported active features are diagnosed instead of silently filled with invented values. See `COMPATIBILITY.md` and `VALIDATION.md` for source-audit details and verification scope.
