@@ -1,3 +1,9 @@
+## Beta.25 cloud crash — исправление проверено на точном Loader (2026-10-21)
+
+- Лог пользователя указывает на `Mixin transformation of net.vulkanmod.render.sky.CloudRenderer failed`: `veyra$selectCloudVertexFormat` не нашёл целевой вызов (`0/1`), потому что `@At(INVOKE)` для `Tesselator.begin` в опубликованном beta.25 содержал `remap=false`. В PR #65 снят этот внутренний флаг; внешний `@ModifyArg(remap=false)` сохранён.
+- Исправление уже в `main` через PR #65 (`c43122a`). Дополнительная проверка на точной конфигурации пользователя: Minecraft 1.21.11, Fabric Loader 0.19.5, Fabric API 0.141.6+1.21.11, VulkanMod 0.6.8, RTX 3070. Клиент загрузил `gbuffers_clouds`, smoke получил кадры с паком и без него; активный сигнал — 52,276 пикселей, выключенный — 0. В логе нет `CloudRenderer`/Mixin injection failure.
+- PR #66 (beacon vertex/MRT batch) прошёл GitHub Actions: Build, Graphics smoke и pinned source audit. PR пока не слит; beta.25 release asset не менялся. Локальный beta.25-metadata JAR с исправлением и beacon batch: `build/local-candidates/veyra-0.2.0-beta.25+mc1.21.11-beacon-preview.jar`, SHA-256 `28abd0bbe39f5b18620df9c8a8265047fefa18db486a15ae8881166ae8592549`. Это тестовый кандидат, не опубликованный релиз.
+- Следующий шаг: слить PR #66 и продолжить крупный batch custom VSH для block/entity/hand и оставшиеся подтверждённые shaderpack blockers перед новым prerelease.
 # Veyra — передача контекста разработки
 
 ## Beacon vertex/MRT candidate — локальная проверка пройдена (2026-10-21)
