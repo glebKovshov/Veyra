@@ -4672,13 +4672,33 @@ public final class VeyraRenderer {
 
     private static RenderPipeline compileColorDistancePipeline(
             RenderPipeline original, String programName, String fragmentSource, String sourceHash) throws IOException {
+        return compileColorDistancePipeline(original, programName, fragmentSource, sourceHash, null);
+    }
+
+    private static RenderPipeline compileColorDistancePipeline(
+            RenderPipeline original, String programName, String fragmentSource, String sourceHash,
+            String customVertexSource) throws IOException {
+        return compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                customVertexSource, false);
+    }
+
+    private static RenderPipeline compileColorDistancePipeline(
+            RenderPipeline original, String programName, String fragmentSource, String sourceHash,
+            String customVertexSource, boolean usesNoiseSampler) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/color_distance/" + sourceHash);
-        RenderPipeline pipeline = copyPipelineWithFragment(original, fragmentShader);
+        Identifier customVertexShader = customVertexSource == null ? null
+                : Identifier.fromNamespaceAndPath("veyra", "shaderpack/color_distance_vertex/" + sourceHash);
+        RenderPipeline pipeline = customVertexShader == null
+                ? copyPipelineWithFragment(original, fragmentShader)
+                : copyPipelineWithShaders(original, customVertexShader, fragmentShader, usesNoiseSampler);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
                 return fragmentSource;
+            }
+            if (customVertexShader != null && identifier.equals(customVertexShader) && type == ShaderType.VERTEX) {
+                return customVertexSource;
             }
             return shaderManager.getShader(identifier, type);
         };
@@ -4687,6 +4707,16 @@ public final class VeyraRenderer {
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected " + programName + " shader.");
+        }
+        if (usesNoiseSampler) {
+            var nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
+            var descriptor = nativePipeline == null ? null
+                    : nativePipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME);
+            if (descriptor == null) {
+                throw new IOException("VulkanMod did not expose the " + VeyraNoiseTexture.SAMPLER_NAME
+                        + " descriptor for " + original.getLocation() + ".");
+            }
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         return pipeline;
     }
@@ -4698,24 +4728,44 @@ public final class VeyraRenderer {
         String source = pack.readGlintFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_armor_glint.fsh."));
         String programName = pack.hasGlintFragment() ? "gbuffers_armor_glint" : "gbuffers_textured";
-        String fragmentSource;
-        try {
-            fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(source, programName, false);
-        } catch (IOException exception) {
-            if (pack.hasGlintFragment()) {
-                throw exception;
-            }
-            VeyraClient.LOGGER.debug("Skipping the gbuffers_textured armor-glint fallback: {}", exception.getMessage());
-            return new GlintPipelineSet(Map.of());
-        }
-        String sourceHash = sha256(programName + '\n' + fragmentSource);
+        Optional<String> packVertexSource = pack.hasGlintFragment()
+                ? pack.readStage("gbuffers_armor_glint.vsh") : Optional.empty();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
+            String fragmentSource;
+            String adaptedVertexSource = null;
+            boolean usesNoiseSampler = false;
+            try {
+                if (packVertexSource.isPresent()) {
+                    ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+                    String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    GlintVertexShaderAdapter.AdaptedStage adaptedVertex = GlintVertexShaderAdapter.adaptStage(
+                            minecraftVertex, packVertexSource.get(), "gbuffers_armor_glint");
+                    adaptedVertexSource = adaptedVertex.source();
+                    usesNoiseSampler = adaptedVertex.usesNoiseSampler();
+                    if (usesNoiseSampler) {
+                        VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    }
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(source, programName,
+                            adaptedVertex.outputsColor(), true,
+                            adaptedVertex.colorInterpolation() == null ? "smooth" : adaptedVertex.colorInterpolation(),
+                            adaptedVertex.texCoordInterpolation(), true);
+                } else {
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(source, programName, false);
+                }
+            } catch (IOException exception) {
+                if (pack.hasGlintFragment()) throw exception;
+                VeyraClient.LOGGER.debug("Skipping the gbuffers_textured armor-glint fallback: {}", exception.getMessage());
+                return new GlintPipelineSet(Map.of());
+            }
+            String sourceHash = sha256(programName + '\n' + (adaptedVertexSource == null ? "" : adaptedVertexSource)
+                    + '\n' + fragmentSource);
             GlintPipelineKey cacheKey = new GlintPipelineKey(original, sourceHash);
             RenderPipeline replacement = GLINT_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
                 replacement = compileColorDistancePipeline(
-                        original, programName, fragmentSource, sourceHash);
+                        original, programName, fragmentSource, sourceHash, adaptedVertexSource,
+                        usesNoiseSampler);
                 GLINT_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);

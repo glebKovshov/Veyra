@@ -4,7 +4,6 @@ import dev.veyra.vulkan.VeyraNoiseTexture;
 import dev.veyra.vulkan.VeyraCloudTexture;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,9 +50,6 @@ public final class CloudShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:attribute|in)\\b[^\\r\\n]*;?");
     private static final Pattern UNSUPPORTED_CLOUD_VERTEX_INPUT = Pattern.compile(
             "(?i)\\b(?:coord0|lmcoord|lightmap|mc_Entity|gl_MultiTexCoord(?!0)\\w*|gl_TextureMatrix(?!\\s*\\[\\s*0\\s*\\])|gl_ProjectionMatrix|gl_Fog\\w*|gl_VertexID|gl_InstanceID)\\b");
-    private static final Pattern FUNCTION_DEFINITION = Pattern.compile(
-            "(?m)^[\\t ]*(?:[A-Za-z_][A-Za-z0-9_]*[\\t ]+)+([A-Za-z_][A-Za-z0-9_]*)[\\t ]*\\([^;{}]*\\)[\\t ]*\\{");
-    private static final Pattern FUNCTION_CALL = Pattern.compile("\\b([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
     private static final Pattern VERTEX_MAIN_FUNCTION = Pattern.compile(
             "\\bvoid\\s+main\\s*\\(\\s*\\)\\s*\\{");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
@@ -313,61 +309,7 @@ public final class CloudShaderAdapter {
 
     /** Prunes stage-agnostic helper functions that the cloud vertex entrypoint cannot reach. */
     private static String removeUnreachableCloudFunctions(String source) {
-        String uncommented = maskComments(source);
-        Matcher matcher = FUNCTION_DEFINITION.matcher(uncommented);
-        Map<String, List<FunctionBody>> functions = new java.util.LinkedHashMap<>();
-        while (matcher.find()) {
-            int openingBrace = uncommented.indexOf('{', matcher.start());
-            int closingBrace = matchingBrace(uncommented, openingBrace);
-            if (closingBrace >= 0) {
-                FunctionBody function = new FunctionBody(matcher.group(1), matcher.start(), openingBrace, closingBrace + 1);
-                functions.computeIfAbsent(function.name(), ignored -> new ArrayList<>()).add(function);
-            }
-        }
-        if (functions.isEmpty()) return source;
-
-        Set<String> reachable = new LinkedHashSet<>();
-        ArrayDeque<String> pending = new ArrayDeque<>();
-        pending.add("main");
-        while (!pending.isEmpty()) {
-            String name = pending.removeFirst();
-            if (!reachable.add(name)) continue;
-            for (FunctionBody function : functions.getOrDefault(name, List.of())) {
-                Matcher calls = FUNCTION_CALL.matcher(uncommented.substring(function.bodyStart() + 1,
-                        function.end() - 1));
-                while (calls.find()) {
-                    String callee = calls.group(1);
-                    if (functions.containsKey(callee) && !reachable.contains(callee)) pending.addLast(callee);
-                }
-            }
-        }
-
-        List<FunctionBody> unreachable = functions.values().stream().flatMap(List::stream)
-                .filter(function -> !reachable.contains(function.name()))
-                .sorted(java.util.Comparator.comparingInt(FunctionBody::start)).toList();
-        if (unreachable.isEmpty()) return source;
-        StringBuilder result = new StringBuilder(source.length());
-        int copiedThrough = 0;
-        for (FunctionBody function : unreachable) {
-            result.append(source, copiedThrough, function.start());
-            for (int index = function.start(); index < function.end(); index++) {
-                char character = source.charAt(index);
-                result.append(character == '\r' || character == '\n' ? character : ' ');
-            }
-            copiedThrough = function.end();
-        }
-        return result.append(source, copiedThrough, source.length()).toString();
-    }
-
-    private static int matchingBrace(String source, int openingBrace) {
-        if (openingBrace < 0) return -1;
-        int depth = 0;
-        for (int index = openingBrace; index < source.length(); index++) {
-            char character = source.charAt(index);
-            if (character == '{') depth++;
-            else if (character == '}' && --depth == 0) return index;
-        }
-        return -1;
+        return UnreachableGlslFunctions.removeUnreachable(source, "main");
     }
 
     private static String maskComments(String source) {
@@ -638,8 +580,5 @@ public final class CloudShaderAdapter {
     }
 
     private record MainFunction(int start, int bodyStart, int bodyEnd) {
-    }
-
-    private record FunctionBody(String name, int start, int bodyStart, int end) {
     }
 }

@@ -18,9 +18,12 @@ public final class TextureColorDistanceShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?"
+                    + "(?:(flat|smooth|noperspective)\\s+)?(?:varying|in)\\s+"
+                    + "(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|in)\\b[^\\r\\n]*;?");
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?(?:varying|in)\\b[^\\r\\n]*;?");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
@@ -61,6 +64,14 @@ public final class TextureColorDistanceShaderAdapter {
 
     public static String adaptFragment(String source, String programName,
                                        boolean hasVertexColor, boolean hasVertexDistances) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                "smooth", "smooth", false);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                boolean hasVertexColor, boolean hasVertexDistances,
+                                String vertexColorInterpolation, String texCoordInterpolation,
+                                boolean explicitVertexLocations) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -68,7 +79,13 @@ public final class TextureColorDistanceShaderAdapter {
             throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
-        String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
+        String adapted = GlslPreprocessor.process(programName + ".fsh", source.replace("\uFEFF", ""));
+        adapted = UnreachableGlslFunctions.removeUnreachable(adapted, "main");
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(adapted, programName);
+        adapted = fog.source();
+        adapted = UnusedUniformDeclarations.removeUnused(adapted);
+        adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
         while (extensionMatcher.find()) {
@@ -80,7 +97,8 @@ public final class TextureColorDistanceShaderAdapter {
         StringBuffer withoutSamplers = new StringBuffer();
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")) {
+            if (!sampler.equals("texture") && !sampler.equals("gtexture")
+                    && !sampler.equals("tex") && !sampler.equals("Sampler0")) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             if (!samplerMatcher.group(1).equals("sampler2D")) {
@@ -100,8 +118,10 @@ public final class TextureColorDistanceShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
         while (varyingMatcher.find()) {
-            String type = varyingMatcher.group(2);
-            String name = varyingMatcher.group(3);
+            String type = varyingMatcher.group(4);
+            String name = varyingMatcher.group(5);
+            String interpolation = mergeInterpolation(varyingMatcher.group(2), varyingMatcher.group(3),
+                    programName, name);
             String expectedType = INPUT_TYPES.get(name);
             if (expectedType == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's texture-distance bridge yet.");
@@ -115,6 +135,31 @@ public final class TextureColorDistanceShaderAdapter {
             }
             if (!expectedType.equals(type)) {
                 throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
+            }
+            if (COLOR_INPUTS.contains(name)) {
+                if (explicitVertexLocations && !interpolation.equals(vertexColorInterpolation)) {
+                    throw new IOException(programName + " input '" + name
+                            + "' interpolation does not match its vertex-stage output.");
+                }
+            } else if (name.equals("texcoord") || name.equals("texCoord") || name.equals("texCoord0")) {
+                if (explicitVertexLocations && !interpolation.equals(texCoordInterpolation)) {
+                    throw new IOException(programName + " input '" + name
+                            + "' interpolation does not match its vertex-stage output.");
+                }
+            } else if (explicitVertexLocations && !interpolation.equals("smooth")) {
+                throw new IOException(programName + " input '" + name + "' must use smooth interpolation.");
+            }
+            if (explicitVertexLocations && varyingMatcher.group(1) != null) {
+                Integer expectedLocation = switch (name) {
+                    case "color", "glcolor", "glColor", "gl_Color", "vertexColor" -> 0;
+                    case "texcoord", "texCoord", "texCoord0" -> 1;
+                    case "sphericalVertexDistance" -> 2;
+                    case "cylindricalVertexDistance" -> 3;
+                    default -> null;
+                };
+                if (expectedLocation == null || Integer.parseInt(varyingMatcher.group(1)) != expectedLocation) {
+                    throw new IOException(programName + " input '" + name + "' declares a location that does not match Minecraft's glint vertex interface.");
+                }
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
@@ -170,15 +215,25 @@ public final class TextureColorDistanceShaderAdapter {
                 .replaceAll("\\btexcoord\\b|\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
 
-        String distanceInputs = hasVertexDistances ? """
+        String distanceInputs = hasVertexDistances ? explicitVertexLocations ? """
+                layout(location = 2) in float sphericalVertexDistance;
+                layout(location = 3) in float cylindricalVertexDistance;
+                """ : """
                 in float sphericalVertexDistance;
                 in float cylindricalVertexDistance;
                 """ : "";
-        String colorInput = hasVertexColor ? "in vec4 vertexColor;\n" : "";
+        String colorInput = hasVertexColor ? explicitVertexLocations
+                ? "layout(location = 0) " + vertexColorInterpolation + " in vec4 vertexColor;\n"
+                : "in vec4 vertexColor;\n" : "";
+        String texCoordInput = explicitVertexLocations
+                ? "layout(location = 1) " + texCoordInterpolation + " in vec2 texCoord0;\n"
+                : "in vec2 texCoord0;\n";
+        String output = explicitVertexLocations
+                ? "layout(location = 0) out vec4 " + outputName + ";\n"
+                : "out vec4 " + outputName + ";\n";
         String bridge = """
                 %s%s
-                in vec2 texCoord0;
-                out vec4 %s;
+                %s%s
                 uniform sampler2D Sampler0;
                 vec4 veyraTextureSample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
@@ -191,15 +246,25 @@ public final class TextureColorDistanceShaderAdapter {
                 }
                 #define texture Sampler0
                 #define gtexture Sampler0
-                """.formatted(distanceInputs, colorInput, outputName);
+                #define tex Sampler0
+                """.formatted(distanceInputs, colorInput, texCoordInput, output);
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
         }
         result.append(bridge);
+        result.append(fog.bridge());
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
         return result.append(adapted).toString();
+    }
+
+    private static String mergeInterpolation(String first, String second, String programName, String name)
+            throws IOException {
+        if (first != null && second != null && !first.equals(second)) {
+            throw new IOException(programName + " input '" + name + "' has conflicting interpolation qualifiers.");
+        }
+        return first != null ? first : second != null ? second : "smooth";
     }
 
     private static void validateTargetComments(String source, String programName) throws IOException {

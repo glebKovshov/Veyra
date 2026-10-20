@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased compatibility batch
+
+- Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link it to the adapted glint fragment stage. Bridge supported legacy position/color/UV aliases, texture matrix inputs, Iris fog fields, and `noisetex`; reject unsupported vertex formats and interfaces.
+- Map the glint fragment sampler aliases `texture`, `gtexture`, and `tex` to Minecraft's `Sampler0`; prune unreachable helper functions and unused uniforms/samplers before capability checks.
+- Add direct adapter tests, Vulkan SPIR-V shaderc fixtures, an example shaderpack, and a Lavapipe enchanted-book fixture.
+- Keep `gbuffers_basic.vsh` capability-rejected where the native leash/line vertex formats omit required normal or UV/lightmap inputs. The pinned candidate audit accepts 705 and rejects 12 geometry fragments across 75 cases / 5,178 stages; Sildur attachment 4 and `LightC` remain unsupported. No full third-party pack visual validation is claimed.
+
 ## 0.2.0-beta.24 - 2026-10-20 (experimental prerelease)
 
 - Execute supported terrain `gbuffers_terrain`, `_solid`, `_cutout`, and `_water` vertex shaders after VulkanMod terrain setup. Bridge supported legacy terrain inputs, `noisetex`, and checked scalar/vector/matrix vertex-to-fragment varyings. Keep packed tangent layout compatible with VulkanMod 0.6.8 generic float attributes.
