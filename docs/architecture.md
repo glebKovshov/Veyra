@@ -1,4 +1,6 @@
-# Rendering architecture and remaining integration work
+# Architecture
+
+This document explains how Veyra maps Iris shader pack concepts onto VulkanMod and lists the work that remains for broad pack compatibility. For the user-facing feature list, see [Shader support](shader-support.md).
 
 The analysis used Iris commit `bff1e69cb6c5519d8745784aa9c8b92984de67e7`, VulkanMod commit `087ef24e58e5522dec5ccb44f279768786bfb6da`, and Veyra's existing Minecraft 1.21.11 code. This is a focused source audit, not a claim that every upstream path has been verified.
 
@@ -26,7 +28,7 @@ The material-path comparison additionally inspected Iris commit `0a1fcaae5509935
 
 Post shadow inputs are parsed by `PostShadowSamplers` and carried explicitly in each pipeline program. The frame graph borrows the existing completed depth0/depth1/color views; color aliases share one input, colors use linear/clamp and depths nearest/clamp. The combined descriptor budget includes mandatory InSampler and other depth/color/noise inputs. Modern comparison samplers and helper parameters retain float results; legacy shadow2D returns vec4. Post/vertex declaration scans use horizontal indentation, avoiding repeated scans across expanded blank-line regions.
 
-The post fixture exposed swapped usage/native-ID arguments in VeyraDepthTextureView's VkGpuTexture constructor call. Its alias wrapper could report ID zero or another unrelated numeric ID, leaving stale native table entries under normal encoder binding. The corrected constructor preserves source usage and registers the actual alias ID. The alias still detaches its borrowed image before deletion and retires the image view at the frame fence; it does not own the producer's image.
+`VeyraDepthTextureView` registers each borrowed alias under its own native ID and preserves the source image's usage. The alias detaches its borrowed image before deletion and retires the image view at the frame fence; it does not own the producer's image.
 
 ## Known gaps
 
@@ -45,9 +47,9 @@ Terrain shadowtex1 reserves native slot 10. Auxiliary water sampler assignment s
 | Textures/uniforms | Generated `noisetex`, depth/history, water opaque-depth and auxiliary-color sampling, completed shadow color and separate pre-translucent shadow depth, static resource-pack specular maps, shared frame uniforms; unused samplers removed | Normal/animated material maps, auxiliary-color inputs in other geometry bridges, attachment feedback, wider shadow/depth samplers, custom texture/image units and expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
 | Pack properties | Options, target/shadow settings, program conditions | Full state/property semantics, feature flags, custom images/SSBOs |
-| Runtime verification | Full build, unit tests, CPU shaderc/source audits; 17 Lavapipe synthetic fixtures pass, including terrain MRT, tangent-space inputs, water depth/colors, static specular atlas/entity, shadow inputs and a four-phase post shadow chain | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
+| Runtime verification | Full build, unit tests, CPU shaderc/source audits, and synthetic Lavapipe fixtures; see [Validation](validation.md) | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
 
-The 17 synthetic client fixtures report no runtime validation errors before world shutdown. Process teardown still reports child-object diagnostics; the latest beta.14 and PR #26 runs each recorded 10,031 diagnostics. Exact results are retained in VALIDATION.md and CI artifacts. Ownership is not identified, so process-wide cleanup is not yet validated. The broader shader-pack pipeline, third-party visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
+The synthetic client fixtures report no runtime validation errors before world shutdown. Process teardown still reports child-object diagnostics whose ownership is not identified, so process-wide cleanup is not yet validated; see [Validation](validation.md#known-issue-teardown-diagnostics). Third-party visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
 
 ## Sources and licensing
 
@@ -56,4 +58,4 @@ The 17 synthetic client fixtures report no runtime validation errors before worl
 - [VulkanMod source](https://github.com/xCollateral/VulkanMod/tree/087ef24e58e5522dec5ccb44f279768786bfb6da/src/main/java/net/vulkanmod)
 - [Vulkan depth/stencil clear requirements](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdClearDepthStencilImage.html)
 
-Upstream Iris/VulkanMod code was inspected, not copied. Their LGPL licenses continue to apply to those projects. JCPP 1.4.14 is bundled under Apache-2.0; see THIRD_PARTY_NOTICES.md. External shaderpacks are not redistributed.
+Upstream Iris/VulkanMod code was inspected, not copied. Their LGPL licenses continue to apply to those projects. JCPP 1.4.14 is bundled under Apache-2.0; see [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). External shaderpacks are not redistributed.

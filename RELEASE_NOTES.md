@@ -12,7 +12,7 @@ This release reports active custom non-cloud geometry vertex stages as unsupport
 
 - Fail explicitly on an active non-cloud `gbuffers_*.vsh` stage when its matching fragment program is present. This avoids silently running VulkanMod's built-in vertex shader while implying the pack's vertex shader ran.
 - Disabled programs are not rejected. The existing cloud and fullscreen post vertex adapters remain supported.
-- PR #54 merged at `96ad2e8db8fe118cfa041fc13a070859f90ca88a`; Build, pinned source audit, and Graphics smoke passed on the PR head, including all 22 Lavapipe fixtures.
+- Merged in #54. Build, pinned source audit, and all 22 Lavapipe graphics fixtures passed.
 
 ## Validation
 
@@ -27,4 +27,4 @@ This release reports active custom non-cloud geometry vertex stages as unsupport
 - Sildur's Vibrant 2.02 Extreme has four translucent programs that need its pack-specific `LightC` varying from a custom vertex stage.
 - No complete third-party shaderpack visual validation or physical-GPU testing has been completed. Vulkan teardown diagnostics and the broader stable-release goal remain unresolved.
 
-See `COMPATIBILITY.md`, `ARCHITECTURE.md`, and `VALIDATION.md` for scope and measured results.
+See the [changelog](https://github.com/glebKovshov/Veyra/blob/main/CHANGELOG.md), [compatibility results](https://github.com/glebKovshov/Veyra/blob/main/docs/compatibility.md), and [validation status](https://github.com/glebKovshov/Veyra/blob/main/docs/validation.md) for details.
