@@ -16,6 +16,14 @@
 - Local shell has no JDK for a fresh Gradle invocation.
 - Final audit after PR #29: publication record merged at commit 837706b376db202f218d7c5b56bbb463671cbc80; post-merge Build [39383490768](https://github.com/glebKovshov/Veyra/actions/runs/39383490768) succeeded. At audit time, main matched origin/main with no unmerged branches or tracked diff. Existing untracked screenshots, assets, logs, GPU dumps, GOAL.md, scripts/analyze_vulkan_shutdown.py, and stash@{0} were preserved.
 
+## Continued work: Complementary terrain absolute midpoint — 2026-10-20
+
+- Terrain now carries the flat Iris `absMidCoordPos` value at a new varying location, computed from the existing per-quad midpoint and each vertex UV. The compressed vertex format and its stride are unchanged.
+- Build [#456](https://github.com/glebKovshov/Veyra/actions/runs/39385059735) passed **227 tests with 0 failures, 0 errors, and 0 skipped**, `validateShaders`, build, and JAR verification. Shaderc processed 50 examples and compiled 47 directly to Vulkan SPIR-V, including the new `absMidCoordPos` fixture.
+- Graphics smoke [#173](https://github.com/glebKovshov/Veyra/actions/runs/39385060028) passed **19/19 Lavapipe fixtures**. The updated terrain-midpoint fixture measured 56,288 active magenta / 167,037 opposite-region pixels, 0 disabled magenta pixels, and 0 runtime validation errors. Teardown diagnostics remain.
+- Source audit [#134](https://github.com/glebKovshov/Veyra/actions/runs/39385059792) passed 75 cases (12 defaults and 63 declared-profile cases) across 4 pinned packs / 3 dimensions: **486 geometry fragments accepted / 231 rejected**, up from beta.15's 432 / 285. These are source checks, not third-party visual validation.
+- Beta.15 remains the latest published release; this change is awaiting PR merge and release prep. Remaining source blockers, physical-GPU visuals, clean Vulkan teardown, and stable readiness are unproven.
+
 ## Continued work: terrain material IDs and beta.15 publication — 2026-10-20
 
 - PR [#27](https://github.com/glebKovshov/Veyra/pull/27) merged to `main` at `24ca7756fbef228fdf25ecede8a0f0e66772bec7`; checked head `85232d104a33bc8b9d8bada3012ef97c0063148b`. It adds per-vertex `block.properties` IDs and Iris `mc_Entity` render types, int/float `mat`, terrain rebuilds after mapping changes, selector parsing fixes, and original terrain/water examples and fixtures.

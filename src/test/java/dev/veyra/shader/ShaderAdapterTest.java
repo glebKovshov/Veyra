@@ -119,7 +119,10 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("layout (location = 5) in float VeyraTerrainRenderType;"));
         assertTrue(vertex.contains("layout (location = 11) out flat int veyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
-        assertTrue(vertex.contains("veyraSignMidCoordPos = sign(texCoord0 - veyraMidTexCoord);"));
+        assertTrue(vertex.contains("layout (location = 14) out flat vec2 veyraAbsMidCoordPos;"));
+        assertTrue(vertex.contains("const vec2 veyraMidCoordOffset = texCoord0 - veyraMidTexCoord;"));
+        assertTrue(vertex.contains("veyraSignMidCoordPos = sign(veyraMidCoordOffset);"));
+        assertTrue(vertex.contains("veyraAbsMidCoordPos = abs(veyraMidCoordOffset);"));
         assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
     }
 
@@ -160,6 +163,19 @@ class ShaderAdapterTest {
         assertTrue(adapted.contains("layout(location = 12) in vec2 veyraSignMidCoordPos;"));
         assertTrue(adapted.contains("#define signMidCoordPos veyraSignMidCoordPos"));
         assertFalse(adapted.contains("varying vec2 signMidCoordPos;"));
+    }
+
+    @Test
+    void bridgesComplementaryAbsoluteMidCoordPosFromTerrainUvCenters() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec2 absMidCoordPos;
+                void main() { gl_FragColor = vec4(absMidCoordPos, 0.0, 1.0); }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 14) flat in vec2 veyraAbsMidCoordPos;"));
+        assertTrue(adapted.contains("#define absMidCoordPos veyraAbsMidCoordPos"));
+        assertFalse(adapted.contains("varying vec2 absMidCoordPos;"));
     }
 
     @Test
