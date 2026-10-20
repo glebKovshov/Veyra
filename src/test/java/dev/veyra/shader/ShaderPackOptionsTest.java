@@ -124,6 +124,33 @@ class ShaderPackOptionsTest {
         Files.writeString(cloud.resolve("gbuffers_clouds.vsh"), "void main(){}\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(cloud.getParent()).validatePipelineCapabilities());
     }
+    @Test void glintVertexStagesExecuteWhenTheirFixedVaryingLinksAreSupported() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("glint/shaders"));
+        Files.writeString(shader.resolve("gbuffers_armor_glint.vsh"), """
+                #version 130
+                flat out vec4 glColor;
+                out vec2 texCoord;
+                void main() {
+                    gl_Position = ftransform();
+                    glColor = gl_Color;
+                    texCoord = gl_MultiTexCoord0.xy;
+                }
+                """);
+        Files.writeString(shader.resolve("gbuffers_armor_glint.fsh"), """
+                #version 130
+                flat in vec4 glColor;
+                in vec2 texCoord;
+                void main() { gl_FragColor = glColor; }
+                """);
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+
+        Path unsupported = Files.createDirectories(root.resolve("unsupported-geometry/shaders"));
+        Files.writeString(unsupported.resolve("gbuffers_entities.vsh"), "void main(){gl_Position=vec4(0.0);}\n");
+        Files.writeString(unsupported.resolve("gbuffers_entities.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        IOException error = assertThrows(IOException.class,
+                () -> ShaderPack.inspect(unsupported.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("gbuffers_entities.vsh"));
+    }
     @Test void requiredIrisFeaturesAreNotSilentlyIgnored() throws IOException {
         Path shader = Files.createDirectories(root.resolve("pack/shaders"));
         Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");

@@ -10,6 +10,14 @@ Downloaded published [`veyra-0.2.0-beta.24+mc1.21.11.jar`](https://github.com/gl
 
 The pinned source audit covers 4 archives / 75 default-profile-dimension cases / 5,178 stages: **705 geometry fragments accepted / 12 rejected**. All 75 whole-pack cases stop at the unsupported non-terrain `gbuffers_armor_glint.vsh`; all records have `visualValidation=false`. The 12 fragment rejections are Sildur `LightC` inputs. Selected Complementary profiles also require unsupported `shadowcomp.csh`. No full third-party shaderpack visual validation or physical-GPU validation has been completed. The terrain varying fixture measured 223,366 active pixels, 0 when shaders were disabled, and 0 runtime Vulkan validation errors; process teardown still reports 10,031 diagnostics.
 
+## Unreleased armor-glint vertex candidate (2026-10-20)
+
+On `feature/nonterrain-vertex-batch`, forced JDK 21 `test validateShaders compileGraphicsSmokeJava --rerun-tasks` and `build validateShaders packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passed: **263 tests, 0 failures/errors/skips**, 58 example shaders preprocessed, 56 directly compiled to Vulkan SPIR-V, and the graphics-smoke harness compiled. The CPU shaderc checks include custom armor-glint vertex/fragment stages and the Iris `tex` sampler alias.
+
+The local beta.24-metadata candidate JAR is 663,335 bytes, SHA-256 `ecd885fce1ffe23ee2e4df3754ea47b10c9cbd5f297e95c455c17d8c63378f18`; it passes `scripts/verify_jar.py` for Minecraft 1.21.11 / VulkanMod 0.6.8. The example-packs ZIP contains `glint-vertex-execution`. The JAR has not been version-bumped and is not a release asset.
+
+The fresh pinned source audit refreshed [`validation/shaderpack-source-audit.json`](validation/shaderpack-source-audit.json): 4 archives / 75 cases / 5,178 stages, **705 accepted / 12 rejected**, with `visualValidation=false` in every record. Complementary glint passes; `gbuffers_basic.vsh` remains the first blocker in 72 cases, Sildur attachment 4 blocks 3 cases, and 12 Sildur fragment cases require `LightC`. The Lavapipe glint fixture has been added to CI configuration but has not yet run on GitHub. No complete third-party shaderpack or physical-GPU visual validation is claimed.
+
 ## Beta.22 experimental prerelease - published (2026-10-20)
 
 PR [#51](https://github.com/glebKovshov/Veyra/pull/51) merged geometry color inputs and feedback snapshots at `bc253f51ece852688b5b26b59b877effea7ff091`. Release-prep PR [#52](https://github.com/glebKovshov/Veyra/pull/52) merged at `3fe7b508f687e76bb00130ca3c42ad838f3f941c`; annotated tag `v0.2.0-beta.22+mc1.21.11` points to that commit. Release workflow [39440625486](https://github.com/glebKovshov/Veyra/actions/runs/39440625486) passed the pinned source audit, **22/22** Lavapipe fixtures, release build/tests, distributable verification, and publication. Tag Build [39440625450](https://github.com/glebKovshov/Veyra/actions/runs/39440625450) also passed.

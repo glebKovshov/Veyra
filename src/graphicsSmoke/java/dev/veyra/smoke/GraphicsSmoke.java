@@ -27,9 +27,9 @@ public final class GraphicsSmoke {
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
-            entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture;
+            entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
-            disabledCurrentRenderedItemGreenPixels;
+            disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -57,7 +57,9 @@ public final class GraphicsSmoke {
             entityMrtFixture = fixture.equals("entity-mrt");
             entityColorFeedbackFixture = fixture.equals("entity-colortex-feedback");
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
-            boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
+            glintVertexFixture = fixture.equals("glint-vertex-execution");
+            boolean itemFixture = currentRenderedItemFixture || glintVertexFixture;
+            boolean entityFixture = itemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture;
             if (entityFixture && !entityFixtureStarted && worldTicks >= 20
@@ -69,15 +71,17 @@ public final class GraphicsSmoke {
                 double playerX = client.player.getX(), playerY = client.player.getY(), playerZ = client.player.getZ();
                 server.execute(() -> {
                     try {
-                        if (currentRenderedItemFixture) {
+                        if (itemFixture) {
                             var player = server.getPlayerList().getPlayer(client.player.getUUID());
                             if (player == null) throw new IllegalStateException("Could not find the smoke-test player");
                             player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
-                                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND));
+                                    new net.minecraft.world.item.ItemStack(glintVertexFixture
+                                            ? net.minecraft.world.item.Items.ENCHANTED_BOOK
+                                            : net.minecraft.world.item.Items.DIAMOND));
                             player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND,
                                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STONE));
                             LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                                    "Equipped currentRenderedItemId fixture items: mainhand={}, selectedSlot={}, selected={}, offhand={}",
+                                    "Equipped item fixture items: mainhand={}, selectedSlot={}, selected={}, offhand={}",
                                     net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem()),
                                     player.getInventory().getSelectedSlot(),
                                     net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
@@ -95,7 +99,7 @@ public final class GraphicsSmoke {
                 });
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
-            client.options.hideGui = !currentRenderedItemFixture;
+            client.options.hideGui = !itemFixture;
             client.player.setXRot(entityFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
@@ -133,7 +137,7 @@ public final class GraphicsSmoke {
             var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
-                    && !entityColorFeedbackFixture && !currentRenderedItemFixture
+                    && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -197,7 +201,8 @@ public final class GraphicsSmoke {
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
-                if (currentRenderedItemFixture && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
+                if ((currentRenderedItemFixture || glintVertexFixture)
+                        && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
             int oppositeCount = opposite;
@@ -209,15 +214,21 @@ public final class GraphicsSmoke {
                     activePixels = count;
                     activeOppositeMidTexCoordPixels = oppositeCount;
                     activeCurrentRenderedItemGreenPixels = renderedItemGreenCount;
+                    activeGlintGreenPixels = renderedItemGreenCount;
                     VeyraRenderer.disable();
                     baselineAt = worldTicks + 80;
                     stage = 1;
                     pending = false;
                 } else {
                     disabledCurrentRenderedItemGreenPixels = renderedItemGreenCount;
+                    disabledGlintGreenPixels = renderedItemGreenCount;
                     int minPixels = currentRenderedItemFixture ? 100 : 2000;
                     Throwable failure;
-                    if (terrainVertexExecutionFixture) {
+                    if (glintVertexFixture) {
+                        failure = activeGlintGreenPixels < 100 || disabledGlintGreenPixels * 4 >= activeGlintGreenPixels
+                                ? new IllegalStateException("The armor-glint vertex-stage signal was absent or unchanged: active="
+                                + activeGlintGreenPixels + ", disabled=" + disabledGlintGreenPixels) : null;
+                    } else if (terrainVertexExecutionFixture) {
                         failure = activePixels >= minPixels || count >= minPixels
                                 ? new IllegalStateException("The terrain vertex main did not clip its magenta geometry: active="
                                 + activePixels + ", disabled=" + count) : null;
@@ -249,6 +260,8 @@ public final class GraphicsSmoke {
                     + ",\"activeCurrentRenderedItemGreenPixels\":" + activeCurrentRenderedItemGreenPixels
                     + ",\"disabledMagentaPixels\":" + baseline
                     + ",\"disabledCurrentRenderedItemGreenPixels\":" + disabledCurrentRenderedItemGreenPixels
+                    + ",\"activeGlintGreenPixels\":" + activeGlintGreenPixels
+                    + ",\"disabledGlintGreenPixels\":" + disabledGlintGreenPixels
                     + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);

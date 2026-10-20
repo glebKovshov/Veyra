@@ -57,6 +57,70 @@ public class ShaderCompileSmoke {
                     count++;
                 }
             }
+            Path glintFixture = Path.of("examples/glint-vertex-execution/shaders");
+            String glintPackVertex = GlslPreprocessor.process("gbuffers_armor_glint.vsh",
+                    Files.readString(glintFixture.resolve("gbuffers_armor_glint.vsh")));
+            String glintNativeVertex = """
+                    #version 460
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec2 UV0;
+                    layout(location = 1) out vec2 texCoord0;
+                    layout(location = 2) out float sphericalVertexDistance;
+                    layout(location = 3) out float cylindricalVertexDistance;
+                    layout(set = 0, binding = 0, std140) uniform DynamicTransforms {
+                        mat4 ProjMat;
+                        mat4 ModelViewMat;
+                        mat4 TextureMat;
+                    };
+                    void main() {
+                        gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                        texCoord0 = (TextureMat * vec4(UV0, 0.0, 1.0)).xy;
+                        sphericalVertexDistance = 0.0;
+                        cylindricalVertexDistance = 0.0;
+                    }
+                    """;
+            CustomUniforms.activate(CustomUniforms.EMPTY);
+            GlintVertexShaderAdapter.AdaptedStage glintVertex = GlintVertexShaderAdapter.adaptStage(
+                    glintNativeVertex, glintPackVertex, "gbuffers_armor_glint");
+            String glintPackFragment = GlslPreprocessor.process("gbuffers_armor_glint.fsh",
+                    Files.readString(glintFixture.resolve("gbuffers_armor_glint.fsh")));
+            String glintFragment = TextureColorDistanceShaderAdapter.adaptFragment(glintPackFragment,
+                    "gbuffers_armor_glint", glintVertex.outputsColor(), true,
+                    glintVertex.colorInterpolation() == null ? "smooth" : glintVertex.colorInterpolation(),
+                    glintVertex.texCoordInterpolation(), true);
+            compileVertex(compiler, options, glintVertex.source(), "armor-glint-vertex-stage", true);
+            compile(compiler, options, glintFragment, "armor-glint-fragment-stage", true);
+            String glintTexAliasFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 120
+                    uniform sampler2D tex;
+                    varying vec2 texcoord;
+                    void main() { gl_FragColor = texture2D(tex, texcoord); }
+                    """, "gbuffers_armor_glint", false);
+            compile(compiler, options, glintTexAliasFragment, "armor-glint-iris-tex-sampler-alias", true);
+            GlintVertexShaderAdapter.AdaptedStage glintSharedLibraryVertex = GlintVertexShaderAdapter.adaptStage(
+                    glintNativeVertex, """
+                            #version 130
+                            uniform sampler2D noisetex;
+                            out vec2 texCoord;
+                            flat out vec4 glColor;
+                            vec2 GetLightMapCoordinates() {
+                                return (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                            }
+                            float ReadNoise() { return texture2D(noisetex, vec2(0.5)).r; }
+                            void main() {
+                                gl_Position = ftransform();
+                                texCoord = gl_MultiTexCoord0.xy;
+                                glColor = gl_Color;
+                                  float noise = ReadNoise();
+                            }
+                            """, "gbuffers_armor_glint");
+            if (!glintSharedLibraryVertex.usesNoiseSampler()) {
+                throw new AssertionError("The armor-glint shared-library noisetex was not bridged.");
+            }
+            compileVertex(compiler, options, glintSharedLibraryVertex.source(),
+                    "armor-glint-shared-noise-lightmap-helpers", true);
+            count += 3;
+            compiled += 4;
             String entityShadow = EntityShaderAdapter.adaptFragment("""
                     #version 120
                     uniform sampler2DShadow shadowtex0;
@@ -404,7 +468,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex and Iris tex sampler alias, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

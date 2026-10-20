@@ -1,5 +1,19 @@
 # Shaderpack compatibility: Veyra 0.2.0-beta.24 experimental prerelease
 
+## Unreleased compatibility batch after beta.24
+
+The current candidate executes `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup, then links supported color, UV, and fog-distance outputs to the adapted glint fragment stage. It bridges the glint texture matrix, supported legacy position/color/UV aliases, Iris fog uniforms, and `noisetex`. The fragment bridge maps `texture`, `gtexture`, and Iris `tex` to Minecraft's `Sampler0`. Shared preprocessing removes unreachable helper functions and unused uniforms/samplers while active unsupported reads remain errors. The candidate includes adapter tests, shaderc SPIR-V checks, an example pack, and a Lavapipe enchanted-book fixture.
+
+The refreshed candidate source audit covers 4 pinned archives / 75 profile-dimension cases / 5,178 stages: **705 geometry fragments accepted / 12 rejected**. Complementary armor glint now passes source adaptation. The remaining first whole-pack blockers are `gbuffers_basic.vsh` in all 27 Reimagined cases, all 27 Unbound cases, and all 18 BSL cases, plus Sildur glint output attachment 4 in 3 cases. Twelve Sildur fragment adapters still reject `LightC` across block translucent, entity translucent, hand water, and water. Every audit record retains `visualValidation=false`.
+
+| Pack | Geometry fragments accepted / attempted | Candidate whole-pack source blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | `gbuffers_basic.vsh` in all 27 cases per archive; selected profiles also declare unsupported `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | `gbuffers_basic.vsh` in all 18 cases | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 1/5, 1/5, 1/5 | Glint writes attachment 4; four translucent programs require `LightC` | Not tested |
+
+Minecraft 1.21.11's leash vertex format has position, color, and lightmap but no normal; the lines format has position, color, and normal but no UV/lightmap. The audited `gbuffers_basic.vsh` programs require inputs these native paths do not both provide, so Veyra retains an explicit capability rejection instead of fabricating those values. This candidate has no complete third-party pack visual validation or physical-GPU result.
+
 ## Beta.24 terrain vertex stages
 
 Beta.24 adds limited custom vertex-shader execution for `gbuffers_terrain`, `_solid`, `_cutout`, and `_water` after VulkanMod's terrain setup. The terrain bridge provides supported position, color, normal, lightmap, material, midpoint UV, tangent, chunk-fade, and `noisetex` inputs. Scalar, vector, and matrix outputs link to matching fragment inputs with checked types and interpolation. Unused VulkanMod outputs are pruned to make room for pack varyings; unsupported attributes, samplers, and interface overflow fail with named diagnostics.

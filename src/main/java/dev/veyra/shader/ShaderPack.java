@@ -985,6 +985,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 if (TERRAIN_PROGRAMS.contains(program)) {
                     // Terrain VSH signatures, capacity, and fragment links were checked above with
                     // locations freed by unused VulkanMod outputs.
+                } else if (program.equals("gbuffers_armor_glint")) {
+                    String vertexSource = readStage(file).orElseThrow(
+                            () -> new IOException("The pack no longer contains " + file + "."));
+                    GlintVertexShaderAdapter.AdaptedStage adaptedVertex =
+                            GlintVertexShaderAdapter.validate(program, vertexSource);
+                    String fragmentProgram = hasGlintFragment() ? program : "gbuffers_textured";
+                    String fragmentSource = readGlintFragment().orElseThrow(
+                            () -> new IOException("The pack no longer contains an armor-glint fragment shader."));
+                    TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, fragmentProgram,
+                            adaptedVertex.outputsColor(), true,
+                            adaptedVertex.colorInterpolation() == null ? "smooth" : adaptedVertex.colorInterpolation(),
+                            adaptedVertex.texCoordInterpolation(), true);
                 } else {
                     throw new IOException("Cannot execute " + file
                             + ": custom vertex shaders for this gbuffers program are not implemented by Veyra.");
