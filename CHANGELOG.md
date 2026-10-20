@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.20 - 2026-10-20 (prerelease)
+
+- Add active Minecraft cloud-texture sampling for supported `gbuffers_clouds` programs, with reload and Vulkan resource cleanup.
+- Bridge cloud UVs, flat face normals, and BSL `sunVec`, `upVec`, and `eastVec` inputs through the supported cloud vertex stage.
+- Add cloud texture and directional-input Lavapipe coverage. The fixture read back 46,140 active pixels with 0 runtime Vulkan validation errors; all 20 graphics fixtures passed.
+- Refresh the pinned source audit: 690 accepted / 27 rejected geometry fragments across 75 cases and 5,178 stages. BSL defaults accept 9/9 in each tested dimension; these are source and synthetic-fixture results, not full-pack visual validation.
+
 ## 0.2.0-beta.19 - 2026-10-20 (prerelease)
 
 - Add terrain `dist` and BSL `recolor` inputs from Veyra's bridged view position and block IDs.

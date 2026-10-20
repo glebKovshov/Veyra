@@ -1,4 +1,4 @@
-# Shaderpack compatibility: Veyra beta.19 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.20 experimental prerelease
 
 ## Beta.19 published — 2026-10-20
 
@@ -6,14 +6,16 @@ Beta.19 is published from annotated tag [`v0.2.0-beta.19+mc1.21.11`](https://git
 
 The released `veyra-0.2.0-beta.19+mc1.21.11.jar` is **593,532 bytes**, SHA-256 `78192452d957306c74e1cc3bad01e2220b01c9877b74586aff065f5a0c4b8f4c`. It matches the release's `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.19+mc1.21.11. The source audit reports Complementary Reimagined/Unbound 10/10 defaults in each tested dimension, BSL 8/9, and Sildur 0/5. No third-party pack visuals or physical-GPU results are claimed. The water fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; process teardown still reported 10,049 diagnostics.
 
-## Current source candidate after beta.19 (not included in the published JAR)
+## Beta.20 cloud texture and vertex inputs
 
-The current feature branch adds a Vulkan cloud-texture sampler and extended cloud mesh inputs for UV0 and flat face normals. It adapts BSL 10.1.8's cloud `texture`, `texCoord`, `normal`, `sunVec`, `upVec`, and `eastVec` interfaces. The local pinned audit covers 75 cases / 5,178 stages and accepts 690 / rejects 27 geometry fragments; BSL defaults accept 9/9 in Overworld, Nether, and End. Its cloud vertex stage adapts against VulkanMod 0.6.8's actual base cloud vertex shader for all audited BSL profiles. Complementary cloud vertex input `lmCoord` and Sildur cloud inputs remain unsupported. These source results do not verify rendered third-party packs: every audit record has `visualValidation: false`, and the new cloud texture Lavapipe fixture is awaiting CI.
+PR [#43](https://github.com/glebKovshov/Veyra/pull/43) merged at `abea76234afae81349b9b12be0aff794891284b6`. On its final head, Build [39417276367](https://github.com/glebKovshov/Veyra/actions/runs/39417276367), Graphics smoke [39417276374](https://github.com/glebKovshov/Veyra/actions/runs/39417276374) (**20/20**), and pinned source audit [39417276455](https://github.com/glebKovshov/Veyra/actions/runs/39417276455) passed. The new cloud-texture fixture read back **46,140 active magenta pixels**, 0 disabled pixels, and **0 runtime Vulkan validation errors**; shutdown still emitted 10,031 diagnostics.
+
+The pinned source audit covers 4 packs, 75 default/profile/dimension cases, and 5,178 preprocessed stages: **690 accepted / 27 rejected** geometry fragments. BSL 10.1.8 now accepts 9/9 default geometry fragment programs in Overworld, Nether, and End, and its audited cloud vertex stages adapt against VulkanMod 0.6.8's base shader. This is source-level and synthetic-fixture evidence only: every audit record has `visualValidation: false`, and no complete third-party shaderpack has been visually tested.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: terrain `spriteBounds` and unsupported `shadowcomp.csh` compute stage | Not tested |
-| BSL 10.1.8 | 8/9, 8/9, 8/9 | clouds: active `texture` sampler | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: terrain `spriteBounds`, unsupported `shadowcomp.csh` compute stage; cloud vertex `lmCoord` | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | No default geometry fragment source blocker in the pinned audit | Full pack not tested; synthetic cloud-texture fixture passed |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
 ## Beta.18 legacy fog inputs
