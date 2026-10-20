@@ -2,7 +2,9 @@
 
 ## Beta.18 legacy fog inputs
 
-PR [#37](https://github.com/glebKovshov/Veyra/pull/37), merged at [`5637504`](https://github.com/glebKovshov/Veyra/commit/5637504cbb6766204e9adc6b8a41ad1fe60888e5), maps legacy `gl_Fog.color`, `.start`, `.end`, and the derived `.scale` to Minecraft's Fog UBO. `gl_Fog.density` remains explicitly unsupported because Veyra has no validated runtime value. Its pinned source audit (run [39399069951](https://github.com/glebKovshov/Veyra/actions/runs/39399069951), artifact [12254301342](https://github.com/glebKovshov/Veyra/actions/runs/39399069951/artifacts/12254301342)) accepts **636** and rejects **81** geometry fragment programs across 75 cases / 5,178 stages; all records have `visualValidation: false`. Complementary Reimagined and Unbound r5.9.3 accept **10/10** default geometry fragments in Overworld, Nether, and End. Selected profiles still fail on `spriteBounds` or the unsupported `shadowcomp.csh` compute stage. BSL remains 6/9 and Sildur's Vibrant 0/5. No complete third-party pack has been visually validated.
+Beta.18 is published from tag [`v0.2.0-beta.18+mc1.21.11`](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.18%2Bmc1.21.11), at commit [`e3428eb`](https://github.com/glebKovshov/Veyra/commit/e3428eb782a0d715b1b1bd22e167c34c48b9bf94). Release workflow [39400531356](https://github.com/glebKovshov/Veyra/actions/runs/39400531356) passed the pinned source audit, all 19 Lavapipe fixtures, release build/tests, JAR verification, and publication. Audit artifact [12253973732](https://github.com/glebKovshov/Veyra/actions/runs/39400531356/artifacts/12253973732) accepts **636** and rejects **81** geometry fragment programs across 75 cases / 5,178 stages; every record has `visualValidation: false`.
+
+PR [#37](https://github.com/glebKovshov/Veyra/pull/37) maps legacy `gl_Fog.color`, `.start`, `.end`, and the derived `.scale` to Minecraft's Fog UBO. `gl_Fog.density` remains explicitly unsupported because Veyra has no validated runtime value. Complementary Reimagined and Unbound r5.9.3 accept **10/10** default geometry fragments in Overworld, Nether, and End. Selected profiles still fail on `spriteBounds` or the unsupported `shadowcomp.csh` compute stage. BSL remains 6/9 and Sildur's Vibrant 0/5. No complete third-party pack has been visually validated.
 
 ## Beta.17 terrain midpoint bridge
 
@@ -10,9 +12,9 @@ The beta.17 release audit [39395224331](https://github.com/glebKovshov/Veyra/act
 
 The release adds the flat `midCoord` terrain input and applies VulkanMod's current texture matrix to the midpoint and terrain UV before deriving `signMidCoordPos` and `absMidCoordPos`. It initializes VulkanMod's mapped texture matrix to identity if its contents are unset, while preserving valid live transforms. Complementary Reimagined and Unbound r5.9.3 now accept **8/10** default geometry fragments in Overworld, Nether, and End, up from 7/10. Their remaining default blockers are unsupported translucent block/entity inputs; selected profiles still require the unimplemented `shadowcomp.csh` compute stage. BSL remains at 6/9 and Sildur's Vibrant at 0/5. No third-party pack has been visually validated. Release workflow [39395224331](https://github.com/glebKovshov/Veyra/actions/runs/39395224331) passed all 19 Lavapipe fixtures; `geometry-mid-texcoord` reported 63,883 active magenta pixels, 158,771 opposite-region pixels, 0 disabled magenta pixels, and 0 runtime Vulkan validation errors. Shutdown still reports 10,031 descriptor-pool diagnostics.
 
-| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: `spriteBounds` and `shadowcomp.csh` compute stage; translucent profiles have not been visually validated | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: terrain `spriteBounds` and unsupported `shadowcomp.csh` compute stage | Not tested |
 | BSL 10.1.8 | 6/9, 6/9, 6/9 | terrain: `recolor`; water: `dist`; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
