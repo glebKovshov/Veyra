@@ -114,10 +114,10 @@ public final class GraphicsSmoke {
             var source = renderer.getMainPass().getMainFramebuffer().getColorAttachment();
             if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
                 throw new IllegalStateException("Surface image does not support frame readback");
-            // This fixture declares no auxiliary MRT target and validates its signal in the
+            // These fixtures declare no auxiliary MRT target and validate their signals in the
             // presented colortex0 image. Keep the existing colortex1 check for other fixtures.
             var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
-                    && !geometryMidTexCoordFixture
+                    && !geometryMidTexCoordFixture && !currentRenderedItemFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
