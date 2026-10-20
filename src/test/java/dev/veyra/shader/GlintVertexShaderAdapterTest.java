@@ -9,11 +9,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class GlintVertexShaderAdapterTest {
     private static final String MINECRAFT_GLINT_VERTEX = """
             #version 330
-            layout(location = 0) in vec3 Position;
-            layout(location = 1) in vec2 UV0;
-            layout(location = 1) out vec2 texCoord0;
-            layout(location = 2) out float sphericalVertexDistance;
-            layout(location = 3) out float cylindricalVertexDistance;
+            in vec3 Position;
+            in vec2 UV0;
+            out vec2 texCoord0;
+            out float sphericalVertexDistance;
+            out float cylindricalVertexDistance;
             uniform mat4 ProjMat;
             uniform mat4 ModelViewMat;
             uniform mat4 TextureMat;
@@ -38,8 +38,11 @@ class GlintVertexShaderAdapterTest {
                 }
                 """, "gbuffers_armor_glint").source();
 
-        assertTrue(adapted.contains("layout(location = 0) flat out vec4 vertexColor;"));
-        assertTrue(adapted.contains("layout(location = 1) smooth out vec2 texCoord0;"));
+        assertTrue(adapted.contains("#define VEYRA_GLINT_COLOR_OUTPUT layout(location = 0) flat out vec4 vertexColor;"));
+        assertTrue(adapted.contains("#define VEYRA_GLINT_OUTPUT_1 layout(location = 1) smooth out vec2 texCoord0;"));
+        assertTrue(adapted.contains("VEYRA_GLINT_COLOR_OUTPUT\n"));
+        assertTrue(adapted.contains("VEYRA_GLINT_OUTPUT_1\n"));
+        assertFalse(java.util.regex.Pattern.compile("(?m)^\\s*layout\\s*\\(\\s*location\\s*=").matcher(adapted).find(), adapted);
         assertTrue(adapted.contains("#define glColor vertexColor"));
         assertTrue(adapted.contains("#define gl_Color Color"));
         assertTrue(adapted.contains("veyraArmorGlintMain();"));
@@ -120,9 +123,10 @@ class GlintVertexShaderAdapterTest {
                 void main() { gl_FragColor = texture2D(texture, texCoord) * glColor; }
                 """, "gbuffers_armor_glint", true, true, "flat", "smooth", true);
 
-        assertTrue(adapted.contains("layout(location = 0) flat in vec4 vertexColor;"));
-        assertTrue(adapted.contains("layout(location = 1) smooth in vec2 texCoord0;"));
-        assertTrue(adapted.contains("layout(location = 0) out vec4 veyraTextureFragColor;"));
+        assertTrue(adapted.contains("#define VEYRA_GLINT_COLOR_INPUT layout(location = 0) flat in vec4 vertexColor;"));
+        assertTrue(adapted.contains("#define VEYRA_GLINT_TEXCOORD_INPUT layout(location = 1) smooth in vec2 texCoord0;"));
+        assertTrue(adapted.contains("#define VEYRA_GLINT_FRAGMENT_OUTPUT layout(location = 0) out vec4 veyraTextureFragColor;"));
+        assertFalse(java.util.regex.Pattern.compile("(?m)^\\s*layout\\s*\\(\\s*location\\s*=").matcher(adapted).find(), adapted);
 
         IOException mismatch = assertThrows(IOException.class, () -> TextureColorDistanceShaderAdapter.adaptFragment("""
                 in vec4 glColor;

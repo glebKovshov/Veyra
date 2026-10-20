@@ -215,21 +215,25 @@ public final class TextureColorDistanceShaderAdapter {
                 .replaceAll("\\btexcoord\\b|\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
 
-        String distanceInputs = hasVertexDistances ? explicitVertexLocations ? """
-                layout(location = 2) in float sphericalVertexDistance;
-                layout(location = 3) in float cylindricalVertexDistance;
-                """ : """
+        String distanceInputs = hasVertexDistances ? explicitVertexLocations
+                ? parserSafeLocatedDeclaration("VEYRA_GLINT_SPHERICAL_DISTANCE",
+                        "layout(location = 2) in float sphericalVertexDistance;")
+                    + parserSafeLocatedDeclaration("VEYRA_GLINT_CYLINDRICAL_DISTANCE",
+                        "layout(location = 3) in float cylindricalVertexDistance;") : """
                 in float sphericalVertexDistance;
                 in float cylindricalVertexDistance;
                 """ : "";
         String colorInput = hasVertexColor ? explicitVertexLocations
-                ? "layout(location = 0) " + vertexColorInterpolation + " in vec4 vertexColor;\n"
+                ? parserSafeLocatedDeclaration("VEYRA_GLINT_COLOR_INPUT",
+                        "layout(location = 0) " + vertexColorInterpolation + " in vec4 vertexColor;")
                 : "in vec4 vertexColor;\n" : "";
         String texCoordInput = explicitVertexLocations
-                ? "layout(location = 1) " + texCoordInterpolation + " in vec2 texCoord0;\n"
+                ? parserSafeLocatedDeclaration("VEYRA_GLINT_TEXCOORD_INPUT",
+                        "layout(location = 1) " + texCoordInterpolation + " in vec2 texCoord0;")
                 : "in vec2 texCoord0;\n";
         String output = explicitVertexLocations
-                ? "layout(location = 0) out vec4 " + outputName + ";\n"
+                ? parserSafeLocatedDeclaration("VEYRA_GLINT_FRAGMENT_OUTPUT",
+                        "layout(location = 0) out vec4 " + outputName + ";")
                 : "out vec4 " + outputName + ";\n";
         String bridge = """
                 %s%s
@@ -257,6 +261,11 @@ public final class TextureColorDistanceShaderAdapter {
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
         return result.append(adapted).toString();
+    }
+
+    /** VulkanMod's RenderSystem parser treats a source-level {@code layout(...)} as a UBO declaration. */
+    private static String parserSafeLocatedDeclaration(String macroName, String declaration) {
+        return "#define " + macroName + " " + declaration + '\n' + macroName + '\n';
     }
 
     private static String mergeInterpolation(String first, String second, String programName, String name)

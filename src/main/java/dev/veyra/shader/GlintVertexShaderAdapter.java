@@ -155,7 +155,8 @@ final class GlintVertexShaderAdapter {
         StringBuilder bridge = new StringBuilder();
         if (outputs.usesLegacyColor()) {
             Matcher input = BASE_COLOR_INPUT.matcher(base);
-            if (!input.find()) bridge.append("layout(location = 2) in vec4 Color;\n");
+            if (!input.find()) bridge.append(parserSafeLocatedDeclaration("VEYRA_GLINT_COLOR_INPUT",
+                    "layout(location = 2) in vec4 Color;"));
         }
         bridge.append("#define gl_Vertex vec4(Position, 1.0)\n")
                 .append("#define gl_Color Color\n")
@@ -251,7 +252,8 @@ final class GlintVertexShaderAdapter {
                 }
             }
             if (found) patched = patchOutput(patched, "vec4", "vertexColor", 0, outputs.colorInterpolation(), programName);
-            else patched += "\nlayout(location = 0) " + outputs.colorInterpolation() + " out vec4 vertexColor;\n";
+            else patched += "\n" + parserSafeLocatedDeclaration("VEYRA_GLINT_COLOR_OUTPUT",
+                    "layout(location = 0) " + outputs.colorInterpolation() + " out vec4 vertexColor;");
         }
         return patched;
     }
@@ -264,8 +266,9 @@ final class GlintVertexShaderAdapter {
         while (matcher.find()) {
             if (!matcher.group(3).equals(type) || !matcher.group(4).equals(name)) continue;
             found = true;
-            matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(1) + "layout(location = "
-                    + location + ") " + interpolation + " out " + type + " " + name + ";"));
+            matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(1)
+                    + parserSafeLocatedDeclaration("VEYRA_GLINT_OUTPUT_" + location,
+                    "layout(location = " + location + ") " + interpolation + " out " + type + " " + name + ";")));
         }
         if (found) {
             matcher.appendTail(result);
@@ -275,6 +278,11 @@ final class GlintVertexShaderAdapter {
             throw new IOException("Minecraft's glint vertex shader does not declare the " + name + " output expected by " + programName + ".");
         }
         return source;
+    }
+
+    /** VulkanMod's RenderSystem parser treats a source-level {@code layout(...)} as a UBO declaration. */
+    private static String parserSafeLocatedDeclaration(String macroName, String declaration) {
+        return "#define " + macroName + " " + declaration + '\n' + macroName + '\n';
     }
 
     private static String mergeInterpolation(String first, String second, String programName, String name) throws IOException {
