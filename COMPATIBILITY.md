@@ -7,7 +7,7 @@ The pinned audit covers 75 default/profile/dimension cases and all 5,178 preproc
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
 | Complementary Reimagined / Unbound r5.9.3 | 3/10, 3/10, 3/10 | block/entities/glowing/hand: writes beyond color attachment 0; translucent block/entities: unsupported inputs; water: `viewVector`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
-| BSL 10.1.8 | 2/9, 2/9, 2/9 | water: `mat`; entity/block: unsupported inputs; hand: `isMainHand`; clouds: `texture` sampler | Not tested |
+| BSL 10.1.8 | 2/9, 2/9, 2/9 | water: `mat`; entity/block: unsupported inputs; hand: unsupported `sunVec`, `upVec`, and `eastVec` inputs; clouds: `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
 ## Entity overlay, lightmap aliases, and adapter diagnostics (working tree)
@@ -24,7 +24,13 @@ Unit tests, direct shaderc compilation, the source audit, and the dedicated `geo
 
 Iris exposes `currentRenderedItemId` for the item or armor currently being rendered, including in gbuffers and shadow programs ([item mapping reference](https://shaders.properties/current/reference/miscellaneous/item_properties/), [ID uniform reference](https://shaders.properties/current/reference/uniforms/id/)). Veyra retains the source `ItemStack` on Minecraft's item render state and resolves it when nodes are submitted, so changing packs uses the active pack's mappings. All item stacks, including block items, use `item.properties`; `block.properties` remains for block and block-entity IDs. Mapped IDs select cached per-item pipeline variants for entity, block-entity, first-person hand, and entity-shadow renders. Other paths receive `-1`.
 
-Iris' hardcoded armor-trim and cape identifiers are not mapped yet. The original `examples/current-rendered-item-id` fixture configures mapped diamond and stone item entities and checks their separate signals in the graphics smoke harness; its CI runtime check is pending. The pinned source audit no longer reports `currentRenderedItemId` as a blocker, but acceptance is still limited by other inputs such as `entityColor`, water `viewVector`/`mat`, compute passes, and attachment feedback. All audit records keep `visualValidation=false`; the listed third-party packs remain **Not tested** in-game.
+Iris' hardcoded armor-trim and cape identifiers are not mapped yet. The Lavapipe `examples/current-rendered-item-id` fixture equips mapped diamond (ID 42) in the main hand and mapped stone (ID 43) in the offhand; its fragment requires both the item ID and the correct hand signal. The fixture passed in [graphics run 39366976302](https://github.com/glebKovshov/Veyra/actions/runs/39366976302), with 32,321 active magenta pixels for the main-hand item, 14,102 active green pixels for the offhand item, and zero pixels for both signals when shaders are disabled. This validates the synthetic submission path only. The pinned source audit no longer reports `currentRenderedItemId` as a blocker, but acceptance is still limited by other inputs such as water `viewVector`/`mat`, compute passes, and attachment feedback. All audit records keep `visualValidation=false`; the listed third-party packs remain **Not tested** in-game.
+
+## Iris `isMainHand` input for first-person hands (PR #21)
+
+First-person hand fragments may declare Iris `varying float isMainHand`. Veyra scopes the logical Minecraft hand around each item submission and specializes cached Vulkan pipeline variants to `1.0` for the main hand and `0.0` for the offhand. The input is accepted only by the hand-program adapter. The `current-rendered-item-id` Lavapipe fixture checks `isMainHand` together with IDs 42 and 43, so either signal alone cannot satisfy the readback.
+
+This does not make BSL playable. Its pinned default hand fragment now advances past `isMainHand` but remains rejected for unsupported fragment inputs `sunVec`, `upVec`, and `eastVec`; BSL's other entity, water, and cloud blockers also remain. The pinned audit still accepts 180 and rejects 537 geometry fragments across 75 cases / 5,178 preprocessed stages, with `visualValidation=false` throughout. No third-party pack has been visually validated.
 
 ## Entity and block entity identifiers (beta.4)
 
