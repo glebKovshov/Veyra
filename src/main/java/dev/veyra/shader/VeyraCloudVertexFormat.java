@@ -18,6 +18,7 @@ public final class VeyraCloudVertexFormat {
             .add("Color", VertexFormatElement.COLOR)
             .add("UV0", VertexFormatElement.UV0)
             .add("Normal", VertexFormatElement.NORMAL)
+            .padding(1)
             .build();
 
     private static final ThreadLocal<BuildState> CURRENT_BUILD = new ThreadLocal<>();
