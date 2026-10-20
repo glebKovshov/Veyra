@@ -2,6 +2,7 @@ package dev.veyra.shader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -22,7 +23,7 @@ public final class EntityShaderAdapter {
     private static final Pattern ENTITY_IDENTIFIER_UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern COMMA_SEPARATED_VARYING_DECLARATION = Pattern.compile(
             "(?m)^([\\t ]*(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s+)"
                     + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)\\s*;"
@@ -170,8 +171,20 @@ public final class EntityShaderAdapter {
                                                boolean shadowSamplerAvailable, int entityId, int blockEntityId,
                                                int currentRenderedItemId, boolean entityColorAvailable,
                                                boolean isMainHand) throws IOException {
+        return adaptGeometryFragment(source, programName, handPass, shadowSamplerAvailable, entityId, blockEntityId,
+                currentRenderedItemId, entityColorAvailable, isMainHand, Map.of());
+    }
+
+    /** Links pack-declared fragment inputs to the matching custom entity vertex-stage outputs. */
+    static String adaptGeometryFragment(String source, String programName, boolean handPass,
+                                        boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
+            throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
-                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, true);
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, true,
+                vertexVaryings);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -217,7 +230,7 @@ public final class EntityShaderAdapter {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
-            if (matcher.group(3).equals("normal")) {
+            if (matcher.group(4).equals("normal")) {
                 return true;
             }
         }
@@ -228,8 +241,8 @@ public final class EntityShaderAdapter {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
-            if (matcher.group(3).equals("lmcoord") || matcher.group(3).equals("lightMapCoord")
-                    || matcher.group(3).equals("lmCoord")) {
+            if (matcher.group(4).equals("lmcoord") || matcher.group(4).equals("lightMapCoord")
+                    || matcher.group(4).equals("lmCoord")) {
                 return true;
             }
         }
@@ -252,7 +265,7 @@ public final class EntityShaderAdapter {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(uncommented));
         while (matcher.find()) {
-            if (matcher.group(3).equals(name)) {
+            if (matcher.group(4).equals(name)) {
                 return true;
             }
         }
@@ -506,6 +519,18 @@ public final class EntityShaderAdapter {
                                         int entityId, int blockEntityId,
                                         int currentRenderedItemId, boolean entityColorAvailable,
                                         boolean isMainHand, boolean geometryColorInputsAvailable) throws IOException {
+        return adaptFragment(source, programName, textPipeline, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand,
+                geometryColorInputsAvailable, Map.of());
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline,
+                                        boolean handPass, boolean shadowSamplerAvailable,
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand, boolean geometryColorInputsAvailable,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
+            throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -600,16 +625,33 @@ public final class EntityShaderAdapter {
         boolean suppliesSunVector = false;
         boolean suppliesUpVector = false;
         boolean suppliesEastVector = false;
+        Map<String, TerrainVertexShaderAdapter.PackVarying> linkedPackVaryings = new LinkedHashMap<>();
         while (varyingMatcher.find()) {
-            String type = varyingMatcher.group(2);
-            String name = varyingMatcher.group(3);
+            String interpolation = varyingMatcher.group(2) == null ? "smooth" : varyingMatcher.group(2);
+            String type = varyingMatcher.group(3);
+            String name = varyingMatcher.group(4);
             Varying varying = (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
-            if (varying == null) {
+            TerrainVertexShaderAdapter.PackVarying packVarying = vertexVaryings.get(name);
+            if (varying == null && packVarying == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's "
                         + (textPipeline ? "sign-text" : "entity") + " bridge yet.");
             }
-            if (!varying.type().equals(type)) {
-                throw new IOException(programName + " input '" + name + "' must use " + varying.type() + ".");
+            String expectedType = packVarying == null ? varying.type() : packVarying.type();
+            if (!expectedType.equals(type)) {
+                throw new IOException(programName + " input '" + name + "' must use " + expectedType + ".");
+            }
+            if (packVarying != null) {
+                String declaredLocation = varyingMatcher.group(1);
+                if (declaredLocation != null && Integer.parseInt(declaredLocation) != packVarying.location()) {
+                    throw new IOException(programName + " input '" + name + "' declares location "
+                            + declaredLocation + ", but its vertex output uses location "
+                            + packVarying.location() + ".");
+                }
+                if (!packVarying.interpolation().equals(interpolation)) {
+                    throw new IOException(programName + " input '" + name + "' uses " + interpolation
+                            + " interpolation, but its vertex output uses " + packVarying.interpolation() + ".");
+                }
+                linkedPackVaryings.put(name, packVarying);
             }
             if (name.equals("isMainHand")) {
                 if (!handPass) {
@@ -645,6 +687,10 @@ public final class EntityShaderAdapter {
         }
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
+        for (Map.Entry<String, TerrainVertexShaderAdapter.PackVarying> entry : linkedPackVaryings.entrySet()) {
+            adapted = adapted.replaceAll("\\b" + Pattern.quote(entry.getKey()) + "\\b",
+                    Matcher.quoteReplacement("veyraEntityPackInput_" + entry.getValue().location()));
+        }
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
             throw new IOException(programName + " declares inputs that are not provided by Veyra's entity bridge yet.");
         }
@@ -819,6 +865,19 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_CYLINDRICAL_DISTANCE__",
                         suppliesCylindricalDistance ? "in float cylindricalVertexDistance;\n" : "")
                 .replace("__VEYRA_FOG_BRIDGE__", fogUniforms.bridge());
+        StringBuilder packVaryingBridge = new StringBuilder();
+        linkedPackVaryings.values().stream().distinct()
+                .sorted(java.util.Comparator.comparingInt(TerrainVertexShaderAdapter.PackVarying::location))
+                .forEach(varying -> {
+                    String name = "veyraEntityPackInput_" + varying.location();
+                    String declaration = "layout(location = " + varying.location() + ") "
+                            + (varying.interpolation().equals("smooth") ? "" : varying.interpolation() + " ")
+                            + "in " + varying.type() + " " + name + ";";
+                    String macro = "VEYRA_ENTITY_INPUT_" + varying.location();
+                    packVaryingBridge.append("#define ").append(macro).append(' ').append(declaration).append('\n')
+                            .append(macro).append('\n');
+                });
+        bridge = packVaryingBridge + bridge;
         if (TerrainShaderAdapter.usesSpecularSampler(source)) {
             bridge = "uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n" + bridge;
         }

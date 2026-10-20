@@ -1016,6 +1016,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     // The leash/line vertex formats and cross-stage varyings were checked above.
                 } else if (program.equals(BEACON_BEAM_PROGRAM)) {
                     // The beacon vertex/fragment interface was linked and its outputs validated above.
+                } else if (isEntityVertexProgram(program)) {
+                    String vertexSource = readStage(file).orElseThrow(
+                            () -> new IOException("The pack no longer contains " + file + "."));
+                    validateEntityVertexProgram(program, vertexSource);
                 } else {
                     throw new IOException("Cannot execute " + file
                             + ": custom vertex shaders for this gbuffers program are not implemented by Veyra.");
@@ -1028,6 +1032,27 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
             }
         }
+    }
+
+    private boolean isEntityVertexProgram(String program) {
+        return blockPrograms.contains(program) || entityPrograms.contains(program)
+                || HAND_PROGRAM.equals(program) && hasHandFragment
+                || HAND_WATER_PROGRAM.equals(program) && hasHandWaterFragment;
+    }
+
+    private void validateEntityVertexProgram(String program, String vertexSource) throws IOException {
+        boolean hand = HAND_PROGRAM.equals(program) || HAND_WATER_PROGRAM.equals(program);
+        Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
+                EntityVertexShaderAdapter.validate(program, vertexSource, hand).varyings();
+        Optional<String> fragment = hand ? readHandFragment(program)
+                : blockPrograms.contains(program) ? readBlockFragment(program) : readEntityFragment(program);
+        if (fragment.isEmpty()) {
+            throw new IOException("The pack no longer contains " + program + ".fsh.");
+        }
+        EntityShaderAdapter.adaptGeometryFragment(fragment.get(), program, hand, hasShadowFragment(),
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
+                true, false, varyings);
+        readGeometryBlendSettings(program);
     }
 
     private void validateBeaconBeamCapabilities() throws IOException {

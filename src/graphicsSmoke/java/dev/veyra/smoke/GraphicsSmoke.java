@@ -30,7 +30,7 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture, beaconBeamFixture;
+            glintMrtFixture, basicVertexFixture, beaconBeamFixture, blockVertexFixture, handVertexFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
@@ -67,10 +67,14 @@ public final class GraphicsSmoke {
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
             basicVertexFixture = fixture.equals("basic-vertex-execution");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
-            boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture;
+            blockVertexFixture = fixture.equals("block-vertex-execution");
+            handVertexFixture = fixture.equals("hand-vertex-execution");
+            boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture
+                    || handVertexFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
-                    || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture;
+                    || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
+                    || fixture.equals("entity-vertex-execution") || blockVertexFixture;
             if ((entityFixture || beaconBeamFixture) && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -105,6 +109,12 @@ public final class GraphicsSmoke {
                                     net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
                                             player.getInventory().getSelectedItem().getItem()),
                                     net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem()));
+                        } else if (blockVertexFixture) {
+                            var chest = net.minecraft.core.BlockPos.containing(playerX - 4.0, playerY, playerZ + 4.0);
+                            server.overworld().setBlock(chest,
+                                    net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+                            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                                    "Placed block-vertex fixture chest at {}", chest);
                         } else {
                             var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                             if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
@@ -166,6 +176,7 @@ public final class GraphicsSmoke {
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     && !glintMrtFixture && !basicVertexFixture && !beaconBeamFixture
+                    && !blockVertexFixture && !handVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -366,7 +377,7 @@ public final class GraphicsSmoke {
                         disabledBeaconBeamGreenPixels = renderedItemGreenCount;
                         disabledBeaconBeamMrtPixels = basicMrtPixelCount;
                     }
-                    int minPixels = currentRenderedItemFixture ? 100 : 2000;
+                    int minPixels = currentRenderedItemFixture || blockVertexFixture || handVertexFixture ? 100 : 2000;
                     Throwable failure;
                     if (beaconBeamFixture) {
                         failure = activeBeaconBeamGreenPixels < 100 || activeBeaconBeamMrtPixels < 100
