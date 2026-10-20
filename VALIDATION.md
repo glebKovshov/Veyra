@@ -1,10 +1,10 @@
 # Veyra 0.2 validation status
 
-## Current source candidate after beta.18 — not released
+## Beta.19 release candidate — integrated, release pending
 
-The current branch `feature/bsl-terrain-water-varyings` passes local forced JDK 21 `test validateShaders build packageExamplePacks --rerun-tasks`: **234 tests, 0 failures/errors/skips**, 50 example shaders processed, and 47 direct Vulkan SPIR-V compilations. Its local 593,550-byte JAR passes `scripts/verify_jar.py`, but uses the beta.18 version string and is not a release artifact.
+PR [#40](https://github.com/glebKovshov/Veyra/pull/40) is merged to `main` at [`660e03c`](https://github.com/glebKovshov/Veyra/commit/660e03c7219e5a74d0f8a1fdecda695134e93c9a). On the merged code, local forced JDK 21 `test validateShaders build packageExamplePacks --rerun-tasks` succeeded: **234 tests, 0 failures/errors/skips**, 50 example shaders processed, and 47 direct Vulkan SPIR-V compilations. The pre-version-bump 593,550-byte candidate JAR passed `scripts/verify_jar.py`; the tagged beta.19 workflow will build and verify the final versioned JAR.
 
-The refreshed pinned audit covers 75 cases / 5,178 stages and accepts **672 / rejects 45** geometry fragments; all records retain `visualValidation=false`. BSL accepts 8/9 defaults in each dimension after the new terrain/water bridges. PR [#40](https://github.com/glebKovshov/Veyra/pull/40) passed Build, pinned source audit, and all **19/19** Lavapipe fixtures. The new water readback measured 226,902 active magenta / 0 disabled pixels and 0 runtime Vulkan validation errors; teardown emitted 10,049 diagnostics. Merge, beta.19 release packaging, and downloaded-release checksum verification are still pending. Third-party pack visuals and physical-GPU behavior remain unverified.
+The refreshed pinned audit covers 75 cases / 5,178 stages and accepts **672 / rejects 45** geometry fragments; all records retain `visualValidation=false`. BSL accepts 8/9 defaults in each dimension after the new terrain/water bridges. PR [#40](https://github.com/glebKovshov/Veyra/pull/40) passed Build, pinned source audit, and all **19/19** Lavapipe fixtures. The new water readback measured 226,902 active magenta / 0 disabled pixels and 0 runtime Vulkan validation errors; teardown emitted 10,049 diagnostics. Release packaging and downloaded-release checksum verification are pending. Third-party pack visuals and physical-GPU behavior remain unverified.
 
 ## Beta.18 experimental prerelease: legacy fog bridge — 2026-10-20
 

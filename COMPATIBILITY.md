@@ -1,8 +1,8 @@
-# Shaderpack compatibility: Veyra beta.18 release and current source candidate
+# Shaderpack compatibility: Veyra beta.19 experimental release candidate
 
-## Current source candidate after beta.18 — not released
+## Beta.19 candidate integrated into main — release pending
 
-The working candidate on `feature/bsl-terrain-water-varyings` adds terrain distance, BSL material recolor, water direction, and BSL advanced-material UV bridges. Its pinned source audit covers 75 cases / 5,178 preprocessed stages and accepts **672 / rejects 45** geometry fragments; every case has `visualValidation: false`. PR [#40](https://github.com/glebKovshov/Veyra/pull/40) passed all 19 Lavapipe fixtures. The updated water block-ID fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; teardown still emitted 10,049 diagnostics. The candidate is not in the published beta.18 JAR, and no third-party pack has been visually tested.
+The beta.19 candidate is integrated into `main` at merge commit [`660e03c`](https://github.com/glebKovshov/Veyra/commit/660e03c7219e5a74d0f8a1fdecda695134e93c9a) via PR [#40](https://github.com/glebKovshov/Veyra/pull/40). It adds terrain distance, BSL material recolor, water direction, and BSL advanced-material UV bridges. Its pinned source audit covers 75 cases / 5,178 preprocessed stages and accepts **672 / rejects 45** geometry fragments; every case has `visualValidation: false`. PR CI passed all 19 Lavapipe fixtures. The water block-ID fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; teardown still emitted 10,049 diagnostics. The final beta.19 JAR has not yet been published, and no third-party pack has been visually tested.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
