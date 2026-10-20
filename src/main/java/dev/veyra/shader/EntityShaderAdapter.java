@@ -20,7 +20,7 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
     private static final Pattern ENTITY_IDENTIFIER_UNIFORM = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
@@ -47,6 +47,12 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+normal\\s*;");
     private static final Pattern LIGHTMAP_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+ivec2\\s+UV2\\s*;");
+    private static final Pattern ITEM_ENTITY_FLOAT_OVERLAY_ATTRIBUTE = Pattern.compile(
+            "(?m)^([\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+)vec2(\\s+UV1\\s*;)");
+    private static final Pattern ITEM_ENTITY_INTEGER_OVERLAY_ATTRIBUTE = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+ivec2\\s+UV1\\s*;");
+    private static final Pattern ITEM_ENTITY_OVERLAY_ASSIGNMENT = Pattern.compile(
+            "(?m)^([\\t ]*texCoord1\\s*=\\s*)UV1(\\s*;)");
     private static final Pattern LIGHTMAP_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec2\\s+lmcoord\\s*;");
     private static final Pattern VIEW_POSITION_VERTEX_ATTRIBUTE = Pattern.compile(
@@ -112,7 +118,8 @@ public final class EntityShaderAdapter {
 
     public static String adaptFragment(String source, String programName, boolean handPass,
                                        boolean shadowSamplerAvailable) throws IOException {
-        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable, -1, -1);
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                -1, -1, ItemIdMap.UNMAPPED);
     }
 
     /** Adapts an entity fragment with per-render Iris entity and block-entity identifiers. */
@@ -120,7 +127,15 @@ public final class EntityShaderAdapter {
                                        boolean shadowSamplerAvailable,
                                        int entityId, int blockEntityId) throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
-                entityId, blockEntityId);
+                entityId, blockEntityId, ItemIdMap.UNMAPPED);
+    }
+
+    /** Adapts an entity fragment with per-render entity, block-entity, and item identifiers. */
+    public static String adaptFragment(String source, String programName, boolean handPass,
+                                       boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                       int currentRenderedItemId) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -137,7 +152,16 @@ public final class EntityShaderAdapter {
                                           boolean shadowSamplerAvailable,
                                           int entityId, int blockEntityId) throws IOException {
         return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
-                entityId, blockEntityId);
+                entityId, blockEntityId, ItemIdMap.UNMAPPED);
+    }
+
+    /** Adapts sign text with per-render block-entity and item identifiers. */
+    public static String adaptTextFragment(String source, String programName,
+                                          boolean shadowSamplerAvailable,
+                                          int entityId, int blockEntityId,
+                                          int currentRenderedItemId) throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId);
     }
 
     /** Whether the active program declares an Iris-bound entity identifier uniform. */
@@ -196,6 +220,33 @@ public final class EntityShaderAdapter {
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName) throws IOException {
         return adaptVertexShader(source, shadowPass, programName, true, false);
+    }
+
+    /**
+     * Minecraft 1.21.11's item-entity vertex shader declares UV1 as a float even though
+     * NEW_ENTITY supplies that overlay attribute as a signed integer pair.
+     */
+    static String adaptItemEntityVertexFormat(String source, String programName) throws IOException {
+        if (source == null || source.isBlank()) {
+            throw new IOException(programName + " cannot adapt the item-entity vertex format because its VulkanMod vertex shader is empty.");
+        }
+        Matcher floatOverlay = ITEM_ENTITY_FLOAT_OVERLAY_ATTRIBUTE.matcher(source);
+        if (!floatOverlay.find()) {
+            if (ITEM_ENTITY_INTEGER_OVERLAY_ATTRIBUTE.matcher(source).find()) {
+                return source;
+            }
+            throw new IOException(programName + " cannot adapt the item-entity vertex format because UV1's shader input changed.");
+        }
+        StringBuffer adapted = new StringBuffer();
+        floatOverlay.appendReplacement(adapted,
+                Matcher.quoteReplacement(floatOverlay.group(1) + "ivec2" + floatOverlay.group(2)));
+        floatOverlay.appendTail(adapted);
+        Matcher overlayAssignment = ITEM_ENTITY_OVERLAY_ASSIGNMENT.matcher(adapted.toString());
+        if (!overlayAssignment.find()) {
+            return adapted.toString();
+        }
+        return overlayAssignment.replaceAll(Matcher.quoteReplacement(overlayAssignment.group(1)
+                + "vec2(UV1)" + overlayAssignment.group(2)));
     }
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName,
@@ -369,7 +420,8 @@ public final class EntityShaderAdapter {
 
     private static String adaptFragment(String source, String programName, boolean textPipeline,
                                         boolean handPass, boolean shadowSamplerAvailable,
-                                        int entityId, int blockEntityId) throws IOException {
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -378,7 +430,7 @@ public final class EntityShaderAdapter {
         }
 
         String adapted = bindEntityIdentifiers(source.replace("\uFEFF", ""), programName,
-                entityId, blockEntityId);
+                entityId, blockEntityId, currentRenderedItemId);
         adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
         boolean usesNoiseSampler = usesNoiseSampler(adapted);
         List<String> extensions = new ArrayList<>();
@@ -693,7 +745,8 @@ public final class EntityShaderAdapter {
     }
 
     private static String bindEntityIdentifiers(String source, String programName,
-                                                int entityId, int blockEntityId) {
+                                                int entityId, int blockEntityId,
+                                                int currentRenderedItemId) {
         Matcher matcher = ENTITY_IDENTIFIER_UNIFORM.matcher(source);
         StringBuffer bound = new StringBuffer();
         while (matcher.find()) {
@@ -702,7 +755,12 @@ public final class EntityShaderAdapter {
                 matcher.appendReplacement(bound, Matcher.quoteReplacement(matcher.group()));
                 continue;
             }
-            int value = name.equals("entityId") ? entityId : blockEntityId;
+            int value = switch (name) {
+                case "entityId" -> entityId;
+                case "blockEntityId" -> blockEntityId;
+                case "currentRenderedItemId" -> currentRenderedItemId;
+                default -> throw new IllegalStateException("Unexpected entity identifier " + name);
+            };
             matcher.appendReplacement(bound, Matcher.quoteReplacement(
                     "const int " + name + " = " + value + ";\n"));
         }

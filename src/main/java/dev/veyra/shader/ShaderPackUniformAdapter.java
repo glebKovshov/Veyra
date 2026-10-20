@@ -22,6 +22,8 @@ public final class ShaderPackUniformAdapter {
             "entityId", "int", "blockEntityId", "int", "currentRenderedItemId", "int", "entityColor", "vec4");
     private static final Pattern ENTITY_ATTRIBUTE_PROGRAM = Pattern.compile(
             "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*)|.*sign_text.*");
+    private static final Pattern CURRENT_RENDERED_ITEM_PROGRAM = Pattern.compile(
+            "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*|textured(?:_lit)?)|.*sign_text.*|shadow_(?:entities|block)");
 
     private ShaderPackUniformAdapter() {
     }
@@ -87,22 +89,31 @@ public final class ShaderPackUniformAdapter {
     }
 
     /**
-     * Iris patches entityId, blockEntityId and currentRenderedItemId only into programs whose vertex
-     * format carries the entity attribute (entity/block-entity/hand overlay formats and text). Elsewhere
-     * Iris 1.21.11 CommonUniforms supplies fixed fallbacks: blockEntityId and currentRenderedItemId are
-     * -1 and entityColor is vec4(0). entityId follows CapturedRenderingState, which entity rendering
+     * Veyra binds entity and block-entity identifiers in entity-family programs and resolves
+     * currentRenderedItemId from the ItemStack submitted by item, armor, hand, and shadow renderers. Programs
+     * outside those routes receive Iris-compatible fallbacks: blockEntityId and currentRenderedItemId
+     * are -1 and entityColor is vec4(0). entityId follows CapturedRenderingState, which entity rendering
      * resets to 0 after every entity, so programs outside that path read 0 in a populated world.
      */
     public static boolean isUnboundEntityIdentifier(String programName, String type, String name) {
-        return type.equals(UNBOUND_ENTITY_VALUES.get(name))
-                && !ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
+        if (!type.equals(UNBOUND_ENTITY_VALUES.get(name))) {
+            return false;
+        }
+        Pattern boundPrograms = name.equals("currentRenderedItemId")
+                ? CURRENT_RENDERED_ITEM_PROGRAM : ENTITY_ATTRIBUTE_PROGRAM;
+        return !boundPrograms.matcher(programName).matches();
     }
 
-    /** True when Iris binds this identifier from an entity or block-entity render. */
+    /** True when Veyra replaces this identifier with a per-render entity, block, or item constant. */
     public static boolean isBoundEntityIdentifier(String programName, String type, String name) {
-        return type.equals(UNBOUND_ENTITY_VALUES.get(name))
-                && (name.equals("entityId") || name.equals("blockEntityId"))
-                && ENTITY_ATTRIBUTE_PROGRAM.matcher(programName).matches();
+        if (!type.equals(UNBOUND_ENTITY_VALUES.get(name))) {
+            return false;
+        }
+        Pattern boundPrograms = name.equals("currentRenderedItemId")
+                ? CURRENT_RENDERED_ITEM_PROGRAM : ENTITY_ATTRIBUTE_PROGRAM;
+        return (name.equals("entityId") || name.equals("blockEntityId")
+                || name.equals("currentRenderedItemId"))
+                && boundPrograms.matcher(programName).matches();
     }
 
     /** The Iris fallback constant for an entity uniform outside entity programs, or null when Iris binds it. */

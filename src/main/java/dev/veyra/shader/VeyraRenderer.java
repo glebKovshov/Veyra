@@ -55,6 +55,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.level.MoonPhase;
@@ -344,6 +345,7 @@ public final class VeyraRenderer {
     private static final ThreadLocal<Integer> BLOCK_ENTITY_SUBMISSION_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<Deque<Integer>> ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> BLOCK_ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
+    private static final ThreadLocal<Deque<Integer>> RENDERED_ITEM_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static boolean handPipelineRoutingLogged;
     private static boolean blockEntityPipelineRoutingLogged;
     private static boolean signTextPipelineRoutingLogged;
@@ -1565,6 +1567,25 @@ public final class VeyraRenderer {
         if (identifiers.isEmpty()) ENTITY_IDENTIFIER_CONTEXT.remove();
     }
 
+    /** Pushes the Iris currentRenderedItemId for synchronous item-node submission. */
+    public static void beginRenderedItemSubmission(ItemStack stack) {
+        int itemId = currentRenderedItemIdentifier(stack);
+        RENDERED_ITEM_IDENTIFIER_CONTEXT.get().push(itemId);
+    }
+
+    public static void endRenderedItemSubmission() {
+        Deque<Integer> identifiers = RENDERED_ITEM_IDENTIFIER_CONTEXT.get();
+        if (!identifiers.isEmpty()) identifiers.pop();
+        if (identifiers.isEmpty()) RENDERED_ITEM_IDENTIFIER_CONTEXT.remove();
+    }
+
+    private static int currentRenderedItemIdentifier(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return ItemIdMap.UNMAPPED;
+        }
+        return ItemIdMap.active().id(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+    }
+
     public static RenderType routeBlockEntityRenderType(RenderType originalType) {
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return originalType;
         if (originalType == null) {
@@ -1573,20 +1594,35 @@ public final class VeyraRenderer {
         boolean blockEntity = BLOCK_ENTITY_SUBMISSION_DEPTH.get() > 0;
         Deque<Integer> entityIdentifiers = ENTITY_IDENTIFIER_CONTEXT.get();
         boolean entity = !entityIdentifiers.isEmpty();
-        if (!blockEntity && !entity) return originalType;
+        Deque<Integer> itemIdentifiers = RENDERED_ITEM_IDENTIFIER_CONTEXT.get();
+        boolean item = !itemIdentifiers.isEmpty();
+        int itemId = item ? itemIdentifiers.peek() : ItemIdMap.UNMAPPED;
+        if (!blockEntity && !entity && !(item && isHandRendering())) return originalType;
         RenderPipeline original = originalType.pipeline();
         if (VeyraShadowRenderer.isRendering()) {
+            if (!blockEntity && !entity) return originalType;
             RenderPipeline shadowPipeline = getShadowEntityPipeline(original, blockEntity);
             EntityPipelineSet set = blockEntity ? shadowBlockEntityPipelineSet : shadowEntityPipelineSet;
             int entityId = entity ? entityIdentifiers.peek() : EntityIdMap.UNMAPPED;
             int blockId = blockEntity ? currentBlockEntityIdentifier() : BlockIdMap.UNMAPPED;
-            shadowPipeline = entityPipelineVariant(set, original, entityId, blockId);
+            shadowPipeline = entityPipelineVariant(set, original, entityId, blockId, itemId);
             return shadowPipeline == null ? originalType : replaceRenderTypePipeline(originalType,
                     shadowPipeline, blockEntity ? "_veyra_shadow_block" : "_veyra_shadow_entity");
         }
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null) {
             return originalType;
+        }
+        if (isHandRendering()) {
+            if (!item || itemId == ItemIdMap.UNMAPPED || !pack.supportsHandPipeline()
+                    || !isEntityRenderPipeline(original)) {
+                return originalType;
+            }
+            EntityPipelineSet pipelines = getHandPipelineSet(pack);
+            RenderPipeline replacement = entityPipelineVariant(pipelines, original,
+                    EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, itemId);
+            return replacement == null ? originalType
+                    : replaceRenderTypePipeline(originalType, replacement, "_veyra_hand_item");
         }
         if (blockEntity) {
             if (!pack.supportsBlockEntityPipeline()
@@ -1595,7 +1631,7 @@ public final class VeyraRenderer {
             }
             EntityPipelineSet pipelines = getBlockEntityPipelineSet(pack);
             RenderPipeline replacement = entityPipelineVariant(pipelines, original,
-                    EntityIdMap.UNMAPPED, currentBlockEntityIdentifier());
+                    EntityIdMap.UNMAPPED, currentBlockEntityIdentifier(), itemId);
             if (replacement == null) return originalType;
             if (!blockEntityPipelineRoutingLogged) {
                 VeyraClient.LOGGER.info("Routing block entity pipeline {} through {} from shader pack '{}'.",
@@ -1608,7 +1644,7 @@ public final class VeyraRenderer {
         if (!pack.hasEntityFragment() || !isEntityRenderPipeline(original)) return originalType;
         getEntityPipeline(original);
         RenderPipeline replacement = entityPipelineVariant(entityPipelineSet, original,
-                entityIdentifiers.peek(), BlockIdMap.UNMAPPED);
+                entityIdentifiers.peek(), BlockIdMap.UNMAPPED, itemId);
         if (replacement == null) {
             return originalType;
         }
@@ -1899,41 +1935,51 @@ public final class VeyraRenderer {
     }
 
     private static RenderPipeline entityPipelineVariant(EntityPipelineSet set, RenderPipeline original,
-                                                        int entityId, int blockEntityId) {
+                                                        int entityId, int blockEntityId,
+                                                        int currentRenderedItemId) {
         if (set == null) return null;
         RenderPipeline base = set.pipelines().get(original);
         EntityPipelineSpec spec = set.variantSources().get(original);
         if (base == null || spec == null) return base;
         int selectedEntityId = spec.usesEntityId() ? entityId : EntityIdMap.UNMAPPED;
         int selectedBlockId = spec.usesBlockEntityId() ? blockEntityId : BlockIdMap.UNMAPPED;
-        if (selectedEntityId == EntityIdMap.UNMAPPED && selectedBlockId == BlockIdMap.UNMAPPED) return base;
+        int selectedItemId = spec.usesCurrentRenderedItemId()
+                ? currentRenderedItemId : ItemIdMap.UNMAPPED;
+        if (selectedEntityId == EntityIdMap.UNMAPPED && selectedBlockId == BlockIdMap.UNMAPPED
+                && selectedItemId == ItemIdMap.UNMAPPED) return base;
 
-        EntityIdentifierPair identifiers = new EntityIdentifierPair(selectedEntityId, selectedBlockId);
+        EntityIdentifierPair identifiers = new EntityIdentifierPair(
+                selectedEntityId, selectedBlockId, selectedItemId);
         RenderPipeline cached = set.variants().getOrDefault(original, Map.of()).get(identifiers);
         if (cached != null) return cached;
         if (set.failedVariants().getOrDefault(original, Set.of()).contains(identifiers)) return base;
         try {
             String fragmentSource = spec.textPipeline()
                     ? EntityShaderAdapter.adaptTextFragment(spec.fragmentSource(), spec.programName(),
-                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId)
+                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId)
                     : EntityShaderAdapter.adaptFragment(spec.fragmentSource(), spec.programName(), spec.handPass(),
-                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId);
+                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId);
             String sourceHash = sha256(spec.programName() + '\n' + fragmentSource);
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, spec.programName(), sourceHash);
             RenderPipeline pipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (pipeline == null) {
-                pipeline = compileEntityPipeline(original, fragmentSource, sourceHash,
-                        spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
-                        spec.requiresViewNormal(), spec.shadowPass(), spec.handPass(), spec.programName());
+                pipeline = spec.shadowPass()
+                        ? compileShadowEntityPipeline(original, spec.programName(), fragmentSource, sourceHash,
+                                spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
+                                spec.requiresViewNormal())
+                        : compileEntityPipeline(original, fragmentSource, sourceHash,
+                                spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
+                                spec.requiresViewNormal(), false, spec.handPass(), spec.programName());
                 ENTITY_PIPELINE_CACHE.put(cacheKey, pipeline);
             }
             set.variants().computeIfAbsent(original, ignored -> new HashMap<>()).put(identifiers, pipeline);
             return pipeline;
         } catch (IOException exception) {
             set.failedVariants().computeIfAbsent(original, ignored -> new HashSet<>()).add(identifiers);
-            VeyraClient.LOGGER.warn("Could not compile {} pipeline variant for entityId={} and blockEntityId={}; "
+            VeyraClient.LOGGER.warn("Could not compile {} pipeline variant for entityId={}, blockEntityId={}, "
+                            + "and currentRenderedItemId={}; "
                             + "using the unmapped shader variant: {}",
-                    spec.programName(), selectedEntityId, selectedBlockId, exception.getMessage());
+                    spec.programName(), selectedEntityId, selectedBlockId, selectedItemId, exception.getMessage());
             return base;
         }
     }
@@ -1945,6 +1991,17 @@ public final class VeyraRenderer {
                 || !isEntityRenderPipeline(original)) {
             return null;
         }
+        EntityPipelineSet pipelines = getHandPipelineSet(pack);
+        RenderPipeline replacement = pipelines == null ? null : pipelines.pipelines().get(original);
+        if (replacement != null && !handPipelineRoutingLogged) {
+            VeyraClient.LOGGER.info("Routing first-person hand pipeline {} through {} from shader pack '{}'.",
+                    original.getLocation(), resolveHandProgram(pack, original), pack.name());
+            handPipelineRoutingLogged = true;
+        }
+        return replacement;
+    }
+
+    private static EntityPipelineSet getHandPipelineSet(ShaderPack pack) {
         if (handPipelineDirty) {
             handPipelineDirty = false;
             try {
@@ -1954,17 +2011,12 @@ public final class VeyraRenderer {
                         handPipelineSet.pipelines().size(), pack.name());
             } catch (Exception exception) {
                 lastError = shortError(exception);
-                VeyraClient.LOGGER.error("Could not load first-person hand shader programs from shader pack '{}'.", pack.name(), exception);
+                VeyraClient.LOGGER.error("Could not load first-person hand shader programs from shader pack '{}'.",
+                        pack.name(), exception);
                 return null;
             }
         }
-        RenderPipeline replacement = handPipelineSet == null ? null : handPipelineSet.pipelines().get(original);
-        if (replacement != null && !handPipelineRoutingLogged) {
-            VeyraClient.LOGGER.info("Routing first-person hand pipeline {} through {} from shader pack '{}'.",
-                    original.getLocation(), resolveHandProgram(pack, original), pack.name());
-            handPipelineRoutingLogged = true;
-        }
-        return replacement;
+        return handPipelineSet;
     }
 
     public static RenderPipeline getDamagedBlockPipeline(RenderPipeline original) {
@@ -3617,69 +3669,80 @@ public final class VeyraRenderer {
     }
 
     private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack, String programName) throws IOException {
-        String fragmentSource = pack.readShadowFragment(programName)
+        String rawFragmentSource = pack.readShadowFragment(programName)
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
-        if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+        if (EntityShaderAdapter.usesNoiseSampler(rawFragmentSource)) {
             VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
         }
-        boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
-        boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
-        boolean requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
-        boolean requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
-        fragmentSource = EntityShaderAdapter.adaptFragment(fragmentSource, programName);
+        boolean requiresNormal = EntityShaderAdapter.requiresNormalInput(rawFragmentSource);
+        boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(rawFragmentSource);
+        boolean requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(rawFragmentSource);
+        boolean requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(rawFragmentSource);
+        String fragmentSource = EntityShaderAdapter.adaptFragment(rawFragmentSource, programName);
         String sourceHash = sha256(programName + '\n' + fragmentSource);
-        Identifier fragmentShader = Identifier.fromNamespaceAndPath(
-                "veyra", "shaderpack/" + programName + "/" + sourceHash);
-        String adaptedFragment = fragmentSource;
-        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
-
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isEntityRenderPipeline)
                 .toList();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        Map<RenderPipeline, EntityPipelineSpec> variantSources = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, programName, sourceHash);
             RenderPipeline shadowPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (shadowPipeline == null) {
-                Identifier location = Identifier.fromNamespaceAndPath("veyra",
-                        "pipeline/" + programName + "/" + sourceHash + "/"
-                                + original.getLocation().getPath().replace('/', '_'));
-                Identifier vertexShader = original.getVertexShader();
-                String adaptedVertex = null;
-                if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal) {
-                    adaptedVertex = EntityShaderAdapter.adaptVertexShader(
-                            shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName,
-                            requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
-                    vertexShader = entityNormalVertexShader(original, sourceHash, true);
-                }
-                Identifier selectedVertexShader = vertexShader;
-                String selectedVertexSource = adaptedVertex;
-                ShaderSource source = (identifier, type) -> {
-                    if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
-                        return adaptedFragment;
-                    }
-                    if (selectedVertexSource != null && identifier.equals(selectedVertexShader)
-                            && type == ShaderType.VERTEX) {
-                        return selectedVertexSource;
-                    }
-                    return shaderManager.getShader(identifier, type);
-                };
-                shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader,
-                        adaptedFragment.contains("uniform sampler2D VeyraNoiseSampler;"));
-                VeyraPipelineResources.track(shadowPipeline);
-                CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
-                if (!compiled.isValid()) {
-                    throw new IOException("VulkanMod could not compile " + original.getLocation()
-                            + " with the selected shadow shader.");
-                }
+                shadowPipeline = compileShadowEntityPipeline(original, programName, fragmentSource, sourceHash,
+                        requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
                 ENTITY_PIPELINE_CACHE.put(cacheKey, shadowPipeline);
             }
             pipelines.put(original, shadowPipeline);
+            variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
+                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
+                    true, false, false, false));
         }
         if (pipelines.isEmpty()) {
             throw new IOException("Minecraft's entity render pipelines were not found for the shadow pass.");
         }
-        return new EntityPipelineSet(pipelines, Map.of());
+        return new EntityPipelineSet(pipelines, variantSources);
+    }
+
+    private static RenderPipeline compileShadowEntityPipeline(
+            RenderPipeline original, String programName, String fragmentSource, String sourceHash,
+            boolean requiresNormal, boolean requiresLightmap,
+            boolean requiresViewPosition, boolean requiresViewNormal) throws IOException {
+        Identifier fragmentShader = Identifier.fromNamespaceAndPath(
+                "veyra", "shaderpack/" + programName + "/" + sourceHash);
+        Identifier location = Identifier.fromNamespaceAndPath("veyra",
+                "pipeline/" + programName + "/" + sourceHash + "/"
+                        + original.getLocation().getPath().replace('/', '_'));
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+        Identifier vertexShader = original.getVertexShader();
+        String adaptedVertex = null;
+        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal) {
+            adaptedVertex = EntityShaderAdapter.adaptVertexShader(
+                    shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName,
+                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
+            vertexShader = entityNormalVertexShader(original, sourceHash, true);
+        }
+        Identifier selectedVertexShader = vertexShader;
+        String selectedVertexSource = adaptedVertex;
+        ShaderSource source = (identifier, type) -> {
+            if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
+                return fragmentSource;
+            }
+            if (selectedVertexSource != null && identifier.equals(selectedVertexShader)
+                    && type == ShaderType.VERTEX) {
+                return selectedVertexSource;
+            }
+            return shaderManager.getShader(identifier, type);
+        };
+        RenderPipeline shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader,
+                fragmentShader, fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;"));
+        VeyraPipelineResources.track(shadowPipeline);
+        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
+        if (!compiled.isValid()) {
+            throw new IOException("VulkanMod could not compile " + original.getLocation()
+                    + " with the selected shadow shader.");
+        }
+        return shadowPipeline;
     }
 
     private static EntityPipelineSet compileBlockEntityPipelines(ShaderPack pack) throws IOException {
@@ -3850,15 +3913,27 @@ public final class VeyraRenderer {
     }
 
     private static boolean isEntityRenderPipeline(RenderPipeline pipeline) {
-        if (pipeline == null
-                || !pipeline.getFragmentShader().equals(Identifier.withDefaultNamespace("core/entity"))) {
+        if (pipeline == null) {
             return false;
         }
         String location = pipeline.getLocation().getPath();
+        boolean entityFragment = pipeline.getFragmentShader()
+                .equals(Identifier.withDefaultNamespace("core/entity"));
+        boolean itemEntityFragment = location.equals("pipeline/item_entity_translucent_cull")
+                && pipeline.getFragmentShader()
+                .equals(Identifier.withDefaultNamespace("core/rendertype_item_entity_translucent_cull"));
+        if (!entityFragment && !itemEntityFragment) {
+            return false;
+        }
         return location.startsWith("pipeline/entity_")
                 || location.startsWith("pipeline/armor_")
                 || location.startsWith("pipeline/item_entity_")
                 || location.equals("pipeline/eyes");
+    }
+
+    private static boolean isItemEntityTranslucentCullPipeline(RenderPipeline pipeline) {
+        return pipeline != null
+                && pipeline.getLocation().getPath().equals("pipeline/item_entity_translucent_cull");
     }
 
     private static String resolveEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
@@ -3915,9 +3990,15 @@ public final class VeyraRenderer {
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
-        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass) {
+        boolean itemEntityPipeline = isItemEntityTranslucentCullPipeline(original);
+        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
+                || itemEntityPipeline) {
+            String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
+            if (itemEntityPipeline) {
+                vertexSource = EntityShaderAdapter.adaptItemEntityVertexFormat(vertexSource, programName);
+            }
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
-                    shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName,
+                    vertexSource, shadowPass, programName,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, handPass);
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         }
@@ -6214,7 +6295,7 @@ public final class VeyraRenderer {
         }
     }
 
-    private record EntityIdentifierPair(int entityId, int blockEntityId) {
+    private record EntityIdentifierPair(int entityId, int blockEntityId, int currentRenderedItemId) {
     }
 
     private record EntityPipelineSpec(String programName, String fragmentSource,
@@ -6228,6 +6309,11 @@ public final class VeyraRenderer {
 
         private boolean usesBlockEntityId() {
             return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId");
+        }
+
+        private boolean usesCurrentRenderedItemId() {
+            return EntityShaderAdapter.usesEntityIdentifier(
+                    fragmentSource, programName, "currentRenderedItemId");
         }
     }
 
