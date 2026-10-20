@@ -305,14 +305,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -325,14 +323,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -345,14 +341,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -365,14 +359,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -385,14 +377,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -701,14 +691,12 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -721,14 +709,12 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -741,14 +727,12 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -761,14 +745,12 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -781,14 +763,12 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1097,14 +1077,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1117,14 +1095,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1137,14 +1113,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1157,14 +1131,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1177,14 +1149,12 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 8,
-    "geometryFragmentsRejected": 1,
+    "geometryFragmentsAccepted": 9,
+    "geometryFragmentsRejected": 0,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   }
-]
+]\n

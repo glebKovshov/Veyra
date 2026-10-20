@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -543,6 +544,123 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void removesUnusedIrisCloudLightmapHelperButKeepsRejectingRealUse() throws IOException {
+        String vulkanModVertex = """
+                #version 450
+                layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out float vertexDistance;
+                void main() {
+                    gl_Position = MVP * vec4(Position, 1.0);
+                    vertexColor = Color * ColorModulator;
+                    vertexDistance = length(Position + ModelOffset);
+                }
+                """;
+        String cloudShader = """
+                #version 130
+                uniform vec3 fogColor;
+                uniform sampler2D colortex0;
+                uniform sampler2D noisetex;
+                vec2 GetLightMapCoordinates() {
+                    vec2 lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                    return clamp((lmCoord - 0.03125) * 1.06667, 0.0, 1.0);
+                }
+                vec2 getCloudTexCoord() {
+                    return gl_MultiTexCoord0.xy + fogColor.xy * 0.0;
+                }
+                vec2 cloudTexCoord() { return getCloudTexCoord(); }
+                float unusedNoise() { return texture2D(noisetex, vec2(0.0)).r; }
+                varying vec2 texCoord;
+                void main() {
+                    texCoord = cloudTexCoord();
+                    gl_Position = ftransform();
+                }
+                """;
+
+        CloudShaderAdapter.AdaptedVertex adapted = CloudShaderAdapter.adaptVertexWithMetadata(
+                vulkanModVertex, cloudShader);
+
+        assertTrue(adapted.requiresExtendedVertexFormat());
+        assertFalse(adapted.source().contains("GetLightMapCoordinates"), adapted.source());
+        assertFalse(adapted.source().contains("gl_MultiTexCoord1"), adapted.source());
+        assertFalse(adapted.source().contains("uniform sampler2D colortex0"), adapted.source());
+        assertFalse(adapted.source().contains("noisetex"), adapted.source());
+        assertFalse(adapted.source().contains("unusedNoise"), adapted.source());
+        assertTrue(adapted.source().contains("#define gl_MultiTexCoord0 vec4(VeyraCloudTexCoord0, 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define fogColor (FogColor.rgb)"), adapted.source());
+        assertTrue(adapted.uniformFields().contains(
+                new ShaderPackUniformAdapter.UniformField("vec4", "FogColor")));
+        CloudShaderAdapter.AdaptedFragment fragment = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform vec3 fogColor;
+                varying vec4 color;
+                void main() { gl_FragColor = vec4(fogColor, color.a); }
+                """, adapted.uniformFields());
+        assertEquals(1, fragment.uniformFields().stream().filter(field -> field.name().equals("FogColor")).count());
+
+        IOException error = assertThrows(IOException.class, () -> CloudShaderAdapter.adaptVertex(
+                vulkanModVertex, cloudShader.replace("texCoord = cloudTexCoord();",
+                        "texCoord = GetLightMapCoordinates();")));
+        assertTrue(error.getMessage().contains("lmCoord"), error.getMessage());
+    }
+
+    @Test
+    void mapsLegacyCloudModelViewMatrixAndLowercaseTexcoord() throws IOException {
+        String vulkanModVertex = """
+                #version 450
+                layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out float vertexDistance;
+                void main() {
+                    gl_Position = MVP * vec4(Position, 1.0);
+                    vertexColor = Color * ColorModulator;
+                    vertexDistance = length(Position + ModelOffset);
+                }
+                """;
+        String cloudVertex = """
+                varying vec2 texcoord;
+                varying vec4 color;
+                varying float dist;
+                void main() {
+                    gl_Position = ftransform();
+                    dist = length(gl_ModelViewMatrix * gl_Vertex);
+                    texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    color = gl_Color;
+                }
+                """;
+
+        CloudShaderAdapter.AdaptedVertex vertex = CloudShaderAdapter.adaptVertexWithMetadata(
+                vulkanModVertex, cloudVertex);
+
+        assertFalse(vertex.source().contains("gl_ModelViewMatrix"), vertex.source());
+        assertTrue(vertex.source().contains("ModelViewMat * gl_Vertex"), vertex.source());
+        assertTrue(vertex.uniformFields().contains(
+                new ShaderPackUniformAdapter.UniformField("mat4", "ModelViewMat")));
+        assertTrue(vertex.uniformFields().contains(
+                new ShaderPackUniformAdapter.UniformField("mat4", "textureMatrix")));
+        assertTrue(vertex.varyings().containsAll(Set.of("texcoord", "color", "dist")));
+
+        CloudShaderAdapter.AdaptedFragment fragment = CloudShaderAdapter.adapt("""
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                varying vec4 color;
+                varying float dist;
+                void main() { gl_FragColor = texture2D(texture, texcoord) * color * clamp(dist, 0.0, 1.0); }
+                """, vertex.uniformFields());
+        assertTrue(fragment.usesCloudTexture());
+        assertTrue(fragment.varyings().containsAll(Set.of("texcoord", "color", "dist")));
+        assertTrue(fragment.source().contains("layout(location = 7) in float veyraCloudDist;"), fragment.source());
+        assertTrue(fragment.source().contains("layout(location = 8) in vec2 veyraCloudTexcoord;"), fragment.source());
+        assertTrue(fragment.uniformFields().containsAll(vertex.uniformFields()));
+    }
+
+    @Test
     void rejectsCloudVertexShaderInputsMissingFromVulkanModMesh() {
         String vulkanModVertex = "#version 450\nvoid main() { gl_Position = vec4(0.0); }\n";
         IOException error = assertThrows(IOException.class, () -> CloudShaderAdapter.adaptVertex(vulkanModVertex, """
@@ -873,6 +991,6 @@ class ShaderAdapterTest {
     @Test
     void rejectsCloudTextureInputs() {
         assertThrows(IOException.class, () -> CloudShaderAdapter.adaptFragment(
-                "uniform sampler2D texture;\nvarying vec2 texcoord;\nvoid main() { gl_FragColor = texture2D(texture, texcoord); }\n"));
+                "uniform sampler2D colortex5;\nvarying vec2 texCoord;\nvoid main() { gl_FragColor = texture2D(colortex5, texCoord); }\n"));
     }
 }

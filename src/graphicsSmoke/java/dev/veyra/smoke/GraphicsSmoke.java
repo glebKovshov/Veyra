@@ -45,7 +45,8 @@ public final class GraphicsSmoke {
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
             cloudSceneColorFixture = fixture.equals("cloud-colortex0");
-            cloudFixture = cloudSceneColorFixture || fixture.equals("cloud-texture-inputs");
+            cloudFixture = cloudSceneColorFixture || fixture.equals("cloud-texture-inputs")
+                    || fixture.equals("cloud-model-view");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             terrainMaterialFixture = fixture.equals("terrain-block-id");

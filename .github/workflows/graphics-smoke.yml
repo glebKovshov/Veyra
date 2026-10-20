@@ -14,6 +14,7 @@ on:
       - 'examples/entity-mrt/**'
       - 'examples/current-rendered-item-id/**'
       - 'examples/cloud-texture-inputs/**'
+      - 'examples/cloud-model-view/**'
       - 'build.gradle'
       - '.github/workflows/graphics-smoke.yml'
   push:
@@ -32,6 +33,7 @@ on:
       - 'examples/water-block-id/**'
       - 'examples/current-rendered-item-id/**'
       - 'examples/cloud-texture-inputs/**'
+      - 'examples/cloud-model-view/**'
       - 'scripts/prepare_graphics_smoke.py'
       - 'examples/specular-*/**'
       - 'examples/shadow-color-*/**'
@@ -47,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, geometry-view-space, geometry-mid-texcoord, terrain-block-id, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, current-rendered-item-id, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, geometry-view-space, geometry-mid-texcoord, terrain-block-id, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
