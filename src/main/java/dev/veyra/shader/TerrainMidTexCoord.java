@@ -10,7 +10,9 @@ public final class TerrainMidTexCoord {
     public static final int ATTRIBUTE_OFFSET = 16;
     public static final int MATERIAL_ID_OFFSET = 20;
     public static final int RENDER_TYPE_OFFSET = 24;
-    public static final int VERTEX_SIZE = 28;
+    public static final int PACKED_NORMAL_OFFSET = 28;
+    public static final int TANGENT_OFFSET = 32;
+    public static final int VERTEX_SIZE = 48;
 
     public static final VertexFormat VERTEX_FORMAT = VertexFormat.builder()
             .add("Position", CustomVertexFormat.ELEMENT_POSITION_INT16)
@@ -22,6 +24,10 @@ public final class TerrainMidTexCoord {
                     VertexFormatElement.Type.INT, VertexFormatElement.Usage.GENERIC, 1))
             .add("VeyraTerrainRenderType", new VertexFormatElement(5, 0,
                     VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainPackedNormal", new VertexFormatElement(6, 0,
+                    VertexFormatElement.Type.INT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainTangent", new VertexFormatElement(7, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 4))
             .build();
 
     private TerrainMidTexCoord() {
@@ -34,6 +40,92 @@ public final class TerrainMidTexCoord {
     /** Matches VulkanMod's compressed UV encoding; the shader reads the bits as unsigned shorts. */
     public static short pack(float coordinate) {
         return (short) (coordinate * 32768.0F);
+    }
+
+    /** Computes Iris's per-quad tangent and handedness from the terrain position, UV, and normal data. */
+    public static void computeTangent(float[] x, float[] y, float[] z, float[] u, float[] v,
+                                      int[] packedNormals, float[] result) {
+        float edge1X = x[1] - x[0], edge1Y = y[1] - y[0], edge1Z = z[1] - z[0];
+        float edge2X = x[2] - x[0], edge2Y = y[2] - y[0], edge2Z = z[2] - z[0];
+        float deltaU1 = u[1] - u[0], deltaV1 = v[1] - v[0];
+        float deltaU2 = u[2] - u[0], deltaV2 = v[2] - v[0];
+        float determinant = deltaU1 * deltaV2 - deltaU2 * deltaV1;
+
+        float normalX = normalComponent(packedNormals[0], 0);
+        float normalY = normalComponent(packedNormals[0], 8);
+        float normalZ = normalComponent(packedNormals[0], 16);
+        float normalLength = (float) Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+        if (normalLength > 1.0e-6F) {
+            normalX /= normalLength;
+            normalY /= normalLength;
+            normalZ /= normalLength;
+        } else {
+            normalX = edge1Y * edge2Z - edge1Z * edge2Y;
+            normalY = edge1Z * edge2X - edge1X * edge2Z;
+            normalZ = edge1X * edge2Y - edge1Y * edge2X;
+            normalLength = (float) Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+            if (normalLength > 1.0e-6F) {
+                normalX /= normalLength;
+                normalY /= normalLength;
+                normalZ /= normalLength;
+            } else {
+                normalX = 0.0F;
+                normalY = 0.0F;
+                normalZ = 1.0F;
+            }
+        }
+
+        float tangentX;
+        float tangentY;
+        float tangentZ;
+        float bitangentX = 0.0F, bitangentY = 0.0F, bitangentZ = 0.0F;
+        if (Math.abs(determinant) > 1.0e-8F) {
+            float reciprocal = 1.0F / determinant;
+            tangentX = (edge1X * deltaV2 - edge2X * deltaV1) * reciprocal;
+            tangentY = (edge1Y * deltaV2 - edge2Y * deltaV1) * reciprocal;
+            tangentZ = (edge1Z * deltaV2 - edge2Z * deltaV1) * reciprocal;
+            bitangentX = (edge2X * deltaU1 - edge1X * deltaU2) * reciprocal;
+            bitangentY = (edge2Y * deltaU1 - edge1Y * deltaU2) * reciprocal;
+            bitangentZ = (edge2Z * deltaU1 - edge1Z * deltaU2) * reciprocal;
+        } else {
+            tangentX = edge1X;
+            tangentY = edge1Y;
+            tangentZ = edge1Z;
+        }
+
+        float projection = tangentX * normalX + tangentY * normalY + tangentZ * normalZ;
+        tangentX -= normalX * projection;
+        tangentY -= normalY * projection;
+        tangentZ -= normalZ * projection;
+        float tangentLength = (float) Math.sqrt(tangentX * tangentX + tangentY * tangentY + tangentZ * tangentZ);
+        if (tangentLength <= 1.0e-6F) {
+            if (Math.abs(normalY) < 0.9F) {
+                tangentX = normalZ;
+                tangentY = 0.0F;
+                tangentZ = -normalX;
+            } else {
+                tangentX = 0.0F;
+                tangentY = -normalZ;
+                tangentZ = normalY;
+            }
+            tangentLength = (float) Math.sqrt(tangentX * tangentX + tangentY * tangentY + tangentZ * tangentZ);
+        }
+        tangentX /= tangentLength;
+        tangentY /= tangentLength;
+        tangentZ /= tangentLength;
+
+        float crossX = normalY * tangentZ - normalZ * tangentY;
+        float crossY = normalZ * tangentX - normalX * tangentZ;
+        float crossZ = normalX * tangentY - normalY * tangentX;
+        float handedness = crossX * bitangentX + crossY * bitangentY + crossZ * bitangentZ < 0.0F ? -1.0F : 1.0F;
+        result[0] = tangentX;
+        result[1] = tangentY;
+        result[2] = tangentZ;
+        result[3] = handedness;
+    }
+
+    private static float normalComponent(int packed, int shift) {
+        return ((byte) (packed >>> shift)) / 127.0F;
     }
 
     /** Uses VulkanMod's existing compressed fields and reserves four bytes for the packed midpoint. */

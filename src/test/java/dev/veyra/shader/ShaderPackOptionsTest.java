@@ -104,14 +104,17 @@ class ShaderPackOptionsTest {
         Files.writeString(shader.resolve("shaders.properties"), "program.composite.enabled=false\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
     }
-    @Test void unsupportedGeometryVertexStagesFailExplicitlyButCloudAndDisabledStagesRemainAllowed() throws IOException {
+    @Test void terrainVertexStagesExecuteWhenTheirInterfacesAreSupported() throws IOException {
         Path shader = Files.createDirectories(root.resolve("geometry/shaders"));
         Files.writeString(shader.resolve("gbuffers_terrain.fsh"), "void main(){}\n");
-        Files.writeString(shader.resolve("gbuffers_terrain.vsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_terrain.vsh"), "#version 120\nvoid main(){ gl_Position = ftransform(); }\n");
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+
+        Files.writeString(shader.resolve("gbuffers_terrain.vsh"),
+                "#version 120\nattribute vec3 at_midBlock;\nvoid main(){}\n");
         IOException error = assertThrows(IOException.class,
                 () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
-        assertTrue(error.getMessage().contains("gbuffers_terrain.vsh"));
-        assertTrue(error.getMessage().contains("VulkanMod's built-in vertex shader"));
+        assertTrue(error.getMessage().contains("at_midBlock"));
 
         Files.writeString(shader.resolve("shaders.properties"), "program.gbuffers_terrain.enabled=false\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());

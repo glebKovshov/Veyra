@@ -1,4 +1,18 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.22 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.23 experimental prerelease
+
+## Beta.23 release status and terrain VSH continuation
+
+Beta.23 is published as an experimental prerelease at [tag `v0.2.0-beta.23+mc1.21.11`](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.23%2Bmc1.21.11). Its release workflow passed all 24 jobs, including 22/22 Lavapipe fixtures, source audit, build, and distributable verification. The published JAR is verified in [VALIDATION.md](VALIDATION.md). It does not execute custom non-cloud geometry vertex stages.
+
+The current `feature/terrain-vertex-stage` candidate adds custom VSH execution for the four terrain programs after VulkanMod's terrain setup. It bridges supported legacy inputs (`gl_Vertex`, color/normal, UV/lightmap, `mc_Entity`, `mc_midTexCoord`, `at_tangent`, and `mc_chunkFade`) and links scalar, vector, and matrix VSH outputs to matching FSH inputs. It handles `noisetex` in the vertex stage and removes unused VulkanMod outputs from the stage interface so pack varyings can use those locations. VSH/FSH types and interpolation qualifiers are checked. Unsupported attributes, samplers, and interface overflow fail with named diagnostics. This candidate is not included in the published beta.23 JAR.
+
+The full JDK 21 `build validateShaders packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passes with 253 tests, 55 example shaders preprocessed, and 52 direct Vulkan SPIR-V compilations. The pinned audit covers 4 archives, 75 default/profile/dimension cases, and 5,178 stages (705 accepted / 12 rejected geometry fragments). Terrain VSH/FSH varying links pass for every active terrain program; all 75 whole-pack cases then stop at the unsupported non-terrain `gbuffers_armor_glint.vsh`. Every record has `visualValidation=false`. The added `terrain-vertex-varyings` Lavapipe fixture still needs its CI runtime result.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Current whole-pack blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | Non-terrain active `gbuffers_*.vsh`; selected profiles also need `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | Non-terrain active `gbuffers_*.vsh` | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 3/15, 3/15, 3/15 | Non-terrain active `gbuffers_*.vsh`; `LightC` in four translucent programs | Not tested |
 
 ## Beta.22 geometry color inputs and feedback snapshots (2026-10-20)
 
@@ -10,7 +24,7 @@ The PR head passed Build [39437938448](https://github.com/glebKovshov/Veyra/acti
 
 The pinned audit covers 4 archives, 75 default/profile/dimension records, and 5,178 preprocessed stages: **705 accepted / 12 rejected** geometry fragments. Every record has `visualValidation: false`. The 12 rejections are four Sildur programs repeated across three dimensions; they require its pack-specific `LightC` varying. Selected Complementary profiles still require the unsupported `shadowcomp.csh` compute stage. No complete third-party pack or physical GPU has been visually validated.
 
-The audit checks fragment-source adaptation; it does not establish that a complete pack can run. In the current audit, all 75 default/profile/dimension records report a non-empty `capabilityError`; the first blocker is an active non-cloud `gbuffers_*.vsh` stage. Veyra rejects these during capability validation because the terrain and entity paths still use VulkanMod's built-in vertex shaders. This prevents those pack vertex programs from being silently ignored. The existing cloud and fullscreen post vertex adapters remain available; general geometry vertex-stage execution is still unsupported. These pack-level capability errors are separate from the 12 fragment-adapter rejections above.
+The audit checks fragment-source adaptation; it does not establish that a complete pack can run. The beta.23 audit reports a non-empty `capabilityError` for all 75 default/profile/dimension records; the first blocker is an active non-cloud `gbuffers_*.vsh` stage. Published beta.23 rejects these during capability validation because its terrain and entity paths use VulkanMod's built-in vertex shaders. This prevents those pack vertex programs from being silently ignored. The current branch adds a supported terrain VSH subset; non-terrain VSH remains unsupported. The existing cloud and fullscreen post vertex adapters also remain available. These pack-level capability errors are separate from the 12 fragment-adapter rejections above.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |

@@ -25,7 +25,8 @@ public final class GraphicsSmoke {
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
-            geometryMidTexCoordFixture, terrainMaterialFixture, waterMaterialFixture,
+            geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
+            terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels;
@@ -50,6 +51,8 @@ public final class GraphicsSmoke {
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             terrainMaterialFixture = fixture.equals("terrain-block-id");
+            terrainVertexExecutionFixture = fixture.equals("terrain-vertex-execution");
+            terrainVertexVaryingsFixture = fixture.equals("terrain-vertex-varyings");
             waterMaterialFixture = fixture.equals("water-block-id");
             entityMrtFixture = fixture.equals("entity-mrt");
             entityColorFeedbackFixture = fixture.equals("entity-colortex-feedback");
@@ -129,6 +132,7 @@ public final class GraphicsSmoke {
             // The entity feedback fixture also writes colortex4, but does not use it as its signal.
             var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
+                    && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
@@ -212,14 +216,21 @@ public final class GraphicsSmoke {
                 } else {
                     disabledCurrentRenderedItemGreenPixels = renderedItemGreenCount;
                     int minPixels = currentRenderedItemFixture ? 100 : 2000;
-                    Throwable failure = activePixels < minPixels || count * 4 >= activePixels
-                            || geometryMidTexCoordFixture && activeOppositeMidTexCoordPixels < 2000
-                            || currentRenderedItemFixture && (activeCurrentRenderedItemGreenPixels < minPixels
-                            || renderedItemGreenCount * 4 >= activeCurrentRenderedItemGreenPixels)
-                            ? new IllegalStateException("Auxiliary MRT, midpoint, or currentRenderedItemId signal absent or unchanged: active="
-                            + activePixels + ", opposite=" + activeOppositeMidTexCoordPixels + ", disabled=" + count
-                            + ", itemGreen=" + activeCurrentRenderedItemGreenPixels
-                            + ", disabledItemGreen=" + renderedItemGreenCount) : null;
+                    Throwable failure;
+                    if (terrainVertexExecutionFixture) {
+                        failure = activePixels >= minPixels || count >= minPixels
+                                ? new IllegalStateException("The terrain vertex main did not clip its magenta geometry: active="
+                                + activePixels + ", disabled=" + count) : null;
+                    } else {
+                        failure = activePixels < minPixels || count * 4 >= activePixels
+                                || geometryMidTexCoordFixture && activeOppositeMidTexCoordPixels < 2000
+                                || currentRenderedItemFixture && (activeCurrentRenderedItemGreenPixels < minPixels
+                                || renderedItemGreenCount * 4 >= activeCurrentRenderedItemGreenPixels)
+                                ? new IllegalStateException("Auxiliary MRT, midpoint, or currentRenderedItemId signal absent or unchanged: active="
+                                + activePixels + ", opposite=" + activeOppositeMidTexCoordPixels + ", disabled=" + count
+                                + ", itemGreen=" + activeCurrentRenderedItemGreenPixels
+                                + ", disabledItemGreen=" + renderedItemGreenCount) : null;
+                    }
                     finish(client, failure, count);
                 }
             };

@@ -23,6 +23,15 @@ public class ShaderCompileSmoke {
                         return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                     });
                     source = GlslPreprocessor.process(name, source);
+                    String programName = name.substring(0, name.length() - 4);
+                    Path vertexPath = path.getParent().resolve(programName + ".vsh");
+                    var packVaryings = Files.exists(vertexPath)
+                            ? TerrainVertexShaderAdapter.validateAndGetVaryings(programName,
+                                    ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
+                                        Path file = vertexPath.getParent().resolve(included);
+                                        return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
+                                    }))
+                            : Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                     Path properties = path.getParent().resolve("shaders.properties");
                     CustomUniforms.activate(Files.exists(properties)
                             ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
@@ -32,7 +41,8 @@ public class ShaderCompileSmoke {
                             name.equals("gbuffers_hand.fsh"), Files.exists(path.getParent().resolve("shadow.fsh")),
                             -1, -1, ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
                                     name.substring(0, name.length()-4)), false)
-                            : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
+                            : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
+                                    packVaryings);
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);
                     try {
@@ -295,6 +305,74 @@ public class ShaderCompileSmoke {
                     }
                     """);
             compileVertex(compiler, options, terrainVertex, "terrain-view-position-vertex-adapter", true);
+            String terrainCustomVertex = TerrainVertexShaderAdapter.adapt(terrainVertex, """
+                    #version 120
+                    attribute vec4 mc_Entity;
+                    attribute vec4 mc_midTexCoord;
+                    attribute vec4 at_tangent;
+                    void main() {
+                        vec4 position = gl_Vertex;
+                        position.xyz += gl_Normal + at_tangent.xyz + mc_Entity.xyz * 0.0 + mc_midTexCoord.xyz * 0.0;
+                        position.xy += (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy * 0.0;
+                        position.xy += (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy * 0.0;
+                        position += gl_Color * 0.0;
+                        gl_Position = gl_ModelViewProjectionMatrix * position;
+                    }
+                    """, "gbuffers_terrain");
+            compileVertex(compiler, options, terrainCustomVertex, "terrain-custom-vertex-main", true);
+            TerrainVertexShaderAdapter.AdaptedStage terrainVaryings = TerrainVertexShaderAdapter.adaptStage(
+                    terrainVertex, """
+                            #version 130
+                            out vec2 texCoord;
+                            out vec3 normal;
+                            flat out int mat;
+                            flat out float chunkFade;
+                            void main() {
+                                texCoord = gl_MultiTexCoord0.xy;
+                                normal = gl_Normal;
+                                mat = 27101;
+                                chunkFade = mc_chunkFade;
+                            }
+                            """, "gbuffers_terrain");
+            compileVertex(compiler, options, terrainVaryings.source(),
+                    "terrain-custom-vertex-varyings", true);
+            String terrainVaryingFragment = TerrainShaderAdapter.adaptFragment("""
+                    #version 130
+                    in vec2 texCoord;
+                    in vec3 normal;
+                    flat in int mat;
+                    flat in float chunkFade;
+                    void main() {
+                        gl_FragColor = vec4(texCoord, normal.x * 0.0 + float(mat) * 0.0 + chunkFade * 0.0, 1.0);
+                    }
+                    """, false, false, terrainVaryings.varyings());
+            compile(compiler, options, terrainVaryingFragment,
+                    "terrain-custom-fragment-varyings", true);
+            TerrainVertexShaderAdapter.AdaptedStage terrainNoiseMatrixVertex =
+                    TerrainVertexShaderAdapter.adaptStage(terrainVertex, """
+                            #version 130
+                            uniform sampler2D noisetex;
+                            out mat3 tbnMatrix;
+                            out vec4 matrixFollowing;
+                            vec3 noiseOffset(vec2 uv) { return texture2D(noisetex, uv).rgb; }
+                            void main() {
+                                float noise = noiseOffset(vec2(0.5)).x;
+                                tbnMatrix = mat3(noise + 1.0);
+                                matrixFollowing = vec4(noise);
+                            }
+                            """, "gbuffers_water", 5);
+            compileVertex(compiler, options, terrainNoiseMatrixVertex.source(),
+                    "terrain-noisetex-matrix-vertex-varyings", true);
+            String terrainNoiseMatrixFragment = TerrainShaderAdapter.adaptFragment("""
+                    #version 130
+                    in mat3 tbnMatrix;
+                    in vec4 matrixFollowing;
+                    void main() {
+                        gl_FragColor = vec4(tbnMatrix[0] + matrixFollowing.rgb, 1.0);
+                    }
+                    """, false, false, terrainNoiseMatrixVertex.varyings());
+            compile(compiler, options, terrainNoiseMatrixFragment,
+                    "terrain-noisetex-matrix-fragment-varyings", true);
             String terrainMidCoord = TerrainShaderAdapter.adaptFragment("""
                     #version 120
                     varying vec2 absMidCoordPos;
@@ -326,7 +404,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, terrain-view-position, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

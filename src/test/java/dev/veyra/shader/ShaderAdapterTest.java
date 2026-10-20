@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -33,6 +34,15 @@ class ShaderAdapterTest {
                         ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                 String adapted;
                 try {
+                String programName = name.substring(0, name.length() - 4);
+                Path vertexPath = path.getParent().resolve(programName + ".vsh");
+                var packVaryings = Files.exists(vertexPath)
+                        ? TerrainVertexShaderAdapter.validateAndGetVaryings(programName,
+                                ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
+                                    Path file = vertexPath.getParent().resolve(included);
+                                    return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
+                                }))
+                        : java.util.Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);
                 } else if (name.startsWith("gbuffers_entities")) {
@@ -41,7 +51,8 @@ class ShaderAdapterTest {
                             ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
                                     name.substring(0, name.length()-4)), false);
                 } else {
-                    adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
+                    adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
+                            packVaryings);
                 }
                 } finally {
                     CustomUniforms.activate(CustomUniforms.EMPTY);
@@ -130,6 +141,8 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("layout (location = 3) in uvec2 MidTexCoord;"));
         assertTrue(vertex.contains("layout (location = 4) in int VeyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 5) in float VeyraTerrainRenderType;"));
+        assertTrue(vertex.contains("layout (location = 6) in int VeyraTerrainPackedNormal;"));
+        assertTrue(vertex.contains("layout (location = 7) in vec4 VeyraTerrainTangent;"));
         assertTrue(vertex.contains("layout (location = 11) out flat int veyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
         assertTrue(vertex.contains("layout (location = 14) out flat vec2 veyraAbsMidCoordPos;"));
@@ -146,6 +159,222 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("const vec2 veyraSpriteRadius = abs(texCoord0 - veyraMidCoord);"));
         assertTrue(vertex.contains("veyraSpriteBounds = vec4(veyraMidCoord - veyraSpriteRadius, veyraMidCoord + veyraSpriteRadius);"));
         assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
+    }
+
+    @Test
+    void executesSupportedTerrainVertexMainAfterVulkanModSetup() throws IOException {
+        String vulkanModVertex = TerrainShaderAdapter.adaptVertex("""
+                #version 460
+                layout (location = 0) out vec4 vertexColor;
+                layout (location = 1) out vec2 texCoord0;
+                layout (location = 4) out flat float fadeFactor;
+                layout (location = 2) in uint PackedColor;
+                layout (location = 1) in uvec2 UV0;
+                layout(binding = 1) uniform UBO {
+                    int UseRgss;
+                };
+                const float UV_INV = 1.0 / 32768.0;
+                void main() {
+                    const vec3 pos = getVertexPosition();
+                    gl_Position = MVP * vec4(pos, 1.0);
+                    vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                    texCoord0 = UV0 * UV_INV;
+                }
+                """);
+
+        String adapted = TerrainVertexShaderAdapter.adapt(vulkanModVertex, """
+                #version 120
+                #define VSH
+                #ifdef VSH
+                void main() {
+                    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+                    gl_Position.x = 4.0 * gl_Position.w;
+                }
+                #endif
+                #ifdef FSH
+                attribute vec3 unsupportedInactiveInput;
+                #endif
+                """, "gbuffers_terrain");
+
+        assertTrue(adapted.contains("void veyraShaderPackMain();"));
+        assertTrue(adapted.contains("veyraShaderPackMain();"));
+        assertTrue(adapted.contains("void veyraShaderPackMain("));
+        assertTrue(adapted.contains("#define gl_Vertex vec4(getVertexPosition(), 1.0)"));
+        assertTrue(adapted.contains("#define gl_ModelViewProjectionMatrix (gbufferProjection * gbufferModelView)"));
+        assertFalse(adapted.contains("unsupportedInactiveInput"));
+        assertTrue(adapted.indexOf("veyraShaderPackMain();") < adapted.lastIndexOf("void veyraShaderPackMain("));
+    }
+
+    @Test
+    void rejectsTerrainVertexInterfacesThatHaveNoMatchingVulkanInputsOrFragmentBridge() throws IOException {
+        IOException attribute = assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate(
+                "gbuffers_terrain", "#version 120\nattribute vec3 at_midBlock;\nvoid main(){}\n"));
+        assertTrue(attribute.getMessage().contains("at_midBlock"));
+
+        IOException output = assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate(
+                "gbuffers_terrain", "#version 120\nout dmat4 unsupportedTransform;\nvoid main(){}\n"));
+        assertTrue(output.getMessage().contains("unsupported varying type dmat4"));
+    }
+
+    @Test
+    void linksCustomTerrainVertexOutputsToFragmentInputs() throws IOException {
+        String baseVertex = TerrainShaderAdapter.adaptVertex("""
+                #version 460
+                layout (location = 0) out vec4 vertexColor;
+                layout (location = 1) out vec2 texCoord0;
+                layout (location = 4) out flat float fadeFactor;
+                layout (location = 2) in uint PackedColor;
+                layout (location = 1) in uvec2 UV0;
+                layout(binding = 1) uniform UBO {
+                    int UseRgss;
+                };
+                const float UV_INV = 1.0 / 32768.0;
+                void main() {
+                    const vec3 pos = getVertexPosition();
+                    gl_Position = MVP * vec4(pos, 1.0);
+                    vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                    texCoord0 = UV0 * UV_INV;
+                }
+                """);
+        TerrainVertexShaderAdapter.AdaptedStage vertex = TerrainVertexShaderAdapter.adaptStage(baseVertex, """
+                #version 130
+                out vec2 texCoord;
+                out vec3 normal;
+                flat out int mat;
+                flat out float chunkFade;
+                void main() {
+                    texCoord = gl_MultiTexCoord0.xy;
+                    normal = gl_Normal;
+                    mat = 27101;
+                    chunkFade = mc_chunkFade;
+                }
+                """, "gbuffers_terrain");
+        String fragment = TerrainShaderAdapter.adaptFragment("""
+                #version 130
+                in vec2 texCoord;
+                in vec3 normal;
+                flat in int mat;
+                flat in float chunkFade;
+                void main() {
+                    gl_FragColor = vec4(texCoord, normal.x * 0.0 + float(mat) * 0.0 + chunkFade * 0.0, 1.0);
+                }
+                """, false, false, vertex.varyings());
+
+        assertTrue(vertex.source().contains("#define texCoord texCoord0"));
+        assertTrue(vertex.source().contains("layout(location = 20) out vec3 veyraPackVarying_normal;"));
+        assertEquals(20, vertex.varyings().get("normal").location());
+        assertTrue(fragment.contains("layout(location = 20) in vec3 veyraPackVarying_normal;"));
+        assertTrue(fragment.contains("layout(location = 4) flat in float veyraPackVarying_chunkFade;"));
+        assertTrue(fragment.contains("#define mat veyraTerrainMaterialId"));
+        assertTrue(fragment.contains("#define chunkFade veyraPackVarying_chunkFade"));
+        assertFalse(fragment.contains("veyraInitializeTerrainTangentFrame"));
+    }
+
+    @Test
+    void linksMatrixTerrainVaryingsAndBridgesVertexNoiseSampler() throws IOException {
+        String baseVertex = TerrainShaderAdapter.adaptVertex("""
+                #version 460
+                layout (location = 0) out vec4 vertexColor;
+                layout (location = 1) out vec2 texCoord0;
+                layout (location = 4) out flat float fadeFactor;
+                layout (location = 2) in uint PackedColor;
+                layout (location = 1) in uvec2 UV0;
+                layout(binding = 1) uniform UBO {
+                    int UseRgss;
+                };
+                const float UV_INV = 1.0 / 32768.0;
+                void main() {
+                    const vec3 pos = getVertexPosition();
+                    gl_Position = MVP * vec4(pos, 1.0);
+                    vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                    texCoord0 = UV0 * UV_INV;
+                    fadeFactor = 1.0;
+                }
+                """);
+        String packVertex = """
+                #version 130
+                uniform sampler2D noisetex;
+                out mat3 tbnMatrix;
+                out vec4 matrixFollowing;
+                vec3 noiseOffset(vec2 uv) {
+                    return texture2D(noisetex, uv).rgb;
+                }
+                void main() {
+                    float noise = noiseOffset(vec2(0.5)).x;
+                    tbnMatrix = mat3(noise + 1.0);
+                    matrixFollowing = vec4(noise);
+                }
+                """;
+
+        TerrainVertexShaderAdapter.AdaptedStage vertex = TerrainVertexShaderAdapter.adaptStage(
+                baseVertex, packVertex, "gbuffers_water", 5);
+        assertTrue(vertex.source().contains("layout(binding = 5) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(vertex.source().contains("#define noisetex VeyraNoiseSampler"));
+        assertTrue(vertex.source().contains("texture(noisetex, uv)"));
+        assertFalse(vertex.source().contains("uniform sampler2D noisetex;"));
+        assertEquals(20, vertex.varyings().get("tbnMatrix").location());
+        assertEquals(23, vertex.varyings().get("matrixFollowing").location());
+
+        String fragment = TerrainShaderAdapter.adaptFragment("""
+                #version 130
+                in mat3 tbnMatrix;
+                in vec4 matrixFollowing;
+                void main() {
+                    gl_FragColor = vec4(tbnMatrix[0] + matrixFollowing.rgb, 1.0);
+                }
+                """, false, false, vertex.varyings());
+        assertTrue(fragment.contains("layout(location = 20) in mat3 veyraPackVarying_tbnMatrix;"));
+        assertTrue(fragment.contains("layout(location = 23) in vec4 veyraPackVarying_matrixFollowing;"));
+        assertTrue(fragment.contains("#define tbnMatrix veyraPackVarying_tbnMatrix"));
+    }
+
+    @Test
+    void allocatesCustomTerrainVaryingsAcrossAllUnoccupiedLocations() throws IOException {
+        StringBuilder source = new StringBuilder("#version 130\n");
+        for (int index = 0; index < 14; index++) source.append("out float extra").append(index).append(";\n");
+        source.append("void main() {}\n");
+        Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
+                TerrainVertexShaderAdapter.validateAndGetVaryings("gbuffers_terrain", source.toString());
+
+        assertEquals(20, varyings.get("extra0").location());
+        assertEquals(31, varyings.get("extra11").location());
+        assertEquals(2, varyings.get("extra12").location());
+        assertEquals(3, varyings.get("extra13").location());
+
+        source.append("out float overflow;\n");
+        IOException error = assertThrows(IOException.class, () ->
+                TerrainVertexShaderAdapter.validate("gbuffers_terrain", source.toString()));
+        assertTrue(error.getMessage().contains("too many vertex outputs"));
+    }
+
+    @Test
+    void freesUnconsumedTerrainVertexOutputsForCustomPackVaryings() throws IOException {
+        String fragment = TerrainShaderAdapter.adaptFragment("""
+                varying vec4 color;
+                void main() { gl_FragColor = color; }
+                """);
+        Set<Integer> unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment);
+        assertFalse(unusedLocations.contains(0));
+        assertTrue(unusedLocations.contains(5));
+
+        String vertex = """
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 5) out vec2 veyraLightmapCoord;
+                void main() { vertexColor = vec4(1.0); veyraLightmapCoord = vec2(0.0); }
+                """;
+        String pruned = TerrainShaderAdapter.pruneUnusedTerrainVertexOutputs(vertex, unusedLocations);
+        assertTrue(pruned.contains("layout(location = 0) out vec4 vertexColor;"));
+        assertTrue(pruned.contains("vec2 veyraLightmapCoord;"));
+        assertFalse(pruned.contains("layout(location = 5) out vec2 veyraLightmapCoord;"));
+
+        String normalFragment = TerrainShaderAdapter.adaptFragment("""
+                varying vec3 normal;
+                void main() { gl_FragColor = vec4(normal, 1.0); }
+                """);
+        Set<Integer> normalUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(normalFragment);
+        assertFalse(normalUnusedLocations.contains(7));
+        assertTrue(normalUnusedLocations.contains(1));
+        assertTrue(normalUnusedLocations.contains(10));
     }
 
     @Test
@@ -315,9 +544,25 @@ class ShaderAdapterTest {
         assertEquals(0.5F, TerrainMidTexCoord.center(0.0F, 1.0F, 1.0F, 0.0F));
         assertEquals((short) 16384, TerrainMidTexCoord.pack(0.5F));
         assertEquals(Short.MIN_VALUE, TerrainMidTexCoord.pack(1.0F));
-        assertEquals(28, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
+        assertEquals(48, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
         assertEquals(20, TerrainMidTexCoord.MATERIAL_ID_OFFSET);
         assertEquals(24, TerrainMidTexCoord.RENDER_TYPE_OFFSET);
+        assertEquals(28, TerrainMidTexCoord.PACKED_NORMAL_OFFSET);
+        assertEquals(32, TerrainMidTexCoord.TANGENT_OFFSET);
+    }
+
+    @Test
+    void computesOrientedTerrainTangentsFromQuadGeometryAndUvs() {
+        float[] tangent = new float[4];
+        TerrainMidTexCoord.computeTangent(
+                new float[]{0, 1, 1, 0}, new float[]{0, 0, 1, 1}, new float[]{0, 0, 0, 0},
+                new float[]{0, 1, 1, 0}, new float[]{0, 0, 1, 1},
+                new int[]{127 << 16, 127 << 16, 127 << 16, 127 << 16}, tangent);
+
+        assertEquals(1.0F, tangent[0], 1.0e-6F);
+        assertEquals(0.0F, tangent[1], 1.0e-6F);
+        assertEquals(0.0F, tangent[2], 1.0e-6F);
+        assertEquals(1.0F, tangent[3]);
     }
 
     @Test

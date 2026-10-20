@@ -957,6 +957,21 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (!required.isEmpty()) {
             throw new IOException("This pack requires Iris features not implemented by Veyra: " + required);
         }
+        for (String program : TERRAIN_PROGRAMS.stream().sorted().toList()) {
+            if (!isProgramEnabled(program) || !terrainPrograms.contains(program)) continue;
+            Optional<String> vertex = readStage(program + ".vsh");
+            if (vertex.isEmpty()) continue;
+            Optional<String> fragment = readTerrainFragment(program);
+            if (fragment.isPresent()) {
+                Map<String, TerrainVertexShaderAdapter.PackVarying> descriptions =
+                        TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+                Set<Integer> freeOutputLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
+                        fragment.get(), descriptions);
+                Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
+                        TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), freeOutputLocations);
+                TerrainShaderAdapter.validatePackVaryingLinks(program, fragment.get(), varyings);
+            }
+        }
         for (String file : stageFiles().stream().sorted().toList()) {
             int dot = file.lastIndexOf('.');
             String program = file.substring(0, dot);
@@ -967,9 +982,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (extension.equals("vsh") && program.startsWith("gbuffers_")
                     && !program.equals("gbuffers_clouds")
                     && readRawShader(programPath(program + ".fsh")).isPresent()) {
-                throw new IOException("Cannot execute " + file
-                        + ": custom gbuffers vertex shaders are not implemented by Veyra; "
-                        + "this program would otherwise use VulkanMod's built-in vertex shader.");
+                if (TERRAIN_PROGRAMS.contains(program)) {
+                    // Terrain VSH signatures, capacity, and fragment links were checked above with
+                    // locations freed by unused VulkanMod outputs.
+                } else {
+                    throw new IOException("Cannot execute " + file
+                            + ": custom vertex shaders for this gbuffers program are not implemented by Veyra.");
+                }
             }
             if (Set.of("csh", "gsh", "tcs", "tes").contains(extension)) {
                 throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
