@@ -23,6 +23,10 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern COMMA_SEPARATED_VARYING_DECLARATION = Pattern.compile(
+            "(?m)^([\\t ]*(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s+)"
+                    + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)\\s*;"
+                    + "([\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$))");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|in)\\b[^\\r\\n]*;?");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
@@ -93,7 +97,10 @@ public final class EntityShaderAdapter {
             Map.entry("normal", new Varying("vec3")),
             Map.entry("viewPos", new Varying("vec3")),
             Map.entry("viewNormal", new Varying("vec3")),
-            Map.entry("isMainHand", new Varying("float")));
+            Map.entry("isMainHand", new Varying("float")),
+            Map.entry("sunVec", new Varying("vec3")),
+            Map.entry("upVec", new Varying("vec3")),
+            Map.entry("eastVec", new Varying("vec3")));
     private static final Map<String, Varying> SUPPORTED_TEXT_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -237,13 +244,38 @@ public final class EntityShaderAdapter {
 
     private static boolean requiresVarying(String source, String name) {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
-        Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
+        Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(uncommented));
         while (matcher.find()) {
             if (matcher.group(3).equals(name)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static String expandCommaSeparatedVaryings(String source) {
+        Matcher matcher = COMMA_SEPARATED_VARYING_DECLARATION.matcher(source);
+        StringBuffer expanded = new StringBuffer();
+        while (matcher.find()) {
+            String prefix = matcher.group(1);
+            String[] names = matcher.group(2).split("\\s*,\\s*");
+            String suffix = matcher.group(3);
+            StringBuilder declarations = new StringBuilder();
+            for (int index = 0; index < names.length; index++) {
+                if (index > 0) declarations.append('\n');
+                declarations.append(prefix).append(names[index]).append(';');
+                if (index == names.length - 1) declarations.append(suffix);
+            }
+            matcher.appendReplacement(expanded, Matcher.quoteReplacement(declarations.toString()));
+        }
+        matcher.appendTail(expanded);
+        return expanded.toString();
+    }
+
+    private static String ensureUniformDeclaration(String source, String type, String name) {
+        Pattern declaration = Pattern.compile("(?m)^[\\t ]*uniform\\s+[^;\\r\\n]*\\b"
+                + Pattern.quote(name) + "\\b[^;\\r\\n]*;");
+        return declaration.matcher(source).find() ? source : "uniform " + type + " " + name + ";\n" + source;
     }
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName) throws IOException {
@@ -524,6 +556,16 @@ public final class EntityShaderAdapter {
             usesLightmapSampler = Pattern.compile("\\blightmap\\b")
                     .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
         }
+        adapted = expandCommaSeparatedVaryings(adapted);
+        boolean suppliesSunVectorInput = requiresVarying(adapted, "sunVec");
+        boolean suppliesUpVectorInput = requiresVarying(adapted, "upVec");
+        boolean suppliesEastVectorInput = requiresVarying(adapted, "eastVec");
+        if (suppliesSunVectorInput) {
+            adapted = ensureUniformDeclaration(adapted, "vec3", "sunPosition");
+        }
+        if (suppliesUpVectorInput || suppliesEastVectorInput) {
+            adapted = ensureUniformDeclaration(adapted, "mat4", "gbufferModelView");
+        }
         IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
         adapted = fogUniforms.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
@@ -543,6 +585,9 @@ public final class EntityShaderAdapter {
         boolean suppliesCylindricalDistance = false;
         boolean suppliesLightmapCoord = false;
         boolean suppliesMainHand = false;
+        boolean suppliesSunVector = false;
+        boolean suppliesUpVector = false;
+        boolean suppliesEastVector = false;
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -560,6 +605,9 @@ public final class EntityShaderAdapter {
                 }
                 suppliesMainHand = true;
             }
+            if (name.equals("sunVec")) suppliesSunVector = true;
+            if (name.equals("upVec")) suppliesUpVector = true;
+            if (name.equals("eastVec")) suppliesEastVector = true;
             if (name.equals("normal")) {
                 suppliesNormal = true;
             }
@@ -678,6 +726,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_VIEW_POSITION_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_IS_MAIN_HAND_VALUE__
+                __VEYRA_DIRECTIONAL_INPUTS__
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
                 out vec4 veyraEntityFragColor;
@@ -731,6 +780,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_NORMAL_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_IS_MAIN_HAND_VALUE__
+                __VEYRA_DIRECTIONAL_INPUTS__
                 in vec2 texCoord0;
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
@@ -763,6 +813,10 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
                 .replace("__VEYRA_IS_MAIN_HAND_VALUE__", suppliesMainHand
                         ? "const float isMainHand = " + (isMainHand ? "1.0" : "0.0") + ";\n" : "")
+                .replace("__VEYRA_DIRECTIONAL_INPUTS__", (suppliesSunVector
+                        ? "#define sunVec normalize(sunPosition)\n" : "")
+                        + (suppliesUpVector ? "#define upVec normalize(gbufferModelView[1].xyz)\n" : "")
+                        + (suppliesEastVector ? "#define eastVec normalize(gbufferModelView[0].xyz)\n" : ""))
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler
