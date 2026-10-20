@@ -19,8 +19,10 @@
 ## Continued work: Complementary terrain absolute midpoint — 2026-10-20
 
 - Terrain now carries the flat Iris `absMidCoordPos` value at a new varying location, computed from the existing per-quad midpoint and each vertex UV. The compressed vertex format and its stride are unchanged.
-- Added a unit regression, a direct shaderc compile fixture, and extended the existing `geometry-mid-texcoord` Lavapipe example to use both `signMidCoordPos` and `absMidCoordPos`. CI results are pending; beta.15 remains the latest published release.
-- Next: verify Build, the terrain graphics fixture, and the pinned shaderpack source audit; then continue with the remaining input blockers. Physical-GPU visuals, clean Vulkan teardown, and stable readiness remain unproven.
+- Build [#456](https://github.com/glebKovshov/Veyra/actions/runs/39385059735) passed **227 tests with 0 failures, 0 errors, and 0 skipped**, `validateShaders`, build, and JAR verification. Shaderc processed 50 examples and compiled 47 directly to Vulkan SPIR-V, including the new `absMidCoordPos` fixture.
+- Graphics smoke [#173](https://github.com/glebKovshov/Veyra/actions/runs/39385060028) passed **19/19 Lavapipe fixtures**. The updated terrain-midpoint fixture measured 56,288 active magenta / 167,037 opposite-region pixels, 0 disabled magenta pixels, and 0 runtime validation errors. Teardown diagnostics remain.
+- Source audit [#134](https://github.com/glebKovshov/Veyra/actions/runs/39385059792) passed 75 cases (12 defaults and 63 declared-profile cases) across 4 pinned packs / 3 dimensions: **486 geometry fragments accepted / 231 rejected**, up from beta.15's 432 / 285. These are source checks, not third-party visual validation.
+- Beta.15 remains the latest published release; this change is awaiting PR merge and release prep. Remaining source blockers, physical-GPU visuals, clean Vulkan teardown, and stable readiness are unproven.
 
 ## Continued work: terrain material IDs and beta.15 publication — 2026-10-20
 
