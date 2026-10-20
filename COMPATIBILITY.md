@@ -1,8 +1,8 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.17 prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.18 prerelease
 
-## Unreleased source candidate: legacy fog inputs
+## Beta.18 legacy fog inputs
 
-Source commit [`d574ab5`](https://github.com/glebKovshov/Veyra/commit/d574ab5968318790c3aee52531b31dfb40bb5650) maps legacy `gl_Fog.color`, `.start`, `.end`, and the derived `.scale` to Minecraft's Fog UBO. It is not included in the published beta.17 JAR. A pinned source audit on this candidate accepts **636** and rejects **81** geometry fragment programs across 75 cases / 5,178 stages; all records have `visualValidation: false`. Complementary Reimagined and Unbound r5.9.3 now accept **10/10** default geometry fragments in Overworld, Nether, and End. Selected profiles still require `spriteBounds` and the unimplemented `shadowcomp.csh` compute stage. BSL remains 6/9 and Sildur's Vibrant 0/5. No complete third-party pack has been visually validated.
+PR [#37](https://github.com/glebKovshov/Veyra/pull/37), merged at [`5637504`](https://github.com/glebKovshov/Veyra/commit/5637504cbb6766204e9adc6b8a41ad1fe60888e5), maps legacy `gl_Fog.color`, `.start`, `.end`, and the derived `.scale` to Minecraft's Fog UBO. `gl_Fog.density` remains explicitly unsupported because Veyra has no validated runtime value. Its pinned source audit (run [39399069951](https://github.com/glebKovshov/Veyra/actions/runs/39399069951), artifact [12254301342](https://github.com/glebKovshov/Veyra/actions/runs/39399069951/artifacts/12254301342)) accepts **636** and rejects **81** geometry fragment programs across 75 cases / 5,178 stages; all records have `visualValidation: false`. Complementary Reimagined and Unbound r5.9.3 accept **10/10** default geometry fragments in Overworld, Nether, and End. Selected profiles still fail on `spriteBounds` or the unsupported `shadowcomp.csh` compute stage. BSL remains 6/9 and Sildur's Vibrant 0/5. No complete third-party pack has been visually validated.
 
 ## Beta.17 terrain midpoint bridge
 
@@ -12,7 +12,7 @@ The release adds the flat `midCoord` terrain input and applies VulkanMod's curre
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 8/10, 8/10, 8/10 | translucent block/entities: unsupported inputs; selected profiles: `shadowcomp.csh` compute stage | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: `spriteBounds` and `shadowcomp.csh` compute stage; translucent profiles have not been visually validated | Not tested |
 | BSL 10.1.8 | 6/9, 6/9, 6/9 | terrain: `recolor`; water: `dist`; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
