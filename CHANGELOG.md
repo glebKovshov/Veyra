@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased compatibility batch
+## 0.2.0-beta.25 - 2026-10-20 (experimental prerelease)
 
-- Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link it to the adapted glint fragment stage. Bridge supported legacy position/color/UV aliases, texture matrix inputs, Iris fog fields, and `noisetex`; reject unsupported vertex formats and interfaces.
-- Map the glint fragment sampler aliases `texture`, `gtexture`, and `tex` to Minecraft's `Sampler0`; prune unreachable helper functions and unused uniforms/samplers before capability checks.
-- Add direct adapter tests, Vulkan SPIR-V shaderc fixtures, an example shaderpack, and a Lavapipe enchanted-book fixture.
-- Keep `gbuffers_basic.vsh` capability-rejected where the native leash/line vertex formats omit required normal or UV/lightmap inputs. The pinned candidate audit accepts 705 and rejects 12 geometry fragments across 75 cases / 5,178 stages; Sildur attachment 4 and `LightC` remain unsupported. No full third-party pack visual validation is claimed.
+- Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link checked color, UV, and fog-distance outputs to the adapted fragment stage. Bridge legacy position/UV inputs, texture matrices, Iris fog fields, and `noisetex`; map `gl_Color` to white where Minecraft's `POSITION_TEX` vertex format has no color input.
+- Map the glint fragment sampler aliases `texture`, `gtexture`, and `tex` to Minecraft's `Sampler0`. Remove unreachable GLSL helpers and unused uniform/sampler declarations before capability checks; retain explicit errors for active unsupported reads.
+- Add adapter regression tests, Vulkan SPIR-V shaderc fixtures, a diagnostic example pack, and an enchanted-book Lavapipe fixture. The fixture read back 313 bright green pixels while enabled and 0 after disabling the pack.
+- PR [#62](https://github.com/glebKovshov/Veyra/pull/62) passed Build, source audit, and all 25/25 Lavapipe fixtures before merging to `main` as `df3df827743adf9a978008c59fe9812cd16a699d`.
+- The pinned audit accepts 705 and rejects 12 geometry fragments across 4 archives / 75 cases / 5,178 stages. Complementary armor glint passes source adaptation; remaining blockers include `gbuffers_basic.vsh`, Sildur attachment 4 and `LightC`, and selected Complementary compute programs. Every audit record has `visualValidation=false`; no full third-party pack or physical-GPU visual validation is claimed.
 
 ## 0.2.0-beta.24 - 2026-10-20 (experimental prerelease)
 

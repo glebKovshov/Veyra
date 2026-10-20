@@ -1,18 +1,20 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.24 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.25 experimental prerelease
 
-## Unreleased compatibility batch after beta.24
+## Beta.25 armor-glint vertex compatibility
 
-The current candidate executes `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup, then links supported color, UV, and fog-distance outputs to the adapted glint fragment stage. It bridges the glint texture matrix, supported legacy position/color/UV aliases, Iris fog uniforms, and `noisetex`. The fragment bridge maps `texture`, `gtexture`, and Iris `tex` to Minecraft's `Sampler0`. Shared preprocessing removes unreachable helper functions and unused uniforms/samplers while active unsupported reads remain errors. The candidate includes adapter tests, shaderc SPIR-V checks, an example pack, and a Lavapipe enchanted-book fixture.
+Beta.25 executes a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and links checked color, UV, and fog-distance outputs to the adapted fragment stage. The bridge exposes legacy position/UV aliases, the texture matrix, Iris fog uniforms, and `noisetex`. Minecraft 1.21.11's native glint vertex format provides `Position` and `UV0` but no color input, so legacy `gl_Color` maps to white. The fragment bridge maps `texture`, `gtexture`, and Iris `tex` to Minecraft's `Sampler0`. Shared preprocessing removes unreachable helpers and unused uniforms/samplers while active unsupported reads remain explicit errors.
 
-The refreshed candidate source audit covers 4 pinned archives / 75 profile-dimension cases / 5,178 stages: **705 geometry fragments accepted / 12 rejected**. Complementary armor glint now passes source adaptation. The remaining first whole-pack blockers are `gbuffers_basic.vsh` in all 27 Reimagined cases, all 27 Unbound cases, and all 18 BSL cases, plus Sildur glint output attachment 4 in 3 cases. Twelve Sildur fragment adapters still reject `LightC` across block translucent, entity translucent, hand water, and water. Every audit record retains `visualValidation=false`.
+PR [#62](https://github.com/glebKovshov/Veyra/pull/62) merged into `main` as `df3df827743adf9a978008c59fe9812cd16a699d`. Its final head passed Build [39483079517](https://github.com/glebKovshov/Veyra/actions/runs/39483079517), pinned source audit [39483079473](https://github.com/glebKovshov/Veyra/actions/runs/39483079473), and all **25/25** Lavapipe fixtures [39483079632](https://github.com/glebKovshov/Veyra/actions/runs/39483079632). The enchanted-book fixture read back 313 bright green pixels while the pack was active and 0 after it was disabled; CI found no runtime Vulkan validation errors before shutdown. Teardown diagnostics remain.
 
-| Pack | Geometry fragments accepted / attempted | Candidate whole-pack source blockers | In-game pack result |
+The pinned source audit covers 4 archives / 75 profile-dimension cases / 5,178 stages: **705 geometry fragments accepted / 12 rejected**. Complementary armor glint passes source adaptation. The remaining first whole-pack blockers are `gbuffers_basic.vsh` in all 27 Reimagined cases, all 27 Unbound cases, and all 18 BSL cases, plus Sildur glint output attachment 4 in 3 cases. Twelve Sildur fragment adapters still reject `LightC` across block translucent, entity translucent, hand water, and water. Every audit record retains `visualValidation=false`.
+
+| Pack | Geometry fragments accepted / attempted | Current whole-pack source blockers | In-game pack result |
 | --- | --- | --- | --- |
 | Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | `gbuffers_basic.vsh` in all 27 cases per archive; selected profiles also declare unsupported `shadowcomp.csh` compute | Not tested |
 | BSL 10.1.8 | 9/9, 9/9, 9/9 | `gbuffers_basic.vsh` in all 18 cases | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 1/5, 1/5, 1/5 | Glint writes attachment 4; four translucent programs require `LightC` | Not tested |
 
-Minecraft 1.21.11's leash vertex format has position, color, and lightmap but no normal; the lines format has position, color, and normal but no UV/lightmap. The audited `gbuffers_basic.vsh` programs require inputs these native paths do not both provide, so Veyra retains an explicit capability rejection instead of fabricating those values. This candidate has no complete third-party pack visual validation or physical-GPU result.
+Minecraft 1.21.11's leash vertex format has position, color, and lightmap but no normal; the lines format has position, color, and normal but no UV/lightmap. The audited `gbuffers_basic.vsh` programs require inputs these native paths do not both provide, so Veyra retains an explicit capability rejection instead of fabricating those values. Beta.25 has no complete third-party pack visual validation or physical-GPU result; the stable goal remains incomplete.
 
 ## Beta.24 terrain vertex stages
 
