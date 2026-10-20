@@ -1,12 +1,14 @@
 # 0.2 development validation status
 
-## Beta.13 release candidate — 2026-10-20
+## Beta.13 experimental release — 2026-10-20
 
-The merged main code adds first-person `isMainHand` variants and BSL hand-direction aliases. The candidate version is `0.2.0-beta.13+mc1.21.11`; the tag has not yet been pushed, so beta.12 remains the latest published release at this point.
+Published [Veyra 0.2.0-beta.13+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.13%2Bmc1.21.11) from tag `v0.2.0-beta.13+mc1.21.11`, target commit `0a275fe5d4b88aab3c033b65140b5fb48b949044`. Release workflow [39369824141](https://github.com/glebKovshov/Veyra/actions/runs/39369824141) passed the pinned source audit, all 16 Lavapipe fixtures, `build validateShaders packageExamplePacks`, distributable verification, and publication.
 
-On checked PR head `092c611e5a445f3fd958d7db22f5889e2622d9f0`, GitHub Build run [39368301651](https://github.com/glebKovshov/Veyra/actions/runs/39368301651) passed `build validateShaders`: **214 tests, 0 failures/errors/skips**; 47 examples preprocessed and 44 compiled directly to Vulkan SPIR-V. Graphics smoke [39368301683](https://github.com/glebKovshov/Veyra/actions/runs/39368301683) passed all 16 Lavapipe fixtures. The pinned source audit [39368301649](https://github.com/glebKovshov/Veyra/actions/runs/39368301649) passed for 4 packs, 75 cases, and 5,178 stages: 234 geometry fragments accepted / 483 rejected. All audit records remain `visualValidation=false`.
+The tag Build run [39369823943](https://github.com/glebKovshov/Veyra/actions/runs/39369823943) passed; its uploaded JUnit reports contain **214 tests, 0 failures, 0 errors, and 0 skipped**. It preprocessed 47 examples and compiled 44 directly to Vulkan SPIR-V. The final pinned audit artifact contains 75 records across 4 packs / 5,178 stages, accepts 234 geometry fragments and rejects 483; `visualValidation=false` for all records.
 
-These are successful PR-head CI runs, not the still-pending tag release run. This shell exposes no JDK, so a fresh local Gradle build is unavailable; the tag workflow will rerun build, tests, shader validation, graphics smoke, source audit, and JAR verification before publication. No physical-GPU or third-party shaderpack visual result is claimed.
+Downloaded release asset `veyra-0.2.0-beta.13+mc1.21.11.jar`: **581,330 bytes**, SHA-256 `0409fd6fe226c71724426e00f2f763a81cc57a98e6350cc2a6521b9e5071c2bd`. It matches `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.13+mc1.21.11. The sources JAR and example-packs ZIP also match their published checksums.
+
+These automated fixtures do not establish third-party pack appearance or physical-GPU correctness. No physical-GPU or third-party shaderpack visual result is claimed; the stable-release goal remains incomplete. This shell exposes no JDK for a fresh local Gradle build.
 
 ## Entity overlay and lightmap adapter candidate — 2026-10-20
 
