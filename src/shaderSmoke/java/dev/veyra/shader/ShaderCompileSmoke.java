@@ -287,6 +287,12 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = vec4(absMidCoordPos, 0.0, 1.0); }
                     """);
             compile(compiler, options, terrainMidCoord, "terrain-abs-midcoordpos-fragment-adapter", true);
+            String terrainSpriteBounds = TerrainShaderAdapter.adaptFragment("""
+                    #version 120
+                    varying vec4 spriteBounds;
+                    void main() { gl_FragColor = vec4(spriteBounds.xy, spriteBounds.zw); }
+                    """);
+            compile(compiler, options, terrainSpriteBounds, "terrain-sprite-bounds-fragment-adapter", true);
             String postShadowSource = "uniform sampler2DShadow shadowtex1;\n"
                     + "float compare(sampler2DShadow depthMap){return texture(depthMap,vec3(0.5));}\n"
                     + "layout(location=0) out vec4 outColor;void main(){outColor=vec4(texture(shadowtex1,vec3(0.5))+compare(shadowtex1))+shadow2D(shadowtex1,vec3(0.5));}\n";
@@ -306,7 +312,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, terrain-view-position and terrain-abs-midcoordpos fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, terrain-view-position, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
