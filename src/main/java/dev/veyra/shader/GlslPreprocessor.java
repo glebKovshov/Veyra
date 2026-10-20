@@ -34,6 +34,7 @@ final class GlslPreprocessor {
         macros.put("MC_SHADOW_QUALITY", "1.0");
         macros.put("MC_HAND_DEPTH", "0.125");
         macros.put("VEYRA", "200");
+        macros.put("IRIS_TAG_SUPPORT", "2");
         macros.putAll(BiomeIds.defines());
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         macros.put(os.contains("win") ? "MC_OS_WINDOWS" : os.contains("mac") ? "MC_OS_MAC" : "MC_OS_LINUX", "1");

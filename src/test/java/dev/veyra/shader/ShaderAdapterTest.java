@@ -115,7 +115,35 @@ class ShaderAdapterTest {
         assertTrue(vertex.indexOf("float near;") < vertex.indexOf("mat4 gbufferModelView;"));
         assertTrue(vertex.contains("veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;"));
         assertTrue(vertex.contains("layout (location = 3) in uvec2 MidTexCoord;"));
+        assertTrue(vertex.contains("layout (location = 4) in int VeyraTerrainMaterialId;"));
+        assertTrue(vertex.contains("layout (location = 5) in float VeyraTerrainRenderType;"));
+        assertTrue(vertex.contains("layout (location = 11) out flat int veyraTerrainMaterialId;"));
+        assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
         assertTrue(vertex.contains("veyraSignMidCoordPos = sign(texCoord0 - veyraMidTexCoord);"));
+        assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
+    }
+
+    @Test
+    void bridgesIrisTerrainMaterialAndFluidInputs() throws IOException {
+        for (String materialType : List.of("int", "float")) {
+            String adapted = TerrainShaderAdapter.adaptFragment("""
+                    #version 120
+                    flat in %s mat;
+                    flat in vec2 mc_Entity;
+                    void main() {
+                        gl_FragColor = mat == 27101 && mc_Entity.y < 0.0
+                                ? vec4(1.0, 0.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+                    }
+                    """.formatted(materialType));
+
+            assertTrue(adapted.contains("layout(location = 11) flat in int veyraTerrainMaterialId;"));
+            assertTrue(adapted.contains("layout(location = 13) flat in vec2 veyraMcEntity;"));
+            assertTrue(adapted.contains(materialType.equals("float")
+                    ? "#define mat float(veyraTerrainMaterialId)" : "#define mat veyraTerrainMaterialId"));
+            assertTrue(adapted.contains("#define mc_Entity veyraMcEntity"));
+            assertFalse(adapted.contains("flat in " + materialType + " mat;"));
+            assertFalse(adapted.contains("flat in vec2 mc_Entity;"));
+        }
     }
 
     @Test
@@ -191,7 +219,9 @@ class ShaderAdapterTest {
         assertEquals(0.5F, TerrainMidTexCoord.center(0.0F, 1.0F, 1.0F, 0.0F));
         assertEquals((short) 16384, TerrainMidTexCoord.pack(0.5F));
         assertEquals(Short.MIN_VALUE, TerrainMidTexCoord.pack(1.0F));
-        assertEquals(20, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
+        assertEquals(28, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
+        assertEquals(20, TerrainMidTexCoord.MATERIAL_ID_OFFSET);
+        assertEquals(24, TerrainMidTexCoord.RENDER_TYPE_OFFSET);
     }
 
     @Test
@@ -202,6 +232,10 @@ class ShaderAdapterTest {
                     "void main() { gl_FragColor = vec4(" + input + "); }\n"));
             assertTrue(error.getMessage().contains("input '" + input + "'"), error.getMessage());
         }
+
+        IOException wrongMaterialType = assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(
+                "in vec3 mat;\nvoid main() { gl_FragColor = vec4(mat, 1.0); }\n"));
+        assertTrue(wrongMaterialType.getMessage().contains("mat' must use int or float"));
     }
 
     @Test

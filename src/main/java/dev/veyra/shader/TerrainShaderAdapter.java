@@ -60,6 +60,8 @@ public final class TerrainShaderAdapter {
             Map.entry("vertexPos", new Varying("vec3", 7)),
             Map.entry("playerPos", new Varying("vec3", 7)),
             Map.entry("viewPos", new Varying("vec3", 10)),
+            Map.entry("mat", new Varying("int", 11)),
+            Map.entry("mc_Entity", new Varying("vec2", 13)),
             Map.entry("signMidCoordPos", new Varying("vec2", 12)),
             Map.entry("sphericalVertexDistance", new Varying("float", 8)),
             Map.entry("cylindricalVertexDistance", new Varying("float", 9)));
@@ -156,7 +158,9 @@ public final class TerrainShaderAdapter {
             layout(location = 8) in float veyraSphericalVertexDistance;
             layout(location = 9) in float veyraCylindricalVertexDistance;
             layout(location = 10) in vec3 veyraViewPosition;
+            layout(location = 11) flat in int veyraTerrainMaterialId;
             layout(location = 12) in vec2 veyraSignMidCoordPos;
+            layout(location = 13) flat in vec2 veyraMcEntity;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -360,6 +364,7 @@ public final class TerrainShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         List<String> declaredVaryings = new ArrayList<>();
+        Map<String, String> declaredVaryingTypes = new java.util.HashMap<>();
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -367,14 +372,17 @@ public final class TerrainShaderAdapter {
             if (varying == null) {
                 throw new IOException("gbuffers_terrain input '" + name + "' is not provided by Veyra's terrain bridge yet.");
             }
-            if (!varying.type().equals(type)) {
-                throw new IOException("gbuffers_terrain input '" + name + "' must use " + varying.type() + ".");
+            boolean floatMaterialId = name.equals("mat") && type.equals("float");
+            if (!varying.type().equals(type) && !floatMaterialId) {
+                String expected = name.equals("mat") ? "int or float" : varying.type();
+                throw new IOException("gbuffers_terrain input '" + name + "' must use " + expected + ".");
             }
             String location = varyingMatcher.group(1);
             if (location != null && varying.location() >= 0 && Integer.parseInt(location) != varying.location()) {
                 throw new IOException("gbuffers_terrain input '" + name + "' uses an unsupported location.");
             }
             declaredVaryings.add(name);
+            declaredVaryingTypes.put(name, type);
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
         varyingMatcher.appendTail(withoutVaryings);
@@ -395,7 +403,8 @@ public final class TerrainShaderAdapter {
         Matcher unsupportedInput = UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented);
         while (unsupportedInput.find()) {
             String name = unsupportedInput.group(1);
-            if ((name.equals("tangent") || name.equals("binormal") || name.equals("viewVector"))
+            if ((name.equals("mc_Entity")
+                    || name.equals("tangent") || name.equals("binormal") || name.equals("viewVector"))
                     && declaredVaryings.contains(name)) {
                 continue;
             }
@@ -417,10 +426,19 @@ public final class TerrainShaderAdapter {
         for (String extension : extensions) {
             result.append(extension).append('\n');
         }
+        StringBuilder terrainMaterialMacros = new StringBuilder();
+        if (declaredVaryings.contains("mat")) {
+            terrainMaterialMacros.append("#define mat ");
+            terrainMaterialMacros.append(declaredVaryingTypes.get("mat").equals("float")
+                    ? "float(veyraTerrainMaterialId)\n" : "veyraTerrainMaterialId\n");
+        }
+        if (declaredVaryings.contains("mc_Entity")) {
+            terrainMaterialMacros.append("#define mc_Entity veyraMcEntity\n");
+        }
         String bridge = FRAGMENT_BRIDGE
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
-                        + fogUniforms.bridge() + "#define texture Sampler0");
+                        + fogUniforms.bridge() + terrainMaterialMacros + "#define texture Sampler0");
         boolean usesDepth = waterInputsAvailable && usesOpaqueDepthSampler(source);
         if (usesDepth) {
             int depthBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0);
@@ -597,10 +615,12 @@ public final class TerrainShaderAdapter {
         }
         String compressedColorMarker = "layout (location = 2) in uint PackedColor;";
         if (!source.contains(compressedColorMarker)) {
-            throw new IOException("VulkanMod's compressed terrain vertex format changed; Veyra cannot read per-quad texture coordinates.");
+            throw new IOException("VulkanMod's compressed terrain vertex format changed; Veyra cannot read per-quad texture coordinates or block IDs.");
         }
         String adapted = source.replace(compressedColorMarker,
-                compressedColorMarker + "\n    layout (location = 3) in uvec2 MidTexCoord;");
+                compressedColorMarker + "\n    layout (location = 3) in uvec2 MidTexCoord;"
+                        + "\n    layout (location = 4) in int VeyraTerrainMaterialId;"
+                        + "\n    layout (location = 5) in float VeyraTerrainRenderType;");
         adapted = adapted.replace(outputMarker,
                 outputMarker + "\nlayout (location = 5) out vec2 veyraLightmapCoord;"
                         + "\nlayout (location = 6) out vec4 veyraShadowPos;"
@@ -608,7 +628,9 @@ public final class TerrainShaderAdapter {
                         + "\nlayout (location = 8) out float veyraSphericalVertexDistance;"
                         + "\nlayout (location = 9) out float veyraCylindricalVertexDistance;"
                         + "\nlayout (location = 10) out vec3 veyraViewPosition;"
-                        + "\nlayout (location = 12) out vec2 veyraSignMidCoordPos;");
+                        + "\nlayout (location = 11) out flat int veyraTerrainMaterialId;"
+                        + "\nlayout (location = 12) out vec2 veyraSignMidCoordPos;"
+                        + "\nlayout (location = 13) out flat vec2 veyraMcEntity;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
@@ -635,7 +657,9 @@ public final class TerrainShaderAdapter {
                         + "\n    veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);"
                         + "\n    veyraSphericalVertexDistance = length(pos);"
                         + "\n    veyraCylindricalVertexDistance = max(length(pos.xz), abs(pos.y));"
-                        + "\n    veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;");
+                        + "\n    veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;"
+                        + "\n    veyraTerrainMaterialId = VeyraTerrainMaterialId;"
+                        + "\n    veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);");
         String texCoordMarker = "texCoord0 = UV0 * UV_INV;";
         if (!adapted.contains(texCoordMarker)) {
             throw new IOException("VulkanMod's compressed terrain texture coordinates changed; Veyra cannot compute the Iris per-quad midpoint.");
