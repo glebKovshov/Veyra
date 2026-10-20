@@ -48,7 +48,8 @@ public final class GraphicsSmoke {
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
-            if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
+            if (entityFixture && !entityFixtureStarted && worldTicks >= 20
+                    && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();
                 // Initial player spawn is randomized around the world's spawn point.
@@ -57,18 +58,31 @@ public final class GraphicsSmoke {
                 server.execute(() -> {
                     try {
                         if (currentRenderedItemFixture) {
+                            // Wait until the local player has finished joining before using its
+                            // position. Keep both items near the center of the fixed 45-degree view.
+                            double frontX = -Math.sqrt(0.5) * 4.0;
+                            double frontZ = Math.sqrt(0.5) * 4.0;
+                            double sideX = Math.sqrt(0.5) * 0.65;
+                            double sideZ = Math.sqrt(0.5) * 0.65;
+                            double itemY = playerY + 0.5;
                             var diamond = new net.minecraft.world.entity.item.ItemEntity(server.overworld(),
-                                    playerX - 4.0, playerY + 0.5, playerZ + 2.0,
+                                    playerX + frontX - sideX, itemY, playerZ + frontZ - sideZ,
                                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND));
                             diamond.setNoGravity(true);
                             diamond.setNeverPickUp();
-                            server.overworld().addFreshEntity(diamond);
+                            if (!server.overworld().addFreshEntity(diamond))
+                                throw new IllegalStateException("Could not add the diamond item fixture entity");
                             var stone = new net.minecraft.world.entity.item.ItemEntity(server.overworld(),
-                                    playerX - 2.0, playerY + 0.5, playerZ + 4.0,
+                                    playerX + frontX + sideX, itemY, playerZ + frontZ + sideZ,
                                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STONE));
                             stone.setNoGravity(true);
                             stone.setNeverPickUp();
-                            server.overworld().addFreshEntity(stone);
+                            if (!server.overworld().addFreshEntity(stone))
+                                throw new IllegalStateException("Could not add the stone item fixture entity");
+                            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                                    "Spawned currentRenderedItemId fixture items at diamond=({}, {}, {}), stone=({}, {}, {})",
+                                    diamond.getX(), diamond.getY(), diamond.getZ(),
+                                    stone.getX(), stone.getY(), stone.getZ());
                         } else {
                             var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                             if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
