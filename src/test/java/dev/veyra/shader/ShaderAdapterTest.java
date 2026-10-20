@@ -119,7 +119,10 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("layout (location = 5) in float VeyraTerrainRenderType;"));
         assertTrue(vertex.contains("layout (location = 11) out flat int veyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
-        assertTrue(vertex.contains("veyraSignMidCoordPos = sign(texCoord0 - veyraMidTexCoord);"));
+        assertTrue(vertex.contains("layout (location = 14) out flat vec2 veyraAbsMidCoordPos;"));
+        assertTrue(vertex.contains("const vec2 veyraMidCoordOffset = texCoord0 - veyraMidTexCoord;"));
+        assertTrue(vertex.contains("veyraSignMidCoordPos = sign(veyraMidCoordOffset);"));
+        assertTrue(vertex.contains("veyraAbsMidCoordPos = abs(veyraMidCoordOffset);"));
         assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
     }
 
