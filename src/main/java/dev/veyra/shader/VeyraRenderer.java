@@ -3430,9 +3430,19 @@ public final class VeyraRenderer {
                 if (!pack.terrainPrograms().contains(programName)) {
                     continue;
                 }
+                var shaderPackVertex = pack.readStage(programName + ".vsh");
+                boolean vertexUsesNoiseSampler = false;
+                Map<String, TerrainVertexShaderAdapter.PackVarying> outputDescriptions = Map.of();
+                if (shaderPackVertex.isPresent()) {
+                    vertexUsesNoiseSampler = TerrainVertexShaderAdapter.usesNoiseSampler(
+                            programName, shaderPackVertex.get());
+                    outputDescriptions = TerrainVertexShaderAdapter.describeVaryings(
+                            programName, shaderPackVertex.get());
+                }
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-                boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                boolean usesNoiseSampler = vertexUsesNoiseSampler
+                        || TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
                 boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
                 boolean usesShadowColor = ShadowColorSampler.used(fragmentSource);
                 boolean usesOpaqueShadow = ShadowDepthSampler.used(fragmentSource);
@@ -3443,14 +3453,45 @@ public final class VeyraRenderer {
                         ? GeometryColorSamplers.indices(GeometryColorSamplers.read(fragmentSource)) : Set.of();
                 if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 FragmentOutputs outputLayout = FragmentOutputs.parse(fragmentSource);
-                fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
-                        programName.equals("gbuffers_water"));
+                Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings = Map.of();
+                Set<Integer> unusedOutputLocations = Set.of();
+                if (shaderPackVertex.isPresent()) {
+                    unusedOutputLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
+                            fragmentSource, outputDescriptions);
+                    packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(
+                            programName, shaderPackVertex.get(), unusedOutputLocations);
+                }
+                String adaptedFragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
+                        programName.equals("gbuffers_water"), packVaryings);
+                String programVertexSource = vertexSource;
+                if (shaderPackVertex.isPresent()) {
+                    Set<Integer> reconciledUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
+                            adaptedFragmentSource);
+                    if (!reconciledUnusedLocations.equals(unusedOutputLocations)) {
+                        unusedOutputLocations = reconciledUnusedLocations;
+                        packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(
+                                programName, shaderPackVertex.get(), unusedOutputLocations);
+                        adaptedFragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource,
+                                shadowSamplerAvailable, programName.equals("gbuffers_water"), packVaryings);
+                        reconciledUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
+                                adaptedFragmentSource);
+                    }
+                    if (!reconciledUnusedLocations.equals(unusedOutputLocations)) {
+                        throw new IOException(programName + ".vsh/.fsh terrain varyings could not reserve a matching interface.");
+                    }
+                    String prunedVertexSource = TerrainShaderAdapter.pruneUnusedTerrainVertexOutputs(
+                            vertexSource, reconciledUnusedLocations);
+                    TerrainVertexShaderAdapter.AdaptedStage adaptedVertex = TerrainVertexShaderAdapter.adaptStage(
+                            prunedVertexSource, shaderPackVertex.get(), programName,
+                            shadowSamplerAvailable ? 6 : 5, reconciledUnusedLocations);
+                    programVertexSource = adaptedVertex.source();
+                }
 
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
                 builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler, usesOpaqueDepthSampler, usesSpecularSampler, usesShadowColor, usesOpaqueShadow, colorInputs));
-                builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
-                builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
+                builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, programVertexSource);
+                builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, adaptedFragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
                 pipelines.put(programName, pipeline);
                 VeyraGeometryTargets.register(pipeline, outputLayout, pack.readGeometryBlendSettings(programName));
