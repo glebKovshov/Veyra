@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.18 - 2026-10-20 (prerelease)
+
+- Bridge legacy Iris `gl_Fog.color`, `gl_Fog.start`, `gl_Fog.end`, and derived `gl_Fog.scale` through Minecraft's existing Fog UBO.
+- Reject `gl_Fog.density` explicitly because Veyra has no validated runtime density value; unsupported values are not fabricated.
+- Extend the geometry-fog example and adapter regressions. The pinned source audit accepts 636 / rejects 81 geometry fragments across 75 cases / 5,178 stages; no third-party pack visuals are validated.
+
 ## 0.2.0-beta.17 - 2026-10-20 (prerelease)
 
 - Bridge Iris terrain `midCoord` from VulkanMod's compressed per-quad midpoint after applying the live texture matrix to midpoint and vertex UVs; derive `signMidCoordPos` and `absMidCoordPos` from those transformed coordinates.
