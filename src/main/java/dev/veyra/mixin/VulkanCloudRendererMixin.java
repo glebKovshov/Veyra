@@ -61,8 +61,8 @@ public abstract class VulkanCloudRendererMixin {
     }
 
     @ModifyArg(method = "buildClouds", at = @At(value = "INVOKE", target =
-            "Lnet/minecraft/class_289;method_60827(Lcom/mojang/blaze3d/vertex/VertexFormat$class_5596;"
-                    + "Lcom/mojang/blaze3d/vertex/VertexFormat;)Lnet/minecraft/class_287;", remap = false),
+            "Lcom/mojang/blaze3d/vertex/Tesselator;begin(Lcom/mojang/blaze3d/vertex/VertexFormat$Mode;"
+                    + "Lcom/mojang/blaze3d/vertex/VertexFormat;)Lcom/mojang/blaze3d/vertex/BufferBuilder;", remap = false),
             index = 1, remap = false)
     private VertexFormat veyra$selectCloudVertexFormat(VertexFormat original) {
         return VeyraRenderer.requiresExtendedCloudVertexFormat()
