@@ -1,14 +1,16 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.15 prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.16 prerelease candidate
 
-## Pinned source audit (beta.15 prerelease)
+## Pinned source audit (beta.16 candidate)
 
-The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **432** geometry fragment programs and rejects **285**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
+The pinned audit [#135](https://github.com/glebKovshov/Veyra/actions/runs/39385648634) covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **486** geometry fragment programs and rejects **231**; every case has `visualValidation: false`. This is a source compatibility check, not proof of a complete shaderpack pipeline or rendered output.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 6/10, 6/10, 6/10 | terrain/water: `absMidCoordPos`; translucent block/entities: unsupported inputs; selected profiles: `shadowcomp.csh` compute stage | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 7/10, 7/10, 7/10 | terrain: `midCoord`; translucent block/entities: unsupported inputs; selected profiles: `shadowcomp.csh` compute stage | Not tested |
 | BSL 10.1.8 | 6/9, 6/9, 6/9 | terrain: `recolor`; water: `dist`; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
+
+The absolute-midpoint terrain bridge added for beta.16 resolves the former `absMidCoordPos` adapter blocker in the pinned Complementary sources and raises their default geometry acceptance from 6/10 to 7/10 in each tested dimension. The remaining `midCoord` identifier is a separate unsupported input reported by the audit. No third-party pack has been visually validated.
 
 ## Terrain tangent-space and material inputs (beta.15 prerelease)
 
@@ -44,7 +46,7 @@ Iris' hardcoded armor-trim and cape identifiers are not mapped yet. The Lavapipe
 
 First-person hand fragments may declare Iris `varying float isMainHand`. Veyra scopes the logical Minecraft hand around each item submission and specializes cached Vulkan pipeline variants to `1.0` for the main hand and `0.0` for the offhand. The input is accepted only by the hand-program adapter. The `current-rendered-item-id` Lavapipe fixture checks `isMainHand` together with IDs 42 and 43, so either signal alone cannot satisfy the readback.
 
-The BSL fragment declares legacy varyings in comma-separated lists. Veyra now splits those declarations before input validation, maps `sunVec` to the live Iris `sunPosition` vector, and derives `upVec` and `eastVec` from the current `gbufferModelView` axes. A BSL-style hand shader is covered by the shaderc SPIR-V fixture. The refreshed source audit accepts the default BSL hand/entity/block fragment cases and records 7/9 geometry fragments accepted in each tested dimension. BSL still has an active cloud `texture` sampler and water `mat` input; it is not confirmed playable. The 75-case matrix accepts 486 and rejects 231 fragments, with `visualValidation=false` throughout. No third-party pack has been visually validated.
+The BSL fragment declares legacy varyings in comma-separated lists. Veyra now splits those declarations before input validation, maps `sunVec` to the live Iris `sunPosition` vector, and derives `upVec` and `eastVec` from the current `gbufferModelView` axes. A BSL-style hand shader is covered by the shaderc SPIR-V fixture. The current pinned audit accepts the default BSL hand/entity/block fragment cases and 6/9 geometry fragments per tested dimension; the remaining terrain `recolor`, water `dist`, and cloud `texture` blockers are listed in the current matrix above. BSL is not confirmed playable. All 75 current audit records have `visualValidation=false`; no third-party pack has been visually validated.
 
 ## Entity and block entity identifiers (beta.4)
 

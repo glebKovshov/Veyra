@@ -4,7 +4,7 @@
 
 Приоритет источников фактов: текущий исходный код и Git → отчёты/ссылки GitHub Actions → документы репозитория → история переписки. Исторические сведения, не подтверждённые текущим кодом, отмечены отдельно.
 
-## Current status: beta.15 experimental prerelease published; stable goal incomplete — 2026-10-20
+## Current status: beta.15 latest published; beta.16 candidate in preparation; stable goal incomplete — 2026-10-20
 
 - Latest release: [Veyra 0.2.0-beta.15+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.15%2Bmc1.21.11), annotated tag `v0.2.0-beta.15+mc1.21.11` at `b3b6d0e0d46efb62a22e3769509f785e6961481e`. Release workflow [39382531868](https://github.com/glebKovshov/Veyra/actions/runs/39382531868) succeeded with all 19 Lavapipe fixtures, the pinned source audit, release build, and publication.
 - Downloaded release JAR: **590,815 bytes**, SHA-256 `179a299d6b2c3d436e675fb022f4618a7dee74318deb07a2e36315eb9a49341d`. It matches the published `SHA256SUMS.txt`; `scripts/verify_jar.py` confirms Minecraft 1.21.11, VulkanMod 0.6.8, and mod `0.2.0-beta.15+mc1.21.11`. The release also contains sources JAR, example-packs ZIP, and checksums.
@@ -18,11 +18,12 @@
 
 ## Continued work: Complementary terrain absolute midpoint — 2026-10-20
 
-- Terrain now carries the flat Iris `absMidCoordPos` value at a new varying location, computed from the existing per-quad midpoint and each vertex UV. The compressed vertex format and its stride are unchanged.
-- Build [#456](https://github.com/glebKovshov/Veyra/actions/runs/39385059735) passed **227 tests with 0 failures, 0 errors, and 0 skipped**, `validateShaders`, build, and JAR verification. Shaderc processed 50 examples and compiled 47 directly to Vulkan SPIR-V, including the new `absMidCoordPos` fixture.
-- Graphics smoke [#173](https://github.com/glebKovshov/Veyra/actions/runs/39385060028) passed **19/19 Lavapipe fixtures**. The updated terrain-midpoint fixture measured 56,288 active magenta / 167,037 opposite-region pixels, 0 disabled magenta pixels, and 0 runtime validation errors. Teardown diagnostics remain.
-- Source audit [#134](https://github.com/glebKovshov/Veyra/actions/runs/39385059792) passed 75 cases (12 defaults and 63 declared-profile cases) across 4 pinned packs / 3 dimensions: **486 geometry fragments accepted / 231 rejected**, up from beta.15's 432 / 285. These are source checks, not third-party visual validation.
-- Beta.15 remains the latest published release; this change is awaiting PR merge and release prep. Remaining source blockers, physical-GPU visuals, clean Vulkan teardown, and stable readiness are unproven.
+- Terrain now carries Iris `absMidCoordPos` as a flat varying calculated from the existing per-quad midpoint UV and each vertex UV. The compressed vertex format and stride are unchanged. PR [#31](https://github.com/glebKovshov/Veyra/pull/31) merged at `7084b8e035e416f5e625fc6bfad6a76bd601e197`.
+- On the final PR head, Build [#458](https://github.com/glebKovshov/Veyra/actions/runs/39385648498) passed **227 tests, 0 failures, 0 errors, 0 skipped**, `validateShaders`, build, and JAR verification. Shaderc processed 50 examples and compiled 47 directly to Vulkan SPIR-V, including the new fixture.
+- Graphics smoke [#174](https://github.com/glebKovshov/Veyra/actions/runs/39385648591) passed **19/19 Lavapipe fixtures**. The midpoint fixture read back 56,892 active magenta pixels, 165,648 opposite-region pixels, 0 disabled magenta pixels, and 0 runtime validation errors. Shutdown still reported 10,031 teardown diagnostics; this synthetic fixture does not visually validate a third-party pack.
+- Source audit [#135](https://github.com/glebKovshov/Veyra/actions/runs/39385648634), artifact [12247886091](https://github.com/glebKovshov/Veyra/actions/runs/39385648634/artifacts/12247886091), passed 75 cases (12 defaults and 63 declared-profile cases) across 4 pinned packs / 3 dimensions: **486 geometry fragments accepted / 231 rejected**, up from beta.15's 432 / 285. All cases retain `visualValidation=false`.
+- Release-prep branch `release-prep/beta16` bumps the version and updates the installation, changelog, release notes, compatibility matrix, and tracked source-audit reports from artifact #135. Beta.16 has not been published yet.
+- Beta.15 remains the latest published release while beta.16 metadata and compatibility docs are prepared. The source audit now reports Complementary `midCoord`, translucent entity/block inputs, and selected compute profiles; BSL `recolor`, `dist`, and cloud `texture`; and Sildur `colortex4`, attachment feedback, and cloud inputs. Physical-GPU visuals, clean Vulkan teardown, and stable readiness are unproven.
 
 ## Continued work: terrain material IDs and beta.15 publication — 2026-10-20
 
