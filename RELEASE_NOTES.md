@@ -16,10 +16,11 @@ This prerelease adds limited per-item `currentRenderedItemId` support. It is not
 
 ## Verification
 
-- Local JDK 21.0.12.1 `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks`: **200 tests**, zero failures/errors/skips; 44 example shader sources and 41 direct Vulkan SPIR-V compilations. The graphics-smoke source set compiles.
+- Local JDK 21.0.12.1 `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks`: **203 tests**, zero failures/errors/skips; 47 example shader sources and 44 direct Vulkan SPIR-V compilations. The graphics-smoke source set compiles.
 - The pinned source audit covers 4 packs, 12 defaults, 63 declared profiles, and 5,178 preprocessed stages; 126 geometry fragments are accepted and 591 rejected. This is a source-only check.
-- The GitHub Release workflow gates publication on that source audit, all 16 Lavapipe graphics fixtures, Gradle build/tests, and distributable verification.
-- The synthetic item fixture validates Veyra's submitted-item mapping bridge; it does not establish third-party pack appearance or physical-GPU compatibility.
+- GitHub Build [39358133674](https://github.com/glebKovshov/Veyra/actions/runs/39358133674), source audit [39358133689](https://github.com/glebKovshov/Veyra/actions/runs/39358133689), and all 16 Lavapipe graphics fixtures [39358133656](https://github.com/glebKovshov/Veyra/actions/runs/39358133656) passed. The item fixture measured 32,321 active magenta pixels for ID 42, 14,102 active green pixels for ID 43, 0 disabled green pixels, and 0 runtime Vulkan validation errors.
+- Release workflow [39358811325](https://github.com/glebKovshov/Veyra/actions/runs/39358811325) passed the pinned source audit, all 16 graphics fixtures, build/tests, and distributable verification. The downloaded release JAR is 577,433 bytes; SHA-256 `34482621D4D1896E5151130F64300397A823BEEC95535D836CDD72CC2827BC34`, matching `SHA256SUMS.txt` and `scripts/verify_jar.py`.
+- Shutdown reported 10,036 `VUID-vkDestroyDevice-device-05137` diagnostics, separate from the zero runtime validation errors. This is not a clean-teardown claim. The synthetic item fixture does not establish third-party pack appearance or physical-GPU compatibility.
 
 ## Known limits
 
