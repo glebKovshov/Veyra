@@ -629,4 +629,5 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 ### Beta.13 release candidate preparation — 2026-10-20
 
 - Prepared version `0.2.0-beta.13+mc1.21.11` from the merged and CI-checked main code. Updated the changelog, install link, and release notes with the hand-input support, current audit counts, known pack blockers, and validation limits.
-- The release tag has not been pushed yet. The tag-triggered release workflow must pass build/tests, source audit, all graphics fixtures, and distributable verification before the prerelease is published.
+- Release commit `32d6863` and annotated tag `v0.2.0-beta.13+mc1.21.11` triggered Release run [39369241688](https://github.com/glebKovshov/Veyra/actions/runs/39369241688). Source audit, all 16 Lavapipe jobs, `build validateShaders packageExamplePacks`, and `scripts/verify_jar.py` passed; publication failed at the final tag identity guard.
+- The failure is in the workflow guard: its exact-ref `git ls-remote --tags` query returned the annotated tag-object SHA, and the old `cut -f1` comparison treated it as the commit SHA. The workflow now requests the peeled `^{}` ref explicitly and resolves that commit (falling back to the direct SHA for lightweight tags); Beta.13 publication must be rerun after this fix, and the final JAR still needs downloading/checksum verification.

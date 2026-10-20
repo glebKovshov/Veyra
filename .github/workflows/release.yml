@@ -58,8 +58,14 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" > existing-tag.txt; then
-            test "$(cut -f1 existing-tag.txt)" = "$GITHUB_SHA"
+          if git ls-remote --exit-code origin \
+            "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}" > existing-tag.txt; then
+            tag_commit=$(awk -v tag_ref="refs/tags/$RELEASE_TAG" '
+              $2 == tag_ref { direct = $1 }
+              $2 == tag_ref "^{}" { peeled = $1 }
+              END { print (peeled != "" ? peeled : direct) }
+            ' existing-tag.txt)
+            test "$tag_commit" = "$GITHUB_SHA"
           fi
           release_flags=()
           if [[ "${RELEASE_TAG%%+*}" == *-* ]]; then
