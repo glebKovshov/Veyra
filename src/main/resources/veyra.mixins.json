@@ -13,6 +13,8 @@
     "GuiRendererMixin",
     "ShaderManagerMixin",
     "PipelineManagerMixin",
+    "TerrainBufferBuilderMixin",
+    "ThreadBuilderPackMixin",
     "LevelRendererMixin",
     "WorldRendererMixin",
     "VkRenderPassMixin",

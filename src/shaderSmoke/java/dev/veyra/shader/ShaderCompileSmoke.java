@@ -105,9 +105,12 @@ public class ShaderCompileSmoke {
                     };
                     layout(binding = 4) uniform sampler2D Sampler2;
                     layout(location = 0) in ivec4 Position;
-                    layout(location = 1) in uint PackedColor;
+                    layout(location = 1) in uvec2 UV0;
+                    layout (location = 2) in uint PackedColor;
                     layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out vec2 texCoord0;
                     layout (location = 4) out flat float fadeFactor;
+                    const float UV_INV = 1.0 / 32768.0;
                     vec3 getVertexPosition() { return vec3(Position.xyz); }
                     vec4 sample_lightmap2(sampler2D sourceSampler, int coordinates) {
                         return texture(sourceSampler, vec2(float(coordinates)));
@@ -117,6 +120,7 @@ public class ShaderCompileSmoke {
                         gl_Position = MVP * vec4(pos, 1.0);
                         const vec4 Color = unpackUnorm4x8(PackedColor);
                         vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                        texCoord0 = UV0 * UV_INV;
                         fadeFactor = 1.0;
                     }
                     """);

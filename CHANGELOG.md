@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.10 — 2026-10-20 (prerelease)
+
+- Extend VulkanMod's compressed terrain vertices with Iris per-quad midpoint UVs and bridge `signMidCoordPos` using the original vertex UV and that midpoint.
+- Bridge terrain `vertexPos`, `playerPos`, and raw `glColorRaw` to source values already carried by the terrain shader.
+- Add regression coverage and a Lavapipe fixture that requires both signs of the midpoint signal; add its observed pixel count to the fixture result.
+- Update the pinned source audit and compatibility matrix after this bridge.
+
 ## 0.2.0-beta.9 — 2026-10-20 (prerelease)
 
 - Bridge terrain-family Iris `viewPos` from VulkanMod's camera-relative vertex position and the current `gbufferModelView` matrix, preserving the configured uniform-buffer layout.

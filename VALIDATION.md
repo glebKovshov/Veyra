@@ -1,10 +1,16 @@
 # 0.2 development validation status
 
-## Beta.8 published prerelease — 2026-10-20
+## Beta.10 candidate — local checks — 2026-10-20
 
-PR #12 (`fix/terrain-interface-diagnostics`) merged as `738b27621b9d66e348795c8781272d35db89949f`; PR #13 merged the publication status update. Tag `v0.2.0-beta.8+mc1.21.11` points to `f3d7fa198bca6edf8c12166620a808b1b9a36dac`. The [Release workflow](https://github.com/glebKovshov/Veyra/actions/runs/39338631777) passed source audit, all 13 Lavapipe graphics fixtures, build/tests, JAR verification and publication.
+On JDK 21.0.12.1, `test validateShaders build packageExamplePacks --rerun-tasks` passed at beta.10: **199 JUnit tests, 0 failures/errors/skips**, 43 example stages processed, 40 compiled directly to Vulkan SPIR-V, plus conditional-include, entity-ID, shadow, cloud and terrain-view-position fixtures. The remapped `veyra-0.2.0-beta.10+mc1.21.11.jar` is 570,849 bytes, SHA-256 `d26cdb64a22b16852158446063fb398a7e77b0cd4794fbd660ba702f0a3abff5`, and passes `scripts/verify_jar.py`.
 
-The [beta.8 GitHub Release](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.8%2Bmc1.21.11) includes [veyra-0.2.0-beta.8+mc1.21.11.jar](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.8%2Bmc1.21.11/veyra-0.2.0-beta.8%2Bmc1.21.11.jar), 565,142 bytes, SHA-256 `1c6e04551a12377617fa5c714eb6daa7481a9a93dc75db0afbac2587fa7a1a85`. The asset was downloaded again and passed `scripts/verify_jar.py`; its hash matches the release `SHA256SUMS.txt` and GitHub asset digest. Local JDK 21.0.12.1 checks passed with 192 tests, 41 shader examples processed and 38 direct SPIR-V compilations. The source audit still reports 72 accepted / 645 rejected across 75 cases / 5,178 sources; all cases have `visualValidation=false`. This is an experimental prerelease, with third-party pack appearance on a physical GPU still unverified.
+The refreshed pinned source audit covers 75 cases / 5,178 sources: 126 geometry fragments accepted / 591 rejected, with `visualValidation=false` throughout. Complementary terrain and BSL terrain now pass source adaptation; Complementary water still needs `viewVector`, BSL water still needs `mat`, and all three tested pack families retain other unsupported inputs. The new 15th Lavapipe midpoint fixture and GitHub PR/release workflows have not yet run. No third-party pack visual check, physical-GPU result, clean teardown or full Iris parity is claimed.
+
+## Beta.9 published prerelease — 2026-10-20
+
+PR #16 merged to `main` as `3ac3f16b25fe16c9c5c78967f30c9cc1650f8c51`; tag `v0.2.0-beta.9+mc1.21.11` and the GitHub prerelease were published by Release workflow `39344144615`. Its downloaded JAR is 565,211 bytes, SHA-256 `9c773e71622e21f0c5af3328849e84a1de02cf720ad62ceaadeeb45edfd73dcd`, matching `SHA256SUMS.txt` and passing `scripts/verify_jar.py`.
+
+The terrain `viewPos` Lavapipe readback measured 222,792 active magenta pixels / 0 disabled, with zero runtime Vulkan validation errors. The run recorded 10,031 `VUID-vkDestroyDevice-device-05137` shutdown diagnostics, matching the same-run vanilla baseline; this is not a clean-teardown claim. Third-party packs were not visually checked.
 
 ## Beta.7 published prerelease — 2026-10-20
 

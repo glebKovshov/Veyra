@@ -23,7 +23,8 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture;
+    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture, geometryMidTexCoordFixture;
+    private static int activeOppositeMidTexCoordPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -41,6 +42,7 @@ public final class GraphicsSmoke {
             vanillaBaseline = fixture.equals("vanilla-baseline");
             cloudFixture = fixture.equals("cloud-colortex0");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
+            geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -96,6 +98,7 @@ public final class GraphicsSmoke {
             // This fixture declares no auxiliary MRT target and validates its signal in the
             // presented colortex0 image. Keep the existing colortex1 check for other fixtures.
             var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
+                    && !geometryMidTexCoordFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -149,6 +152,7 @@ public final class GraphicsSmoke {
 
     private static void capture(Minecraft client, NativeImage image, boolean active) {
         int colored = 0;
+        int opposite = 0;
         try (image) {
             Files.createDirectories(output);
             image.writeToFile(output.resolve(active ? "mrt-active.png" : "shaders-disabled.png"));
@@ -156,20 +160,25 @@ public final class GraphicsSmoke {
                 int pixel = image.getPixel(x, y);
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
+                if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
             }
             int count = colored;
+            int oppositeCount = opposite;
             completion = () -> {
                 if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
                 } else if (active) {
                     activePixels = count;
+                    activeOppositeMidTexCoordPixels = oppositeCount;
                     VeyraRenderer.disable();
                     baselineAt = worldTicks + 80;
                     stage = 1;
                     pending = false;
                 } else {
                     Throwable failure = activePixels < 2000 || count * 4 >= activePixels
-                            ? new IllegalStateException("Auxiliary MRT signal absent or unchanged: active=" + activePixels + ", disabled=" + count) : null;
+                            || geometryMidTexCoordFixture && activeOppositeMidTexCoordPixels < 2000
+                            ? new IllegalStateException("Auxiliary MRT or per-quad midpoint signal absent or unchanged: active="
+                            + activePixels + ", opposite=" + activeOppositeMidTexCoordPixels + ", disabled=" + count) : null;
                     finish(client, failure, count);
                 }
             };
@@ -184,6 +193,7 @@ public final class GraphicsSmoke {
             String error = failure == null ? "" : failure.toString().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
             Files.writeString(output.resolve("result.json"), "{\"status\":\"" + (failure == null ? "passed" : "failed")
                     + "\",\"renderer\":\"Lavapipe/software Vulkan\",\"activeMagentaPixels\":" + activePixels
+                    + ",\"activeOppositeMidTexCoordPixels\":" + activeOppositeMidTexCoordPixels
                     + ",\"disabledMagentaPixels\":" + baseline + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);
