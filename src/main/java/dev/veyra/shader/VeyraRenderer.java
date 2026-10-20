@@ -92,6 +92,7 @@ import org.lwjgl.vulkan.VkFormatProperties;
 import org.lwjgl.vulkan.VK10;
 
 import java.io.IOException;
+import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -701,7 +702,7 @@ public final class VeyraRenderer {
 
     private static void registerShaderPackMatrixUniform(String name) {
         if (name.equals("textureMatrix")) {
-            Uniforms.mat4f_uniformMap.put(name, VRenderSystem::getTextureMatrix);
+            Uniforms.mat4f_uniformMap.put(name, VeyraRenderer::textureMatrixUniformBuffer);
             return;
         }
         if (name.equals("shadowModelViewInverse") || name.equals("shadowProjectionInverse")) {
@@ -711,6 +712,23 @@ public final class VeyraRenderer {
         shaderPackMatrix(name, frameMatrices).get(buffer.buffer.asFloatBuffer());
         SHADER_PACK_MATRIX_BUFFERS.put(name, buffer);
         Uniforms.mat4f_uniformMap.put(name, () -> buffer);
+    }
+
+    private static MappedBuffer textureMatrixUniformBuffer() {
+        MappedBuffer buffer = VRenderSystem.getTextureMatrix();
+        FloatBuffer matrix = buffer.buffer.asFloatBuffer();
+        initializeTextureMatrixIfUnset(matrix);
+        return buffer;
+    }
+
+    static void initializeTextureMatrixIfUnset(FloatBuffer matrix) {
+        boolean initialized = Float.isFinite(matrix.get(15)) && Math.abs(matrix.get(15) - 1.0F) < 1.0e-6F;
+        for (int index = 0; initialized && index < 16; index++) {
+            initialized = Float.isFinite(matrix.get(index));
+        }
+        if (!initialized) {
+            new Matrix4f().get(matrix);
+        }
     }
 
     private static void updateShaderPackMatrixUniforms(FrameMatrices matrices) {
@@ -5632,7 +5650,7 @@ public final class VeyraRenderer {
                 case "is_burning" -> new UniformValue.IntUniform(frameUniforms.isBurning() ? 1 : 0);
                 case "gbufferModelView" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferModelView());
                 case "textureMatrix" -> new UniformValue.Matrix4x4Uniform(
-                        new Matrix4f(VRenderSystem.getTextureMatrix().buffer.asFloatBuffer()));
+                        new Matrix4f(textureMatrixUniformBuffer().buffer.asFloatBuffer()));
                 case "gbufferModelViewInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferModelViewInverse());
                 case "gbufferProjection" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferProjection());
                 case "gbufferProjectionInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferProjectionInverse());
