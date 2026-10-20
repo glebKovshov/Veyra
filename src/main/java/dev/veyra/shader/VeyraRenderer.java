@@ -346,6 +346,7 @@ public final class VeyraRenderer {
     private static final ThreadLocal<Deque<Integer>> ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> BLOCK_ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> RENDERED_ITEM_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
+    private static final Set<String> GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static boolean handPipelineRoutingLogged;
     private static boolean blockEntityPipelineRoutingLogged;
     private static boolean signTextPipelineRoutingLogged;
@@ -1569,7 +1570,15 @@ public final class VeyraRenderer {
 
     /** Pushes the Iris currentRenderedItemId for synchronous item-node submission. */
     public static void beginRenderedItemSubmission(ItemStack stack) {
-        RENDERED_ITEM_IDENTIFIER_CONTEXT.get().push(currentRenderedItemIdentifier(stack));
+        int itemId = currentRenderedItemIdentifier(stack);
+        if (Boolean.getBoolean("veyra.graphicsSmoke") && stack != null && !stack.isEmpty()) {
+            String item = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            if (GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("submit:" + item + ":" + itemId)) {
+                VeyraClient.LOGGER.info("Graphics smoke item submission: {} maps to currentRenderedItemId={}, handRendering={}",
+                        item, itemId, isHandRendering());
+            }
+        }
+        RENDERED_ITEM_IDENTIFIER_CONTEXT.get().push(itemId);
     }
 
     public static void endRenderedItemSubmission() {
@@ -1616,6 +1625,11 @@ public final class VeyraRenderer {
             if (!item || itemId == ItemIdMap.UNMAPPED || !pack.supportsHandPipeline()
                     || !isEntityRenderPipeline(original)) {
                 return originalType;
+            }
+            if (Boolean.getBoolean("veyra.graphicsSmoke")
+                    && GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("route:" + itemId + ":" + original.getLocation())) {
+                VeyraClient.LOGGER.info("Graphics smoke hand pipeline itemId={} routes through {}",
+                        itemId, original.getLocation());
             }
             EntityPipelineSet pipelines = getHandPipelineSet(pack);
             RenderPipeline replacement = entityPipelineVariant(pipelines, original,

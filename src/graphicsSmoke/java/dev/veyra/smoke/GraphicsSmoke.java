@@ -65,7 +65,12 @@ public final class GraphicsSmoke {
                             player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND,
                                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STONE));
                             LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                                    "Equipped currentRenderedItemId fixture items: diamond mainhand, stone offhand");
+                                    "Equipped currentRenderedItemId fixture items: mainhand={}, selectedSlot={}, selected={}, offhand={}",
+                                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getMainHandItem().getItem()),
+                                    player.getInventory().getSelectedSlot(),
+                                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
+                                            player.getInventory().getSelectedItem().getItem()),
+                                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(player.getOffhandItem().getItem()));
                         } else {
                             var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                             if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
