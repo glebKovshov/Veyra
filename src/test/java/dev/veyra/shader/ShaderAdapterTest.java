@@ -425,7 +425,7 @@ class ShaderAdapterTest {
                 """, "gbuffers_spidereyes");
         assertTrue(adapted.contains("in vec4 vertexColor;"));
         assertTrue(adapted.contains("#define color veyraEntityColor"));
-        assertTrue(adapted.contains("veyraEntityFragColor = color;"));
+        assertTrue(adapted.contains("veyraFragColor = color;"));
         assertFalse(adapted.contains("varying vec4 color;"));
     }
 

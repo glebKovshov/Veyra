@@ -93,6 +93,26 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = vec4(lmCoord, 0.0, 1.0); }
                     """, "gbuffers_entities");
             compile(compiler, options, entityLightmap, "entity-lightmap-alias", true);
+            String entityMrt = EntityShaderAdapter.adaptFragment("""
+                    #version 120
+                    /* RENDERTARGETS:0,12 */
+                    layout(location = 0) out vec4 sceneColor;
+                    layout(location = 1) out vec4 materialColor;
+                    void main() {
+                        sceneColor = vec4(0.9, 0.0, 0.9, 1.0);
+                        materialColor = vec4(1.0, 0.0, 1.0, 1.0);
+                    }
+                    """, "gbuffers_entities");
+            compile(compiler, options, entityMrt, "entity-multiple-render-targets", true);
+            String entityLegacyMrt = EntityShaderAdapter.adaptFragment("""
+                    #version 120
+                    /* DRAWBUFFERS:04 */
+                    void main() {
+                        gl_FragData[0] = vec4(0.9, 0.0, 0.9, 1.0);
+                        gl_FragData[1] = vec4(1.0, 0.0, 1.0, 1.0);
+                    }
+                    """, "gbuffers_entities");
+            compile(compiler, options, entityLegacyMrt, "entity-legacy-multiple-render-targets", true);
             Path mainHandFixture = Path.of("examples/current-rendered-item-id/shaders/gbuffers_hand.fsh");
             String mainHandPackSource = GlslPreprocessor.process(
                     mainHandFixture.getFileName().toString(), Files.readString(mainHandFixture));
@@ -199,7 +219,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap, entity-shadow, hand-side/direction, cloud-fog, cloud-vertex and terrain-view-position fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog, cloud-vertex and terrain-view-position fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

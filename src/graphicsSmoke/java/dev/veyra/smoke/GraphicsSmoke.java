@@ -24,7 +24,7 @@ public final class GraphicsSmoke {
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture,
-            geometryMidTexCoordFixture, currentRenderedItemFixture;
+            geometryMidTexCoordFixture, entityMrtFixture, currentRenderedItemFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels;
     private static volatile Throwable entityFixtureFailure;
@@ -45,9 +45,11 @@ public final class GraphicsSmoke {
             cloudFixture = fixture.equals("cloud-colortex0");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
+            entityMrtFixture = fixture.equals("entity-mrt");
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
-                    || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
+                    || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
+                    || entityMrtFixture;
             if (entityFixture && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;

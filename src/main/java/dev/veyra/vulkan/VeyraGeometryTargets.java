@@ -27,12 +27,18 @@ import static org.lwjgl.vulkan.VK10.*;
 public final class VeyraGeometryTargets {
     private static final Map<GraphicsPipeline, FragmentOutputs> layouts = new IdentityHashMap<>();
     private static final Map<GraphicsPipeline, GeometryBlendSettings> blends = new IdentityHashMap<>();
+    private static final Set<GraphicsPipeline> terrainInputs = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<Key, VeyraMrtFramebuffer> framebuffers = new HashMap<>();
     private static final Map<Framebuffer, RenderPass> resumePasses = new IdentityHashMap<>();
     private static Framebuffer scene;
     private VeyraGeometryTargets() { }
 
     public static void register(GraphicsPipeline pipeline, FragmentOutputs layout, GeometryBlendSettings blend) {
+        register(pipeline, layout, blend, true);
+    }
+
+    public static void register(GraphicsPipeline pipeline, FragmentOutputs layout, GeometryBlendSettings blend,
+                                boolean terrainPipeline) {
         if (layout.targets().size() > VeyraDeviceFeatures.maxColorAttachments)
             throw new IllegalStateException("This geometry program exceeds the Vulkan device's color attachment limit.");
         if (!VeyraDeviceFeatures.independentBlendEnabled && java.util.stream.IntStream.range(0, layout.targets().size())
@@ -42,19 +48,27 @@ public final class VeyraGeometryTargets {
             throw new IllegalStateException("Per-buffer geometry blend properties require Vulkan independentBlend support.");
         layouts.put(pipeline, layout);
         blends.put(pipeline, blend);
+        if (terrainPipeline) terrainInputs.add(pipeline);
+        else terrainInputs.remove(pipeline);
     }
     public static FragmentOutputs layout(GraphicsPipeline pipeline) { return layouts.get(pipeline); }
     public static GeometryBlendSettings blend(GraphicsPipeline pipeline) { return blends.get(pipeline); }
-    public static void unregister(GraphicsPipeline pipeline) { layouts.remove(pipeline); blends.remove(pipeline); }
+    public static void unregister(GraphicsPipeline pipeline) {
+        layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline);
+    }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
-        if (layouts.containsKey(pipeline)) { dev.veyra.shader.VeyraShadowRenderer.bindTerrainShadowColor(pipeline); dev.veyra.shader.VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline); }
-        VeyraNoiseTexture.bind(pipeline);
-        if (layouts.containsKey(pipeline) || pipeline.name.startsWith("veyra_shadow_"))
-            VeyraSpecularTextures.bindTerrain(pipeline);
-        if (layouts.containsKey(pipeline)) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
-        Renderer renderer = Renderer.getInstance();
         FragmentOutputs layout = layouts.get(pipeline);
+        boolean terrain = terrainInputs.contains(pipeline);
+        if (layout != null) {
+            dev.veyra.shader.VeyraShadowRenderer.bindTerrainShadowColor(pipeline);
+            dev.veyra.shader.VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline);
+        }
+        VeyraNoiseTexture.bind(pipeline);
+        if (terrain || pipeline.name.startsWith("veyra_shadow_"))
+            VeyraSpecularTextures.bindTerrain(pipeline);
+        if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
+        Renderer renderer = Renderer.getInstance();
         Framebuffer bound = renderer.getBoundFramebuffer();
         if (layout == null) {
             if (bound instanceof VeyraMrtFramebuffer) resumeScene(renderer);
@@ -62,7 +76,7 @@ public final class VeyraGeometryTargets {
         }
         if (!(bound instanceof VeyraMrtFramebuffer)) scene = bound;
         if (scene == null) throw new IllegalStateException("Geometry color targets require an active scene render pass.");
-        boolean endedForSampling = VeyraRenderer.prepareTerrainColorSamplers(pipeline);
+        boolean endedForSampling = terrain && VeyraRenderer.prepareTerrainColorSamplers(pipeline);
         if (layout.sceneOnly()) {
             if (bound instanceof VeyraMrtFramebuffer || endedForSampling) resumeScene(renderer);
             return;

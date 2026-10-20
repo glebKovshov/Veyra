@@ -78,6 +78,31 @@ public record FragmentOutputs(List<Integer> targets, Map<Integer, String> variab
         return result.toString();
     }
 
+    /**
+     * Entity pipelines are preprocessed by VulkanMod's RenderSystem parser, which treats every
+     * {@code layout(...)} token as a uniform-block declaration and only accepts one parsed fragment
+     * output. Keep output declarations inside macro definitions so that parser passes them through;
+     * the GLSL compiler then expands the macros and sees the real locations.
+     */
+    public String entityPipelineDeclarations() {
+        StringBuilder result = new StringBuilder();
+        variables.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            int location = entry.getKey();
+            String variable = entry.getValue();
+            if (location < targets.size()) {
+                String macro = "VEYRA_ENTITY_OUTPUT_" + location;
+                result.append("#define ").append(macro).append(" layout(location = ")
+                        .append(location).append(") out vec4 ").append(variable).append(";\n")
+                        .append(macro).append('\n');
+            } else {
+                // Unbound glDrawBuffers slots still need a private variable for intra-invocation
+                // reads and writes, but must not become fragment outputs.
+                result.append("vec4 ").append(variable).append(";\n");
+            }
+        });
+        return result.toString();
+    }
+
     public String rewriteLegacy(String source) {
         Matcher matcher = DATA.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuilder rewritten = new StringBuilder();

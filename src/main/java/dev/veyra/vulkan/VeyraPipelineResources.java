@@ -34,7 +34,10 @@ public final class VeyraPipelineResources {
             extended.setProgram(null);
             return true;
         });
-        retired.forEach(GraphicsPipeline::scheduleCleanUp);
+        retired.forEach(pipeline -> {
+            VeyraGeometryTargets.unregister(pipeline);
+            pipeline.scheduleCleanUp();
+        });
         if (RenderSystem.getDevice() instanceof VeyraShaderCache cache) cache.veyra$pruneShaderSources(shaders);
     }
 }
