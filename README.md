@@ -2,7 +2,7 @@
 
 Veyra is a client-side shader mod for Minecraft 1.21.11 on Fabric with VulkanMod 0.6.8. It runs a supported subset of Iris shader pack programs on VulkanMod.
 
-The 0.2 line is an experimental prerelease and does **not** provide full Iris compatibility. Beta.6 adds Iris uniform and custom-expression coverage; beta.7 adds a limited scene-color sampler to the cloud pass; beta.8 adds terrain `lmCoord` and `color` aliases; beta.9 bridges terrain `viewPos`; beta.10 adds per-quad terrain midpoint UVs; beta.11 adds mapped `currentRenderedItemId` values for rendered items. Complementary Reimagined/Unbound, BSL and Sildur's Vibrant still have source-level incompatibilities; none is certified as playable. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results and [ARCHITECTURE.md](ARCHITECTURE.md) for backend gaps. A successful build does not establish visual correctness.
+The 0.2 line is an experimental prerelease and does **not** provide full Iris compatibility. Beta.6 adds Iris uniform and custom-expression coverage; beta.7 adds a limited scene-color sampler to the cloud pass; beta.8 adds terrain `lmCoord` and `color` aliases; beta.9 bridges terrain `viewPos`; beta.10 adds per-quad terrain midpoint UVs; beta.11 adds mapped `currentRenderedItemId` values for rendered items; beta.12 maps entity overlay color and the `lmCoord` spelling for entity shaders. Complementary Reimagined/Unbound, BSL and Sildur's Vibrant still have source-level incompatibilities; none is certified as playable. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results and [ARCHITECTURE.md](ARCHITECTURE.md) for backend gaps. A successful build does not establish visual correctness.
 
 Cloud fragments can sample a pre-cloud copy of scene color through `colortex0` and its documented aliases, or sample `noisetex`. The bridge supports `texture`, `texture2D`, `textureLod`, legacy `texture2DLod`, and `textureSize`; the copy requires a transferable Vulkan color image. `examples/cloud-colortex0` and its Lavapipe fixture check the scene copy and a noise LOD read, not a full third-party pack visual result.
 
@@ -17,7 +17,7 @@ Terrain, entity-family and post programs can sample the completed shadow pass co
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.
-2. For the experimental 0.2 subset, use the [0.2.0-beta.11 prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.11%2Bmc1.21.11). Put its mod JAR (not the `-sources.jar`) in the instance's `mods` folder. [Stable 0.1.1](https://github.com/glebKovshov/Veyra/releases/tag/v0.1.1%2Bmc1.21.11) remains a separate release. Read the known compatibility limits before installing.
+2. For the experimental 0.2 subset, use the [0.2.0-beta.12 prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.12%2Bmc1.21.11). Put its mod JAR (not the `-sources.jar`) in the instance's `mods` folder. [Stable 0.1.1](https://github.com/glebKovshov/Veyra/releases/tag/v0.1.1%2Bmc1.21.11) remains a separate release. Read the known compatibility limits before installing.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
 

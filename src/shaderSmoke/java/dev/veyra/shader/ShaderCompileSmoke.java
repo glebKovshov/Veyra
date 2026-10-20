@@ -93,6 +93,15 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = vec4(lmCoord, 0.0, 1.0); }
                     """, "gbuffers_entities");
             compile(compiler, options, entityLightmap, "entity-lightmap-alias", true);
+            Path mainHandFixture = Path.of("examples/current-rendered-item-id/shaders/gbuffers_hand.fsh");
+            String mainHandPackSource = GlslPreprocessor.process(
+                    mainHandFixture.getFileName().toString(), Files.readString(mainHandFixture));
+            String mainHandShader = EntityShaderAdapter.adaptFragment(mainHandPackSource,
+                    "gbuffers_hand", true, false, -1, -1, ItemIdMap.UNMAPPED, true, true);
+            compile(compiler, options, mainHandShader, "hand-main-hand-specialization", true);
+            String offHandShader = EntityShaderAdapter.adaptFragment(mainHandPackSource,
+                    "gbuffers_hand", true, false, -1, -1, ItemIdMap.UNMAPPED, true, false);
+            compile(compiler, options, offHandShader, "hand-off-hand-specialization", true);
             String shadowItemIdentifier = EntityShaderAdapter.adaptFragment("""
                     uniform int currentRenderedItemId;
                     void main() { gl_FragColor = vec4(float(currentRenderedItemId)); }
