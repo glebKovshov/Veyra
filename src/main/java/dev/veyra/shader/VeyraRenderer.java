@@ -3057,6 +3057,12 @@ public final class VeyraRenderer {
             }
         }
         collectEntityColorTargets(pack, width, height, colorTargetSettings, colorTargetIndices);
+        var glintFragment = pack.readGlintFragment();
+        if (glintFragment.isPresent()) {
+            String glintProgram = pack.hasGlintFragment() ? "gbuffers_armor_glint" : "gbuffers_textured";
+            addGeometryColorTargets(glintProgram, glintFragment.get(), width, height,
+                    colorTargetSettings, colorTargetIndices);
+        }
         var basicFragment = pack.readBasicFragment();
         if (basicFragment.isPresent()) {
             addGeometryColorTargets("gbuffers_basic", basicFragment.get(), width, height,

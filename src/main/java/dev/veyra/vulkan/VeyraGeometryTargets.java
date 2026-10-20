@@ -76,6 +76,11 @@ public final class VeyraGeometryTargets {
             if (bound instanceof VeyraMrtFramebuffer) resumeScene(renderer);
             return;
         }
+        // Minecraft 1.21.11 renders GUI item icons into a small atlas framebuffer.
+        // Shaderpack geometry outputs belong to the world scene and must not borrow
+        // its colortex attachments while a pipeline is drawing into that atlas.
+        if (!(bound instanceof VeyraMrtFramebuffer)
+                && bound != renderer.getMainPass().getMainFramebuffer()) return;
         if (!(bound instanceof VeyraMrtFramebuffer)) scene = bound;
         if (scene == null) throw new IllegalStateException("Geometry color targets require an active scene render pass.");
         boolean pipelineChanged = renderer.getBoundPipeline() != pipeline;

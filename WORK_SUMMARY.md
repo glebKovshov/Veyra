@@ -1,5 +1,12 @@
 # Veyra — передача контекста разработки
 
+## Исправление падения glint smoke в offscreen GUI проходе (2026-10-21)
+
+- Проверка PR #65 выявила отдельный runtime crash в fixture `glint-mrt-outputs`: Veyra запрашивал `colortex4`, когда Minecraft 1.21.11 рисовал иконку предмета в `UI items atlas`, до выделения геометрических color targets.
+- `VeyraGeometryTargets` теперь маршрутизирует shaderpack MRT только для главного framebuffer сцены или уже активного Veyra MRT framebuffer. Offscreen atlas больше не принимается за мировую сцену. Color targets объявленные glint fragment shader также включены в общий allocation pass; smoke harness читает glint MRT только при активном shaderpack capture.
+- Изменены только `VeyraGeometryTargets.java`, `VeyraRenderer.java` и `GraphicsSmoke.java`. `git diff --check` проходит; локальная Gradle сборка не запустилась, потому что в текущем окружении нет `java`/`JAVA_HOME`. Проверка этой поправки ожидает повторного Build и Graphics smoke в CI PR #65.
+- Исходный crash из лога пользователя отдельно устранён исправлением remap selector в `VulkanCloudRendererMixin` (см. следующую запись). До зелёного CI обе проверки считаются незавершёнными.
+
 ## Исправление падения Minecraft по логу пользователя (2026-10-21)
 
 - В приложенном логе с Minecraft 1.21.11, Fabric Loader 0.19.5, VulkanMod 0.6.8 и Veyra beta.25 причина `Unexpected error` — критическая инъекция `VulkanCloudRendererMixin.veyra$selectCloudVertexFormat`: `@ModifyArg` находил `0/1` вызовов. Сообщения об invalid path в ресурс-паке VulkanMod — отдельные предупреждения, не первопричина этого падения.

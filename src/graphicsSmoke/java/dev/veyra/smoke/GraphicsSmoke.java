@@ -168,7 +168,8 @@ public final class GraphicsSmoke {
                 throw new IllegalStateException("Unsupported readback format " + format);
             readback = new Buffer("Veyra graphics evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
             readback.createBuffer((long) width * height * 4);
-            var glintMrtSource = glintMrtFixture ? VeyraRenderer.geometryColorAttachment(4) : null;
+            var glintMrtSource = glintMrtFixture && captureActive
+                    ? VeyraRenderer.geometryColorAttachment(4) : null;
             if (glintMrtSource != null) {
                 if (glintMrtSource.width != width || glintMrtSource.height != height
                         || glintMrtSource.format != VK_FORMAT_R8G8B8A8_UNORM
