@@ -593,5 +593,13 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - PR #20 (`feature/entity-overlay-lmcoord-beta12`) merged into `main` as `f19ca23fec04bb255b1b29f39b84b5c53bfb7217` from checked head `26525386a0be532a599b4237e3d59f0988f41378`.
 - GitHub Build run 39364825714, Graphics smoke run 39364825718, and pinned shaderpack source audit run 39364825607 all passed. Graphics smoke passed all 16 Lavapipe fixtures.
 - The source-audit workflow passed on the same head and produced the refreshed 75-case audit across 4 packs, 12 defaults, 63 declared profile/dimension cases, and 5,178 preprocessed stages: 180 geometry fragments accepted / 537 rejected. The records do not claim visual validation.
-- The local beta.12 candidate remains 578,363 bytes with SHA-256 `E2863108087BB5E4D519D053A36BB54864116F8677BE55DCCCFE2F8E6851471C`; this is not yet the downloaded release asset. GitHub release workflow and asset verification are pending.
+- Before publication, the local beta.12 candidate was 578,363 bytes with SHA-256 `E2863108087BB5E4D519D053A36BB54864116F8677BE55DCCCFE2F8E6851471C`. The published CI artifact and its verification are recorded below.
 - Beta.12 remains an experimental prerelease. Physical-GPU and third-party shaderpack visual validation are not claimed; see the source blockers above and `GOAL.md` for the remaining stable-release work.
+
+### Beta.12 GitHub Release and downloaded asset - 2026-10-20
+
+- Release workflow [39365310115](https://github.com/glebKovshov/Veyra/actions/runs/39365310115) succeeded for tag `v0.2.0-beta.12+mc1.21.11` at commit `89a6263a7eefba8a163c02424be7279904c7ceee`. The pinned source audit, all 16 Lavapipe fixtures, final build/tests, distributable verifier, and publish step passed. The tag-triggered Build run 39365310100 also passed.
+- Published experimental prerelease: https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.12%2Bmc1.21.11. Assets include `veyra-0.2.0-beta.12+mc1.21.11.jar`, the sources JAR, example-packs ZIP, and `SHA256SUMS.txt`.
+- Downloaded release JAR: 578,344 bytes, SHA-256 `BD66E276CA2C978F4C0BE2A961035A7AB82B20EC8C9F2ACDC341C6371B83D0BB`. It matches the published checksum file and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.12.
+- The pre-release local JAR is not byte-for-byte identical to the CI asset. Both ZIPs contain the same entry set; the text differences are CRLF versus LF in `THIRD_PARTY_NOTICES.md` and `licenses/jcpp-Apache-2.0.txt`. `EntityShaderAdapter.class` and `EntityShaderAdapter$Varying.class` also differ bytewise, with matching entry lengths. The release asset is the CI-built, checksum-matched JAR; reproducible binary output across the Windows local build and Ubuntu CI build remains unverified.
+- Beta.12 remains an experimental prerelease. No physical-GPU or third-party shaderpack visual success is claimed; the broad stable-release goal and source compatibility blockers remain open.
