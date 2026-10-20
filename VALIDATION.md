@@ -1,4 +1,14 @@
 # Veyra 0.2 validation status
+## Beta.26 experimental prerelease - published (2026-10-21)
+
+Release-prep PR [#68](https://github.com/glebKovshov/Veyra/pull/68) merged as d9e58ea598555d24a02375f3e6fa2d56d1013bf3; tag v0.2.0-beta.26+mc1.21.11 points to that commit. Release workflow [39516955852](https://github.com/glebKovshov/Veyra/actions/runs/39516955852) passed the pinned source audit, **31/31** graphics smoke fixtures, release build/tests, distributable verification, and publication. Tag Build [39516955962](https://github.com/glebKovshov/Veyra/actions/runs/39516955962) also passed.
+
+Downloaded published install JAR [veyra-0.2.0-beta.26+mc1.21.11.jar](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.26%2Bmc1.21.11/veyra-0.2.0-beta.26+mc1.21.11.jar): **731,597 bytes**, SHA-256 e9c80bf1d6914e275bb817a13859eb1b290b6feb0d1c1ae95254b021d5938be9. It matches the published [SHA256SUMS.txt](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.26%2Bmc1.21.11/SHA256SUMS.txt) and passes scripts/verify_jar.py for Minecraft 1.21.11 / VulkanMod 0.6.8 / Veyra beta.26. The release also includes the 265,175-byte sources JAR and 84,319-byte example-packs ZIP.
+
+Forced local JDK 21 build validateShaders packageExamplePacks passed **299 tests, 0 failures/errors/skips**, processed 79 shader sources, and compiled 78 directly to Vulkan SPIR-V. The pinned audit covers 4 archives / 75 records / 5,178 stages and accepts **709 / rejects 8** geometry fragments. Every record retains visualValidation=false. The PR #67 physical-GPU entity, block-entity, and hand fixtures remain synthetic feature checks rather than full third-party pack visual validation.
+
+Beta.26 contains the beta.25 cloud selector remap fix from PR #65. The beta.25 GitHub asset was not replaced. The user-provided 00:09:35 crash log predates installation of the patched local preview at 01:00:24; that preview was verified and the exact Loader 0.19.5 RTX 3070 cloud smoke passed separately. Beta.26 is experimental; full shaderpack visual validation and the stable-release goal remain outstanding.
+
 
 ## Beta.25 experimental prerelease - published (2026-10-20)
 
