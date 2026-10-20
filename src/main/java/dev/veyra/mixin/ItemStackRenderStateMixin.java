@@ -1,8 +1,8 @@
 package dev.veyra.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import dev.veyra.mixin.accessor.ItemLayerRenderStateAccessor;
-import dev.veyra.mixin.accessor.ItemStackRenderStateAccessor;
+import dev.veyra.accessor.ItemLayerRenderStateAccess;
+import dev.veyra.accessor.ItemStackRenderStateAccess;
 import dev.veyra.shader.VeyraRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ItemStackRenderState.class)
-public abstract class ItemStackRenderStateMixin implements ItemStackRenderStateAccessor {
+public abstract class ItemStackRenderStateMixin implements ItemStackRenderStateAccess {
     @Unique
     private ItemStack veyra$sourceStack = ItemStack.EMPTY;
 
@@ -41,7 +41,7 @@ public abstract class ItemStackRenderStateMixin implements ItemStackRenderStateA
                                        int packedLight, int packedOverlay, int outlineColor) {
         VeyraRenderer.beginRenderedItemSubmission(veyra$sourceStack);
         try {
-            ((ItemLayerRenderStateAccessor) (Object) layer)
+            ((ItemLayerRenderStateAccess) (Object) layer)
                     .veyra$submit(poseStack, collector, packedLight, packedOverlay, outlineColor);
         } finally {
             VeyraRenderer.endRenderedItemSubmission();

@@ -1,6 +1,6 @@
 package dev.veyra.mixin;
 
-import dev.veyra.mixin.accessor.ItemStackRenderStateAccessor;
+import dev.veyra.accessor.ItemStackRenderStateAccess;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.world.entity.Entity;
@@ -38,6 +38,6 @@ public abstract class ItemModelResolverMixin {
     }
 
     private static void rememberSourceStack(ItemStackRenderState renderState, ItemStack stack) {
-        ((ItemStackRenderStateAccessor) renderState).veyra$setSourceStack(stack);
+        ((ItemStackRenderStateAccess) renderState).veyra$setSourceStack(stack);
     }
 }
