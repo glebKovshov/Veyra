@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.23 - 2026-10-20 (prerelease)
+
+- Reject active non-cloud `gbuffers_*.vsh` stages with a clear capability error when their fragment program exists; Veyra still uses VulkanMod's built-in terrain/entity vertex stages.
+- Keep disabled programs and the existing cloud and fullscreen post vertex adapters available. This change does not implement general geometry vertex-stage execution.
+- Refresh the pinned audit snapshots. Fragment adapter counts remain 705 accepted / 12 rejected across 75 records and 5,178 stages; all records now show a whole-pack capability error for unsupported active geometry vertex stages, and `visualValidation=false` remains on every row.
+- PR #54 passed Build, source audit, and 22/22 Lavapipe graphics fixtures. The release-tag workflow rebuilds and verifies the versioned artifact.
+
 ## 0.2.0-beta.22 - 2026-10-20 (prerelease)
 
 - Add auxiliary `colortex1..15` sampling to supported water and entity-family geometry, up to six unique inputs per program.
