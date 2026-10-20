@@ -23,7 +23,8 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture,
+    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, cloudSceneColorFixture,
+            geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, waterMaterialFixture,
             entityMrtFixture, currentRenderedItemFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
@@ -43,7 +44,8 @@ public final class GraphicsSmoke {
             worldTicks++;
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
-            cloudFixture = fixture.equals("cloud-colortex0");
+            cloudSceneColorFixture = fixture.equals("cloud-colortex0");
+            cloudFixture = cloudSceneColorFixture || fixture.equals("cloud-texture-inputs");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             terrainMaterialFixture = fixture.equals("terrain-block-id");
@@ -98,7 +100,7 @@ public final class GraphicsSmoke {
             } else if (!vanillaBaseline && stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
-                if (cloudFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
+                if (cloudSceneColorFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
                     throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
                 pending = true;
                 requested = true; captureActive = true;
