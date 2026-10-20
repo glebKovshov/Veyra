@@ -13,7 +13,8 @@
 - All 19 release Lavapipe fixtures passed. Terrain-ID readback was 223,462 active / 0 disabled magenta pixels; water-ID was 226,902 / 0 disabled. Runtime validation errors were 0 for these two fixtures; teardown still reported 10,031 and 10,050 diagnostics respectively.
 - PR [#27](https://github.com/glebKovshov/Veyra/pull/27) merged at `24ca7756fbef228fdf25ecede8a0f0e66772bec7`; release-prep PR [#28](https://github.com/glebKovshov/Veyra/pull/28) merged at the tagged release commit. Beta.15 remains experimental: physical-GPU testing, third-party shaderpack visual validation, clean Vulkan teardown, and full Iris parity are not established. The stable goal in `GOAL.md` remains incomplete.
 - The latest manual screenshots show a Veyra in-game test menu, a loaded world, and a Modrinth instance with Veyra/VulkanMod enabled. They do not identify an exact JAR hash, establish a clean shutdown, or validate third-party shaderpacks. `logs/latest.log` is Gradle test output, not a captured runtime log.
-- Local shell has no JDK for a fresh Gradle invocation. Existing untracked screenshots, `assets/`, `logs/`, GPU dumps, `GOAL.md`, `scripts/analyze_vulkan_shutdown.py`, and the user's stash remain preserved and unstaged.
+- Local shell has no JDK for a fresh Gradle invocation.
+- Final audit after PR #29: publication record merged at commit 837706b376db202f218d7c5b56bbb463671cbc80; post-merge Build [39383490768](https://github.com/glebKovshov/Veyra/actions/runs/39383490768) succeeded. At audit time, main matched origin/main with no unmerged branches or tracked diff. Existing untracked screenshots, assets, logs, GPU dumps, GOAL.md, scripts/analyze_vulkan_shutdown.py, and stash@{0} were preserved.
 
 ## Continued work: terrain material IDs and beta.15 publication — 2026-10-20
 
