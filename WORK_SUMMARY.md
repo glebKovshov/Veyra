@@ -640,3 +640,10 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Published release: [Veyra 0.2.0-beta.13+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.13%2Bmc1.21.11). Assets: main JAR, sources JAR, example-packs ZIP, and `SHA256SUMS.txt`.
 - Downloaded main JAR: 581,330 bytes, SHA-256 `0409fd6fe226c71724426e00f2f763a81cc57a98e6350cc2a6521b9e5071c2bd`. It and the sources JAR / examples ZIP match published checksums. The main JAR passes `scripts/verify_jar.py` for Minecraft 1.21.11, Fabric Loader 0.18.4+, VulkanMod 0.6.8, and the beta.13 mod version.
 - The release is experimental. No physical-GPU or third-party pack visual validation is claimed; the stable goal remains open.
+
+### Entity-family MRT implementation — in progress (2026-10-20)
+
+- Rechecked `main` at `4860730` and confirmed its tracked tree was clean before implementation. The pre-existing untracked `GOAL.md`, screenshots, logs, assets, GPU dumps, and `scripts/analyze_vulkan_shutdown.py` were left untouched. Work is isolated on `feature/entity-mrt-routing`.
+- Extended the existing `FragmentOutputs` path so entity, first-person hand, block-entity, and sign-text fragments can retain explicit/legacy outputs across colortex targets. Geometry pipelines now register their layouts and per-target blend settings; entity-family pipelines skip terrain-only color/depth sampling hooks. Entity targets are included when scene-sized color buffers are allocated, and retired native pipelines unregister their layouts before deferred cleanup.
+- Added unit and direct shaderc fixtures for explicit and legacy entity MRT outputs, plus a Lavapipe `entity-mrt` pack that routes a magenta signal through `colortex1` and the final pass. These checks have not run yet. No compatibility matrix counts or pack claims have been changed before CI evidence is available.
+- Local Java/Gradle execution is unavailable because this shell has no exposed JDK. GitHub Build, graphics smoke, and pinned source-audit results are pending; the broad stable-release goal remains incomplete.

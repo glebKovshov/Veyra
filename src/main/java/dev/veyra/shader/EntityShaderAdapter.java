@@ -33,9 +33,6 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
-    private static final Pattern GL_FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]");
-    private static final Pattern RENDERTARGETS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
-    private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_ENTITY_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|tangent|at_tangent|gl_Fog\\w*)\\b");
@@ -507,6 +504,8 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
+        FragmentOutputs outputLayout = FragmentOutputs.parse(source);
+
         String adapted = bindEntityIdentifiers(source.replace("\uFEFF", ""), programName,
                 entityId, blockEntityId, currentRenderedItemId);
         adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
@@ -637,26 +636,15 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " declares inputs that are not provided by Veyra's entity bridge yet.");
         }
 
-        String outputName = "veyraEntityFragColor";
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
-        int outputCount = 0;
         while (outputMatcher.find()) {
-            String location = outputMatcher.group(1);
-            if (location != null && !location.equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-            outputName = outputMatcher.group(2);
-            outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
         outputMatcher.appendTail(withoutOutputs);
-        if (outputCount > 1) {
-            throw new IOException(programName + " can declare only one fragment output.");
-        }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException(programName + " supports one vec4 fragment output.");
+            throw new IOException(programName + " supports vec4 fragment outputs at locations 0..7.");
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
@@ -682,28 +670,9 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " uses a texture sampling function that Veyra's entity bridge does not support yet.");
         }
 
-        Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
-        while (renderTargets.find()) {
-            String[] targets = renderTargets.group(1).split(",");
-            if (targets.length != 1 || !targets[0].trim().equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-        Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
-        while (drawBuffers.find()) {
-            if (!drawBuffers.group(1).equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-        Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
-        while (fragDataMatcher.find()) {
-            if (!fragDataMatcher.group(1).equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-
+        String outputName = outputLayout.variables().getOrDefault(0, "veyraEntityFragColor");
         adapted = adapted
-                .replaceAll("\\bgl_FragData\\s*\\[\\s*0\\s*\\]", outputName)
+                .transform(outputLayout::rewriteLegacy)
                 .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btextureLod\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraEntitySampleGrad(")
@@ -729,7 +698,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_DIRECTIONAL_INPUTS__
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
-                out vec4 veyraEntityFragColor;
+                __VEYRA_ENTITY_OUTPUTS__
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
                 __VEYRA_SHADOW_SAMPLER__
@@ -753,7 +722,7 @@ public final class EntityShaderAdapter {
                 #define ALPHA_CUTOUT 0.1
                 #endif
                 #define alphaTestRef ALPHA_CUTOUT
-                """.replace("veyraEntityFragColor;", outputName + ";") : """
+                """ : """
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
                 __VEYRA_VIEW_POSITION_INPUT__
@@ -782,7 +751,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_IS_MAIN_HAND_VALUE__
                 __VEYRA_DIRECTIONAL_INPUTS__
                 in vec2 texCoord0;
-                out vec4 veyraEntityFragColor;
+                __VEYRA_ENTITY_OUTPUTS__
                 __VEYRA_FOG_BRIDGE__
                 uniform sampler2D Sampler0;
                 __VEYRA_SHADOW_SAMPLER__
@@ -805,7 +774,8 @@ public final class EntityShaderAdapter {
                 #define ALPHA_CUTOUT 0.1
                 #endif
                 #define alphaTestRef ALPHA_CUTOUT
-                """.replace("veyraEntityFragColor;", outputName + ";");
+                """;
+        bridge = bridge.replace("__VEYRA_ENTITY_OUTPUTS__", outputLayout.declarations());
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
                 .replace("__VEYRA_COLOR_ALIAS__", suppliesLegacyColor ? "#define color veyraEntityColor\n" : "")
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
