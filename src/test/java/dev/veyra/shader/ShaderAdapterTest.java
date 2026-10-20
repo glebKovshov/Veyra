@@ -91,13 +91,18 @@ class ShaderAdapterTest {
                 """);
         String vertex = TerrainShaderAdapter.adaptVertex("""
                 #version 460
+                layout (location = 2) in uint PackedColor;
+                layout (location = 1) in uvec2 UV0;
+                layout (location = 1) out vec2 texCoord0;
                 layout (location = 4) out flat float fadeFactor;
+                const float UV_INV = 1.0 / 32768.0;
                 layout(binding = 1) uniform UBO {
                     int UseRgss;
                 };
                 void main() {
                     const vec3 pos = getVertexPosition();
                     vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                    texCoord0 = UV0 * UV_INV;
                 }
                 """);
 
@@ -109,6 +114,59 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("mat4 gbufferModelView;"));
         assertTrue(vertex.indexOf("float near;") < vertex.indexOf("mat4 gbufferModelView;"));
         assertTrue(vertex.contains("veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;"));
+        assertTrue(vertex.contains("layout (location = 3) in uvec2 MidTexCoord;"));
+        assertTrue(vertex.contains("veyraSignMidCoordPos = sign(texCoord0 - veyraMidTexCoord);"));
+    }
+
+    @Test
+    void bridgesComplementarySignMidCoordPosFromTerrainUvCenters() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec2 signMidCoordPos;
+                void main() {
+                    gl_FragColor = signMidCoordPos.x > 0.0 && signMidCoordPos.y > 0.0
+                            ? vec4(1.0, 0.0, 1.0, 1.0) : vec4(0.0, 1.0, 0.0, 1.0);
+                }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 12) in vec2 veyraSignMidCoordPos;"));
+        assertTrue(adapted.contains("#define signMidCoordPos veyraSignMidCoordPos"));
+        assertFalse(adapted.contains("varying vec2 signMidCoordPos;"));
+    }
+
+    @Test
+    void bridgesTerrainAndWaterPlayerSpacePositions() throws IOException {
+        for (String input : List.of("vertexPos", "playerPos")) {
+            String adapted = TerrainShaderAdapter.adaptFragment("""
+                    #version 120
+                    varying vec3 %s;
+                    void main() { gl_FragColor = vec4(abs(%s) / 64.0, 1.0); }
+                    """.formatted(input, input));
+            assertTrue(adapted.contains("layout(location = 7) in vec3 veyraTerrainPosition;"));
+            assertTrue(adapted.contains("#define " + input + " veyraTerrainPosition"));
+            assertFalse(adapted.contains("varying vec3 " + input + ";"));
+        }
+    }
+
+    @Test
+    void bridgesRawTerrainVertexColor() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec4 glColorRaw;
+                void main() { gl_FragColor = glColorRaw; }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 0) in vec4 veyraVertexColor;"));
+        assertTrue(adapted.contains("#define glColorRaw veyraVertexColor"));
+        assertFalse(adapted.contains("varying vec4 glColorRaw;"));
+    }
+
+    @Test
+    void encodesPerQuadMidpointWithTheCompressedTerrainUvScale() {
+        assertEquals(0.5F, TerrainMidTexCoord.center(0.0F, 1.0F, 1.0F, 0.0F));
+        assertEquals((short) 16384, TerrainMidTexCoord.pack(0.5F));
+        assertEquals(Short.MIN_VALUE, TerrainMidTexCoord.pack(1.0F));
+        assertEquals(20, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
     }
 
     @Test
