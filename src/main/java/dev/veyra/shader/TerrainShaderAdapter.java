@@ -63,6 +63,7 @@ public final class TerrainShaderAdapter {
             Map.entry("mat", new Varying("int", 11)),
             Map.entry("mc_Entity", new Varying("vec2", 13)),
             Map.entry("signMidCoordPos", new Varying("vec2", 12)),
+            Map.entry("absMidCoordPos", new Varying("vec2", 14)),
             Map.entry("sphericalVertexDistance", new Varying("float", 8)),
             Map.entry("cylindricalVertexDistance", new Varying("float", 9)));
     private static final List<ShaderUniform> SHADERPACK_UNIFORMS = withIrisExtras(List.of(
@@ -161,6 +162,7 @@ public final class TerrainShaderAdapter {
             layout(location = 11) flat in int veyraTerrainMaterialId;
             layout(location = 12) in vec2 veyraSignMidCoordPos;
             layout(location = 13) flat in vec2 veyraMcEntity;
+            layout(location = 14) flat in vec2 veyraAbsMidCoordPos;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -187,6 +189,7 @@ public final class TerrainShaderAdapter {
             #define vertexPos veyraTerrainPosition
             #define playerPos veyraTerrainPosition
             #define signMidCoordPos veyraSignMidCoordPos
+            #define absMidCoordPos veyraAbsMidCoordPos
             #define shadow2D(sampler, coord) veyraSample(sampler, coord)
             #define sphericalVertexDistance veyraSphericalVertexDistance
             #define cylindricalVertexDistance veyraCylindricalVertexDistance
@@ -630,7 +633,8 @@ public final class TerrainShaderAdapter {
                         + "\nlayout (location = 10) out vec3 veyraViewPosition;"
                         + "\nlayout (location = 11) out flat int veyraTerrainMaterialId;"
                         + "\nlayout (location = 12) out vec2 veyraSignMidCoordPos;"
-                        + "\nlayout (location = 13) out flat vec2 veyraMcEntity;");
+                        + "\nlayout (location = 13) out flat vec2 veyraMcEntity;"
+                        + "\nlayout (location = 14) out flat vec2 veyraAbsMidCoordPos;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
@@ -666,7 +670,9 @@ public final class TerrainShaderAdapter {
         }
         return adapted.replace(texCoordMarker,
                 texCoordMarker + "\n    const vec2 veyraMidTexCoord = vec2(MidTexCoord) * UV_INV;"
-                        + "\n    veyraSignMidCoordPos = sign(texCoord0 - veyraMidTexCoord);");
+                        + "\n    const vec2 veyraMidCoordOffset = texCoord0 - veyraMidTexCoord;"
+                        + "\n    veyraSignMidCoordPos = sign(veyraMidCoordOffset);"
+                        + "\n    veyraAbsMidCoordPos = abs(veyraMidCoordOffset);");
     }
 
     private static String expandCommaSeparatedVaryings(String source) {

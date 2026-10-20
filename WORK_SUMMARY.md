@@ -16,6 +16,12 @@
 - Local shell has no JDK for a fresh Gradle invocation.
 - Final audit after PR #29: publication record merged at commit 837706b376db202f218d7c5b56bbb463671cbc80; post-merge Build [39383490768](https://github.com/glebKovshov/Veyra/actions/runs/39383490768) succeeded. At audit time, main matched origin/main with no unmerged branches or tracked diff. Existing untracked screenshots, assets, logs, GPU dumps, GOAL.md, scripts/analyze_vulkan_shutdown.py, and stash@{0} were preserved.
 
+## Continued work: Complementary terrain absolute midpoint — 2026-10-20
+
+- Terrain now carries the flat Iris `absMidCoordPos` value at a new varying location, computed from the existing per-quad midpoint and each vertex UV. The compressed vertex format and its stride are unchanged.
+- Added a unit regression, a direct shaderc compile fixture, and extended the existing `geometry-mid-texcoord` Lavapipe example to use both `signMidCoordPos` and `absMidCoordPos`. CI results are pending; beta.15 remains the latest published release.
+- Next: verify Build, the terrain graphics fixture, and the pinned shaderpack source audit; then continue with the remaining input blockers. Physical-GPU visuals, clean Vulkan teardown, and stable readiness remain unproven.
+
 ## Continued work: terrain material IDs and beta.15 publication — 2026-10-20
 
 - PR [#27](https://github.com/glebKovshov/Veyra/pull/27) merged to `main` at `24ca7756fbef228fdf25ecede8a0f0e66772bec7`; checked head `85232d104a33bc8b9d8bada3012ef97c0063148b`. It adds per-vertex `block.properties` IDs and Iris `mc_Entity` render types, int/float `mat`, terrain rebuilds after mapping changes, selector parsing fixes, and original terrain/water examples and fixtures.

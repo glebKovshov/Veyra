@@ -163,6 +163,19 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void bridgesComplementaryAbsoluteMidCoordPosFromTerrainUvCenters() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec2 absMidCoordPos;
+                void main() { gl_FragColor = vec4(absMidCoordPos, 0.0, 1.0); }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 14) flat in vec2 veyraAbsMidCoordPos;"));
+        assertTrue(adapted.contains("#define absMidCoordPos veyraAbsMidCoordPos"));
+        assertFalse(adapted.contains("varying vec2 absMidCoordPos;"));
+    }
+
+    @Test
     void bridgesTerrainAndWaterPlayerSpacePositions() throws IOException {
         for (String input : List.of("vertexPos", "playerPos")) {
             String adapted = TerrainShaderAdapter.adaptFragment("""
