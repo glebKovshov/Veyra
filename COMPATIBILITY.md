@@ -1,4 +1,10 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.20 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.21 experimental prerelease
+
+## Beta.21 cloud vertex follow-up — candidate checks passed (2026-10-20)
+
+PR [#46](https://github.com/glebKovshov/Veyra/pull/46) merged at [`347c820`](https://github.com/glebKovshov/Veyra/commit/347c82086ba56716346575fa6962cd8d8398dc69). Its Build [39425512471](https://github.com/glebKovshov/Veyra/actions/runs/39425512471), pinned source audit [39425512233](https://github.com/glebKovshov/Veyra/actions/runs/39425512233), and Graphics smoke [39425512429](https://github.com/glebKovshov/Veyra/actions/runs/39425512429) passed. The graphics matrix passed **21/21** fixtures. The new cloud model-view fixture measured **52,495 active magenta pixels**, 0 disabled pixels, and **0 runtime Vulkan validation errors**; Vulkan teardown diagnostics remain.
+
+The refreshed pinned audit covers 4 packs, 75 default/profile/dimension records, and 5,178 preprocessed stages: **693 accepted / 24 rejected** geometry fragments, reducing total source errors from 84 to 24. All records keep `visualValidation: false`. BSL 10.1.8 accepts 9/9 default geometry fragments in each tested dimension; Sildur's Vibrant 2.02 Extreme accepts 3/15 default geometry fragments. The remaining source blockers include Complementary profile `spriteBounds`, Sildur `colortex4`, and Sildur water attachment feedback. Complementary's selected `shadowcomp.csh` compute stage remains unsupported. No complete third-party shaderpack visuals or physical-GPU results are claimed. Beta.21 remains experimental and does not meet the stable-release goal.
 
 ## Beta.19 published — 2026-10-20
 

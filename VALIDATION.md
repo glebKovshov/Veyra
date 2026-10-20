@@ -1,5 +1,11 @@
 # Veyra 0.2 validation status
 
+## Beta.21 candidate checks — 2026-10-20
+
+PR [#46](https://github.com/glebKovshov/Veyra/pull/46) merged the cloud vertex compatibility follow-up at `347c82086ba56716346575fa6962cd8d8398dc69`. On its final head, Build [39425512471](https://github.com/glebKovshov/Veyra/actions/runs/39425512471), the pinned source audit [39425512233](https://github.com/glebKovshov/Veyra/actions/runs/39425512233), and Graphics smoke [39425512429](https://github.com/glebKovshov/Veyra/actions/runs/39425512429) passed; graphics passed **21/21** fixtures. The new `cloud-model-view` readback measured 52,495 active pixels, 0 disabled pixels, and 0 runtime Vulkan validation errors.
+
+Forced local JDK 21 `build validateShaders packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passed **241 tests, 0 failures/errors/skips**, processed 52 example shader sources, and compiled 49 directly to Vulkan SPIR-V. The pinned source audit covers 4 packs / 75 records / 5,178 stages and accepts **693 / rejects 24** geometry fragments; source errors fell from 84 to 24. Every record still has `visualValidation=false`. The beta.21 publication and downloaded JAR verification will be recorded after the release workflow finishes.
+
 ## Beta.20 experimental prerelease — published (2026-10-20)
 
 PR [#43](https://github.com/glebKovshov/Veyra/pull/43) merged the cloud-texture and vertex-input bridge at `abea76234afae81349b9b12be0aff794891284b6`; release metadata followed in PR [#44](https://github.com/glebKovshov/Veyra/pull/44), merged at `89ec7aa34ff8ead3fcd5afb2040b4908e7c493a1`. The annotated tag `v0.2.0-beta.20+mc1.21.11` points to the latter commit. Release workflow [39418635587](https://github.com/glebKovshov/Veyra/actions/runs/39418635587) passed its source audit, all **20/20** Lavapipe fixtures, release build/tests, distributable verification, and publication.
