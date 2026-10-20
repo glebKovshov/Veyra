@@ -1,10 +1,18 @@
 # Veyra 0.2 validation status
 
-## Beta.16 release candidate — 2026-10-20
+## Beta.16 experimental prerelease — 2026-10-20
 
-PR [#31](https://github.com/glebKovshov/Veyra/pull/31) added the terrain `absMidCoordPos` varying and merged to `main` at `7084b8e035e416f5e625fc6bfad6a76bd601e197`. On its final source head, [Build #458](https://github.com/glebKovshov/Veyra/actions/runs/39385648498) passed with 227 tests, 0 failures, 0 errors, and 0 skipped; `validateShaders` processed 50 example shaders and compiled 47 directly to Vulkan SPIR-V, including the new midpoint fixture. JAR verification passed using beta.15 metadata; release CI must rebuild the beta.16 artifact.
+Published [Veyra 0.2.0-beta.16+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.16%2Bmc1.21.11) from annotated tag `v0.2.0-beta.16+mc1.21.11` at commit `abf0d7106db88714fea94356b3605e9c129ef036`. Release workflow [39387855512](https://github.com/glebKovshov/Veyra/actions/runs/39387855512) passed source audit, all graphics fixtures, build, JAR verification, and publication.
 
-[Graphics smoke #174](https://github.com/glebKovshov/Veyra/actions/runs/39385648591) passed all 19 Lavapipe fixtures. The midpoint fixture read back 56,892 active magenta pixels and 165,648 pixels from the opposite midpoint region, with 0 disabled magenta pixels and 0 runtime validation errors; process teardown still reported 10,031 diagnostics. [Pinned source audit #135](https://github.com/glebKovshov/Veyra/actions/runs/39385648634), artifact [12247886091](https://github.com/glebKovshov/Veyra/actions/runs/39385648634/artifacts/12247886091), passed 75 cases across 4 pinned packs / 5,178 shader stages: 486 geometry fragments accepted / 231 rejected. Every case has `visualValidation=false`; no third-party pack or physical GPU is validated by these results.
+Tag Build run [39387855462](https://github.com/glebKovshov/Veyra/actions/runs/39387855462) passed **227 tests, 0 failures, 0 errors, and 0 skipped**, `validateShaders`, build, and JAR verification. Shaderc processed 50 example shaders and compiled 47 directly to Vulkan SPIR-V. Post-merge Build [39387804543](https://github.com/glebKovshov/Veyra/actions/runs/39387804543) also passed.
+
+All 19 Lavapipe fixtures passed. The terrain-midpoint fixture read back 60,049 active magenta pixels / 162,877 opposite-region pixels / 0 disabled magenta pixels, with 0 runtime validation errors. Process teardown still reported 10,031 diagnostics. These are synthetic graphics fixtures, not third-party shaderpack visuals.
+
+Release source-audit artifact [12248416739](https://github.com/glebKovshov/Veyra/actions/runs/39387855512/artifacts/12248416739) covers 75 cases, 4 pinned packs, and 5,178 stages: 486 geometry fragments accepted / 231 rejected. The downloaded artifact matches the tracked audit JSON; all records have `visualValidation=false`.
+
+Downloaded release asset `veyra-0.2.0-beta.16+mc1.21.11.jar`: **590,888 bytes**, SHA-256 `3574e4dc2bcfd051b7972ed2ed6e6c99359f2bc9a143ae51972bfd2718d1f487`. It matches `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.16+mc1.21.11. The sources JAR and example-packs ZIP are also published.
+
+No physical-GPU or third-party shaderpack visual result is claimed. Beta.16 is experimental; clean Vulkan teardown and the stable-release goal remain unresolved.
 
 ## Beta.15 experimental prerelease — 2026-10-20
 

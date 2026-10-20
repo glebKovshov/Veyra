@@ -1,8 +1,8 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.16 prerelease candidate
+# Shaderpack compatibility: Veyra 0.2.0-beta.16 prerelease
 
-## Pinned source audit (beta.16 candidate)
+## Pinned source audit (beta.16 prerelease)
 
-The pinned audit [#135](https://github.com/glebKovshov/Veyra/actions/runs/39385648634) covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **486** geometry fragment programs and rejects **231**; every case has `visualValidation: false`. This is a source compatibility check, not proof of a complete shaderpack pipeline or rendered output.
+The release audit [#39387855512](https://github.com/glebKovshov/Veyra/actions/runs/39387855512), artifact [12248416739](https://github.com/glebKovshov/Veyra/actions/runs/39387855512/artifacts/12248416739), covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **486** geometry fragment programs and rejects **231**; every case has `visualValidation: false`. This is a source compatibility check, not proof of a complete shaderpack pipeline or rendered output.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
