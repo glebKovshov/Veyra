@@ -1,5 +1,13 @@
 # 0.2 development validation status
 
+## Beta.13 release candidate — 2026-10-20
+
+The merged main code adds first-person `isMainHand` variants and BSL hand-direction aliases. The candidate version is `0.2.0-beta.13+mc1.21.11`; the tag has not yet been pushed, so beta.12 remains the latest published release at this point.
+
+On checked PR head `092c611e5a445f3fd958d7db22f5889e2622d9f0`, GitHub Build run [39368301651](https://github.com/glebKovshov/Veyra/actions/runs/39368301651) passed `build validateShaders`: **214 tests, 0 failures/errors/skips**; 47 examples preprocessed and 44 compiled directly to Vulkan SPIR-V. Graphics smoke [39368301683](https://github.com/glebKovshov/Veyra/actions/runs/39368301683) passed all 16 Lavapipe fixtures. The pinned source audit [39368301649](https://github.com/glebKovshov/Veyra/actions/runs/39368301649) passed for 4 packs, 75 cases, and 5,178 stages: 234 geometry fragments accepted / 483 rejected. All audit records remain `visualValidation=false`.
+
+These are successful PR-head CI runs, not the still-pending tag release run. This shell exposes no JDK, so a fresh local Gradle build is unavailable; the tag workflow will rerun build, tests, shader validation, graphics smoke, source audit, and JAR verification before publication. No physical-GPU or third-party shaderpack visual result is claimed.
+
 ## Entity overlay and lightmap adapter candidate — 2026-10-20
 
 The working tree now maps Iris `entityColor` to Minecraft's entity `overlayColor`, supplies the transparent fallback when the active pipeline has no overlay varying, and accepts Iris's `lmCoord` spelling. The entity adapter no longer mistakes a local `viewPos` variable for a missing fragment input. The unsupported-uniform checks now keep horizontal whitespace on one line, and unused sampler references are collected in one identifier pass.

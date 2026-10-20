@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.13 - 2026-10-20 (prerelease)
+
+- Add Iris `isMainHand` specialization for first-person hand fragments, with separate cached main-hand and offhand pipeline variants.
+- Normalize comma-separated legacy varying declarations and bridge BSL `sunVec`, `upVec`, and `eastVec` through Iris celestial/frame inputs.
+- Refresh the pinned shaderpack audit: 234 geometry fragments accepted and 483 rejected across 75 cases / 5,178 preprocessed stages; no third-party pack is visually validated.
+
 ## 0.2.0-beta.12 - 2026-10-20 (prerelease)
 
 - Map Iris entityColor to Minecraft's overlayColor varying where the selected entity pipeline provides it; keep the transparent fallback on pipelines without that input.
