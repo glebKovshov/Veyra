@@ -151,7 +151,7 @@ loom {
         graphicsSmoke {
             client()
             source = sourceSets.graphicsSmoke
-            runDir = 'run-graphics-smoke'
+            runDir = project.findProperty('graphicsSmokeRunDir')?.toString() ?: 'run-graphics-smoke'
             vmArgs '-Xmx3G', '-Dveyra.graphicsSmoke=true',
                     "-Dveyra.graphicsSmoke.output=${layout.buildDirectory.dir('reports/graphics-smoke').get().asFile.absolutePath}"
             programArgs '--quickPlaySingleplayer', 'VeyraValidation', '--width', '640', '--height', '360'

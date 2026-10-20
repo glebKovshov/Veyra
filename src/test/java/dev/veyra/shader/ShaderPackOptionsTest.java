@@ -151,6 +151,28 @@ class ShaderPackOptionsTest {
                 () -> ShaderPack.inspect(unsupported.getParent()).validatePipelineCapabilities());
         assertTrue(error.getMessage().contains("gbuffers_entities.vsh"));
     }
+    @Test void glintFragmentMrtIsValidatedEvenWithoutACustomVertexStage() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("glint-mrt/shaders"));
+        Path fragment = shader.resolve("gbuffers_armor_glint.fsh");
+        Files.writeString(fragment, """
+                #version 120
+                /* RENDERTARGETS: 0,4 */
+                void main() {
+                    gl_FragData[0] = vec4(0.0, 1.0, 0.0, 1.0);
+                    gl_FragData[1] = vec4(1.0, 0.0, 1.0, 1.0);
+                }
+                """);
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+
+        Files.writeString(fragment, """
+                #version 120
+                /* RENDERTARGETS: 0,16 */
+                void main() { gl_FragData[0] = vec4(1.0); }
+                """);
+        IOException error = assertThrows(IOException.class,
+                () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("at most 8 distinct colortex0..15"));
+    }
     @Test void requiredIrisFeaturesAreNotSilentlyIgnored() throws IOException {
         Path shader = Files.createDirectories(root.resolve("pack/shaders"));
         Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");

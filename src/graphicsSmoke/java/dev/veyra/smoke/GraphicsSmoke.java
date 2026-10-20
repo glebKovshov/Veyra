@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import dev.veyra.shader.VeyraRenderer;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
@@ -11,6 +12,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VkBufferImageCopy;
 import org.lwjgl.vulkan.VkMemoryBarrier;
+import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import static org.lwjgl.vulkan.VK10.*;
 import org.slf4j.LoggerFactory;
 
@@ -27,9 +29,12 @@ public final class GraphicsSmoke {
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
-            entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture;
+            entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
+            glintMrtFixture, basicVertexFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
-            disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels;
+            disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
+            activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
+            disabledBasicMrtPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -58,10 +63,12 @@ public final class GraphicsSmoke {
             entityColorFeedbackFixture = fixture.equals("entity-colortex-feedback");
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             glintVertexFixture = fixture.equals("glint-vertex-execution");
-            boolean itemFixture = currentRenderedItemFixture || glintVertexFixture;
+            glintMrtFixture = fixture.equals("glint-mrt-outputs");
+            basicVertexFixture = fixture.equals("basic-vertex-execution");
+            boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
-                    || entityColorFeedbackFixture || entityMrtFixture;
+                    || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture;
             if (entityFixture && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -75,7 +82,7 @@ public final class GraphicsSmoke {
                             var player = server.getPlayerList().getPlayer(client.player.getUUID());
                             if (player == null) throw new IllegalStateException("Could not find the smoke-test player");
                             player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
-                                    new net.minecraft.world.item.ItemStack(glintVertexFixture
+                                    new net.minecraft.world.item.ItemStack(glintVertexFixture || glintMrtFixture
                                             ? net.minecraft.world.item.Items.ENCHANTED_BOOK
                                             : net.minecraft.world.item.Items.DIAMOND));
                             player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND,
@@ -94,6 +101,13 @@ public final class GraphicsSmoke {
                             cow.setNoAi(true);
                             java.util.Objects.requireNonNull(cow.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE)).setBaseValue(2.0);
                             server.overworld().addFreshEntity(cow);
+                            if (basicVertexFixture) {
+                                var fence = net.minecraft.core.BlockPos.containing(playerX - 1.0, playerY - 1.0, playerZ + 1.0);
+                                server.overworld().setBlock(fence, net.minecraft.world.level.block.Blocks.OAK_FENCE.defaultBlockState(), 3);
+                                var knot = net.minecraft.world.entity.decoration.LeashFenceKnotEntity.getOrCreateKnot(
+                                        server.overworld(), fence);
+                                ((net.minecraft.world.entity.Leashable) cow).setLeashedTo(knot, true);
+                            }
                         }
                     } catch (Throwable failure) { entityFixtureFailure = failure; }
                 });
@@ -126,6 +140,8 @@ public final class GraphicsSmoke {
         requested = false;
         Minecraft client = Minecraft.getInstance();
         Buffer readback = null;
+        Buffer glintMrtReadback = null;
+        Buffer basicMrtReadback = null;
         try {
             Renderer renderer = Renderer.getInstance();
             renderer.endRenderPass();
@@ -138,6 +154,7 @@ public final class GraphicsSmoke {
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
+                    && !glintMrtFixture && !basicVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -151,6 +168,28 @@ public final class GraphicsSmoke {
                 throw new IllegalStateException("Unsupported readback format " + format);
             readback = new Buffer("Veyra graphics evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
             readback.createBuffer((long) width * height * 4);
+            var glintMrtSource = glintMrtFixture && captureActive
+                    ? VeyraRenderer.geometryColorAttachment(4) : null;
+            if (glintMrtSource != null) {
+                if (glintMrtSource.width != width || glintMrtSource.height != height
+                        || glintMrtSource.format != VK_FORMAT_R8G8B8A8_UNORM
+                        || (glintMrtSource.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
+                    throw new IllegalStateException("glint MRT colortex4 is not a readable RGBA8 transfer source");
+                }
+                glintMrtReadback = new Buffer("Veyra glint MRT evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
+                glintMrtReadback.createBuffer((long) width * height * 4);
+            }
+            var basicMrtSource = basicVertexFixture && captureActive
+                    ? VeyraRenderer.geometryColorAttachment(6) : null;
+            if (basicMrtSource != null) {
+                if (basicMrtSource.width != width || basicMrtSource.height != height
+                        || basicMrtSource.format != VK_FORMAT_R8G8B8A8_UNORM
+                        || (basicMrtSource.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
+                    throw new IllegalStateException("basic MRT colortex6 is not a readable RGBA8 transfer source");
+                }
+                basicMrtReadback = new Buffer("Veyra basic MRT evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
+                basicMrtReadback.createBuffer((long) width * height * 4);
+            }
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 var commands = Renderer.getCommandBuffer();
                 int layout = source.getCurrentLayout();
@@ -164,8 +203,30 @@ public final class GraphicsSmoke {
                 vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
                         0, barrier, null, null);
                 source.transitionImageLayout(stack, commands, layout);
+                if (glintMrtSource != null) {
+                    int mrtLayout = glintMrtSource.getCurrentLayout();
+                    glintMrtSource.transitionImageLayout(stack, commands, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                    region.bufferOffset(0);
+                    vkCmdCopyImageToBuffer(commands, glintMrtSource.getId(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                            glintMrtReadback.getId(), region);
+                    vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                            0, barrier, null, null);
+                    glintMrtSource.transitionImageLayout(stack, commands, mrtLayout);
+                }
+                if (basicMrtSource != null) {
+                    int mrtLayout = basicMrtSource.getCurrentLayout();
+                    basicMrtSource.transitionImageLayout(stack, commands, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                    region.bufferOffset(0);
+                    vkCmdCopyImageToBuffer(commands, basicMrtSource.getId(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                            basicMrtReadback.getId(), region);
+                    vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                            0, barrier, null, null);
+                    basicMrtSource.transitionImageLayout(stack, commands, mrtLayout);
+                }
             }
             Buffer completed = readback;
+            Buffer completedGlintMrt = glintMrtReadback;
+            Buffer completedBasicMrt = basicMrtReadback;
             boolean active = captureActive;
             MemoryManager.getInstance().addFrameOp(() -> {
                 try {
@@ -179,34 +240,85 @@ public final class GraphicsSmoke {
                         image.setPixel(x, y, (alpha << 24) | ((bgra ? third : first) << 16)
                                 | (green << 8) | (bgra ? first : third));
                     }
-                    capture(client, image, active);
+                    NativeImage mrtImage = null;
+                    if (completedGlintMrt != null) {
+                        var mrtBytes = MemoryUtil.memByteBuffer(completedGlintMrt.getDataPtr(), width * height * 4);
+                        mrtImage = new NativeImage(width, height, false);
+                        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                            int offset = (y * width + x) * 4;
+                            mrtImage.setPixel(x, y, (mrtBytes.get(offset + 3) & 255) << 24
+                                    | (mrtBytes.get(offset) & 255) << 16
+                                    | (mrtBytes.get(offset + 1) & 255) << 8
+                                    | (mrtBytes.get(offset + 2) & 255));
+                        }
+                    }
+                    NativeImage basicMrtImage = null;
+                    if (completedBasicMrt != null) {
+                        var mrtBytes = MemoryUtil.memByteBuffer(completedBasicMrt.getDataPtr(), width * height * 4);
+                        basicMrtImage = new NativeImage(width, height, false);
+                        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                            int offset = (y * width + x) * 4;
+                            basicMrtImage.setPixel(x, y, (mrtBytes.get(offset + 3) & 255) << 24
+                                    | (mrtBytes.get(offset) & 255) << 16
+                                    | (mrtBytes.get(offset + 1) & 255) << 8
+                                    | (mrtBytes.get(offset + 2) & 255));
+                        }
+                    }
+                    capture(client, image, active, mrtImage, basicMrtImage);
                 } catch (Throwable failure) { finish(client, failure, -1); }
-                finally { completed.scheduleFree(); }
+                finally {
+                    completed.scheduleFree();
+                    if (completedGlintMrt != null) completedGlintMrt.scheduleFree();
+                    if (completedBasicMrt != null) completedBasicMrt.scheduleFree();
+                }
             });
         } catch (Throwable failure) {
             if (readback != null) readback.scheduleFree();
+            if (glintMrtReadback != null) glintMrtReadback.scheduleFree();
+            if (basicMrtReadback != null) basicMrtReadback.scheduleFree();
             finish(client, failure, -1);
         }
     }
 
-    private static void capture(Minecraft client, NativeImage image, boolean active) {
+    private static void capture(Minecraft client, NativeImage image, boolean active,
+                                NativeImage glintMrtImage, NativeImage basicMrtImage) {
         int colored = 0;
         int opposite = 0;
         int renderedItemGreen = 0;
-        try (image) {
+        int glintMrtPixels = 0;
+        int basicMrtPixels = 0;
+        try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
             image.writeToFile(output.resolve(active ? "mrt-active.png" : "shaders-disabled.png"));
+            if (glintMrtImage != null) {
+                glintMrtImage.writeToFile(output.resolve("glint-mrt-colortex4.png"));
+                for (int y = 0; y < glintMrtImage.getHeight(); y++) for (int x = 0; x < glintMrtImage.getWidth(); x++) {
+                    int pixel = glintMrtImage.getPixel(x, y);
+                    int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
+                    if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) glintMrtPixels++;
+                }
+            }
+            if (basicMrtImage != null) {
+                basicMrtImage.writeToFile(output.resolve("basic-vertex-mrt-colortex6.png"));
+                for (int y = 0; y < basicMrtImage.getHeight(); y++) for (int x = 0; x < basicMrtImage.getWidth(); x++) {
+                    int pixel = basicMrtImage.getPixel(x, y);
+                    int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
+                    if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) basicMrtPixels++;
+                }
+            }
             for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
                 int pixel = image.getPixel(x, y);
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
-                if ((currentRenderedItemFixture || glintVertexFixture)
+                if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture)
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
             int oppositeCount = opposite;
             int renderedItemGreenCount = renderedItemGreen;
+            int glintMrtPixelCount = glintMrtPixels;
+            int basicMrtPixelCount = basicMrtPixels;
             completion = () -> {
                 if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
@@ -215,6 +327,16 @@ public final class GraphicsSmoke {
                     activeOppositeMidTexCoordPixels = oppositeCount;
                     activeCurrentRenderedItemGreenPixels = renderedItemGreenCount;
                     activeGlintGreenPixels = renderedItemGreenCount;
+                    activeGlintMrtPixels = glintMrtPixelCount;
+                    activeBasicGreenPixels = renderedItemGreenCount;
+                    activeBasicMrtPixels = basicMrtPixelCount;
+                    if (glintMrtFixture) {
+                        finish(client, activeGlintGreenPixels < 100 || activeGlintMrtPixels < 100
+                                ? new IllegalStateException("The glint MRT outputs were absent: scene green="
+                                + activeGlintGreenPixels + ", colortex4 magenta=" + activeGlintMrtPixels) : null,
+                                activeGlintGreenPixels);
+                        return;
+                    }
                     VeyraRenderer.disable();
                     baselineAt = worldTicks + 80;
                     stage = 1;
@@ -222,9 +344,18 @@ public final class GraphicsSmoke {
                 } else {
                     disabledCurrentRenderedItemGreenPixels = renderedItemGreenCount;
                     disabledGlintGreenPixels = renderedItemGreenCount;
+                    disabledBasicGreenPixels = renderedItemGreenCount;
+                    disabledBasicMrtPixels = basicMrtPixelCount;
                     int minPixels = currentRenderedItemFixture ? 100 : 2000;
                     Throwable failure;
-                    if (glintVertexFixture) {
+                    if (basicVertexFixture) {
+                        failure = activeBasicGreenPixels < 100 || activeBasicMrtPixels < 100
+                                || disabledBasicGreenPixels * 4 >= activeBasicGreenPixels
+                                || disabledBasicMrtPixels * 4 >= activeBasicMrtPixels
+                                ? new IllegalStateException("The basic vertex/MRT signal was absent or unchanged: scene active/disabled="
+                                + activeBasicGreenPixels + "/" + disabledBasicGreenPixels + ", colortex6 active/disabled="
+                                + activeBasicMrtPixels + "/" + disabledBasicMrtPixels) : null;
+                    } else if (glintVertexFixture) {
                         failure = activeGlintGreenPixels < 100 || disabledGlintGreenPixels * 4 >= activeGlintGreenPixels
                                 ? new IllegalStateException("The armor-glint vertex-stage signal was absent or unchanged: active="
                                 + activeGlintGreenPixels + ", disabled=" + disabledGlintGreenPixels) : null;
@@ -254,17 +385,35 @@ public final class GraphicsSmoke {
         try {
             Files.createDirectories(output);
             String error = failure == null ? "" : failure.toString().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+            String renderer = physicalDeviceName().replace("\\", "\\\\").replace("\"", "\\\"");
             Files.writeString(output.resolve("result.json"), "{\"status\":\"" + (failure == null ? "passed" : "failed")
-                    + "\",\"renderer\":\"Lavapipe/software Vulkan\",\"activeMagentaPixels\":" + activePixels
+                    + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
                     + ",\"activeOppositeMidTexCoordPixels\":" + activeOppositeMidTexCoordPixels
                     + ",\"activeCurrentRenderedItemGreenPixels\":" + activeCurrentRenderedItemGreenPixels
                     + ",\"disabledMagentaPixels\":" + baseline
                     + ",\"disabledCurrentRenderedItemGreenPixels\":" + disabledCurrentRenderedItemGreenPixels
                     + ",\"activeGlintGreenPixels\":" + activeGlintGreenPixels
                     + ",\"disabledGlintGreenPixels\":" + disabledGlintGreenPixels
+                    + ",\"activeGlintMrtPixels\":" + activeGlintMrtPixels
+                    + ",\"activeBasicGreenPixels\":" + activeBasicGreenPixels
+                    + ",\"disabledBasicGreenPixels\":" + disabledBasicGreenPixels
+                    + ",\"activeBasicMrtPixels\":" + activeBasicMrtPixels
+                    + ",\"disabledBasicMrtPixels\":" + disabledBasicMrtPixels
                     + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);
         client.stop();
+    }
+
+    private static String physicalDeviceName() {
+        if (DeviceManager.physicalDevice == null) return "unknown Vulkan device";
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
+            vkGetPhysicalDeviceProperties(DeviceManager.physicalDevice, properties);
+            return properties.deviceNameString();
+        } catch (Throwable failure) {
+            LoggerFactory.getLogger("veyra-graphics-smoke").warn("Could not read Vulkan device name", failure);
+            return "unknown Vulkan device";
+        }
     }
 }

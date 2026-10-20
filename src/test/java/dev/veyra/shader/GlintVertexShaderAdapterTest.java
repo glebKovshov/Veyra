@@ -126,7 +126,7 @@ class GlintVertexShaderAdapterTest {
 
         assertTrue(adapted.contains("#define VEYRA_GLINT_COLOR_INPUT layout(location = 0) flat in vec4 vertexColor;"));
         assertTrue(adapted.contains("#define VEYRA_GLINT_TEXCOORD_INPUT layout(location = 1) smooth in vec2 texCoord0;"));
-        assertTrue(adapted.contains("#define VEYRA_GLINT_FRAGMENT_OUTPUT layout(location = 0) out vec4 veyraTextureFragColor;"));
+        assertTrue(adapted.contains("#define VEYRA_ENTITY_OUTPUT_0 layout(location = 0) out vec4 veyraFragColor;"));
         assertFalse(java.util.regex.Pattern.compile("(?m)^\\s*layout\\s*\\(\\s*location\\s*=").matcher(adapted).find(), adapted);
 
         IOException mismatch = assertThrows(IOException.class, () -> TextureColorDistanceShaderAdapter.adaptFragment("""
