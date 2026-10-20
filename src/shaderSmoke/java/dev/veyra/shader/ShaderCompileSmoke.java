@@ -111,7 +111,15 @@ public class ShaderCompileSmoke {
                         gl_FragColor = vec4(normalize(sunVec) + normalize(upVec) + normalize(eastVec), 1.0);
                     }
                     """, "gbuffers_hand", true, false);
-            compile(compiler, options, handDirections, "hand-directional-inputs", true);
+            String handDirectionsWithUniformBlock = handDirections
+                    .replace("uniform vec3 sunPosition;\n", "")
+                    .replace("uniform mat4 gbufferModelView;\n", "")
+                    .replaceFirst("#version 460\\n", "#version 460\n"
+                            + "layout(set = 0, binding = 1, std140) uniform DirectionInputs {\n"
+                            + "    vec3 sunPosition;\n"
+                            + "    mat4 gbufferModelView;\n"
+                            + "};\n");
+            compile(compiler, options, handDirectionsWithUniformBlock, "hand-directional-inputs", true);
             String shadowItemIdentifier = EntityShaderAdapter.adaptFragment("""
                     uniform int currentRenderedItemId;
                     void main() { gl_FragColor = vec4(float(currentRenderedItemId)); }
