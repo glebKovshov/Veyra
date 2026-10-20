@@ -1,29 +1,29 @@
-# Veyra 0.2.0-beta.18+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.19+mc1.21.11 - experimental prerelease
 
-This experimental prerelease bridges supported legacy Iris fog members to Minecraft's live Fog UBO. It does not claim full Iris parity, stable-release readiness, or correct rendering of complete third-party shaderpacks.
+This experimental prerelease extends terrain and water inputs used by BSL and related Iris-compatible packs. It does not claim full Iris parity, stable-release readiness, or correct rendering of complete third-party shaderpacks.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, Java 21 or newer.
-- Install `veyra-0.2.0-beta.18+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
+- Install `veyra-0.2.0-beta.19+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
 - Optional example packs can be extracted into `shaderpacks`. Press F6, select a pack, then use Configure / Apply for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
 
-## Changes since beta.17
+## Changes since beta.18
 
-- Rewrite legacy `gl_Fog.color`, `gl_Fog.start`, and `gl_Fog.end` to Minecraft's Fog UBO fields; derive `gl_Fog.scale` from the same environmental start/end values.
-- Keep `gl_Fog.density` explicitly unsupported because Veyra has no validated runtime density value.
-- Extend the geometry-fog example and regression coverage. PR #37 passed Build, all 19 Lavapipe fixtures, and the 75-case pinned shaderpack source audit.
+- Bridge terrain `dist` from view-space position and BSL `recolor` from the mapped terrain block ID.
+- Supply water direction vectors and BSL advanced-material UVs from Iris uniforms, the live texture matrix, and per-quad terrain midpoint.
+- PR #40 passed Build, all 19 Lavapipe fixtures, and the 75-case pinned shaderpack source audit. The final versioned build and release checks run on the beta.19 tag.
 
 ## Validation
 
-- On PR head `492f0d307427db4385c4dc5e154230aaac49e34d`, Build [39399069930](https://github.com/glebKovshov/Veyra/actions/runs/39399069930), Graphics smoke [39399069988](https://github.com/glebKovshov/Veyra/actions/runs/39399069988), and source audit [39399069951](https://github.com/glebKovshov/Veyra/actions/runs/39399069951) passed. Local forced JDK 21 `build validateShaders packageExamplePacks --rerun-tasks` passed 231 tests (0 failures/errors/skips), processing 50 examples and compiling 47 directly to Vulkan SPIR-V.
-- The pinned audit covers 75 cases, 4 pinned packs, and 5,178 stages: 636 geometry fragments accepted / 81 rejected; every record has `visualValidation=false`. Lavapipe teardown still reports validation diagnostics.
+- On PR #40's final head `f2c3a7d478210372a6af686e00453c406d1b9fae`, Build [39405808357](https://github.com/glebKovshov/Veyra/actions/runs/39405808357), Graphics smoke [39405808241](https://github.com/glebKovshov/Veyra/actions/runs/39405808241), and source audit [39405808038](https://github.com/glebKovshov/Veyra/actions/runs/39405808038) passed. The merged `main` build also passed locally with JDK 21: 234 tests, 50 examples processed, and 47 direct Vulkan SPIR-V compilations.
+- The pinned audit covers 75 cases, 4 pinned packs, and 5,178 stages: 672 geometry fragments accepted / 45 rejected; every record has `visualValidation=false`. Lavapipe teardown still reports validation diagnostics.
 - Release CI rebuilds and verifies the final versioned artifact. Synthetic fixtures do not establish third-party-pack appearance or physical-GPU compatibility.
 
 ## Known limits
 
 - Complementary Reimagined and Unbound accept 10/10 default geometry fragments in each tested dimension. Selected profiles still require `spriteBounds` and the unsupported `shadowcomp.csh` compute stage.
-- BSL 10.1.8 accepts 6/9 default geometry fragments in each tested dimension. Terrain `recolor`, water `dist`, and the active cloud `texture` sampler remain unsupported.
+- BSL 10.1.8 accepts 8/9 default geometry fragments in each tested dimension. The active cloud `texture` sampler remains unsupported.
 - Sildur's Vibrant 2.02 Extreme accepts 0/5 default geometry fragments; `colortex4` inputs, attachment feedback, and cloud inputs remain unsupported.
 - No third-party shaderpack visual validation or physical-GPU testing has been completed; full Iris parity and clean Vulkan teardown remain incomplete.
 

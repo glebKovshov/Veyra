@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.19 - 2026-10-20 (prerelease)
+
+- Add terrain `dist` and BSL `recolor` inputs from Veyra's bridged view position and block IDs.
+- Add water `sunVec`, `upVec`, and `eastVec`, plus BSL `vTexCoord` and `vTexCoordAM` using the live texture matrix and terrain quad midpoint.
+- Refresh the pinned source audit: 672 accepted / 45 rejected geometry fragments across 75 cases and 5,178 stages. The results are source-level only; third-party pack visuals remain unverified.
+
 ## 0.2.0-beta.18 - 2026-10-20 (prerelease)
 
 - Bridge legacy Iris `gl_Fog.color`, `gl_Fog.start`, `gl_Fog.end`, and derived `gl_Fog.scale` through Minecraft's existing Fog UBO.
