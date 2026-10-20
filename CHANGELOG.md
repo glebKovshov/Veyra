@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.21 - 2026-10-20 (prerelease)
+
+- Prune cloud vertex helper functions that are unreachable from shaderpack `main()`, while preserving rejection of unsupported helpers that remain reachable.
+- Bridge supported legacy cloud fog fields, `gl_ModelViewMatrix` through VulkanMod's live `ModelViewMat`, lowercase `texcoord`, and cloud `dist`.
+- Add cloud model-view shaderc fixtures and a real-client Lavapipe fixture. It read back 52,495 active magenta pixels, 0 disabled pixels, and 0 runtime Vulkan validation errors; all 21 graphics fixtures passed.
+- Refresh the pinned source audit: 693 geometry fragments accepted / 24 rejected across 75 records and 5,178 stages; total source errors fell from 84 to 24. Third-party pack visuals remain unverified.
+
 ## 0.2.0-beta.20 - 2026-10-20 (prerelease)
 
 - Add active Minecraft cloud-texture sampling for supported `gbuffers_clouds` programs, with reload and Vulkan resource cleanup.
