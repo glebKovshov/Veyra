@@ -47,6 +47,12 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+normal\\s*;");
     private static final Pattern LIGHTMAP_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+ivec2\\s+UV2\\s*;");
+    private static final Pattern ITEM_ENTITY_FLOAT_OVERLAY_ATTRIBUTE = Pattern.compile(
+            "(?m)^([\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+)vec2(\\s+UV1\\s*;)");
+    private static final Pattern ITEM_ENTITY_INTEGER_OVERLAY_ATTRIBUTE = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+ivec2\\s+UV1\\s*;");
+    private static final Pattern ITEM_ENTITY_OVERLAY_ASSIGNMENT = Pattern.compile(
+            "(?m)^([\\t ]*texCoord1\\s*=\\s*)UV1(\\s*;)");
     private static final Pattern LIGHTMAP_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec2\\s+lmcoord\\s*;");
     private static final Pattern VIEW_POSITION_VERTEX_ATTRIBUTE = Pattern.compile(
@@ -214,6 +220,33 @@ public final class EntityShaderAdapter {
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName) throws IOException {
         return adaptVertexShader(source, shadowPass, programName, true, false);
+    }
+
+    /**
+     * Minecraft 1.21.11's item-entity vertex shader declares UV1 as a float even though
+     * NEW_ENTITY supplies that overlay attribute as a signed integer pair.
+     */
+    static String adaptItemEntityVertexFormat(String source, String programName) throws IOException {
+        if (source == null || source.isBlank()) {
+            throw new IOException(programName + " cannot adapt the item-entity vertex format because its VulkanMod vertex shader is empty.");
+        }
+        Matcher floatOverlay = ITEM_ENTITY_FLOAT_OVERLAY_ATTRIBUTE.matcher(source);
+        if (!floatOverlay.find()) {
+            if (ITEM_ENTITY_INTEGER_OVERLAY_ATTRIBUTE.matcher(source).find()) {
+                return source;
+            }
+            throw new IOException(programName + " cannot adapt the item-entity vertex format because UV1's shader input changed.");
+        }
+        StringBuffer adapted = new StringBuffer();
+        floatOverlay.appendReplacement(adapted,
+                Matcher.quoteReplacement(floatOverlay.group(1) + "ivec2" + floatOverlay.group(2)));
+        floatOverlay.appendTail(adapted);
+        Matcher overlayAssignment = ITEM_ENTITY_OVERLAY_ASSIGNMENT.matcher(adapted.toString());
+        if (!overlayAssignment.find()) {
+            return adapted.toString();
+        }
+        return overlayAssignment.replaceAll(Matcher.quoteReplacement(overlayAssignment.group(1)
+                + "vec2(UV1)" + overlayAssignment.group(2)));
     }
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName,

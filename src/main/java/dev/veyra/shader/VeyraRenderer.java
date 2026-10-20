@@ -346,7 +346,6 @@ public final class VeyraRenderer {
     private static final ThreadLocal<Deque<Integer>> ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> BLOCK_ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> RENDERED_ITEM_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
-    private static final Set<String> GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static boolean handPipelineRoutingLogged;
     private static boolean blockEntityPipelineRoutingLogged;
     private static boolean signTextPipelineRoutingLogged;
@@ -1571,14 +1570,6 @@ public final class VeyraRenderer {
     /** Pushes the Iris currentRenderedItemId for synchronous item-node submission. */
     public static void beginRenderedItemSubmission(ItemStack stack) {
         int itemId = currentRenderedItemIdentifier(stack);
-        if (Boolean.getBoolean("veyra.graphicsSmoke") && stack != null && !stack.isEmpty()) {
-            String item = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-            boolean handRendering = isHandRendering();
-            if (GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("submit:" + item + ":" + itemId + ":" + handRendering)) {
-                VeyraClient.LOGGER.info("Graphics smoke item submission: {} maps to currentRenderedItemId={}, handRendering={}",
-                        item, itemId, handRendering);
-            }
-        }
         RENDERED_ITEM_IDENTIFIER_CONTEXT.get().push(itemId);
     }
 
@@ -1606,13 +1597,6 @@ public final class VeyraRenderer {
         Deque<Integer> itemIdentifiers = RENDERED_ITEM_IDENTIFIER_CONTEXT.get();
         boolean item = !itemIdentifiers.isEmpty();
         int itemId = item ? itemIdentifiers.peek() : ItemIdMap.UNMAPPED;
-        if (Boolean.getBoolean("veyra.graphicsSmoke") && item && isHandRendering()) {
-            String pipeline = originalType == null ? "<null>" : originalType.pipeline().getLocation().toString();
-            if (GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("hand-request:" + itemId + ":" + pipeline)) {
-                VeyraClient.LOGGER.info("Graphics smoke hand route request: itemId={} pipeline={} entityPipeline={}",
-                        itemId, pipeline, originalType != null && isEntityRenderPipeline(originalType.pipeline()));
-            }
-        }
         if (!blockEntity && !entity && !(item && isHandRendering())) return originalType;
         RenderPipeline original = originalType.pipeline();
         if (VeyraShadowRenderer.isRendering()) {
@@ -1633,11 +1617,6 @@ public final class VeyraRenderer {
             if (!item || itemId == ItemIdMap.UNMAPPED || !pack.supportsHandPipeline()
                     || !isEntityRenderPipeline(original)) {
                 return originalType;
-            }
-            if (Boolean.getBoolean("veyra.graphicsSmoke")
-                    && GRAPHICS_SMOKE_ITEM_ID_DIAGNOSTICS.add("route:" + itemId + ":" + original.getLocation())) {
-                VeyraClient.LOGGER.info("Graphics smoke hand pipeline itemId={} routes through {}",
-                        itemId, original.getLocation());
             }
             EntityPipelineSet pipelines = getHandPipelineSet(pack);
             RenderPipeline replacement = entityPipelineVariant(pipelines, original,
@@ -3952,6 +3931,11 @@ public final class VeyraRenderer {
                 || location.equals("pipeline/eyes");
     }
 
+    private static boolean isItemEntityTranslucentCullPipeline(RenderPipeline pipeline) {
+        return pipeline != null
+                && pipeline.getLocation().getPath().equals("pipeline/item_entity_translucent_cull");
+    }
+
     private static String resolveEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
         boolean eyes = pipeline.getLocation().getPath().equals("pipeline/eyes");
         if (eyes
@@ -4006,9 +3990,15 @@ public final class VeyraRenderer {
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
-        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass) {
+        boolean itemEntityPipeline = isItemEntityTranslucentCullPipeline(original);
+        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
+                || itemEntityPipeline) {
+            String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
+            if (itemEntityPipeline) {
+                vertexSource = EntityShaderAdapter.adaptItemEntityVertexFormat(vertexSource, programName);
+            }
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
-                    shaderManager.getShader(vertexShader, ShaderType.VERTEX), shadowPass, programName,
+                    vertexSource, shadowPass, programName,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, handPass);
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         }
