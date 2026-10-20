@@ -24,7 +24,8 @@ public final class GraphicsSmoke {
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture,
-            geometryMidTexCoordFixture, entityMrtFixture, currentRenderedItemFixture;
+            geometryMidTexCoordFixture, terrainMaterialFixture, waterMaterialFixture,
+            entityMrtFixture, currentRenderedItemFixture;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels;
     private static volatile Throwable entityFixtureFailure;
@@ -45,6 +46,8 @@ public final class GraphicsSmoke {
             cloudFixture = fixture.equals("cloud-colortex0");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
+            terrainMaterialFixture = fixture.equals("terrain-block-id");
+            waterMaterialFixture = fixture.equals("water-block-id");
             entityMrtFixture = fixture.equals("entity-mrt");
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
@@ -121,7 +124,8 @@ public final class GraphicsSmoke {
             // These fixtures declare no auxiliary MRT target and validate their signals in the
             // presented colortex0 image. Keep the existing colortex1 check for other fixtures.
             var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
-                    && !geometryMidTexCoordFixture && !currentRenderedItemFixture
+                    && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
+                    && !currentRenderedItemFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),

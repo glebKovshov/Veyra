@@ -1,5 +1,6 @@
 package dev.veyra.mixin;
 
+import dev.veyra.shader.TerrainMaterialContext;
 import dev.veyra.shader.TerrainMidTexCoord;
 import net.vulkanmod.render.shader.PipelineManager;
 import net.vulkanmod.render.vertex.TerrainBufferBuilder;
@@ -30,12 +31,20 @@ public abstract class TerrainBufferBuilderMixin {
     }
 
     @Inject(method = "vertex(FFFIFFII)V", at = @At("RETURN"), remap = false)
-    private void veyra$writeQuadMidpoint(float x, float y, float z, int color, float u, float v,
-                                         int light, int packedNormal, CallbackInfo ci) {
-        if (PipelineManager.getTerrainVertexFormat() != TerrainMidTexCoord.VERTEX_FORMAT
-                || (this.vertices & 3) != 0) {
+    private void veyra$writeExtendedTerrainAttributes(float x, float y, float z, int color,
+                                                       float u, float v, int light,
+                                                       int packedNormal, CallbackInfo ci) {
+        if (PipelineManager.getTerrainVertexFormat() != TerrainMidTexCoord.VERTEX_FORMAT) {
             return;
         }
+
+        long currentVertex = this.bufferPtr + this.nextElementByte - this.vertexSize;
+        MemoryUtil.memPutInt(currentVertex + TerrainMidTexCoord.MATERIAL_ID_OFFSET,
+                TerrainMaterialContext.materialId());
+        MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.RENDER_TYPE_OFFSET,
+                TerrainMaterialContext.renderType());
+
+        if ((this.vertices & 3) != 0) return;
 
         short midpointU = TerrainMidTexCoord.pack(TerrainMidTexCoord.center(
                 this.veyra$quadU[0], this.veyra$quadU[1], this.veyra$quadU[2], this.veyra$quadU[3]));

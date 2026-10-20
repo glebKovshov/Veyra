@@ -29,7 +29,34 @@ class BlockIdMapTest {
                 block.13 = minecraft:oak_log
                 """);
 
-        assertEquals(3, map.id("minecraft:oak_log", Map.of("axis", "y"), java.util.Set.of("minecraft:logs")));
+        assertEquals(8, map.id("minecraft:oak_log", Map.of("axis", "y"), java.util.Set.of("minecraft:logs")));
+        assertEquals(13, map.id("minecraft:oak_log", Map.of("axis", "x"), java.util.Set.of("minecraft:logs")));
         assertEquals(BlockIdMap.UNMAPPED, map.id("minecraft:stone", Map.of()));
+    }
+
+    @Test
+    void matchesCommaSeparatedPropertyValuesAndRetainsRepeatedIdLines() {
+        BlockIdMap map = BlockIdMap.parse("""
+                block.21 = minecraft:oak_door:facing=north,south:hinge=right
+                block.22 = minecraft:stone
+                block.22 = minecraft:dirt
+                """);
+
+        assertEquals(21, map.id("minecraft:oak_door", Map.of("facing", "south", "hinge", "right")));
+        assertEquals(BlockIdMap.UNMAPPED, map.id("minecraft:oak_door", Map.of("facing", "east", "hinge", "right")));
+        assertEquals(22, map.id("minecraft:stone", Map.of()));
+        assertEquals(22, map.id("minecraft:dirt", Map.of()));
+    }
+
+    @Test
+    void enablesCurrentIrisTagPropertiesMacro() throws Exception {
+        String properties = GlslPreprocessor.properties("""
+                #ifdef IRIS_TAG_SUPPORT
+                block.31 = %minecraft:logs
+                #endif
+                """, Map.of());
+        BlockIdMap map = BlockIdMap.parse(properties);
+
+        assertEquals(31, map.id("minecraft:oak_log", Map.of(), java.util.Set.of("minecraft:logs")));
     }
 }

@@ -9,6 +9,8 @@ on:
       - 'src/graphicsSmoke/**'
       - 'scripts/prepare_graphics_smoke.py'
       - 'examples/geometry-mid-texcoord/**'
+      - 'examples/terrain-block-id/**'
+      - 'examples/water-block-id/**'
       - 'examples/entity-mrt/**'
       - 'examples/current-rendered-item-id/**'
       - 'build.gradle'
@@ -25,6 +27,8 @@ on:
       - 'examples/water-opaque-depth/**'
       - 'examples/water-color-inputs/**'
       - 'examples/geometry-view-space/**'
+      - 'examples/terrain-block-id/**'
+      - 'examples/water-block-id/**'
       - 'examples/current-rendered-item-id/**'
       - 'scripts/prepare_graphics_smoke.py'
       - 'examples/specular-*/**'
@@ -41,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, geometry-view-space, geometry-mid-texcoord, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, current-rendered-item-id, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, geometry-view-space, geometry-mid-texcoord, terrain-block-id, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, current-rendered-item-id, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:

@@ -18,6 +18,8 @@
     "PipelineManagerMixin",
     "CustomVertexFormatMixin",
     "TerrainBufferBuilderMixin",
+    "TerrainBuilderMixin",
+    "FluidRendererMixin",
     "ThreadBuilderPackMixin",
     "LevelRendererMixin",
     "WorldRendererMixin",

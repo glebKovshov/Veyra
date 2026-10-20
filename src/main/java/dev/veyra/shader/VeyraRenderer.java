@@ -372,7 +372,9 @@ public final class VeyraRenderer {
     public static void initialize(ShaderPackRepository packRepository) {
         repository = packRepository;
         registerShaderPackUniforms();
+        BlockIdMap previousBlockIds = BlockIdMap.active();
         activateCustomUniforms(packRepository.getSelected().orElse(null));
+        boolean blockMappingsChanged = !previousBlockIds.sameMappings(BlockIdMap.active());
         VeyraShadowRenderer.initialize();
         packRepository.getSelected().ifPresent(pack -> {
             try {
@@ -433,7 +435,8 @@ public final class VeyraRenderer {
         cloudPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasCloudFragment)
                 .orElse(false);
-        updateTerrainLayerMode(packRepository.getSelected().orElse(null));
+        boolean terrainRebuilt = updateTerrainLayerMode(packRepository.getSelected().orElse(null));
+        if (blockMappingsChanged && !terrainRebuilt) rebuildTerrainSections();
     }
 
     private static void registerShaderPackUniforms() {
@@ -2493,7 +2496,8 @@ public final class VeyraRenderer {
             CustomUniforms.activate(pack.readCustomUniforms());
             ItemIdMap.activate(pack.readItemIds());
             EntityIdMap.activate(pack.readEntityIds());
-            BlockIdMap.activate(pack.readBlockIds());
+            BlockIdMap nextBlockIds = pack.readBlockIds();
+            boolean blockMappingsChanged = !previousBlockIds.sameMappings(nextBlockIds);
             registerCustomUniforms();
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
@@ -2547,8 +2551,10 @@ public final class VeyraRenderer {
                 preparedClouds = compileCloudPipeline(pack);
             }
             repository.select(pack);
+            BlockIdMap.activate(nextBlockIds);
             VeyraShadowRenderer.configure(preparedShadowSettings);
-            updateTerrainLayerMode(pack);
+            boolean terrainRebuilt = updateTerrainLayerMode(pack);
+            if (blockMappingsChanged && !terrainRebuilt) rebuildTerrainSections();
             replacePipelineSet(prepared);
             prepared = null;
             replaceTerrainPipelines(preparedTerrain);
@@ -4889,16 +4895,15 @@ public final class VeyraRenderer {
         return pack.terrainPrograms().contains("gbuffers_terrain") ? "gbuffers_terrain" : null;
     }
 
-    private static void updateTerrainLayerMode(ShaderPack pack) {
+    private static boolean updateTerrainLayerMode(ShaderPack pack) {
         if (Initializer.CONFIG == null) {
-            return;
+            return false;
         }
         boolean needsSeparateOpaqueLayers = pack != null
                 && (pack.terrainPrograms().contains("gbuffers_terrain_solid")
                 || pack.terrainPrograms().contains("gbuffers_terrain_cutout"));
         if (!needsSeparateOpaqueLayers) {
-            restoreUniqueOpaqueLayer();
-            return;
+            return restoreUniqueOpaqueLayer();
         }
 
         if (previousUniqueOpaqueLayer == null) {
@@ -4910,12 +4915,14 @@ public final class VeyraRenderer {
             rebuildTerrainSections();
             VeyraClient.LOGGER.info(
                     "Temporarily enabled separate solid and cutout terrain layers for the active shader pack.");
+            return true;
         }
+        return false;
     }
 
-    private static void restoreUniqueOpaqueLayer() {
+    private static boolean restoreUniqueOpaqueLayer() {
         if (previousUniqueOpaqueLayer == null || Initializer.CONFIG == null) {
-            return;
+            return false;
         }
         boolean originalValue = previousUniqueOpaqueLayer;
         boolean changed = Initializer.CONFIG.uniqueOpaqueLayer != originalValue;
@@ -4927,6 +4934,7 @@ public final class VeyraRenderer {
             VeyraClient.LOGGER.info(
                     "Restored VulkanMod uniqueOpaqueLayer to {} after shader pack use.", originalValue);
         }
+        return changed;
     }
 
     private static void rebuildTerrainSections() {

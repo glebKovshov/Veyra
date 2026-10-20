@@ -5,10 +5,12 @@ import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.vulkanmod.render.vertex.CustomVertexFormat;
 import net.vulkanmod.render.vertex.VertexBuilder;
 
-/** VulkanMod's compressed terrain format with Iris' per-quad texture midpoint appended. */
+/** VulkanMod's compressed terrain format with Iris midpoint and material inputs appended. */
 public final class TerrainMidTexCoord {
     public static final int ATTRIBUTE_OFFSET = 16;
-    public static final int VERTEX_SIZE = 20;
+    public static final int MATERIAL_ID_OFFSET = 20;
+    public static final int RENDER_TYPE_OFFSET = 24;
+    public static final int VERTEX_SIZE = 28;
 
     public static final VertexFormat VERTEX_FORMAT = VertexFormat.builder()
             .add("Position", CustomVertexFormat.ELEMENT_POSITION_INT16)
@@ -16,6 +18,10 @@ public final class TerrainMidTexCoord {
             .add("Color", CustomVertexFormat.ELEMENT_COLOR_UINT)
             .add("MidTexCoord", new VertexFormatElement(3, 1,
                     VertexFormatElement.Type.USHORT, VertexFormatElement.Usage.UV, 2))
+            .add("VeyraTerrainMaterialId", new VertexFormatElement(4, 0,
+                    VertexFormatElement.Type.INT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainRenderType", new VertexFormatElement(5, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
             .build();
 
     private TerrainMidTexCoord() {
