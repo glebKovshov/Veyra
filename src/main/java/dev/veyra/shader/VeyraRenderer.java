@@ -3934,11 +3934,18 @@ public final class VeyraRenderer {
     }
 
     private static boolean isEntityRenderPipeline(RenderPipeline pipeline) {
-        if (pipeline == null
-                || !pipeline.getFragmentShader().equals(Identifier.withDefaultNamespace("core/entity"))) {
+        if (pipeline == null) {
             return false;
         }
         String location = pipeline.getLocation().getPath();
+        boolean entityFragment = pipeline.getFragmentShader()
+                .equals(Identifier.withDefaultNamespace("core/entity"));
+        boolean itemEntityFragment = location.equals("pipeline/item_entity_translucent_cull")
+                && pipeline.getFragmentShader()
+                .equals(Identifier.withDefaultNamespace("core/rendertype_item_entity_translucent_cull"));
+        if (!entityFragment && !itemEntityFragment) {
+            return false;
+        }
         return location.startsWith("pipeline/entity_")
                 || location.startsWith("pipeline/armor_")
                 || location.startsWith("pipeline/item_entity_")
