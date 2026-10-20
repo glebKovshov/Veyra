@@ -120,7 +120,11 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("layout (location = 11) out flat int veyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
         assertTrue(vertex.contains("layout (location = 14) out flat vec2 veyraAbsMidCoordPos;"));
-        assertTrue(vertex.contains("const vec2 veyraMidCoordOffset = texCoord0 - veyraMidTexCoord;"));
+        assertTrue(vertex.contains("layout (location = 15) out flat vec2 veyraMidCoord;"));
+        assertTrue(vertex.contains("mat4 textureMatrix;"));
+        assertTrue(vertex.contains("texCoord0 = (textureMatrix * vec4(veyraRawTexCoord, 0.0, 1.0)).xy;"));
+        assertTrue(vertex.contains("veyraMidCoord = (textureMatrix * vec4(veyraRawMidTexCoord, 0.0, 1.0)).xy;"));
+        assertTrue(vertex.contains("const vec2 veyraMidCoordOffset = texCoord0 - veyraMidCoord;"));
         assertTrue(vertex.contains("veyraSignMidCoordPos = sign(veyraMidCoordOffset);"));
         assertTrue(vertex.contains("veyraAbsMidCoordPos = abs(veyraMidCoordOffset);"));
         assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
@@ -176,6 +180,19 @@ class ShaderAdapterTest {
         assertTrue(adapted.contains("layout(location = 14) flat in vec2 veyraAbsMidCoordPos;"));
         assertTrue(adapted.contains("#define absMidCoordPos veyraAbsMidCoordPos"));
         assertFalse(adapted.contains("varying vec2 absMidCoordPos;"));
+    }
+
+    @Test
+    void bridgesComplementaryMidCoordFromTextureTransformedTerrainUvCenters() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                flat in vec2 midCoord;
+                void main() { gl_FragColor = vec4(midCoord, 0.0, 1.0); }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 15) flat in vec2 veyraMidCoord;"));
+        assertTrue(adapted.contains("#define midCoord veyraMidCoord"));
+        assertFalse(adapted.contains("flat in vec2 midCoord;"));
     }
 
     @Test

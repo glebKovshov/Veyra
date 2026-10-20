@@ -1,6 +1,9 @@
 package dev.veyra.shader;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -40,6 +43,26 @@ class IrisUniformParityTest {
         assertEquals(6000, VeyraRenderer.irisWorldTime(6000L, true, true),
                 "Nether and End preserve their day time even when their dimension type has fixed time");
         assertEquals(6000, VeyraRenderer.irisWorldTime(30000L, false, false));
+    }
+
+    @Test
+    void uninitializedVulkanTextureMatrixDefaultsToIdentityAndPreservesValidTransforms() {
+        FloatBuffer uninitialized = ByteBuffer.allocateDirect(16 * Float.BYTES)
+                .order(ByteOrder.nativeOrder()).asFloatBuffer();
+        VeyraRenderer.initializeTextureMatrixIfUnset(uninitialized);
+        assertEquals(1.0F, uninitialized.get(0));
+        assertEquals(1.0F, uninitialized.get(5));
+        assertEquals(1.0F, uninitialized.get(10));
+        assertEquals(1.0F, uninitialized.get(15));
+
+        FloatBuffer transformed = ByteBuffer.allocateDirect(16 * Float.BYTES)
+                .order(ByteOrder.nativeOrder()).asFloatBuffer();
+        new org.joml.Matrix4f().translate(0.25F, 0.5F, 0.0F).get(transformed);
+        float translationX = transformed.get(12);
+        float translationY = transformed.get(13);
+        VeyraRenderer.initializeTextureMatrixIfUnset(transformed);
+        assertEquals(translationX, transformed.get(12));
+        assertEquals(translationY, transformed.get(13));
     }
 
     @Test
@@ -96,11 +119,15 @@ class IrisUniformParityTest {
         assertTrue(terrain.contains("    int heightLimit;"));
         assertTrue(terrain.contains("    vec3 sunPosition;"));
         assertTrue(terrain.contains("    float timeAngle;"));
+        assertTrue(terrain.contains("    mat4 textureMatrix;"));
+        assertFalse(terrain.contains("uniform mat4 textureMatrix;"));
 
         ShaderPackUniformAdapter.AdaptedShader entity = ShaderPackUniformAdapter.extract(
-                "uniform vec3 shadowLightPosition;\nuniform bool isRightHanded;\nvoid main(){}\n", "gbuffers_entities");
+                "uniform vec3 shadowLightPosition;\nuniform bool isRightHanded;\n"
+                        + "uniform mat4 textureMatrix;\nvoid main(){}\n", "gbuffers_entities");
         assertTrue(entity.fields().contains(new ShaderPackUniformAdapter.UniformField("vec3", "shadowLightPosition")));
         assertTrue(entity.fields().contains(new ShaderPackUniformAdapter.UniformField("int", "veyra_isRightHanded")));
+        assertTrue(entity.fields().contains(new ShaderPackUniformAdapter.UniformField("mat4", "textureMatrix")));
 
         // A pack override of a hardcoded custom uniform keeps a single block member.
         CustomUniforms.activate(CustomUniforms.parse("uniform.float.timeAngle=worldTime / 24000.0\n"));
