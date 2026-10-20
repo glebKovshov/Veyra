@@ -1,8 +1,10 @@
-# Shaderpack compatibility: Veyra beta.19 experimental release candidate
+# Shaderpack compatibility: Veyra beta.19 experimental prerelease
 
-## Beta.19 candidate integrated into main — release pending
+## Beta.19 published — 2026-10-20
 
-The beta.19 candidate is integrated into `main` at merge commit [`660e03c`](https://github.com/glebKovshov/Veyra/commit/660e03c7219e5a74d0f8a1fdecda695134e93c9a) via PR [#40](https://github.com/glebKovshov/Veyra/pull/40). It adds terrain distance, BSL material recolor, water direction, and BSL advanced-material UV bridges. Its pinned source audit covers 75 cases / 5,178 preprocessed stages and accepts **672 / rejects 45** geometry fragments; every case has `visualValidation: false`. PR CI passed all 19 Lavapipe fixtures. The water block-ID fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; teardown still emitted 10,049 diagnostics. The final beta.19 JAR has not yet been published, and no third-party pack has been visually tested.
+Beta.19 is published from annotated tag [`v0.2.0-beta.19+mc1.21.11`](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.19%2Bmc1.21.11) at merge commit [`de65a42`](https://github.com/glebKovshov/Veyra/commit/de65a42886cc368a71ecd4e326ed7802633e34eb). Release workflow [39407213882](https://github.com/glebKovshov/Veyra/actions/runs/39407213882) passed source audit, all **19/19** Lavapipe fixtures, release build/tests, distributable verification, and publication. The pinned audit artifact [12257937543](https://github.com/glebKovshov/Veyra/actions/runs/39407213882/artifacts/12257937543) covers 75 cases / 5,178 stages and accepts **672 / rejects 45** geometry fragments; every record has `visualValidation: false`.
+
+The released `veyra-0.2.0-beta.19+mc1.21.11.jar` is **593,532 bytes**, SHA-256 `78192452d957306c74e1cc3bad01e2220b01c9877b74586aff065f5a0c4b8f4c`. It matches the release's `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.19+mc1.21.11. The source audit reports Complementary Reimagined/Unbound 10/10 defaults in each tested dimension, BSL 8/9, and Sildur 0/5. No third-party pack visuals or physical-GPU results are claimed. The water fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; process teardown still reported 10,049 diagnostics.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
