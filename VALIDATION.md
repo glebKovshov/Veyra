@@ -1,5 +1,11 @@
 # Veyra 0.2 validation status
 
+## Beta.20 candidate checks — PR #43 merged, release build pending (2026-10-20)
+
+PR [#43](https://github.com/glebKovshov/Veyra/pull/43) merged at `abea76234afae81349b9b12be0aff794891284b6`. Its final head passed Build [39417276367](https://github.com/glebKovshov/Veyra/actions/runs/39417276367), Graphics smoke [39417276374](https://github.com/glebKovshov/Veyra/actions/runs/39417276374) (20/20), and pinned source audit [39417276455](https://github.com/glebKovshov/Veyra/actions/runs/39417276455). The cloud texture fixture read back 46,140 active pixels, 0 disabled pixels, and 0 runtime Vulkan validation errors; process teardown emitted 10,031 diagnostics.
+
+The source audit covers 4 packs / 75 cases / 5,178 stages and accepts 690 / rejects 27 geometry fragment programs; all records have `visualValidation=false`. BSL defaults pass 9/9 in each tested dimension. The local forced JDK 21 build passed 238 tests, processed 51 examples, and directly compiled 48 to Vulkan SPIR-V. These checks validate Veyra's supported sources and synthetic fixture, not a full third-party pack. Release CI must still build and verify the versioned beta.20 JAR from its tag.
+
 ## Beta.19 experimental prerelease — published 2026-10-20
 
 Beta.19 is published from annotated tag [`v0.2.0-beta.19+mc1.21.11`](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.19%2Bmc1.21.11) at merge commit [`de65a42`](https://github.com/glebKovshov/Veyra/commit/de65a42886cc368a71ecd4e326ed7802633e34eb). Release workflow [39407213882](https://github.com/glebKovshov/Veyra/actions/runs/39407213882) passed source audit, all **19/19** Lavapipe fixtures, release build/tests, JAR verification, and publication. Tag Build [39407213769](https://github.com/glebKovshov/Veyra/actions/runs/39407213769) passed; its test report artifact [12257857082](https://github.com/glebKovshov/Veyra/actions/runs/39407213769/artifacts/12257857082) contains **234 tests, 0 failures/errors/skips**.
