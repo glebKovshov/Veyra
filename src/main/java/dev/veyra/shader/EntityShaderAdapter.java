@@ -825,7 +825,7 @@ public final class EntityShaderAdapter {
         result.append(bridge);
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
-        result.append(outputLayout.declarations());
+        result.append(outputLayout.entityPipelineDeclarations());
         return result.append(adapted).toString();
     }
 
