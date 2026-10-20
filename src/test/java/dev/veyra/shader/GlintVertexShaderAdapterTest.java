@@ -44,7 +44,8 @@ class GlintVertexShaderAdapterTest {
         assertTrue(adapted.contains("VEYRA_GLINT_OUTPUT_1\n"));
         assertFalse(java.util.regex.Pattern.compile("(?m)^\\s*layout\\s*\\(\\s*location\\s*=").matcher(adapted).find(), adapted);
         assertTrue(adapted.contains("#define glColor vertexColor"));
-        assertTrue(adapted.contains("#define gl_Color Color"));
+        assertTrue(adapted.contains("#define gl_Color vec4(1.0)"));
+        assertFalse(adapted.contains("layout(location = 2) in vec4 Color;"), adapted);
         assertTrue(adapted.contains("veyraArmorGlintMain();"));
         assertTrue(adapted.contains("void veyraArmorGlintMain()"));
     }

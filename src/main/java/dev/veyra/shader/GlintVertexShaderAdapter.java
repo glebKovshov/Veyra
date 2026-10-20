@@ -153,13 +153,9 @@ final class GlintVertexShaderAdapter {
         base = base.substring(0, baseMain.closeBrace()) + "\n    veyraArmorGlintMain();\n" + base.substring(baseMain.closeBrace());
 
         StringBuilder bridge = new StringBuilder();
-        if (outputs.usesLegacyColor()) {
-            Matcher input = BASE_COLOR_INPUT.matcher(base);
-            if (!input.find()) bridge.append(parserSafeLocatedDeclaration("VEYRA_GLINT_COLOR_INPUT",
-                    "layout(location = 2) in vec4 Color;"));
-        }
+        boolean hasNativeColorInput = BASE_COLOR_INPUT.matcher(base).find();
         bridge.append("#define gl_Vertex vec4(Position, 1.0)\n")
-                .append("#define gl_Color Color\n")
+                .append("#define gl_Color ").append(hasNativeColorInput ? "Color" : "vec4(1.0)").append('\n')
                 .append("#define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)\n")
                 .append("#define gl_MultiTexCoord1 vec4(0.0, 0.0, 0.0, 1.0)\n")
                 .append("#define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)\n")
