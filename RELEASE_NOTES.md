@@ -1,30 +1,27 @@
-# Veyra 0.2.0-beta.23+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.24+mc1.21.11 — experimental prerelease
 
-This release reports active custom non-cloud geometry vertex stages as unsupported before attempting to load a shader pack. Veyra still uses VulkanMod's built-in terrain and entity vertex stages. It does not implement general geometry vertex-stage execution, full Iris parity, or stable-release compatibility.
+Beta.24 adds limited custom vertex shader execution for supported terrain programs after VulkanMod's terrain setup. It is an experimental subset; it does not provide full Iris compatibility or stable-release support.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, Java 21 or newer.
-- Install `veyra-0.2.0-beta.23+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
+- Install `veyra-0.2.0-beta.24+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
 - Optional example packs can be extracted into `shaderpacks`. Press F6, select a pack, then use Configure / Apply for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
 
-## Changes since beta.22
+## Changes since beta.23
 
-- Fail explicitly on an active non-cloud `gbuffers_*.vsh` stage when its matching fragment program is present. This avoids silently running VulkanMod's built-in vertex shader while implying the pack's vertex shader ran.
-- Disabled programs are not rejected. The existing cloud and fullscreen post vertex adapters remain supported.
-- PR #54 merged at `96ad2e8db8fe118cfa041fc13a070859f90ca88a`; Build, pinned source audit, and Graphics smoke passed on the PR head, including all 22 Lavapipe fixtures.
+- Run supported `gbuffers_terrain`, `_solid`, `_cutout`, and `_water` custom vertex programs after VulkanMod's terrain setup.
+- Bridge the available terrain position, color, normal, lightmap, material, midpoint UV, tangent, chunk-fade, and `noisetex` inputs.
+- Link supported scalar, vector, and matrix vertex outputs to matching fragment inputs with checked types and interpolation. Unused VulkanMod outputs are pruned so terrain pack varyings can use available locations.
+- Store tangent components in scalar vertex attributes supported by VulkanMod 0.6.8; preserve the packed terrain stride and field offsets.
+- Reject unsupported attributes, samplers, and varying interfaces with named diagnostics.
 
-## Validation
+PR [#59](https://github.com/glebKovshov/Veyra/pull/59) merged into `main` as `d97dcb135dc4d289ed149b9916dc932b9f6d814a`. The final PR head passed Build [39464726776](https://github.com/glebKovshov/Veyra/actions/runs/39464726776), pinned source audit [39464726807](https://github.com/glebKovshov/Veyra/actions/runs/39464726807), and all **24/24** Lavapipe fixtures [39464726902](https://github.com/glebKovshov/Veyra/actions/runs/39464726902). The terrain VSH-to-FSH readback measured 223,366 active magenta pixels, 0 with shaders disabled, and 0 runtime Vulkan validation errors. Process teardown still reports 10,031 diagnostics.
 
-- The merged code passed local JDK 21 `build validateShaders packageExamplePacks compileGraphicsSmokeJava --rerun-tasks`: 244 tests, 0 failures/errors/skips; 53 example shaders preprocessed and 50 compiled directly to Vulkan SPIR-V.
-- The pinned audit covers 4 archives, 75 records, and 5,178 stages: 705 geometry fragments accepted / 12 rejected. Every record reports an active unsupported geometry vertex stage as a capability error, and all retain `visualValidation=false`.
-- Release CI rebuilds and tests the final versioned artifact, reruns the pinned audit and Lavapipe fixtures, verifies the distributable, and publishes SHA-256 checksums.
+## Shaderpack audit and known limits
 
-## Known limits
+The pinned audit covers 4 shaderpack archives, 75 default/profile/dimension cases, and 5,178 shader stages. It accepted 705 and rejected 12 geometry fragments. Every case still encounters the unsupported non-terrain `gbuffers_armor_glint.vsh`; every record has `visualValidation=false`. The 12 fragment rejections are Sildur `LightC` inputs. The selected Complementary profiles also use unsupported `shadowcomp.csh` compute programs.
 
-- General geometry `gbuffers_*.vsh` execution is not implemented. All 75 pinned-pack profile/dimension audit records currently report a whole-pack capability error for an active custom vertex stage. The fragment adapter counts above are source-level results, not evidence those complete packs load.
-- Complementary Reimagined and Unbound still need `shadowcomp.csh` compute execution in selected profiles.
-- Sildur's Vibrant 2.02 Extreme has four translucent programs that need its pack-specific `LightC` varying from a custom vertex stage.
-- No complete third-party shaderpack visual validation or physical-GPU testing has been completed. Vulkan teardown diagnostics and the broader stable-release goal remain unresolved.
+No complete third-party shaderpack has been visually validated, and physical-GPU testing has not been completed. Entity and armor-glint custom vertex programs, compute execution, other pack-specific inputs, and Vulkan process teardown ownership remain open work. Beta.24 is experimental and makes no full Iris-parity claim.
 
-See `COMPATIBILITY.md`, `ARCHITECTURE.md`, and `VALIDATION.md` for scope and measured results.
+The tag-triggered Release workflow rebuilds and tests the versioned artifact, reruns the pinned audit and graphics fixtures, verifies distributable contents, and publishes the installable JAR, sources JAR, example-pack archive, and SHA-256 manifest.

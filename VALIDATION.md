@@ -1,5 +1,13 @@
 # Veyra 0.2 validation status
 
+## Beta.24 release candidate - publication pending (2026-10-20)
+
+PR [#59](https://github.com/glebKovshov/Veyra/pull/59) merged terrain vertex-stage execution into `main` at `d97dcb135dc4d289ed149b9916dc932b9f6d814a`. The final PR head passed Build [39464726776](https://github.com/glebKovshov/Veyra/actions/runs/39464726776), pinned source audit [39464726807](https://github.com/glebKovshov/Veyra/actions/runs/39464726807), and all **24/24** Lavapipe fixtures [39464726902](https://github.com/glebKovshov/Veyra/actions/runs/39464726902). The post-merge Build on `main` also passed: [39465440876](https://github.com/glebKovshov/Veyra/actions/runs/39465440876).
+
+The beta.24 versioned candidate was built from the merged commit with JDK 21. `build validateShaders packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passed **253 tests, 0 failures/errors/skips**, processed 55 example shaders, and compiled 52 directly to Vulkan SPIR-V. Local `veyra-0.2.0-beta.24+mc1.21.11.jar` is 642,996 bytes, passes `scripts/verify_jar.py`, and has SHA-256 `3e77fead7149108bae1403e7752fc4c449c422be483873c96521bc248874c2f0`. This is a local candidate only. The tag-triggered Release workflow and published asset verification are pending; no beta.24 release or published checksum is claimed yet.
+
+The pinned source audit covers 4 archives / 75 default-profile-dimension cases / 5,178 stages: **705 geometry fragments accepted / 12 rejected**. All 75 whole-pack cases stop at the unsupported non-terrain `gbuffers_armor_glint.vsh`; all records have `visualValidation=false`. The 12 fragment rejections are Sildur `LightC` inputs. Selected Complementary profiles also require unsupported `shadowcomp.csh`. No full third-party shaderpack visual validation or physical-GPU validation has been completed. The terrain varying fixture measured 223,366 active pixels, 0 when shaders were disabled, and 0 runtime Vulkan validation errors; process teardown still reports 10,031 diagnostics.
+
 ## Beta.22 experimental prerelease - published (2026-10-20)
 
 PR [#51](https://github.com/glebKovshov/Veyra/pull/51) merged geometry color inputs and feedback snapshots at `bc253f51ece852688b5b26b59b877effea7ff091`. Release-prep PR [#52](https://github.com/glebKovshov/Veyra/pull/52) merged at `3fe7b508f687e76bb00130ca3c42ad838f3f941c`; annotated tag `v0.2.0-beta.22+mc1.21.11` points to that commit. Release workflow [39440625486](https://github.com/glebKovshov/Veyra/actions/runs/39440625486) passed the pinned source audit, **22/22** Lavapipe fixtures, release build/tests, distributable verification, and publication. Tag Build [39440625450](https://github.com/glebKovshov/Veyra/actions/runs/39440625450) also passed.
