@@ -1,29 +1,22 @@
-# Veyra 0.2.0-beta.24+mc1.21.11 — experimental prerelease
+# Veyra 0.2.0-beta.25+mc1.21.11 — experimental prerelease
 
-Beta.24 adds limited custom vertex shader execution for supported terrain programs after VulkanMod's terrain setup. It is an experimental subset; it does not provide full Iris compatibility or stable-release support.
+Beta.25 adds a supported subset of armor-glint vertex execution for Minecraft 1.21.11 with VulkanMod 0.6.8. It remains an experimental subset and does not provide full Iris compatibility or establish that a complete third-party shaderpack is playable.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, Java 21 or newer.
-- Install `veyra-0.2.0-beta.24+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
-- Optional example packs can be extracted into `shaderpacks`. Press F6, select a pack, then use Configure / Apply for options and profiles. Overrides persist under `veyra/options/`; archives are not modified.
+- Install `veyra-0.2.0-beta.25+mc1.21.11.jar` in the instance's `mods` folder alongside VulkanMod. Do not install the sources JAR.
+- Optional example packs can be extracted into `shaderpacks`. Press F6, select a pack, then use Configure / Apply for options and profiles. Overrides persist under `veyra/options/`; shader pack archives are not modified.
 
-## Changes since beta.23
+## Changes since beta.24
 
-- Run supported `gbuffers_terrain`, `_solid`, `_cutout`, and `_water` custom vertex programs after VulkanMod's terrain setup.
-- Bridge the available terrain position, color, normal, lightmap, material, midpoint UV, tangent, chunk-fade, and `noisetex` inputs.
-- Link supported scalar, vector, and matrix vertex outputs to matching fragment inputs with checked types and interpolation. Unused VulkanMod outputs are pruned so terrain pack varyings can use available locations.
-- Store tangent components in scalar vertex attributes supported by VulkanMod 0.6.8; preserve the packed terrain stride and field offsets.
-- Reject unsupported attributes, samplers, and varying interfaces with named diagnostics.
+- Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link checked color, UV, and fog-distance outputs to the adapted fragment stage.
+- Bridge legacy position/UV aliases, the glint texture matrix, Iris fog fields, and `noisetex`. Minecraft's native `POSITION_TEX` glint format supplies no color input, so legacy `gl_Color` maps to white.
+- Map fragment sampler aliases `texture`, `gtexture`, and Iris `tex` to Minecraft's `Sampler0`. Prune unreachable helpers and unused uniform/sampler declarations before capability checks while retaining errors for active unsupported reads.
+- Add adapter regressions, shaderc SPIR-V fixtures, an example pack, and an enchanted-book Lavapipe fixture.
 
-PR [#59](https://github.com/glebKovshov/Veyra/pull/59) merged into `main` as `d97dcb135dc4d289ed149b9916dc932b9f6d814a`. The final PR head passed Build [39464726776](https://github.com/glebKovshov/Veyra/actions/runs/39464726776), pinned source audit [39464726807](https://github.com/glebKovshov/Veyra/actions/runs/39464726807), and all **24/24** Lavapipe fixtures [39464726902](https://github.com/glebKovshov/Veyra/actions/runs/39464726902). The terrain VSH-to-FSH readback measured 223,366 active magenta pixels, 0 with shaders disabled, and 0 runtime Vulkan validation errors. Process teardown still reports 10,031 diagnostics.
+## Validation and known limits
 
-Beta.24 was published from annotated tag `v0.2.0-beta.24+mc1.21.11` after release-prep PR [#60](https://github.com/glebKovshov/Veyra/pull/60) merged at `d22b24a8271bf2771f96b923a32005f862d44134`. Release workflow [39466425593](https://github.com/glebKovshov/Veyra/actions/runs/39466425593) passed the source audit, all 24 Lavapipe fixtures, release build/tests, distributable verification, and publication. The downloaded published [install JAR](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.24%2Bmc1.21.11/veyra-0.2.0-beta.24%2Bmc1.21.11.jar) is **642,978 bytes** with SHA-256 `edaaa23fe9b4bd5c4a6bfed210b12b407fc983260059c095db5eb32f3bbdd40e`; it matches `SHA256SUMS.txt` and passes `scripts/verify_jar.py`.
+PR [#62](https://github.com/glebKovshov/Veyra/pull/62) merged to `main` as `df3df827743adf9a978008c59fe9812cd16a699d`. The final PR head passed Build, pinned source audit, and all **25/25** Lavapipe graphics fixtures. The glint fixture read back 313 bright green pixels with the pack active and 0 after disabling it; CI found no runtime Vulkan validation errors before shutdown. Process teardown diagnostics remain.
 
-## Shaderpack audit and known limits
-
-The pinned audit covers 4 shaderpack archives, 75 default/profile/dimension cases, and 5,178 shader stages. It accepted 705 and rejected 12 geometry fragments. Every case still encounters the unsupported non-terrain `gbuffers_armor_glint.vsh`; every record has `visualValidation=false`. The 12 fragment rejections are Sildur `LightC` inputs. The selected Complementary profiles also use unsupported `shadowcomp.csh` compute programs.
-
-No complete third-party shaderpack has been visually validated, and physical-GPU testing has not been completed. Entity and armor-glint custom vertex programs, compute execution, other pack-specific inputs, and Vulkan process teardown ownership remain open work. Beta.24 is experimental and makes no full Iris-parity claim.
-
-The tag-triggered Release workflow rebuilds and tests the versioned artifact, reruns the pinned audit and graphics fixtures, verifies distributable contents, and publishes the installable JAR, sources JAR, example-pack archive, and SHA-256 manifest.
+The pinned audit covers 4 archives / 75 profile-dimension cases / 5,178 stages: 705 geometry fragments accepted and 12 rejected. Complementary glint passes source adaptation. The audited packs still encounter unsupported `gbuffers_basic.vsh`, Sildur attachment 4 and `LightC`, and selected Complementary `shadowcomp.csh` compute programs. Every audit record has `visualValidation=false`. No complete third-party pack or physical-GPU visual validation is claimed; the stable goal remains incomplete.
