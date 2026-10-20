@@ -2,19 +2,19 @@
 
 ## Pinned source audit (current working tree)
 
-The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **180** geometry fragment programs and rejects **537**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
+The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **234** geometry fragment programs and rejects **483**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
 | Complementary Reimagined / Unbound r5.9.3 | 3/10, 3/10, 3/10 | block/entities/glowing/hand: writes beyond color attachment 0; translucent block/entities: unsupported inputs; water: `viewVector`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
-| BSL 10.1.8 | 2/9, 2/9, 2/9 | water: `mat`; entity/block: unsupported inputs; hand: unsupported `sunVec`, `upVec`, and `eastVec` inputs; clouds: `texture` sampler | Not tested |
+| BSL 10.1.8 | 5/9, 5/9, 5/9 | water: `mat`; glowing/translucent entities: outputs beyond color attachment 0; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
 ## Entity overlay, lightmap aliases, and adapter diagnostics (working tree)
 
 Iris defines `entityColor` as the current entity overlay and documents its compatibility mapping to the `vaUV1` overlay attribute ([uniform reference](https://github.com/IrisShaders/docs/blob/main/src/content/docs/current/Reference/Uniforms/rendering.mdx#entitycolor), [compatibility mapping](https://github.com/IrisShaders/docs/blob/main/src/content/docs/current/How%20To/compatibility_vs_core.mdx)). Minecraft 1.21.11's standard entity vertex shader samples that overlay into `overlayColor`; Veyra now maps the Iris uniform to this varying. The item-entity pipeline that does not emit an overlay varying and sign/text programs keep the transparent zero fallback.
 
-The entity bridge also normalizes Iris's `lmCoord` spelling to the existing `lmcoord` lightmap input. The fresh source audit no longer reports `entityColor` or `lmCoord` as blockers. It also no longer mistakes Complementary's locally declared `vec3 viewPos` variables for missing fragment inputs; those programs now reach the next real limit, writing beyond color attachment 0. Complementary still reaches `viewVector` in water, and BSL retains unsupported entity inputs. These changes are source-adapter checks only; no third-party pack has been visually validated.
+The entity bridge also normalizes Iris's `lmCoord` spelling to the existing `lmcoord` lightmap input. The fresh source audit no longer reports `entityColor` or `lmCoord` as blockers. It also no longer mistakes Complementary's locally declared `vec3 viewPos` variables for missing fragment inputs; those programs now reach the next real limit, writing beyond color attachment 0. Complementary still reaches `viewVector` in water. BSL's regular block, entity, and hand programs now pass source adaptation; glowing/translucent entity outputs remain beyond attachment 0. These changes are source-adapter checks only; no third-party pack has been visually validated.
 
 Beta.8 added terrain aliases `lmCoord` and `color`; beta.9 added terrain `viewPos`. Beta.10 extends VulkanMod's 16-byte compressed terrain vertex to 20 bytes, appending two unsigned 16-bit midpoint UV components per quad. The terrain writer computes the average UV from each group of four vertices, while existing position, lightmap, UV0 and color bytes retain their offsets. Iris defines `mc_midTexCoord` as the center UV of the current quad, calculated per quad ([Iris attribute reference](https://shaders.properties/current/reference/attributes/mc_midtexcoord/)). The adapted vertex shader computes `signMidCoordPos = sign(texCoord0 - mc_midTexCoord)`. Terrain aliases `vertexPos` and `playerPos` use the existing camera-relative terrain position; `glColorRaw` uses the raw unpacked terrain color before lightmap multiplication.
 
@@ -26,11 +26,11 @@ Iris exposes `currentRenderedItemId` for the item or armor currently being rende
 
 Iris' hardcoded armor-trim and cape identifiers are not mapped yet. The Lavapipe `examples/current-rendered-item-id` fixture equips mapped diamond (ID 42) in the main hand and mapped stone (ID 43) in the offhand; its fragment requires both the item ID and the correct hand signal. The fixture passed in [graphics run 39366976302](https://github.com/glebKovshov/Veyra/actions/runs/39366976302), with 32,321 active magenta pixels for the main-hand item, 14,102 active green pixels for the offhand item, and zero pixels for both signals when shaders are disabled. This validates the synthetic submission path only. The pinned source audit no longer reports `currentRenderedItemId` as a blocker, but acceptance is still limited by other inputs such as water `viewVector`/`mat`, compute passes, and attachment feedback. All audit records keep `visualValidation=false`; the listed third-party packs remain **Not tested** in-game.
 
-## Iris `isMainHand` input for first-person hands (PR #21)
+## Iris `isMainHand` and BSL direction inputs for first-person hands (PRs #21 and #22)
 
 First-person hand fragments may declare Iris `varying float isMainHand`. Veyra scopes the logical Minecraft hand around each item submission and specializes cached Vulkan pipeline variants to `1.0` for the main hand and `0.0` for the offhand. The input is accepted only by the hand-program adapter. The `current-rendered-item-id` Lavapipe fixture checks `isMainHand` together with IDs 42 and 43, so either signal alone cannot satisfy the readback.
 
-This does not make BSL playable. Its pinned default hand fragment now advances past `isMainHand` but remains rejected for unsupported fragment inputs `sunVec`, `upVec`, and `eastVec`; BSL's other entity, water, and cloud blockers also remain. The pinned audit still accepts 180 and rejects 537 geometry fragments across 75 cases / 5,178 preprocessed stages, with `visualValidation=false` throughout. No third-party pack has been visually validated.
+The BSL fragment declares legacy varyings in comma-separated lists. Veyra now splits those declarations before input validation, maps `sunVec` to the live Iris `sunPosition` vector, and derives `upVec` and `eastVec` from the current `gbufferModelView` axes. A BSL-style hand shader is covered by the shaderc SPIR-V fixture. The pinned source audit now accepts the default BSL hand/entity/block fragment cases and records 5/9 geometry fragments accepted in each tested dimension. BSL still has active cloud `texture`, water `mat`, and glowing/translucent entity outputs beyond attachment 0; it is not confirmed playable. The 75-case matrix accepts 234 and rejects 483 fragments, with `visualValidation=false` throughout. No third-party pack has been visually validated.
 
 ## Entity and block entity identifiers (beta.4)
 
