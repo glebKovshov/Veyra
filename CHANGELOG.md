@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.15 - 2026-10-20 (prerelease)
+
+- Append Iris `block.properties` IDs and the `mc_Entity` fluid marker to VulkanMod terrain vertices; expose them to terrain shaders as `mat` and `mc_Entity`.
+- Rebuild terrain sections after selecting a pack when its block mappings change.
+- Handle repeated block-ID entries, comma-separated state property values, and Iris 1.8+ direct block/state priority over tags.
+- Add original terrain-ID and water-ID examples and Lavapipe readback fixtures. The fixtures verify the synthetic bridge only; third-party shaderpack rendering is not certified.
+
 ## 0.2.0-beta.14 - 2026-10-20 (prerelease)
 
 - Add native multiple color attachments for supported entity, first-person hand, block-entity, and sign-text geometry, retaining explicit and legacy output mappings.
