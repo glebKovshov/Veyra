@@ -172,6 +172,41 @@ public class ShaderCompileSmoke {
                     }
                     """, cloudPackVertex);
             compileVertex(compiler, options, cloudVertex, "cloud-vertex-adapter", true);
+            CloudShaderAdapter.AdaptedVertex modelViewCloudVertex = CloudShaderAdapter.adaptVertexWithMetadata("""
+                    #version 450
+                    layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                    layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec4 Color;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out float vertexDistance;
+                    void main() {
+                        gl_Position = MVP * vec4(Position, 1.0);
+                        vertexColor = Color * ColorModulator;
+                        vertexDistance = length(Position + ModelOffset);
+                    }
+                    """, """
+                    varying vec2 texcoord;
+                    varying vec4 color;
+                    varying float dist;
+                    void main() {
+                        gl_Position = ftransform();
+                        dist = length(gl_ModelViewMatrix * gl_Vertex);
+                        texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                        color = gl_Color;
+                    }
+                    """);
+            String modelViewCloudVertexSource = appendCloudUniformFields(
+                    modelViewCloudVertex.source(), modelViewCloudVertex.uniformFields());
+            String modelViewCloudFragmentSource = CloudShaderAdapter.adapt("""
+                    uniform sampler2D texture;
+                    varying vec2 texcoord;
+                    varying vec4 color;
+                    varying float dist;
+                    void main() { gl_FragColor = texture2D(texture, texcoord) * color * clamp(dist, 0.0, 1.0); }
+                    """, modelViewCloudVertex.uniformFields()).source();
+            compileVertex(compiler, options, modelViewCloudVertexSource, "cloud-model-view-uniform", true);
+            compile(compiler, options, modelViewCloudFragmentSource, "cloud-model-view-varying-link", true);
             CloudShaderAdapter.AdaptedVertex bslCloudVertex = CloudShaderAdapter.adaptVertexWithMetadata("""
                     #version 450
                     layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };

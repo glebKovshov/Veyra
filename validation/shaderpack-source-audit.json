@@ -13,10 +13,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -33,10 +31,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -54,10 +51,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -74,10 +69,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -94,10 +87,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -114,10 +105,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -134,10 +123,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -155,10 +143,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -175,10 +161,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -195,10 +179,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -215,10 +197,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -236,10 +217,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -256,10 +235,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -276,10 +253,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -296,10 +271,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -316,10 +289,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -337,10 +309,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -357,10 +327,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -481,18 +449,16 @@
     "profiles": 0,
     "stages": 42,
     "preprocessed": 42,
-    "geometryFragmentsAccepted": 0,
-    "geometryFragmentsRejected": 5,
+    "geometryFragmentsAccepted": 1,
+    "geometryFragmentsRejected": 4,
     "geometryVertexStages": 13,
     "computeStages": 0,
-    "errorCount": 6,
+    "errorCount": 4,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds input 'texcoord' is not provided by Veyra's cloud bridge yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex4'.",
       "gbuffers_hand_water.fsh adapter: gbuffers_hand_water uses unsupported sampler 'colortex4'.",
-      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'gl_ModelViewMatrix' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported."
     ],
     "visualValidation": false
   },
@@ -510,10 +476,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -530,10 +494,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -551,10 +514,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -571,10 +532,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -591,10 +550,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -611,10 +568,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -631,10 +586,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -652,10 +606,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -672,10 +624,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -692,10 +642,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -712,10 +660,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -733,10 +680,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -753,10 +698,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -773,10 +716,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -793,10 +734,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -813,10 +752,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -834,10 +772,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -854,10 +790,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -978,18 +912,16 @@
     "profiles": 0,
     "stages": 42,
     "preprocessed": 42,
-    "geometryFragmentsAccepted": 0,
-    "geometryFragmentsRejected": 5,
+    "geometryFragmentsAccepted": 1,
+    "geometryFragmentsRejected": 4,
     "geometryVertexStages": 13,
     "computeStages": 0,
-    "errorCount": 6,
+    "errorCount": 4,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds input 'texcoord' is not provided by Veyra's cloud bridge yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex4'.",
       "gbuffers_hand_water.fsh adapter: gbuffers_hand_water uses unsupported sampler 'colortex4'.",
-      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'gl_ModelViewMatrix' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported."
     ],
     "visualValidation": false
   },
@@ -1007,10 +939,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1027,10 +957,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1048,10 +977,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1068,10 +995,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1088,10 +1013,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1108,10 +1031,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1128,10 +1049,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1149,10 +1069,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1169,10 +1087,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1189,10 +1105,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1209,10 +1123,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1230,10 +1143,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1250,10 +1161,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1270,10 +1179,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1290,10 +1197,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1310,10 +1215,9 @@
     "geometryFragmentsRejected": 1,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 2,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'spriteBounds' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1331,10 +1235,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1351,10 +1253,8 @@
     "geometryFragmentsRejected": 0,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 1,
-    "errors": [
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'lmCoord' is not provided by VulkanMod's cloud mesh."
-    ],
+    "errorCount": 0,
+    "errors": [],
     "visualValidation": false
   },
   {
@@ -1475,19 +1375,17 @@
     "profiles": 0,
     "stages": 42,
     "preprocessed": 42,
-    "geometryFragmentsAccepted": 0,
-    "geometryFragmentsRejected": 5,
+    "geometryFragmentsAccepted": 1,
+    "geometryFragmentsRejected": 4,
     "geometryVertexStages": 13,
     "computeStages": 0,
-    "errorCount": 6,
+    "errorCount": 4,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds input 'texcoord' is not provided by Veyra's cloud bridge yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex4'.",
       "gbuffers_hand_water.fsh adapter: gbuffers_hand_water uses unsupported sampler 'colortex4'.",
-      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported.",
-      "gbuffers_clouds.vsh adapter: gbuffers_clouds vertex input or transform 'gl_ModelViewMatrix' is not provided by VulkanMod's cloud mesh."
+      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported."
     ],
     "visualValidation": false
   }
-]
+]\n
