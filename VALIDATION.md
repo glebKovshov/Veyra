@@ -1,5 +1,11 @@
 # Veyra 0.2 validation status
 
+## Unreleased source candidate: legacy fog bridge — 2026-10-20
+
+Commit [`d574ab5`](https://github.com/glebKovshov/Veyra/commit/d574ab5968318790c3aee52531b31dfb40bb5650) adapts legacy `gl_Fog.color`, `.start`, `.end`, and derived `.scale` to the Minecraft Fog UBO. The published beta.17 JAR does not contain this change. A local rerun of `scripts/run_shaderpack_source_audit.py` against the four SHA-512-pinned packs recorded 75 cases, 5,178 stages, **636 accepted / 81 rejected** geometry fragments, with `visualValidation=false` for every record. `validation/shaderpack-source-audit.json` and `validation/shaderpack-profile-audit.json` now contain these candidate results; before the refresh they still described the pre-`midCoord` beta.16 source (486 / 231).
+
+Complementary Reimagined and Unbound r5.9.3 now accept 10/10 default geometry fragments in all three dimensions. Selected profiles still fail on `spriteBounds` or the unsupported `shadowcomp.csh` compute stage. BSL remains 6/9 with `recolor`, water `dist`, and cloud `texture` blockers; Sildur's Vibrant remains 0/5 due to `colortex4`, attachment feedback, and cloud inputs. Forced JDK 21 `build validateShaders packageExamplePacks --rerun-tasks` passed: 231 tests, 0 failures/errors/skips, 50 example shaders, and 47 direct Vulkan SPIR-V compilations. The release-tagged beta.17 JAR still verifies separately; this candidate has no physical-GPU or third-party-pack visual validation.
+
 ## Beta.17 experimental prerelease — 2026-10-20
 
 Published [Veyra 0.2.0-beta.17+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.17%2Bmc1.21.11) from annotated tag `v0.2.0-beta.17+mc1.21.11` at `ab14d1ad43c1094fdd19988413eda296c4ed3f8f`. Release workflow [39395224331](https://github.com/glebKovshov/Veyra/actions/runs/39395224331) passed the pinned source audit, all 19 Lavapipe fixtures, release build/tests, JAR verification, and publication. Tag Build [39395224342](https://github.com/glebKovshov/Veyra/actions/runs/39395224342) also passed `build validateShaders` and distributable verification.

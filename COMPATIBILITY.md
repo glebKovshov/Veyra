@@ -1,5 +1,9 @@
 # Shaderpack compatibility: Veyra 0.2.0-beta.17 prerelease
 
+## Unreleased source candidate: legacy fog inputs
+
+Source commit [`d574ab5`](https://github.com/glebKovshov/Veyra/commit/d574ab5968318790c3aee52531b31dfb40bb5650) maps legacy `gl_Fog.color`, `.start`, `.end`, and the derived `.scale` to Minecraft's Fog UBO. It is not included in the published beta.17 JAR. A pinned source audit on this candidate accepts **636** and rejects **81** geometry fragment programs across 75 cases / 5,178 stages; all records have `visualValidation: false`. Complementary Reimagined and Unbound r5.9.3 now accept **10/10** default geometry fragments in Overworld, Nether, and End. Selected profiles still require `spriteBounds` and the unimplemented `shadowcomp.csh` compute stage. BSL remains 6/9 and Sildur's Vibrant 0/5. No complete third-party pack has been visually validated.
+
 ## Beta.17 terrain midpoint bridge
 
 The beta.17 release audit [39395224331](https://github.com/glebKovshov/Veyra/actions/runs/39395224331), artifact [12251935741](https://github.com/glebKovshov/Veyra/actions/runs/39395224331/artifacts/12251935741), covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **528** geometry fragment programs and rejects **189**; every record has `visualValidation: false`.
