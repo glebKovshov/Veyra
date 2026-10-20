@@ -6,6 +6,10 @@ Beta.19 is published from annotated tag [`v0.2.0-beta.19+mc1.21.11`](https://git
 
 The released `veyra-0.2.0-beta.19+mc1.21.11.jar` is **593,532 bytes**, SHA-256 `78192452d957306c74e1cc3bad01e2220b01c9877b74586aff065f5a0c4b8f4c`. It matches the release's `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and mod 0.2.0-beta.19+mc1.21.11. The source audit reports Complementary Reimagined/Unbound 10/10 defaults in each tested dimension, BSL 8/9, and Sildur 0/5. No third-party pack visuals or physical-GPU results are claimed. The water fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; process teardown still reported 10,049 diagnostics.
 
+## Current source candidate after beta.19 (not included in the published JAR)
+
+The current feature branch adds a Vulkan cloud-texture sampler and extended cloud mesh inputs for UV0 and flat face normals. It adapts BSL 10.1.8's cloud `texture`, `texCoord`, `normal`, `sunVec`, `upVec`, and `eastVec` interfaces. The local pinned audit covers 75 cases / 5,178 stages and accepts 690 / rejects 27 geometry fragments; BSL defaults accept 9/9 in Overworld, Nether, and End. Its cloud vertex stage adapts against VulkanMod 0.6.8's actual base cloud vertex shader for all audited BSL profiles. Complementary cloud vertex input `lmCoord` and Sildur cloud inputs remain unsupported. These source results do not verify rendered third-party packs: every audit record has `visualValidation: false`, and the new cloud texture Lavapipe fixture is awaiting CI.
+
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
 | Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: terrain `spriteBounds` and unsupported `shadowcomp.csh` compute stage | Not tested |

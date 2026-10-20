@@ -28,6 +28,7 @@
     "VkCommandEncoderMixin",
     "VeyraUniformsMixin",
     "accessor.MinecraftAccessor",
+    "accessor.BufferBuilderAccessor",
     "accessor.ItemLayerRenderStateInvoker",
     "accessor.LevelRendererAccessor",
     "accessor.CameraAccessor",

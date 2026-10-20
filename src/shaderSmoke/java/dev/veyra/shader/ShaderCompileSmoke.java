@@ -172,6 +172,52 @@ public class ShaderCompileSmoke {
                     }
                     """, cloudPackVertex);
             compileVertex(compiler, options, cloudVertex, "cloud-vertex-adapter", true);
+            CloudShaderAdapter.AdaptedVertex bslCloudVertex = CloudShaderAdapter.adaptVertexWithMetadata("""
+                    #version 450
+                    layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                    layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec4 Color;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out float vertexDistance;
+                    void main() {
+                        gl_Position = MVP * vec4(Position, 1.0);
+                        vertexColor = Color * ColorModulator;
+                        vertexDistance = length(Position + ModelOffset);
+                    }
+                    """, """
+                    varying vec2 texCoord;
+                    varying vec3 normal;
+                    varying vec3 sunVec, upVec, eastVec;
+                    varying vec4 color;
+                    uniform float timeAngle;
+                    uniform mat4 gbufferModelView;
+                    void main() {
+                        texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                        color = gl_Color;
+                        normal = normalize(gl_NormalMatrix * gl_Normal);
+                        sunVec = normalize((gbufferModelView * vec4(vec3(timeAngle), 1.0)).xyz);
+                        upVec = normalize(gbufferModelView[1].xyz);
+                        eastVec = normalize(gbufferModelView[0].xyz);
+                        gl_Position = ftransform();
+                    }
+                    """);
+            String bslCloudVertexSource = appendCloudUniformFields(
+                    bslCloudVertex.source(), bslCloudVertex.uniformFields());
+            String bslCloudFragmentSource = CloudShaderAdapter.adapt("""
+                    uniform sampler2D texture;
+                    varying vec2 texCoord;
+                    varying vec3 normal;
+                    varying vec3 sunVec, upVec, eastVec;
+                    varying vec4 color;
+                    void main() {
+                        vec4 albedo = texture2D(texture, texCoord);
+                        albedo.rgb *= dot(normal, upVec) + dot(sunVec, eastVec);
+                        gl_FragColor = albedo * color;
+                    }
+                    """, bslCloudVertex.uniformFields()).source();
+            compileVertex(compiler, options, bslCloudVertexSource, "bsl-cloud-vertex-inputs", true);
+            compile(compiler, options, bslCloudFragmentSource, "bsl-cloud-fragment-inputs", true);
             String terrainVertex = TerrainShaderAdapter.adaptVertex("""
                     #version 460
                     layout(binding = 0) uniform UBO0 { mat4 MVP; };
@@ -225,7 +271,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog, cloud-vertex, terrain-view-position and terrain-abs-midcoordpos fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, terrain-view-position and terrain-abs-midcoordpos fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
@@ -248,5 +294,19 @@ public class ShaderCompileSmoke {
             if (success != expected) throw new AssertionError(name + ": " + shaderc_result_get_error_message(result));
             System.out.println("PASS " + name);
         } finally { shaderc_result_release(result); }
+    }
+
+    private static String appendCloudUniformFields(String source,
+            java.util.List<ShaderPackUniformAdapter.UniformField> fields) {
+        if (fields.isEmpty()) return source;
+        String marker = "float FogCloudsEnd;";
+        int markerIndex = source.indexOf(marker);
+        if (markerIndex < 0) throw new AssertionError("Cloud vertex fixture has no FogCloudsEnd field.");
+        int lineEnd = source.indexOf('\n', markerIndex);
+        StringBuilder additions = new StringBuilder();
+        for (ShaderPackUniformAdapter.UniformField field : fields) {
+            additions.append("    ").append(field.type()).append(' ').append(field.name()).append(";\n");
+        }
+        return source.substring(0, lineEnd + 1) + additions + source.substring(lineEnd + 1);
     }
 }

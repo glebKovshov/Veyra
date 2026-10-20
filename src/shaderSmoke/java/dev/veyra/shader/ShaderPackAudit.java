@@ -1,9 +1,12 @@
 package dev.veyra.shader;
 
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
 
 /** Read-only audit of caller-provided pack archives; it never renders or redistributes them. */
 public final class ShaderPackAudit {
@@ -34,6 +37,7 @@ public final class ShaderPackAudit {
 
     public static void main(String[] args) throws Exception {
         seedVanillaBiomeIds();
+        String vulkanModCloudVertex = readVulkanModCloudVertex();
         int dimension = 0;
         String profile = "";
         for (String argument : args) {
@@ -78,6 +82,17 @@ public final class ShaderPackAudit {
                         } catch (Exception exception) { rejected++; errors.add(file + " adapter: " + exception.getMessage()); }
                     } catch (Exception exception) { errors.add(file + " preprocess: " + exception.getMessage()); }
                 }
+                try {
+                    pack.readCloudVertex().ifPresent(source -> {
+                        try {
+                            CloudShaderAdapter.adaptVertexWithMetadata(vulkanModCloudVertex, source);
+                        } catch (IOException exception) {
+                            errors.add("gbuffers_clouds.vsh adapter: " + exception.getMessage());
+                        }
+                    });
+                } catch (Exception exception) {
+                    errors.add("gbuffers_clouds.vsh preprocess: " + exception.getMessage());
+                }
             } else errors.add(pack.issue());
             System.out.println("{\"pack\":" + quote(pack.path().getFileName().toString()) + ",\"discovered\":" + pack.supportsShaderPrograms()
                     + ",\"dimension\":" + dimension + ",\"profile\":" + quote(profile) + ",\"capabilityError\":" + quote(capabilityError)
@@ -85,6 +100,14 @@ public final class ShaderPackAudit {
                     + ",\"geometryFragmentsAccepted\":" + accepted + ",\"geometryFragmentsRejected\":" + rejected + ",\"geometryVertexStages\":" + geometryVertices
                     + ",\"computeStages\":" + compute + ",\"errorCount\":" + errors.size() + ",\"errors\":["
                     + String.join(",", errors.stream().limit(16).map(ShaderPackAudit::quote).toList()) + "],\"visualValidation\":false}");
+        }
+    }
+
+    private static String readVulkanModCloudVertex() throws IOException {
+        String resource = "assets/vulkanmod/shaders/basic/clouds/clouds.vsh";
+        try (InputStream input = ShaderPackAudit.class.getClassLoader().getResourceAsStream(resource)) {
+            if (input == null) throw new IOException("VulkanMod cloud vertex shader is missing from the audit classpath.");
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

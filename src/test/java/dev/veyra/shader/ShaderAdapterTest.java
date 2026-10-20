@@ -391,7 +391,7 @@ class ShaderAdapterTest {
 
         assertFalse(adapted.usesSceneColorSampler());
         assertTrue(adapted.usesNoiseSampler());
-        assertTrue(adapted.source().contains("layout(binding = 3) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(adapted.source().contains("layout(binding = 2) uniform sampler2D VeyraNoiseSampler;"));
         assertTrue(adapted.source().contains("#define noisetex VeyraNoiseSampler"));
         assertTrue(adapted.source().contains("texture(noisetex, vec2(0.5))"));
         assertFalse(adapted.source().contains("uniform sampler2D noisetex;"));
@@ -408,6 +408,28 @@ class ShaderAdapterTest {
         assertTrue(adapted.usesNoiseSampler());
         assertTrue(adapted.source().contains("textureLod(noisetex, vec2(0.5), 0.0)"));
         assertFalse(adapted.source().contains("texture2DLod("));
+    }
+
+    @Test
+    void assignsContiguousBindingsToActiveCloudSamplers() throws IOException {
+        CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D colortex0;
+                uniform sampler2D noisetex;
+                uniform sampler2D texture;
+                void main() {
+                    vec2 uv = vec2(0.5);
+                    gl_FragColor = texture2D(colortex0, uv)
+                            + texture2D(noisetex, uv) + texture2D(texture, uv);
+                }
+                """);
+
+        assertTrue(adapted.source().contains("layout(binding = 2) uniform sampler2D VeyraCloudSceneSampler;"));
+        assertTrue(adapted.source().contains("layout(binding = 3) uniform sampler2D VeyraNoiseSampler;"));
+        assertTrue(adapted.source().contains("layout(binding = 4) uniform sampler2D VeyraCloudTextureSampler;"));
+        assertEquals(2, adapted.samplerBindings().get("VeyraCloudSceneSampler"));
+        assertEquals(3, adapted.samplerBindings().get("VeyraNoiseSampler"));
+        assertEquals(4, adapted.samplerBindings().get("VeyraCloudTextureSampler"));
     }
 
     @Test
@@ -449,11 +471,75 @@ class ShaderAdapterTest {
 
         assertTrue(adapted.contains("#define ftransform() (MVP * vec4(Position, 1.0))"));
         assertTrue(adapted.contains("#define color vertexColor"));
+        assertFalse(adapted.contains("#define gl_Color (Color * ColorModulator)"));
+        assertEquals(1, adapted.split("#define gl_Color vertexColor", -1).length - 1);
         assertTrue(adapted.contains("vertexColor = Color * ColorModulator;"));
         assertTrue(adapted.contains("gl_Position = ftransform();"));
         assertTrue(adapted.contains("color = gl_Color;"));
         assertFalse(adapted.contains("varying vec4 color;"));
         assertFalse(adapted.contains("varying float vertexDistance;"));
+    }
+
+    @Test
+    void adaptsBslCloudTextureCoordinatesNormalsAndDirectionVaryings() throws IOException {
+        String vulkanModVertex = """
+                #version 450
+                layout(binding = 0) uniform UBO0 { mat4 MVP; vec3 ModelOffset; };
+                layout(binding = 1) uniform UBO { vec4 ColorModulator; float FogCloudsEnd; };
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out float vertexDistance;
+                void main() {
+                    gl_Position = MVP * vec4(Position, 1.0);
+                    vertexColor = Color * ColorModulator;
+                    vertexDistance = length(Position + ModelOffset);
+                }
+                """;
+        CloudShaderAdapter.AdaptedVertex vertex = CloudShaderAdapter.adaptVertexWithMetadata(vulkanModVertex, """
+                #version 120
+                varying vec2 texCoord;
+                varying vec3 normal;
+                varying vec3 sunVec, upVec, eastVec;
+                varying vec4 color;
+                uniform float timeAngle;
+                uniform mat4 gbufferModelView;
+                const float sunPathRotation = 0.0;
+                void main() {
+                    texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    color = gl_Color;
+                    normal = normalize(gl_NormalMatrix * gl_Normal);
+                    sunVec = normalize((gbufferModelView * vec4(vec3(timeAngle), 1.0)).xyz);
+                    upVec = normalize(gbufferModelView[1].xyz);
+                    eastVec = normalize(gbufferModelView[0].xyz);
+                    gl_Position = ftransform();
+                }
+                """);
+        CloudShaderAdapter.AdaptedFragment fragment = CloudShaderAdapter.adapt("""
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texCoord;
+                varying vec3 normal;
+                varying vec3 sunVec, upVec, eastVec;
+                varying vec4 color;
+                void main() {
+                    vec4 albedo = texture2D(texture, texCoord);
+                    albedo.rgb *= dot(normal, upVec) + dot(sunVec, eastVec);
+                    gl_FragColor = albedo * color;
+                }
+                """, vertex.uniformFields());
+
+        assertTrue(vertex.requiresExtendedVertexFormat());
+        assertTrue(vertex.source().contains("layout(location = 2) in vec2 VeyraCloudTexCoord0;"));
+        assertTrue(vertex.source().contains("layout(location = 3) in vec3 VeyraCloudNormal;"));
+        assertTrue(vertex.source().contains("layout(location = 6) out vec3 veyraCloudEastVec;"));
+        assertTrue(vertex.source().contains("uniform mat4 textureMatrix;")
+                || vertex.uniformFields().stream().anyMatch(field -> field.name().equals("textureMatrix")));
+        assertTrue(fragment.usesCloudTexture());
+        assertTrue(fragment.source().contains("layout(binding = 2) uniform sampler2D VeyraCloudTextureSampler;"));
+        assertTrue(fragment.source().contains("texture(VeyraCloudTextureSampler, texCoord)"));
+        assertTrue(fragment.source().contains("layout(location = 6) in vec3 veyraCloudEastVec;"));
+        assertTrue(fragment.uniformFields().containsAll(vertex.uniformFields()));
     }
 
     @Test
@@ -467,7 +553,7 @@ class ShaderAdapterTest {
                     coord0 = vec2(0.0);
                 }
                 """));
-        assertTrue(error.getMessage().contains("attributes or transforms"), error.getMessage());
+        assertTrue(error.getMessage().contains("coord0"), error.getMessage());
     }
 
     @Test
