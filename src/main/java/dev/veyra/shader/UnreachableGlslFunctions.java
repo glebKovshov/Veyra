@@ -31,6 +31,18 @@ final class UnreachableGlslFunctions {
                 functions.computeIfAbsent(function.name(), ignored -> new ArrayList<>()).add(function);
             }
         }
+        List<FunctionBody> topLevelFunctions = functions.values().stream().flatMap(List::stream)
+                .sorted(java.util.Comparator.comparingInt(FunctionBody::start)).toList();
+        functions.clear();
+        int topLevelEnd = -1;
+        for (FunctionBody function : topLevelFunctions) {
+            // The permissive declaration matcher can also recognize function-like text inside
+            // a function body. GLSL does not allow nested function definitions; ignoring these
+            // overlapping matches keeps source slicing and reachability limited to real bodies.
+            if (function.start() < topLevelEnd) continue;
+            functions.computeIfAbsent(function.name(), ignored -> new ArrayList<>()).add(function);
+            topLevelEnd = function.end();
+        }
         if (functions.isEmpty() || !functions.containsKey(entrypoint)) return source;
 
         Set<String> reachable = new LinkedHashSet<>();

@@ -972,6 +972,15 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 TerrainShaderAdapter.validatePackVaryingLinks(program, fragment.get(), varyings);
             }
         }
+        validateBasicLineCapabilities();
+        if (hasGlintFragment() && readStage(GLINT_PROGRAM + ".vsh").isEmpty()) {
+            String fragment = readGlintFragment().orElseThrow(
+                    () -> new IOException("The pack no longer contains an armor-glint fragment shader."));
+            String activeFragment = GlslPreprocessor.process(GLINT_PROGRAM + ".fsh", fragment);
+            FragmentOutputs.parse(activeFragment);
+            readGeometryBlendSettings(GLINT_PROGRAM);
+            TextureColorDistanceShaderAdapter.adaptFragment(fragment, GLINT_PROGRAM, false);
+        }
         for (String file : stageFiles().stream().sorted().toList()) {
             int dot = file.lastIndexOf('.');
             String program = file.substring(0, dot);
@@ -997,6 +1006,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                             adaptedVertex.outputsColor(), true,
                             adaptedVertex.colorInterpolation() == null ? "smooth" : adaptedVertex.colorInterpolation(),
                             adaptedVertex.texCoordInterpolation(), true);
+                } else if (program.equals(BASIC_PROGRAM) || program.equals(LINE_PROGRAM)) {
+                    // The leash/line vertex formats and cross-stage varyings were checked above.
                 } else {
                     throw new IOException("Cannot execute " + file
                             + ": custom vertex shaders for this gbuffers program are not implemented by Veyra.");
@@ -1008,6 +1019,39 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (program.matches("begin\\d*")) {
                 throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
             }
+        }
+    }
+
+    private void validateBasicLineCapabilities() throws IOException {
+        Optional<String> basicVertex = readStage(BASIC_PROGRAM + ".vsh");
+        if (hasBasicFragment) {
+            String fragment = readBasicFragment().orElseThrow(
+                    () -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
+            validateBasicLineProgram(BASIC_PROGRAM, fragment, basicVertex,
+                    BasicVertexShaderAdapter.Format.LEASH);
+            readGeometryBlendSettings(BASIC_PROGRAM);
+        }
+
+        if (hasLineFragment || hasBasicFragment) {
+            String fragmentProgram = hasLineFragment ? LINE_PROGRAM : BASIC_PROGRAM;
+            String fragment = hasLineFragment
+                    ? readLineFragment().orElseThrow(() -> new IOException("The pack no longer contains gbuffers_line.fsh."))
+                    : readBasicFragment().orElseThrow(() -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
+            Optional<String> lineVertex = readStage(LINE_PROGRAM + ".vsh").or(() -> basicVertex);
+            validateBasicLineProgram(fragmentProgram, fragment, lineVertex,
+                    BasicVertexShaderAdapter.Format.LINE);
+            readGeometryBlendSettings(fragmentProgram);
+        }
+    }
+
+    private static void validateBasicLineProgram(String programName, String fragment,
+            Optional<String> vertex, BasicVertexShaderAdapter.Format format) throws IOException {
+        if (vertex.isPresent()) {
+            Map<String, TerrainVertexShaderAdapter.PackVarying> outputs =
+                    BasicVertexShaderAdapter.describeVaryings(programName, vertex.get(), format);
+            TextureColorDistanceShaderAdapter.adaptFragment(fragment, programName, outputs);
+        } else {
+            ColorDistanceShaderAdapter.adaptFragment(fragment, programName, format == BasicVertexShaderAdapter.Format.LEASH);
         }
     }
 

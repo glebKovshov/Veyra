@@ -97,6 +97,16 @@ public class ShaderCompileSmoke {
                     void main() { gl_FragColor = texture2D(tex, texcoord); }
                     """, "gbuffers_armor_glint", false);
             compile(compiler, options, glintTexAliasFragment, "armor-glint-iris-tex-sampler-alias", true);
+            String glintMrtFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 120
+                    /* RENDERTARGETS: 0,4 */
+                    varying vec2 texcoord;
+                    void main() {
+                        gl_FragData[0] = vec4(texcoord, 0.0, 1.0);
+                        gl_FragData[1] = vec4(0.0, 1.0, 0.0, 1.0);
+                    }
+                    """, "gbuffers_armor_glint", false);
+            compile(compiler, options, glintMrtFragment, "armor-glint-mrt-outputs", true);
             GlintVertexShaderAdapter.AdaptedStage glintSharedLibraryVertex = GlintVertexShaderAdapter.adaptStage(
                     glintNativeVertex, """
                             #version 130
@@ -119,7 +129,151 @@ public class ShaderCompileSmoke {
             }
             compileVertex(compiler, options, glintSharedLibraryVertex.source(),
                     "armor-glint-shared-noise-lightmap-helpers", true);
-            count += 3;
+            String nativeLeashVertex = """
+                    #version 460
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec4 Color;
+                    layout(location = 2) in ivec2 UV2;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out float sphericalVertexDistance;
+                    layout(location = 2) out float cylindricalVertexDistance;
+                    layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                        mat4 ModelViewMat;
+                        mat4 ProjMat;
+                        mat4 TextureMat;
+                        vec4 ColorModulator;
+                    };
+                    void main() {
+                        gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                        vertexColor = Color * ColorModulator;
+                        sphericalVertexDistance = 0.0;
+                        cylindricalVertexDistance = 0.0;
+                    }
+                    """;
+            var basicLeashVertex = BasicVertexShaderAdapter.adaptStage(nativeLeashVertex, """
+                    #version 130
+                    varying vec2 lmCoord;
+                    flat varying vec4 color;
+                    void main() {
+                        gl_Position = ftransform();
+                        lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                        color = gl_Color;
+                    }
+                    """, "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH);
+            compileVertex(compiler, options, basicLeashVertex.source(), "basic-leash-vertex-adapter", true);
+            String nativeLineVertex = """
+                    #version 460
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec4 Color;
+                    layout(location = 2) in vec3 Normal;
+                    layout(location = 3) in float LineWidth;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out float sphericalVertexDistance;
+                    layout(location = 2) out float cylindricalVertexDistance;
+                    layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                        mat4 ModelViewMat;
+                        mat4 ProjMat;
+                        mat4 TextureMat;
+                        vec4 ColorModulator;
+                        vec2 ScreenSize;
+                    };
+                    void main() {
+                        gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                        vertexColor = Color * ColorModulator;
+                        sphericalVertexDistance = 0.0;
+                        cylindricalVertexDistance = 0.0;
+                    }
+                    """;
+            var basicLineVertex = BasicVertexShaderAdapter.adaptStage(nativeLineVertex, """
+                    #version 130
+                    flat out vec4 color;
+                    out vec3 normal;
+                    void main() {
+                        gl_Position = ftransform();
+                        color = gl_Color;
+                        normal = gl_Normal;
+                    }
+                    """, "gbuffers_line", BasicVertexShaderAdapter.Format.LINE);
+            compileVertex(compiler, options, basicLineVertex.source(), "basic-line-vertex-adapter", true);
+            Path basicFixture = Path.of("examples/basic-vertex-execution/shaders");
+            String basicPackVertexSource = GlslPreprocessor.process("gbuffers_basic.vsh",
+                    Files.readString(basicFixture.resolve("gbuffers_basic.vsh")));
+            var basicPackVertex = BasicVertexShaderAdapter.adaptStage(nativeLeashVertex,
+                    basicPackVertexSource, "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH);
+            compileVertex(compiler, options, basicPackVertex.source(), "basic-pack-leash-vertex", true);
+            String basicPackFragment = TextureColorDistanceShaderAdapter.adaptFragment(
+                    Files.readString(basicFixture.resolve("gbuffers_basic.fsh")), "gbuffers_basic",
+                    basicPackVertex.varyings(), false, true);
+            compile(compiler, options, basicPackFragment, "basic-pack-leash-fragment", true);
+            var basicFallbackLineVertex = BasicVertexShaderAdapter.adaptStage(nativeLineVertex, """
+                    #version 130
+                    void main() {
+                        gl_Position = ProjMat * ModelViewMat * vec4(vaPosition + vaNormal, 1.0);
+                    }
+                    """, "gbuffers_line", BasicVertexShaderAdapter.Format.LINE, true);
+            compileVertex(compiler, options, basicFallbackLineVertex.source(),
+                    "basic-fallback-line-vertex-widening", true);
+            String linePackVertexSource = GlslPreprocessor.process("gbuffers_line.vsh",
+                    Files.readString(basicFixture.resolve("gbuffers_line.vsh")));
+            var linePackVertex = BasicVertexShaderAdapter.adaptStage(nativeLineVertex,
+                    linePackVertexSource, "gbuffers_line", BasicVertexShaderAdapter.Format.LINE);
+            compileVertex(compiler, options, linePackVertex.source(), "basic-pack-line-vertex", true);
+            String linePackFragment = TextureColorDistanceShaderAdapter.adaptFragment(
+                    Files.readString(basicFixture.resolve("gbuffers_line.fsh")), "gbuffers_line",
+                    linePackVertex.varyings(), false, false);
+            compile(compiler, options, linePackFragment, "basic-pack-line-fragment", true);
+            String basicLineFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 130
+                    /* DRAWBUFFERS:06 */
+                    flat in vec2 lmCoord;
+                    in vec3 normal;
+                    flat in vec3 upVec, sunVec;
+                    flat in vec4 glColor;
+                    void main() {
+                        gl_FragData[0] = glColor * vec4(normal + upVec + sunVec, 1.0);
+                        gl_FragData[1] = vec4(lmCoord, 0.0, 1.0);
+                    }
+                    """, "gbuffers_line", Map.of(
+                    "glColor", new TerrainVertexShaderAdapter.PackVarying("vec4", "flat", 0, "vertexColor", true),
+                    "lmCoord", new TerrainVertexShaderAdapter.PackVarying("vec2", "flat", 3,
+                            "veyraBasicLightmapCoord", true),
+                    "normal", new TerrainVertexShaderAdapter.PackVarying("vec3", "smooth", 4,
+                            "veyraBasicNormal", true),
+                    "upVec", new TerrainVertexShaderAdapter.PackVarying("vec3", "flat", 6,
+                            "veyraPackVarying_upVec", false),
+                    "sunVec", new TerrainVertexShaderAdapter.PackVarying("vec3", "flat", 7,
+                            "veyraPackVarying_sunVec", false)));
+            compile(compiler, options, basicLineFragment, "basic-line-fragment-mrt-adapter", true);
+            count += 8;
+            compiled += 9;
+            String basicSamplerFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 130
+                    /* DRAWBUFFERS:06 */
+                    uniform sampler2D texture;
+                    uniform sampler2D lightmap;
+                    uniform sampler2D noisetex;
+                    uniform sampler2D specular;
+                    uniform sampler2DShadow shadowtex0;
+                    uniform sampler2D shadowtex1;
+                    uniform sampler2D shadowcolor0;
+                    uniform sampler2D gdepth;
+                    uniform sampler2D colortex6;
+                    flat in vec2 lmCoord;
+                    void main() {
+                        float shadow = texture2DShadow(shadowtex0, vec3(lmCoord, 0.5));
+                        gl_FragData[0] = texture2D(texture, lmCoord) + texture2D(lightmap, lmCoord)
+                                + texture2D(noisetex, lmCoord) + texture2D(specular, lmCoord)
+                                + texture2D(shadowtex1, lmCoord) + texture2D(shadowcolor0, lmCoord)
+                                + texture2D(gdepth, lmCoord) + texture2D(colortex6, lmCoord) + vec4(shadow);
+                        gl_FragData[1] = vec4(lmCoord, 0.0, 1.0);
+                    }
+                    """, "gbuffers_basic", Map.of(
+                    "lmCoord", new TerrainVertexShaderAdapter.PackVarying(
+                            "vec2", "flat", 3, "veyraBasicLightmapCoord", true)), true, true);
+            compile(compiler, options, basicSamplerFragment, "basic-line-fragment-sampler-bridge", true);
+            count++;
+            compiled++;
+            count += 4;
             compiled += 4;
             String entityShadow = EntityShaderAdapter.adaptFragment("""
                     #version 120
@@ -468,7 +622,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex and Iris tex sampler alias, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

@@ -28,6 +28,7 @@ public final class VeyraGeometryTargets {
     private static final Map<GraphicsPipeline, FragmentOutputs> layouts = new IdentityHashMap<>();
     private static final Map<GraphicsPipeline, GeometryBlendSettings> blends = new IdentityHashMap<>();
     private static final Set<GraphicsPipeline> terrainInputs = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<GraphicsPipeline> specularInputs = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<Key, VeyraMrtFramebuffer> framebuffers = new HashMap<>();
     private static final Map<Framebuffer, RenderPass> resumePasses = new IdentityHashMap<>();
     private static Framebuffer scene;
@@ -53,8 +54,9 @@ public final class VeyraGeometryTargets {
     }
     public static FragmentOutputs layout(GraphicsPipeline pipeline) { return layouts.get(pipeline); }
     public static GeometryBlendSettings blend(GraphicsPipeline pipeline) { return blends.get(pipeline); }
+    public static void registerSpecularInput(GraphicsPipeline pipeline) { specularInputs.add(pipeline); }
     public static void unregister(GraphicsPipeline pipeline) {
-        layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline);
+        layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline); specularInputs.remove(pipeline);
     }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
@@ -65,7 +67,7 @@ public final class VeyraGeometryTargets {
             dev.veyra.shader.VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline);
         }
         VeyraNoiseTexture.bind(pipeline);
-        if (terrain || pipeline.name.startsWith("veyra_shadow_"))
+        if (terrain || specularInputs.contains(pipeline) || pipeline.name.startsWith("veyra_shadow_"))
             VeyraSpecularTextures.bindTerrain(pipeline);
         if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
         Renderer renderer = Renderer.getInstance();

@@ -21,9 +21,6 @@ public final class ColorDistanceShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;?");
-    private static final Pattern GL_FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]");
-    private static final Pattern RENDERTARGETS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
-    private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE = Pattern.compile(
             "\\b(?:texture|texture2D|textureLod|texelFetch)\\s*\\(");
@@ -56,7 +53,9 @@ public final class ColorDistanceShaderAdapter {
             throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
-        String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
+        FragmentOutputs outputLayout = FragmentOutputs.parse(source);
+        String adapted = outputLayout.rewriteLegacy(source.replace("\uFEFF", ""));
+        adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
         while (extensionMatcher.find()) {
@@ -104,42 +103,23 @@ public final class ColorDistanceShaderAdapter {
             throw new IOException(programName + " declares inputs that are not provided by Veyra's color-distance bridge yet.");
         }
 
-        String outputName = "veyraColorDistanceFragColor";
+        String outputName = outputLayout.variables().getOrDefault(0, "veyraColorDistanceFragColor");
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
-        int outputCount = 0;
         while (outputMatcher.find()) {
-            String location = outputMatcher.group(1);
-            if (location != null && !location.equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-            outputName = outputMatcher.group(2);
-            outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
         outputMatcher.appendTail(withoutOutputs);
-        if (outputCount > 1) {
-            throw new IOException(programName + " can declare only one fragment output.");
-        }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException(programName + " supports one vec4 fragment output.");
+            throw new IOException(programName + " supports vec4 fragment outputs at locations 0..7.");
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_TEXTURE.matcher(uncommented).find()) {
             throw new IOException(programName + " cannot sample textures because its vertex bridge has no UVs.");
         }
-        validateTargetComments(source, programName);
-        Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
-        while (fragDataMatcher.find()) {
-            if (!fragDataMatcher.group(1).equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-
         adapted = adapted
-                .replaceAll("\\bgl_FragData\\s*\\[\\s*0\\s*\\]", outputName)
                 .replaceAll("\\bgl_FragColor\\b", outputName)
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
 
@@ -151,9 +131,8 @@ public final class ColorDistanceShaderAdapter {
                 ? (flatVertexColor ? "flat " : "") + "in vec4 vertexColor;\n"
                 : "";
         String bridge = """
-                %s%s
-                out vec4 %s;
-                """.formatted(distanceInputs, colorInput, outputName);
+                %s%s%s
+                """.formatted(distanceInputs, colorInput, outputLayout.entityPipelineDeclarations());
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
@@ -164,19 +143,4 @@ public final class ColorDistanceShaderAdapter {
         return result.append(adapted).toString();
     }
 
-    private static void validateTargetComments(String source, String programName) throws IOException {
-        Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
-        while (renderTargets.find()) {
-            String[] targets = renderTargets.group(1).split(",");
-            if (targets.length != 1 || !targets[0].trim().equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-        Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
-        while (drawBuffers.find()) {
-            if (!drawBuffers.group(1).equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-    }
 }

@@ -22,15 +22,17 @@ public final class TextureColorDistanceShaderAdapter {
                     + "(?:(flat|smooth|noperspective)\\s+)?(?:varying|in)\\s+"
                     + "(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern COMMA_VARYING_DECLARATION = Pattern.compile(
+            "(?m)^([\\t ]*(?:(?:layout\\s*\\([^)]*\\)\\s*)?)(?:(?:flat|smooth|noperspective)\\s+)?"
+                    + "(?:varying|in)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+)"
+                    + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)"
+                    + "(\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$))");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?(?:varying|in)\\b[^\\r\\n]*;?");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;?");
-    private static final Pattern GL_FRAG_DATA_INDEX = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]");
-    private static final Pattern RENDERTARGETS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
-    private static final Pattern DRAWBUFFERS_DIRECTIVE = Pattern.compile("(?is)/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
@@ -72,6 +74,29 @@ public final class TextureColorDistanceShaderAdapter {
                                 boolean hasVertexColor, boolean hasVertexDistances,
                                 String vertexColorInterpolation, String texCoordInterpolation,
                                 boolean explicitVertexLocations) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                vertexColorInterpolation, texCoordInterpolation, explicitVertexLocations, null, false, false);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs) throws IOException {
+        return adaptFragment(source, programName, vertexOutputs, true, true);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                boolean shadowPassAvailable, boolean lightmapSamplerAvailable) throws IOException {
+        return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
+                Map.copyOf(vertexOutputs), shadowPassAvailable, lightmapSamplerAvailable);
+    }
+
+    private static String adaptFragment(String source, String programName,
+                                        boolean hasVertexColor, boolean hasVertexDistances,
+                                        String vertexColorInterpolation, String texCoordInterpolation,
+                                        boolean explicitVertexLocations,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                        boolean shadowPassAvailable, boolean lightmapSamplerAvailable)
+            throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -81,10 +106,15 @@ public final class TextureColorDistanceShaderAdapter {
 
         String adapted = GlslPreprocessor.process(programName + ".fsh", source.replace("\uFEFF", ""));
         adapted = UnreachableGlslFunctions.removeUnreachable(adapted, "main");
+        FragmentOutputs outputLayout = FragmentOutputs.parse(adapted);
+        adapted = outputLayout.rewriteLegacy(adapted);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(adapted, programName);
         adapted = fog.source();
         adapted = UnusedUniformDeclarations.removeUnused(adapted);
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        SamplerBridge samplers = adaptSamplers(adapted, programName, vertexOutputs != null,
+                shadowPassAvailable, lightmapSamplerAvailable);
+        adapted = samplers.source();
         adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(adapted);
@@ -115,13 +145,50 @@ public final class TextureColorDistanceShaderAdapter {
             throw new IOException(programName + " has an unsupported uniform declaration.");
         }
 
-        Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
+        adapted = expandCommaVaryings(adapted);
+        Matcher varyingMatcher = VARYING_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
+        StringBuilder linkedVertexInputs = new StringBuilder();
+        Set<String> linkedInterfaceLocations = new java.util.HashSet<>();
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(4);
             String name = varyingMatcher.group(5);
             String interpolation = mergeInterpolation(varyingMatcher.group(2), varyingMatcher.group(3),
                     programName, name);
+            if (vertexOutputs != null) {
+                TerrainVertexShaderAdapter.PackVarying vertexOutput = findVertexOutput(vertexOutputs, name);
+                if (vertexOutput == null) {
+                    throw new IOException(programName + " input '" + name
+                            + "' is not written by its gbuffers vertex shader.");
+                }
+                if (!vertexOutput.type().equals(type)) {
+                    throw new IOException(programName + " input '" + name + "' uses " + type
+                            + " but its vertex output uses " + vertexOutput.type() + ".");
+                }
+                if (!vertexOutput.interpolation().equals(interpolation)) {
+                    throw new IOException(programName + " input '" + name
+                            + "' has an interpolation qualifier that does not match its vertex output.");
+                }
+                String declaredLocation = varyingMatcher.group(1);
+                if (declaredLocation != null && Integer.parseInt(declaredLocation) != vertexOutput.location()) {
+                    throw new IOException(programName + " input '" + name
+                            + "' declares a location that does not match its vertex output.");
+                }
+                String fragmentVariable = canonicalFragmentVariable(name);
+                String interfaceKey = Integer.toString(vertexOutput.location());
+                if (!linkedInterfaceLocations.add(interfaceKey)) {
+                    throw new IOException(programName + " declares more than one fragment input for location "
+                            + vertexOutput.location() + ".");
+                }
+                linkedVertexInputs.append(parserSafeLocatedDeclaration(
+                        "VEYRA_BASIC_FRAGMENT_INPUT_" + vertexOutput.location() + "_" + sanitize(name),
+                        "layout(location = " + vertexOutput.location() + ") "
+                                + (vertexOutput.interpolation().equals("smooth") ? ""
+                                        : vertexOutput.interpolation() + " ")
+                                + "in " + type + " " + fragmentVariable + ";"));
+                varyingMatcher.appendReplacement(withoutVaryings, "");
+                continue;
+            }
             String expectedType = INPUT_TYPES.get(name);
             if (expectedType == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's texture-distance bridge yet.");
@@ -169,42 +236,24 @@ public final class TextureColorDistanceShaderAdapter {
             throw new IOException(programName + " declares inputs that are not provided by Veyra's texture-distance bridge yet.");
         }
 
-        String outputName = "veyraTextureFragColor";
+        String outputName = outputLayout.variables().getOrDefault(0, "veyraTextureFragColor");
         Matcher outputMatcher = OUTPUT_DECLARATION.matcher(adapted);
         StringBuffer withoutOutputs = new StringBuffer();
-        int outputCount = 0;
         while (outputMatcher.find()) {
             String location = outputMatcher.group(1);
-            if (location != null && !location.equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-            outputName = outputMatcher.group(2);
-            outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
         outputMatcher.appendTail(withoutOutputs);
-        if (outputCount > 1) {
-            throw new IOException(programName + " can declare only one fragment output.");
-        }
         adapted = withoutOutputs.toString();
         if (UNSUPPORTED_OUTPUT_DECLARATION.matcher(adapted).find()) {
-            throw new IOException(programName + " supports one vec4 fragment output.");
+            throw new IOException(programName + " supports vec4 fragment outputs at locations 0..7.");
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
             throw new IOException(programName + " uses a texture sampling function that Veyra's texture-distance bridge does not support yet.");
         }
-        validateTargetComments(source, programName);
-        Matcher fragDataMatcher = GL_FRAG_DATA_INDEX.matcher(uncommented);
-        while (fragDataMatcher.find()) {
-            if (!fragDataMatcher.group(1).equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-
         adapted = adapted
-                .replaceAll("\\bgl_FragData\\s*\\[\\s*0\\s*\\]", outputName)
                 .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "veyraTextureSampleLod(")
                 .replaceAll("\\btextureLod\\s*\\(", "veyraTextureSampleLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraTextureSampleGrad(")
@@ -215,7 +264,7 @@ public final class TextureColorDistanceShaderAdapter {
                 .replaceAll("\\btexcoord\\b|\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\bcolor\\b|\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "vertexColor");
 
-        String distanceInputs = hasVertexDistances ? explicitVertexLocations
+        String distanceInputs = vertexOutputs != null ? linkedVertexInputs.toString() : hasVertexDistances ? explicitVertexLocations
                 ? parserSafeLocatedDeclaration("VEYRA_GLINT_SPHERICAL_DISTANCE",
                         "layout(location = 2) in float sphericalVertexDistance;")
                     + parserSafeLocatedDeclaration("VEYRA_GLINT_CYLINDRICAL_DISTANCE",
@@ -223,18 +272,15 @@ public final class TextureColorDistanceShaderAdapter {
                 in float sphericalVertexDistance;
                 in float cylindricalVertexDistance;
                 """ : "";
-        String colorInput = hasVertexColor ? explicitVertexLocations
+        String colorInput = vertexOutputs != null ? "" : hasVertexColor ? explicitVertexLocations
                 ? parserSafeLocatedDeclaration("VEYRA_GLINT_COLOR_INPUT",
                         "layout(location = 0) " + vertexColorInterpolation + " in vec4 vertexColor;")
                 : "in vec4 vertexColor;\n" : "";
-        String texCoordInput = explicitVertexLocations
+        String texCoordInput = vertexOutputs != null ? "" : explicitVertexLocations
                 ? parserSafeLocatedDeclaration("VEYRA_GLINT_TEXCOORD_INPUT",
                         "layout(location = 1) " + texCoordInterpolation + " in vec2 texCoord0;")
                 : "in vec2 texCoord0;\n";
-        String output = explicitVertexLocations
-                ? parserSafeLocatedDeclaration("VEYRA_GLINT_FRAGMENT_OUTPUT",
-                        "layout(location = 0) out vec4 " + outputName + ";")
-                : "out vec4 " + outputName + ";\n";
+        String output = outputLayout.entityPipelineDeclarations();
         String bridge = """
                 %s%s
                 %s%s
@@ -248,10 +294,9 @@ public final class TextureColorDistanceShaderAdapter {
                 vec4 veyraTextureSampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                     return textureGrad(sourceSampler, sourceUv, dx, dy);
                 }
-                #define texture Sampler0
-                #define gtexture Sampler0
-                #define tex Sampler0
-                """.formatted(distanceInputs, colorInput, texCoordInput, output);
+                """.formatted(distanceInputs, colorInput, texCoordInput, output)
+                + samplers.bridge()
+                + "#define texture Sampler0\n#define gtexture Sampler0\n#define tex Sampler0\n";
         StringBuilder result = new StringBuilder("#version 460\n");
         for (String extension : extensions) {
             result.append(extension).append('\n');
@@ -263,9 +308,158 @@ public final class TextureColorDistanceShaderAdapter {
         return result.append(adapted).toString();
     }
 
+    private static SamplerBridge adaptSamplers(String source, String programName, boolean allowIrisSamplers,
+                                               boolean shadowPassAvailable, boolean lightmapSamplerAvailable)
+            throws IOException {
+        Map<String, Integer> geometryInputs = allowIrisSamplers
+                ? GeometryColorSamplers.read(source) : Map.of();
+        Set<Integer> geometryIndices = GeometryColorSamplers.indices(geometryInputs);
+        if (allowIrisSamplers) {
+            ShadowColorSampler.validate(source, shadowPassAvailable, geometryIndices.size());
+            ShadowDepthSampler.validate(source, shadowPassAvailable, geometryIndices.size());
+            if (EntityShaderAdapter.usesShadowSampler(source) && !shadowPassAvailable) {
+                throw new IOException(programName + " samples shadowtex0, but this shader pack has no supported shadow pass.");
+            }
+        }
+
+        Matcher matcher = SAMPLER_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(source));
+        StringBuilder stripped = new StringBuilder(source.length());
+        int copiedThrough = 0;
+        boolean usesLightmap = false;
+        boolean usesSampler2DShadow = false;
+        while (matcher.find()) {
+            String type = matcher.group(1);
+            String name = matcher.group(2);
+            boolean recognized = name.equals("texture") || name.equals("gtexture") || name.equals("tex")
+                    || name.equals("Sampler0");
+            boolean irisSampler = allowIrisSamplers && (name.equals("lightmap") || name.equals("noisetex")
+                    || name.equals("specular") || name.equals("shadowtex0") || name.equals("shadowtex1")
+                    || name.equals("shadowcolor") || name.equals("shadowcolor0")
+                    || geometryInputs.containsKey(name));
+            if (!recognized && !irisSampler) {
+                throw new IOException(programName + " uses unsupported sampler '" + name + "'.");
+            }
+            boolean shadowCompare = allowIrisSamplers
+                    && (name.equals("shadowtex0") || name.equals("shadowtex1"))
+                    && type.equals("sampler2DShadow");
+            if (!type.equals("sampler2D") && !shadowCompare) {
+                throw new IOException(programName + " sampler '" + name + "' must use sampler2D.");
+            }
+            if (name.equals("lightmap")) usesLightmap = true;
+            if (shadowCompare) usesSampler2DShadow = true;
+            stripped.append(source, copiedThrough, matcher.start());
+            copiedThrough = matcher.end();
+        }
+        stripped.append(source, copiedThrough, source.length());
+
+        String uncommented = ShaderSource.maskBlockAndLineComments(stripped.toString());
+        usesLightmap |= allowIrisSamplers && Pattern.compile("\\blightmap\\b").matcher(uncommented).find();
+        if (usesLightmap && !lightmapSamplerAvailable) {
+            throw new IOException(programName + " requires Minecraft's lightmap sampler, which this pipeline does not provide.");
+        }
+        boolean usesNoise = allowIrisSamplers && TerrainShaderAdapter.usesNoiseSampler(uncommented);
+        boolean usesSpecular = allowIrisSamplers && TerrainShaderAdapter.usesSpecularSampler(uncommented);
+        boolean usesShadow = allowIrisSamplers && EntityShaderAdapter.usesShadowSampler(uncommented);
+        boolean usesOpaqueShadow = allowIrisSamplers && ShadowDepthSampler.used(uncommented);
+        boolean usesShadowColor = allowIrisSamplers && ShadowColorSampler.used(uncommented);
+        StringBuilder bridge = new StringBuilder();
+        if (usesLightmap) bridge.append("uniform sampler2D Sampler2;\n#define lightmap Sampler2\n");
+        if (usesNoise) bridge.append("uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n");
+        if (usesSpecular) bridge.append("uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n");
+        if (usesShadow) bridge.append("uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n");
+        if (usesOpaqueShadow) bridge.append("uniform sampler2D ").append(ShadowDepthSampler.NAME)
+                .append(";\n#define shadowtex1 ").append(ShadowDepthSampler.NAME).append('\n');
+        if (usesShadowColor) bridge.append("uniform sampler2D ").append(ShadowColorSampler.NAME)
+                .append(";\n#define shadowcolor0 ").append(ShadowColorSampler.NAME)
+                .append("\n#define shadowcolor ").append(ShadowColorSampler.NAME).append('\n');
+        for (Map.Entry<String, Integer> input : geometryInputs.entrySet()) {
+            bridge.append("uniform sampler2D ").append(GeometryColorSamplers.samplerName(input.getValue()))
+                    .append(";\n#define ").append(input.getKey()).append(' ')
+                    .append(GeometryColorSamplers.samplerName(input.getValue())).append('\n');
+        }
+        if (usesSampler2DShadow) {
+            bridge.append("""
+                    float veyraTextureShadowCompare(sampler2D sourceSampler, vec3 sourceCoord) {
+                        return step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                    }
+                    vec4 veyraTextureShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                        return vec4(veyraTextureShadowCompare(sourceSampler, sourceCoord));
+                    }
+                    vec4 veyraTextureSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                        return veyraTextureShadowSample(sourceSampler, sourceCoord);
+                    }
+                    """);
+        }
+        String result = stripped.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D")
+                .replaceAll("\\btexture2DShadow\\s*\\(", "veyraTextureShadowCompare(")
+                .replaceAll("\\bshadow2D\\s*\\(", "veyraTextureShadowSample(");
+        return new SamplerBridge(result, bridge.toString(), new SamplerInputs(
+                usesNoise, usesShadow, usesSpecular, usesLightmap, usesShadowColor, usesOpaqueShadow,
+                Set.copyOf(geometryIndices)));
+    }
+
+    static SamplerInputs inspectSamplers(String source, String programName,
+                                         boolean shadowPassAvailable, boolean lightmapSamplerAvailable)
+            throws IOException {
+        String active = GlslPreprocessor.process(programName + ".fsh", source.replace("\uFEFF", ""));
+        active = UnreachableGlslFunctions.removeUnreachable(active, "main");
+        active = UnusedSamplerDeclarations.removeUnused(active);
+        return adaptSamplers(active, programName, true, shadowPassAvailable, lightmapSamplerAvailable).inputs();
+    }
+
+    record SamplerInputs(boolean usesNoiseSampler, boolean usesShadowSampler, boolean usesSpecularSampler,
+                         boolean usesLightmapSampler, boolean usesShadowColor, boolean usesOpaqueShadow,
+                         Set<Integer> geometryColorInputs) {
+        static SamplerInputs empty() { return new SamplerInputs(false, false, false, false, false, false, Set.of()); }
+    }
+
+    private record SamplerBridge(String source, String bridge, SamplerInputs inputs) { }
+
     /** VulkanMod's RenderSystem parser treats a source-level {@code layout(...)} as a UBO declaration. */
     private static String parserSafeLocatedDeclaration(String macroName, String declaration) {
         return "#define " + macroName + " " + declaration + '\n' + macroName + '\n';
+    }
+
+    private static TerrainVertexShaderAdapter.PackVarying findVertexOutput(
+            Map<String, TerrainVertexShaderAdapter.PackVarying> outputs, String name) {
+        TerrainVertexShaderAdapter.PackVarying direct = outputs.get(name);
+        if (direct != null) return direct;
+        Set<String> aliases = switch (name) {
+            case "color", "glcolor", "glColor", "gl_Color", "vertexColor" ->
+                    Set.of("color", "glcolor", "glColor", "gl_Color", "vertexColor");
+            case "texcoord", "texCoord", "texCoord0" -> Set.of("texcoord", "texCoord", "texCoord0");
+            case "lmcoord", "lmCoord", "lightMapCoord" -> Set.of("lmcoord", "lmCoord", "lightMapCoord");
+            default -> Set.of(name);
+        };
+        return aliases.stream().map(outputs::get).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private static String canonicalFragmentVariable(String name) {
+        return switch (name) {
+            case "color", "glcolor", "glColor", "gl_Color", "vertexColor" -> "vertexColor";
+            case "texcoord", "texCoord", "texCoord0" -> "texCoord0";
+            default -> name;
+        };
+    }
+
+    private static String expandCommaVaryings(String source) {
+        Matcher matcher = COMMA_VARYING_DECLARATION.matcher(source);
+        StringBuilder expanded = new StringBuilder(source.length());
+        int copiedThrough = 0;
+        while (matcher.find()) {
+            expanded.append(source, copiedThrough, matcher.start());
+            String prefix = matcher.group(1);
+            String suffix = matcher.group(3);
+            for (String name : matcher.group(2).split(",")) {
+                expanded.append(prefix).append(name.trim()).append(suffix);
+            }
+            copiedThrough = matcher.end();
+        }
+        return expanded.append(source, copiedThrough, source.length()).toString();
+    }
+
+    private static String sanitize(String name) {
+        return name.replaceAll("[^A-Za-z0-9_]", "_");
     }
 
     private static String mergeInterpolation(String first, String second, String programName, String name)
@@ -276,19 +470,4 @@ public final class TextureColorDistanceShaderAdapter {
         return first != null ? first : second != null ? second : "smooth";
     }
 
-    private static void validateTargetComments(String source, String programName) throws IOException {
-        Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
-        while (renderTargets.find()) {
-            String[] targets = renderTargets.group(1).split(",");
-            if (targets.length != 1 || !targets[0].trim().equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-        Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
-        while (drawBuffers.find()) {
-            if (!drawBuffers.group(1).equals("0")) {
-                throw new IOException(programName + " can write only color attachment 0.");
-            }
-        }
-    }
 }

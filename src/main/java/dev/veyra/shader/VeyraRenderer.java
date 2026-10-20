@@ -3057,6 +3057,16 @@ public final class VeyraRenderer {
             }
         }
         collectEntityColorTargets(pack, width, height, colorTargetSettings, colorTargetIndices);
+        var basicFragment = pack.readBasicFragment();
+        if (basicFragment.isPresent()) {
+            addGeometryColorTargets("gbuffers_basic", basicFragment.get(), width, height,
+                    colorTargetSettings, colorTargetIndices);
+        }
+        var lineFragment = pack.readLineFragment().or(() -> basicFragment);
+        if (lineFragment.isPresent()) {
+            addGeometryColorTargets("gbuffers_line", lineFragment.get(), width, height,
+                    colorTargetSettings, colorTargetIndices);
+        }
         for (ShaderPack.Program source : sources) {
             if (TerrainShaderAdapter.usesNoiseSampler(source.source())) {
                 VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
@@ -4614,7 +4624,8 @@ public final class VeyraRenderer {
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isLeashPipeline)
                 .toList();
-        return compileColorDistancePipelines(pack, "gbuffers_basic", candidates);
+        return compileColorDistancePipelines(pack, "gbuffers_basic", candidates,
+                "gbuffers_basic.vsh", BasicVertexShaderAdapter.Format.LEASH);
     }
 
     private static ColorDistancePipelineSet compileLinePipelines(ShaderPack pack) throws IOException {
@@ -4622,11 +4633,15 @@ public final class VeyraRenderer {
                 .filter(VeyraRenderer::isLinePipeline)
                 .toList();
         String programName = pack.hasLineFragment() ? "gbuffers_line" : "gbuffers_basic";
-        return compileColorDistancePipelines(pack, programName, candidates);
+        String vertexFile = pack.readStage("gbuffers_line.vsh").isPresent()
+                ? "gbuffers_line.vsh" : "gbuffers_basic.vsh";
+        return compileColorDistancePipelines(pack, programName, candidates,
+                vertexFile, BasicVertexShaderAdapter.Format.LINE);
     }
 
     private static ColorDistancePipelineSet compileColorDistancePipelines(
-            ShaderPack pack, String programName, List<RenderPipeline> candidates) throws IOException {
+            ShaderPack pack, String programName, List<RenderPipeline> candidates,
+            String vertexFile, BasicVertexShaderAdapter.Format format) throws IOException {
         String source = switch (programName) {
             case "gbuffers_basic" -> pack.readBasicFragment().orElseThrow(
                     () -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
@@ -4634,15 +4649,44 @@ public final class VeyraRenderer {
                     () -> new IOException("The pack no longer contains gbuffers_line.fsh."));
             default -> throw new IOException("Unsupported color-distance program '" + programName + "'.");
         };
+        FragmentOutputs outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
+        GeometryBlendSettings blendSettings = pack.readGeometryBlendSettings(programName);
+        Optional<String> packVertex = pack.readStage(vertexFile);
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
-            String fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
-                    source, programName, isLeashPipeline(original));
-            String sourceHash = sha256(programName + "\n" + fragmentSource);
+            String fragmentSource;
+            String vertexSource = null;
+            boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
+            if (packVertex.isPresent()) {
+                ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+                String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                        minecraftVertex, packVertex.get(), programName, format,
+                        format == BasicVertexShaderAdapter.Format.LINE && vertexFile.equals("gbuffers_basic.vsh"));
+                vertexSource = adaptedVertex.source();
+                usesNoiseSampler = adaptedVertex.usesNoiseSampler();
+                samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
+                        source, programName, pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"));
+                usesNoiseSampler |= samplerInputs.usesNoiseSampler();
+                if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                        source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
+                        original.getSamplers().contains("Sampler2"));
+                validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
+            } else {
+                fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
+                        source, programName, isLeashPipeline(original));
+            }
+            String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
+                    + '\n' + fragmentSource + '\n' + outputLayout + '\n' + blendSettings);
             ColorDistancePipelineKey cacheKey = new ColorDistancePipelineKey(original, sourceHash);
             RenderPipeline replacement = COLOR_DISTANCE_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
-                replacement = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash);
+                replacement = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                        vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 COLOR_DISTANCE_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);
@@ -4651,6 +4695,24 @@ public final class VeyraRenderer {
             throw new IOException("VulkanMod's Minecraft pipelines for " + programName + " were not found.");
         }
         return new ColorDistancePipelineSet(pipelines);
+    }
+
+    private static void validateColorDistanceSamplerBudget(String programName, RenderPipeline original,
+                                                            boolean usesNoiseSampler,
+                                                            TextureColorDistanceShaderAdapter.SamplerInputs inputs)
+            throws IOException {
+        Set<String> names = new HashSet<>(original.getSamplers());
+        if (usesNoiseSampler) names.add(VeyraNoiseTexture.SAMPLER_NAME);
+        if (inputs.usesShadowSampler()) names.add("Sampler3");
+        if (inputs.usesSpecularSampler()) names.add(VeyraSpecularTextures.SAMPLER);
+        if (inputs.usesOpaqueShadow()) names.add(ShadowDepthSampler.NAME);
+        if (inputs.usesShadowColor()) names.add(ShadowColorSampler.NAME);
+        if (inputs.usesLightmapSampler()) names.add("Sampler2");
+        for (int index : inputs.geometryColorInputs()) names.add(GeometryColorSamplers.samplerName(index));
+        if (names.size() > 12) {
+            throw new IOException(programName + " requires " + names.size()
+                    + " texture descriptors; VulkanMod supports at most 12 for this pipeline.");
+        }
     }
 
     private static boolean isLeashPipeline(RenderPipeline pipeline) {
@@ -4685,13 +4747,34 @@ public final class VeyraRenderer {
     private static RenderPipeline compileColorDistancePipeline(
             RenderPipeline original, String programName, String fragmentSource, String sourceHash,
             String customVertexSource, boolean usesNoiseSampler) throws IOException {
+        return compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                customVertexSource, usesNoiseSampler, null, null);
+    }
+
+    private static RenderPipeline compileColorDistancePipeline(
+            RenderPipeline original, String programName, String fragmentSource, String sourceHash,
+            String customVertexSource, boolean usesNoiseSampler,
+            FragmentOutputs outputLayout, GeometryBlendSettings blendSettings) throws IOException {
+        return compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                customVertexSource, usesNoiseSampler, outputLayout, blendSettings,
+                TextureColorDistanceShaderAdapter.SamplerInputs.empty());
+    }
+
+    private static RenderPipeline compileColorDistancePipeline(
+            RenderPipeline original, String programName, String fragmentSource, String sourceHash,
+            String customVertexSource, boolean usesNoiseSampler,
+            FragmentOutputs outputLayout, GeometryBlendSettings blendSettings,
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/color_distance/" + sourceHash);
         Identifier customVertexShader = customVertexSource == null ? null
                 : Identifier.fromNamespaceAndPath("veyra", "shaderpack/color_distance_vertex/" + sourceHash);
         RenderPipeline pipeline = customVertexShader == null
                 ? copyPipelineWithFragment(original, fragmentShader)
-                : copyPipelineWithShaders(original, customVertexShader, fragmentShader, usesNoiseSampler);
+                : copyPipelineWithShaders(original, customVertexShader, fragmentShader,
+                        usesNoiseSampler, samplerInputs.usesShadowSampler(), samplerInputs.usesSpecularSampler(),
+                        samplerInputs.usesShadowColor(), samplerInputs.usesOpaqueShadow(),
+                        samplerInputs.geometryColorInputs());
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
@@ -4708,8 +4791,11 @@ public final class VeyraRenderer {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected " + programName + " shader.");
         }
+        var nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
+        if (nativePipeline == null && (usesNoiseSampler || samplerInputs.usesSpecularSampler())) {
+            throw new IOException("VulkanMod did not create a native pipeline for " + original.getLocation() + ".");
+        }
         if (usesNoiseSampler) {
-            var nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
             var descriptor = nativePipeline == null ? null
                     : nativePipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME);
             if (descriptor == null) {
@@ -4717,6 +4803,29 @@ public final class VeyraRenderer {
                         + " descriptor for " + original.getLocation() + ".");
             }
             descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        if (samplerInputs.usesSpecularSampler()) {
+            var descriptor = nativePipeline.getImageDescriptor(VeyraSpecularTextures.SAMPLER);
+            if (descriptor == null) {
+                throw new IOException("VulkanMod did not expose the specular sampler for " + original.getLocation() + ".");
+            }
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        for (int index : samplerInputs.geometryColorInputs()) {
+            var descriptor = nativePipeline == null ? null
+                    : nativePipeline.getImageDescriptor(GeometryColorSamplers.samplerName(index));
+            if (descriptor == null) {
+                throw new IOException("VulkanMod did not expose the colortex" + index
+                        + " sampler for " + original.getLocation() + ".");
+            }
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        if (outputLayout != null) {
+            if (nativePipeline == null) {
+                throw new IOException("VulkanMod did not create a native pipeline for " + original.getLocation() + ".");
+            }
+            VeyraGeometryTargets.register(nativePipeline, outputLayout, blendSettings, false);
+            if (samplerInputs.usesSpecularSampler()) VeyraGeometryTargets.registerSpecularInput(nativePipeline);
         }
         return pipeline;
     }
@@ -4728,6 +4837,9 @@ public final class VeyraRenderer {
         String source = pack.readGlintFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_armor_glint.fsh."));
         String programName = pack.hasGlintFragment() ? "gbuffers_armor_glint" : "gbuffers_textured";
+        FragmentOutputs outputLayout = FragmentOutputs.parse(
+                GlslPreprocessor.process(programName + ".fsh", source));
+        GeometryBlendSettings blendSettings = pack.readGeometryBlendSettings(programName);
         Optional<String> packVertexSource = pack.hasGlintFragment()
                 ? pack.readStage("gbuffers_armor_glint.vsh") : Optional.empty();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
@@ -4759,13 +4871,13 @@ public final class VeyraRenderer {
                 return new GlintPipelineSet(Map.of());
             }
             String sourceHash = sha256(programName + '\n' + (adaptedVertexSource == null ? "" : adaptedVertexSource)
-                    + '\n' + fragmentSource);
+                    + '\n' + fragmentSource + '\n' + outputLayout + '\n' + blendSettings);
             GlintPipelineKey cacheKey = new GlintPipelineKey(original, sourceHash);
             RenderPipeline replacement = GLINT_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
                 replacement = compileColorDistancePipeline(
                         original, programName, fragmentSource, sourceHash, adaptedVertexSource,
-                        usesNoiseSampler);
+                        usesNoiseSampler, outputLayout, blendSettings);
                 GLINT_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);
