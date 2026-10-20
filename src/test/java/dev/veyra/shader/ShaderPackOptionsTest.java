@@ -104,6 +104,23 @@ class ShaderPackOptionsTest {
         Files.writeString(shader.resolve("shaders.properties"), "program.composite.enabled=false\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
     }
+    @Test void unsupportedGeometryVertexStagesFailExplicitlyButCloudAndDisabledStagesRemainAllowed() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("geometry/shaders"));
+        Files.writeString(shader.resolve("gbuffers_terrain.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_terrain.vsh"), "void main(){}\n");
+        IOException error = assertThrows(IOException.class,
+                () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("gbuffers_terrain.vsh"));
+        assertTrue(error.getMessage().contains("VulkanMod's built-in vertex shader"));
+
+        Files.writeString(shader.resolve("shaders.properties"), "program.gbuffers_terrain.enabled=false\n");
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+
+        Path cloud = Files.createDirectories(root.resolve("cloud/shaders"));
+        Files.writeString(cloud.resolve("gbuffers_clouds.fsh"), "void main(){}\n");
+        Files.writeString(cloud.resolve("gbuffers_clouds.vsh"), "void main(){}\n");
+        assertDoesNotThrow(() -> ShaderPack.inspect(cloud.getParent()).validatePipelineCapabilities());
+    }
     @Test void requiredIrisFeaturesAreNotSilentlyIgnored() throws IOException {
         Path shader = Files.createDirectories(root.resolve("pack/shaders"));
         Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");

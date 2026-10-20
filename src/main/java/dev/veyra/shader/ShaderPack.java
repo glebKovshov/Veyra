@@ -964,6 +964,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             // Iris allows suffixed compute stages belonging to one parent program.
             String parent = extension.equals("csh") ? program.replaceFirst("_[a-z]+$", "") : program;
             if (!isProgramEnabled(parent)) continue;
+            if (extension.equals("vsh") && program.startsWith("gbuffers_")
+                    && !program.equals("gbuffers_clouds")
+                    && readRawShader(programPath(program + ".fsh")).isPresent()) {
+                throw new IOException("Cannot execute " + file
+                        + ": custom gbuffers vertex shaders are not implemented by Veyra; "
+                        + "this program would otherwise use VulkanMod's built-in vertex shader.");
+            }
             if (Set.of("csh", "gsh", "tcs", "tes").contains(extension)) {
                 throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
             }
