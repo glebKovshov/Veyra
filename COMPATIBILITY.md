@@ -1,10 +1,16 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.16 prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.17 prerelease candidate
 
-## Unreleased terrain-midpoint source candidate (post-beta.16)
+## Beta.17 terrain midpoint bridge candidate
 
-The local audit of the current `feature/terrain-midcoord-input` source, using the same four SHA-512-pinned archives, covered 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepted **528** geometry fragment programs and rejected **189**; every record still has `visualValidation: false`. These numbers describe this unmerged source candidate, not the published beta.16 JAR.
+The current source audit on the merged PR #34 head, using the same four SHA-512-pinned archives, covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **528** geometry fragment programs and rejects **189**; every record still has `visualValidation: false`. This candidate is not in the beta.16 JAR; the beta.17 release workflow will rebuild and verify the versioned artifact.
 
-The candidate adds the flat `midCoord` terrain input and applies VulkanMod's current texture matrix to the midpoint and terrain UV before deriving `signMidCoordPos` and `absMidCoordPos`. It initializes VulkanMod's mapped texture matrix to identity if its contents are unset, while preserving valid live transforms. Complementary Reimagined and Unbound r5.9.3 now accept **8/10** default geometry fragments in Overworld, Nether, and End, up from 7/10. Their remaining default blockers are unsupported translucent block/entity inputs; selected profiles still require the unimplemented `shadowcomp.csh` compute stage. BSL remains at 6/9 and Sildur's Vibrant at 0/5. No third-party pack has been visually validated. The initial PR graphics run exposed three synthetic fixture failures from the unset matrix. After the initialization fix, the corrected head passed all 19 Lavapipe fixtures, including `geometry-mid-texcoord`; runtime Vulkan validation errors for that fixture were zero.
+The candidate adds the flat `midCoord` terrain input and applies VulkanMod's current texture matrix to the midpoint and terrain UV before deriving `signMidCoordPos` and `absMidCoordPos`. It initializes VulkanMod's mapped texture matrix to identity if its contents are unset, while preserving valid live transforms. Complementary Reimagined and Unbound r5.9.3 now accept **8/10** default geometry fragments in Overworld, Nether, and End, up from 7/10. Their remaining default blockers are unsupported translucent block/entity inputs; selected profiles still require the unimplemented `shadowcomp.csh` compute stage. BSL remains at 6/9 and Sildur's Vibrant at 0/5. No third-party pack has been visually validated. PR #34 passed Build, source audit, and all 19 Lavapipe fixtures after the matrix initialization fix; `geometry-mid-texcoord` reported 55,237 active magenta pixels, 167,494 opposite-region pixels, 0 disabled magenta pixels, and 0 runtime Vulkan validation errors.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 8/10, 8/10, 8/10 | translucent block/entities: unsupported inputs; selected profiles: `shadowcomp.csh` compute stage | Not tested |
+| BSL 10.1.8 | 6/9, 6/9, 6/9 | terrain: `recolor`; water: `dist`; clouds: active `texture` sampler | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
 ## Pinned source audit (beta.16 prerelease)
 

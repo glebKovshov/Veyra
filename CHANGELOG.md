@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.17 - 2026-10-20 (prerelease)
+
+- Bridge Iris terrain `midCoord` from VulkanMod's compressed per-quad midpoint after applying the live texture matrix to midpoint and vertex UVs; derive `signMidCoordPos` and `absMidCoordPos` from those transformed coordinates.
+- Initialize VulkanMod's unset mapped texture matrix to identity while preserving valid transforms, preventing terrain and specular shader inputs from collapsing to zero UVs.
+- Add direct-buffer uniform regression coverage and extend the terrain midpoint Lavapipe fixture. The pinned source audit accepts 528 / rejects 189 geometry fragments; third-party pack visuals remain unverified.
+
 ## 0.2.0-beta.16 - 2026-10-20 (prerelease)
 
 - Bridge Iris terrain `absMidCoordPos` from the existing per-quad midpoint UV without changing the compressed vertex format or stride.
