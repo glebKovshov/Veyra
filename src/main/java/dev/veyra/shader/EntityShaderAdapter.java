@@ -20,7 +20,7 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
     private static final Pattern ENTITY_IDENTIFIER_UNIFORM = Pattern.compile(
-            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
@@ -112,7 +112,8 @@ public final class EntityShaderAdapter {
 
     public static String adaptFragment(String source, String programName, boolean handPass,
                                        boolean shadowSamplerAvailable) throws IOException {
-        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable, -1, -1);
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                -1, -1, ItemIdMap.UNMAPPED);
     }
 
     /** Adapts an entity fragment with per-render Iris entity and block-entity identifiers. */
@@ -120,7 +121,15 @@ public final class EntityShaderAdapter {
                                        boolean shadowSamplerAvailable,
                                        int entityId, int blockEntityId) throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
-                entityId, blockEntityId);
+                entityId, blockEntityId, ItemIdMap.UNMAPPED);
+    }
+
+    /** Adapts an entity fragment with per-render entity, block-entity, and item identifiers. */
+    public static String adaptFragment(String source, String programName, boolean handPass,
+                                       boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                       int currentRenderedItemId) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -137,7 +146,16 @@ public final class EntityShaderAdapter {
                                           boolean shadowSamplerAvailable,
                                           int entityId, int blockEntityId) throws IOException {
         return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
-                entityId, blockEntityId);
+                entityId, blockEntityId, ItemIdMap.UNMAPPED);
+    }
+
+    /** Adapts sign text with per-render block-entity and item identifiers. */
+    public static String adaptTextFragment(String source, String programName,
+                                          boolean shadowSamplerAvailable,
+                                          int entityId, int blockEntityId,
+                                          int currentRenderedItemId) throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId);
     }
 
     /** Whether the active program declares an Iris-bound entity identifier uniform. */
@@ -369,7 +387,8 @@ public final class EntityShaderAdapter {
 
     private static String adaptFragment(String source, String programName, boolean textPipeline,
                                         boolean handPass, boolean shadowSamplerAvailable,
-                                        int entityId, int blockEntityId) throws IOException {
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -378,7 +397,7 @@ public final class EntityShaderAdapter {
         }
 
         String adapted = bindEntityIdentifiers(source.replace("\uFEFF", ""), programName,
-                entityId, blockEntityId);
+                entityId, blockEntityId, currentRenderedItemId);
         adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
         boolean usesNoiseSampler = usesNoiseSampler(adapted);
         List<String> extensions = new ArrayList<>();
@@ -693,7 +712,8 @@ public final class EntityShaderAdapter {
     }
 
     private static String bindEntityIdentifiers(String source, String programName,
-                                                int entityId, int blockEntityId) {
+                                                int entityId, int blockEntityId,
+                                                int currentRenderedItemId) {
         Matcher matcher = ENTITY_IDENTIFIER_UNIFORM.matcher(source);
         StringBuffer bound = new StringBuffer();
         while (matcher.find()) {
@@ -702,7 +722,12 @@ public final class EntityShaderAdapter {
                 matcher.appendReplacement(bound, Matcher.quoteReplacement(matcher.group()));
                 continue;
             }
-            int value = name.equals("entityId") ? entityId : blockEntityId;
+            int value = switch (name) {
+                case "entityId" -> entityId;
+                case "blockEntityId" -> blockEntityId;
+                case "currentRenderedItemId" -> currentRenderedItemId;
+                default -> throw new IllegalStateException("Unexpected entity identifier " + name);
+            };
             matcher.appendReplacement(bound, Matcher.quoteReplacement(
                     "const int " + name + " = " + value + ";\n"));
         }

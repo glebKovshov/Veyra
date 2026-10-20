@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Iris/OptiFine {@code item.properties}: {@code item.<id>=[namespace:]path ...}, used by heldItemId. */
+/** Iris/OptiFine {@code item.properties}: {@code item.<id>=[namespace:]path ...} item ID mappings. */
 public final class ItemIdMap {
     public static final ItemIdMap EMPTY = new ItemIdMap(Map.of());
     /** Iris reports -1 for items without an item.properties mapping. */

@@ -545,3 +545,14 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Downloaded release JAR: 565,211 bytes, SHA-256 9c773e71622e21f0c5af3328849e84a1de02cf720ad62ceaadeeb45edfd73dcd. The digest matches SHA256SUMS.txt and scripts/verify_jar.py passes on the downloaded asset.
 - The synthetic viewPos fixture passed at 222,792 active magenta pixels / 0 disabled, with zero runtime Vulkan validation errors. Process shutdown still emits 10,031 vkDestroyDevice diagnostics, matching the same-run vanilla baseline; this is not a clean-teardown claim.
 - The release remains experimental. No physical-GPU third-party shaderpack visuals or full Iris parity are claimed; see GOAL.md for remaining scope.
+
+
+### Beta.11 currentRenderedItemId candidate ? 2026-10-20
+
+- Continued from beta.10 `main` at `6a2992ef4883f631efeb37e17485c48d38fa9f15` on `feature/current-rendered-item-id`; existing screenshots, logs, assets, `GOAL.md`, and analysis artifacts remain untracked and untouched.
+- Added per-item `currentRenderedItemId` pipeline variants for entity, block-entity, hand, and shadow submissions. Minecraft's item render state retains the source `ItemStack`; the active pack's `item.properties` is resolved at layer submission time for every item, including block items. The context is cleared with `try/finally`. Iris hardcoded trim/cape IDs remain unsupported.
+- Added an original Lavapipe fixture with diamond and stone item entities mapped to separate `item.properties` IDs and distinct magenta/green output signals. The graphics harness compiles locally; the actual client/readback fixture has not yet run in CI.
+- Local JDK 21 command `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks -Pmod_version=0.2.0-beta.11+mc1.21.11` passed: 200 tests, zero failures/errors/skips; 44 example shader sources and 41 direct Vulkan SPIR-V compilations; graphics-smoke Java compilation and package generation passed.
+- The pinned source audit passed for 4 packs / 12 defaults / 63 declared profiles: 5,178 preprocessed stages; 126 accepted and 591 rejected geometry fragments. All records remain `visualValidation=false`.
+- Candidate `build/libs/veyra-0.2.0-beta.11+mc1.21.11.jar` passed `scripts/verify_jar.py`: 576,210 bytes, SHA-256 `0756B3F11BFFBF1C31300952B02DE33EF0E2E30CA79FA96E115DC37E18C86F73`.
+- The feature is still uncommitted and unmerged; no PR, Lavapipe runtime result, or beta.11 release is claimed yet. Next: run the graphics matrix on GitHub, review its runtime evidence, merge the passing PR, then publish a version-matched release. The broad `GOAL.md` remains incomplete: physical-GPU real-pack visuals and other Iris blockers remain.

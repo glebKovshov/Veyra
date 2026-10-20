@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.11 — 2026-10-20 (prerelease)
+
+- Bridge Iris `currentRenderedItemId` from the submitted `ItemStack` for entity, block-entity, first-person hand, and shadow render paths. Resolve the active pack's `item.properties` mapping at submission time, including block items.
+- Add a real-client graphics smoke fixture with separately mapped diamond and stone item entities and per-ID color readback checks.
+- Armor-trim and cape special IDs remain unsupported; this release does not claim full Iris or third-party shaderpack visual compatibility.
+
 ## 0.2.0-beta.10 — 2026-10-20 (prerelease)
 
 - Extend VulkanMod's compressed terrain vertices with Iris per-quad midpoint UVs and bridge `signMidCoordPos` using the original vertex UV and that midpoint.

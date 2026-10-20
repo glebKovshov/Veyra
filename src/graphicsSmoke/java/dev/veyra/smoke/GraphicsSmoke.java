@@ -23,8 +23,10 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture, geometryMidTexCoordFixture;
-    private static int activeOppositeMidTexCoordPixels;
+    private static boolean entityFixtureStarted, vanillaBaseline, cloudFixture, geometryViewSpaceFixture,
+            geometryMidTexCoordFixture, currentRenderedItemFixture;
+    private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
+            disabledCurrentRenderedItemGreenPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -43,21 +45,38 @@ public final class GraphicsSmoke {
             cloudFixture = fixture.equals("cloud-colortex0");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
-            boolean entityFixture = fixture.equals("specular-entity") || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
+            currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
+            boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
+                    || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity");
             if (entityFixture && !entityFixtureStarted && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();
                 // Initial player spawn is randomized around the world's spawn point.
-                // Place the subject along the fixed 45-degree camera direction instead.
-                double cowX = client.player.getX() - 4.0, cowY = client.player.getY(), cowZ = client.player.getZ() + 4.0;
+                // Place subjects along the fixed 45-degree camera direction instead.
+                double playerX = client.player.getX(), playerY = client.player.getY(), playerZ = client.player.getZ();
                 server.execute(() -> {
                     try {
-                        var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
-                        if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
-                        cow.setPos(cowX, cowY, cowZ);
-                        cow.setNoAi(true);
-                        java.util.Objects.requireNonNull(cow.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE)).setBaseValue(2.0);
-                        server.overworld().addFreshEntity(cow);
+                        if (currentRenderedItemFixture) {
+                            var diamond = new net.minecraft.world.entity.item.ItemEntity(server.overworld(),
+                                    playerX - 4.0, playerY + 0.5, playerZ + 2.0,
+                                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND));
+                            diamond.setNoGravity(true);
+                            diamond.setNeverPickUp();
+                            server.overworld().addFreshEntity(diamond);
+                            var stone = new net.minecraft.world.entity.item.ItemEntity(server.overworld(),
+                                    playerX - 2.0, playerY + 0.5, playerZ + 4.0,
+                                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STONE));
+                            stone.setNoGravity(true);
+                            stone.setNeverPickUp();
+                            server.overworld().addFreshEntity(stone);
+                        } else {
+                            var cow = net.minecraft.world.entity.EntityType.COW.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+                            if (cow == null) throw new IllegalStateException("Could not create material fixture cow");
+                            cow.setPos(playerX - 4.0, playerY, playerZ + 4.0);
+                            cow.setNoAi(true);
+                            java.util.Objects.requireNonNull(cow.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE)).setBaseValue(2.0);
+                            server.overworld().addFreshEntity(cow);
+                        }
                     } catch (Throwable failure) { entityFixtureFailure = failure; }
                 });
             }
@@ -153,6 +172,7 @@ public final class GraphicsSmoke {
     private static void capture(Minecraft client, NativeImage image, boolean active) {
         int colored = 0;
         int opposite = 0;
+        int renderedItemGreen = 0;
         try (image) {
             Files.createDirectories(output);
             image.writeToFile(output.resolve(active ? "mrt-active.png" : "shaders-disabled.png"));
@@ -161,24 +181,33 @@ public final class GraphicsSmoke {
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
+                if (currentRenderedItemFixture && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
             int oppositeCount = opposite;
+            int renderedItemGreenCount = renderedItemGreen;
             completion = () -> {
                 if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
                 } else if (active) {
                     activePixels = count;
                     activeOppositeMidTexCoordPixels = oppositeCount;
+                    activeCurrentRenderedItemGreenPixels = renderedItemGreenCount;
                     VeyraRenderer.disable();
                     baselineAt = worldTicks + 80;
                     stage = 1;
                     pending = false;
                 } else {
-                    Throwable failure = activePixels < 2000 || count * 4 >= activePixels
+                    disabledCurrentRenderedItemGreenPixels = renderedItemGreenCount;
+                    int minPixels = currentRenderedItemFixture ? 100 : 2000;
+                    Throwable failure = activePixels < minPixels || count * 4 >= activePixels
                             || geometryMidTexCoordFixture && activeOppositeMidTexCoordPixels < 2000
-                            ? new IllegalStateException("Auxiliary MRT or per-quad midpoint signal absent or unchanged: active="
-                            + activePixels + ", opposite=" + activeOppositeMidTexCoordPixels + ", disabled=" + count) : null;
+                            || currentRenderedItemFixture && (activeCurrentRenderedItemGreenPixels < minPixels
+                            || renderedItemGreenCount * 4 >= activeCurrentRenderedItemGreenPixels)
+                            ? new IllegalStateException("Auxiliary MRT, midpoint, or currentRenderedItemId signal absent or unchanged: active="
+                            + activePixels + ", opposite=" + activeOppositeMidTexCoordPixels + ", disabled=" + count
+                            + ", itemGreen=" + activeCurrentRenderedItemGreenPixels
+                            + ", disabledItemGreen=" + renderedItemGreenCount) : null;
                     finish(client, failure, count);
                 }
             };
@@ -194,7 +223,10 @@ public final class GraphicsSmoke {
             Files.writeString(output.resolve("result.json"), "{\"status\":\"" + (failure == null ? "passed" : "failed")
                     + "\",\"renderer\":\"Lavapipe/software Vulkan\",\"activeMagentaPixels\":" + activePixels
                     + ",\"activeOppositeMidTexCoordPixels\":" + activeOppositeMidTexCoordPixels
-                    + ",\"disabledMagentaPixels\":" + baseline + ",\"error\":\"" + error + "\"}\n");
+                    + ",\"activeCurrentRenderedItemGreenPixels\":" + activeCurrentRenderedItemGreenPixels
+                    + ",\"disabledMagentaPixels\":" + baseline
+                    + ",\"disabledCurrentRenderedItemGreenPixels\":" + disabledCurrentRenderedItemGreenPixels
+                    + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);
         client.stop();

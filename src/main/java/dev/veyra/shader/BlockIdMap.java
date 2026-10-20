@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Iris {@code block.properties} state and tag mappings used by blockEntityId. */
+/** Iris {@code block.properties} state and tag mappings used by block and block-entity IDs. */
 public final class BlockIdMap {
     public static final BlockIdMap EMPTY = new BlockIdMap(List.of());
     public static final int UNMAPPED = -1;

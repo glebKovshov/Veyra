@@ -1,18 +1,24 @@
 # Shaderpack compatibility: development 0.2
 
-## Terrain interface and pinned source audit (beta.10 candidate)
+## Terrain interface and pinned source audit (beta.11 candidate)
 
 The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **126** geometry fragment programs and rejects **591**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 2/10, 2/10, 2/10 | water: unsupported `viewVector`; entity/block/hand/spidereyes: `currentRenderedItemId`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 2/10, 2/10, 2/10 | water: unsupported `viewVector`; entity/block/hand/spidereyes: `entityColor`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
 | BSL 10.1.8 | 2/9, 2/9, 2/9 | water: `mat`; entities: `entityColor`; hand: `isMainHand`; block: unsupported entity inputs; clouds: `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
 Beta.8 added terrain aliases `lmCoord` and `color`; beta.9 added terrain `viewPos`. Beta.10 extends VulkanMod's 16-byte compressed terrain vertex to 20 bytes, appending two unsigned 16-bit midpoint UV components per quad. The terrain writer computes the average UV from each group of four vertices, while existing position, lightmap, UV0 and color bytes retain their offsets. Iris defines `mc_midTexCoord` as the center UV of the current quad, calculated per quad ([Iris attribute reference](https://shaders.properties/current/reference/attributes/mc_midtexcoord/)). The adapted vertex shader computes `signMidCoordPos = sign(texCoord0 - mc_midTexCoord)`. Terrain aliases `vertexPos` and `playerPos` use the existing camera-relative terrain position; `glColorRaw` uses the raw unpacked terrain color before lightmap multiplication.
 
-The unit tests, direct shaderc compilation and source audit cover these conversions. The dedicated Lavapipe fixture is still required to confirm runtime vertex-format and shader behavior; no third-party shaderpack has been visually checked. Water's Complementary `viewVector` is intentionally still unsupported because VulkanMod does not provide the pack's tangent basis, so the adapter does not substitute a different vector. Other registered and unsupported inputs remain explicit in diagnostics.
+Unit tests, direct shaderc compilation, the source audit, and the dedicated `geometry-mid-texcoord` Lavapipe fixture cover these conversions. The fixture passed as part of [graphics run 39348939401](https://github.com/glebKovshov/Veyra/actions/runs/39348939401), including its active and disabled signal checks. No third-party shaderpack has been visually checked. Water's Complementary `viewVector` is intentionally still unsupported because VulkanMod does not provide the pack's tangent basis, so the adapter does not substitute a different vector. Other registered and unsupported inputs remain explicit in diagnostics.
+
+## Current rendered item IDs (beta.11 candidate)
+
+Iris exposes `currentRenderedItemId` for the item or armor currently being rendered, including in gbuffers and shadow programs ([item mapping reference](https://shaders.properties/current/reference/miscellaneous/item_properties/), [ID uniform reference](https://shaders.properties/current/reference/uniforms/id/)). Veyra retains the source `ItemStack` on Minecraft's item render state and resolves it when nodes are submitted, so changing packs uses the active pack's mappings. All item stacks, including block items, use `item.properties`; `block.properties` remains for block and block-entity IDs. Mapped IDs select cached per-item pipeline variants for entity, block-entity, first-person hand, and entity-shadow renders. Other paths receive `-1`.
+
+Iris' hardcoded armor-trim and cape identifiers are not mapped yet. The original `examples/current-rendered-item-id` fixture configures mapped diamond and stone item entities and checks their separate signals in the graphics smoke harness; its CI runtime check is pending. The pinned source audit no longer reports `currentRenderedItemId` as a blocker, but acceptance is still limited by other inputs such as `entityColor`, water `viewVector`/`mat`, compute passes, and attachment feedback. All audit records keep `visualValidation=false`; the listed third-party packs remain **Not tested** in-game.
 
 ## Entity and block entity identifiers (beta.4)
 

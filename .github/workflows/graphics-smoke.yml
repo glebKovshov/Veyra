@@ -7,7 +7,9 @@ on:
     paths:
       - 'src/main/**'
       - 'src/graphicsSmoke/**'
+      - 'scripts/prepare_graphics_smoke.py'
       - 'examples/geometry-mid-texcoord/**'
+      - 'examples/current-rendered-item-id/**'
       - 'build.gradle'
       - '.github/workflows/graphics-smoke.yml'
   push:
@@ -21,6 +23,7 @@ on:
       - 'examples/water-opaque-depth/**'
       - 'examples/water-color-inputs/**'
       - 'examples/geometry-view-space/**'
+      - 'examples/current-rendered-item-id/**'
       - 'scripts/prepare_graphics_smoke.py'
       - 'examples/specular-*/**'
       - 'examples/shadow-color-*/**'
@@ -36,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, geometry-view-space, geometry-mid-texcoord, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, vanilla-baseline]
+        fixture: [geometry-mrt, geometry-view-space, geometry-mid-texcoord, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, current-rendered-item-id, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
