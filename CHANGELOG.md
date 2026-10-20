@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.12 - 2026-10-20 (prerelease)
+
+- Map Iris entityColor to Minecraft's overlayColor varying where the selected entity pipeline provides it; keep the transparent fallback on pipelines without that input.
+- Normalize the entity-family lmCoord spelling to Veyra's existing lightmap varying.
+- Fix a false unsupported-input rejection when entity shaders declare viewPos as a local variable, and constrain line-anchored uniform scans to horizontal whitespace.
+- Refresh the pinned shaderpack source audit and document the active source limitations; no third-party pack visual result is claimed.
+
 ## 0.2.0-beta.11 — 2026-10-20 (prerelease)
 
 - Bridge Iris `currentRenderedItemId` from the submitted `ItemStack` for entity, block-entity, first-person hand, and shadow render paths. Resolve the active pack's `item.properties` mapping at submission time, including block items.

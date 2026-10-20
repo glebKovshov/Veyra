@@ -1,7 +1,9 @@
 package dev.veyra.shader;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,6 +11,7 @@ import java.util.regex.Pattern;
 final class UnusedSamplerDeclarations {
     private static final Pattern DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler\\w+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern IDENTIFIER = Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*\\b");
 
     private UnusedSamplerDeclarations() {
     }
@@ -26,9 +29,12 @@ final class UnusedSamplerDeclarations {
         // make one another appear live. Keep all code references and preprocessor macro references.
         StringBuilder code = new StringBuilder(uncommented);
         for (Declaration declaration : matches) blank(code, declaration.start(), declaration.end());
-        List<Declaration> unused = matches.stream().filter(declaration ->
-                !Pattern.compile("\\b" + Pattern.quote(declaration.name()) + "\\b")
-                        .matcher(code).find()).toList();
+        Set<String> usedIdentifiers = new HashSet<>();
+        Matcher identifiers = IDENTIFIER.matcher(code);
+        while (identifiers.find()) usedIdentifiers.add(identifiers.group());
+        List<Declaration> unused = matches.stream()
+                .filter(declaration -> !usedIdentifiers.contains(declaration.name()))
+                .toList();
         if (unused.isEmpty()) return source;
 
         StringBuilder result = new StringBuilder(source);

@@ -1958,7 +1958,8 @@ public final class VeyraRenderer {
                     ? EntityShaderAdapter.adaptTextFragment(spec.fragmentSource(), spec.programName(),
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId)
                     : EntityShaderAdapter.adaptFragment(spec.fragmentSource(), spec.programName(), spec.handPass(),
-                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId);
+                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
+                            !isItemEntityTranslucentCullPipeline(original));
             String sourceHash = sha256(spec.programName() + '\n' + fragmentSource);
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, spec.programName(), sourceHash);
             RenderPipeline pipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -3626,7 +3627,8 @@ public final class VeyraRenderer {
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(
-                        fragmentSource, programName, hand, pack.hasShadowFragment(), -1, -1);
+                        fragmentSource, programName, hand, pack.hasShadowFragment(), -1, -1,
+                        ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original));
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -3775,7 +3777,8 @@ public final class VeyraRenderer {
                 requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptFragment(
-                        fragmentSource, programName, false, pack.hasShadowFragment(), -1, -1);
+                        fragmentSource, programName, false, pack.hasShadowFragment(), -1, -1,
+                        ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original));
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
