@@ -1,10 +1,14 @@
 # Veyra 0.2 validation status
 
-## Beta.20 candidate checks — PR #43 merged, release build pending (2026-10-20)
+## Beta.20 experimental prerelease — published (2026-10-20)
 
-PR [#43](https://github.com/glebKovshov/Veyra/pull/43) merged at `abea76234afae81349b9b12be0aff794891284b6`. Its final head passed Build [39417276367](https://github.com/glebKovshov/Veyra/actions/runs/39417276367), Graphics smoke [39417276374](https://github.com/glebKovshov/Veyra/actions/runs/39417276374) (20/20), and pinned source audit [39417276455](https://github.com/glebKovshov/Veyra/actions/runs/39417276455). The cloud texture fixture read back 46,140 active pixels, 0 disabled pixels, and 0 runtime Vulkan validation errors; process teardown emitted 10,031 diagnostics.
+PR [#43](https://github.com/glebKovshov/Veyra/pull/43) merged the cloud-texture and vertex-input bridge at `abea76234afae81349b9b12be0aff794891284b6`; release metadata followed in PR [#44](https://github.com/glebKovshov/Veyra/pull/44), merged at `89ec7aa34ff8ead3fcd5afb2040b4908e7c493a1`. The annotated tag `v0.2.0-beta.20+mc1.21.11` points to the latter commit. Release workflow [39418635587](https://github.com/glebKovshov/Veyra/actions/runs/39418635587) passed its source audit, all **20/20** Lavapipe fixtures, release build/tests, distributable verification, and publication.
 
-The source audit covers 4 packs / 75 cases / 5,178 stages and accepts 690 / rejects 27 geometry fragment programs; all records have `visualValidation=false`. BSL defaults pass 9/9 in each tested dimension. The local forced JDK 21 build passed 238 tests, processed 51 examples, and directly compiled 48 to Vulkan SPIR-V. These checks validate Veyra's supported sources and synthetic fixture, not a full third-party pack. Release CI must still build and verify the versioned beta.20 JAR from its tag.
+Downloaded release JAR `veyra-0.2.0-beta.20+mc1.21.11.jar`: **611,001 bytes**, SHA-256 `efb4494ed8083774611a0209297b72f22fd172977a6be1e8b080976e77a602b4`. It matches the published `SHA256SUMS.txt` and passes `scripts/verify_jar.py` for Minecraft 1.21.11, VulkanMod 0.6.8, and Veyra `0.2.0-beta.20+mc1.21.11`. The source JAR and example-packs ZIP are also published.
+
+On the published source commit, forced local JDK 21 `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passed **238 tests, 0 failures/errors/skips**, processed 51 example shaders, and compiled 48 directly to Vulkan SPIR-V. The final audit covers 4 pinned packs / 75 cases / 5,178 stages and accepts **690 / rejects 27** geometry fragment programs. Every audit record has `visualValidation=false`. The final cloud fixture read back 45,888 active pixels, 0 runtime Vulkan validation errors, and 10,031 teardown diagnostics. These checks cover source adaptation and synthetic graphics fixtures, not full third-party pack appearance.
+
+Known limits remain: selected Complementary profiles need `spriteBounds` and unsupported `shadowcomp.csh` compute; its cloud vertex input `lmCoord` is unavailable. BSL defaults pass 9/9 geometry fragments per tested dimension, but the full pack has not been visually tested. Sildur accepts 0/5 default geometry fragments and still needs `colortex4`, attachment feedback, and cloud inputs. No third-party shaderpack visual or physical-GPU validation is claimed. Beta.20 is experimental; the stable-release goal remains incomplete.
 
 ## Beta.19 experimental prerelease — published 2026-10-20
 
