@@ -2,7 +2,7 @@
 
 ## Current source candidate after beta.18 — not released
 
-The working candidate on `feature/bsl-terrain-water-varyings` adds terrain distance, BSL material recolor, water direction, and BSL advanced-material UV bridges. Its pinned source audit covers 75 cases / 5,178 preprocessed stages and accepts **672 / rejects 45** geometry fragments; every case has `visualValidation: false`. The candidate is not in the published beta.18 JAR. Its synthetic graphics checks still need CI confirmation, and no third-party pack has been visually tested.
+The working candidate on `feature/bsl-terrain-water-varyings` adds terrain distance, BSL material recolor, water direction, and BSL advanced-material UV bridges. Its pinned source audit covers 75 cases / 5,178 preprocessed stages and accepts **672 / rejects 45** geometry fragments; every case has `visualValidation: false`. PR [#40](https://github.com/glebKovshov/Veyra/pull/40) passed all 19 Lavapipe fixtures. The updated water block-ID fixture read back 226,902 active magenta pixels and 0 with shaders disabled, with 0 runtime Vulkan validation errors; teardown still emitted 10,049 diagnostics. The candidate is not in the published beta.18 JAR, and no third-party pack has been visually tested.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
 | --- | --- | --- | --- |
