@@ -14,6 +14,13 @@
 - PR #23 merged from checked head 38a4089504cdedbc2be9ba0964aa6991394cd5cb as 590d38b2de93761e1146fea5f2b1e06b00fba8d3; release-prep PR #24 merged as 8aae40b333f47ebfef2929bb5100f7a689ee1f9f.
 - Physical-GPU testing and third-party shaderpack visual validation remain outstanding. The four audited packs are not confirmed playable; full Iris parity and clean Vulkan teardown are not claimed. Beta.14 is experimental; the stable goal in `GOAL.md` remains incomplete.
 - Local shell has no JDK for a fresh Gradle invocation. Existing untracked screenshots, `assets/`, `logs/`, GPU dumps, `GOAL.md`, `scripts/analyze_vulkan_shutdown.py`, and the user's stash remain preserved and unstaged.
+
+## Continued work: terrain tangent-space inputs — 2026-10-20
+
+- Rechecked the active checkout against GitHub: `main` is `0ba3eab8c42cf25200b90a73918e3ffaa3ea0a35`, beta.14 remains the latest published prerelease, all remote branches are already ancestors of `main`, and there are no open PRs. No source changes from another model were waiting to merge. The user's untracked files remain unstaged.
+- The exact beta.14 audit artifact shows Complementary Reimagined and Unbound each reject 54 water cases because `viewVector` is not provided; further terrain blockers include `tangent`, `spriteBounds`, and block/entity translucent inputs. BSL still rejects water `mat` and cloud `texture`; Sildur remains blocked by `colortex4`, attachment feedback, and cloud inputs.
+- Implemented a terrain tangent frame from derivatives of Veyra's view-space position and UV. The adapter now expands comma-separated Iris varyings and computes `normal`, `tangent`, `binormal`, and `viewVector` once at the start of the fragment entrypoint, before shader-pack control flow. Added unit coverage and extended the existing Lavapipe view-space fixture to check orthonormality and view-vector length. This is a derivative-based bridge for planar terrain; arbitrary custom terrain vertex tangents are not provided.
+- At this checkpoint, `git diff --check` passes. Build, JUnit, shaderc/SPIR-V, pinned source audit, and Lavapipe checks have **not yet run** for this change because the local shell has no JDK. GitHub CI is the next validation gate; compatibility counts and release notes must be updated from its report before any new release.
 ## Beta.10 published prerelease — per-quad terrain midpoint — 2026-10-20
 
 - После исправления format initialization повторена локальная команда `test validateShaders build packageExamplePacks --rerun-tasks`: 199/199 тестов, 43 example stages и 40 прямых Vulkan SPIR-V компиляций. Beta.10 опубликована после успешных CI gates на PR и tag.
