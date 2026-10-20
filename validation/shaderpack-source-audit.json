@@ -447,10 +447,10 @@
     "computeStages": 0,
     "errorCount": 4,
     "errors": [
-      "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_hand_water.fsh adapter: gbuffers_hand_water uses unsupported sampler 'colortex4'.",
-      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported."
+      "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_hand_water.fsh adapter: gbuffers_hand_water input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'LightC' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -902,10 +902,10 @@
     "computeStages": 0,
     "errorCount": 4,
     "errors": [
-      "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_hand_water.fsh adapter: gbuffers_hand_water uses unsupported sampler 'colortex4'.",
-      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported."
+      "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_hand_water.fsh adapter: gbuffers_hand_water input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'LightC' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1357,10 +1357,10 @@
     "computeStages": 0,
     "errorCount": 4,
     "errors": [
-      "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses unsupported sampler 'colortex4'.",
-      "gbuffers_hand_water.fsh adapter: gbuffers_hand_water uses unsupported sampler 'colortex4'.",
-      "gbuffers_water.fsh adapter: Water geometry samples colortex4 while it is also a framebuffer attachment; image feedback is not supported."
+      "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_hand_water.fsh adapter: gbuffers_hand_water input 'LightC' is not provided by Veyra's entity bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'LightC' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   }

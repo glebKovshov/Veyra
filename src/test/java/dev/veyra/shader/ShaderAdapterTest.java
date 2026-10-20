@@ -36,7 +36,10 @@ class ShaderAdapterTest {
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);
                 } else if (name.startsWith("gbuffers_entities")) {
-                    adapted = EntityShaderAdapter.adaptFragment(source, name.substring(0, name.length()-4), false, Files.exists(path.getParent().resolve("shadow.fsh")));
+                    adapted = EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
+                            false, Files.exists(path.getParent().resolve("shadow.fsh")), -1, -1,
+                            ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
+                                    name.substring(0, name.length()-4)), false);
                 } else {
                     adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"));
                 }

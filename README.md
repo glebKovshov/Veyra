@@ -69,7 +69,7 @@ The currently supported formats are `R8`, `RGBA8`, `R16F`, `RGBA16F`, and `R32F`
 
 Water geometry can read `depthtex1` using nearest/clamp sampling; other geometry stages still reject it. `examples/water-opaque-depth` checks the copied opaque floor behind a water surface through MRT and a final pass. Its software Vulkan readback passes; popular-pack water compatibility and physical-GPU behavior remain unverified.
 
-Water geometry can read up to six distinct auxiliary `colortex1..15` buffers and their legacy aliases (`gdepth`, `gnormal`, `composite`, `gaux1..4`). Bindings use the current side after deferred; `examples/water-color-inputs` exercises opaque MRT, a deferred ping-pong switch and a half-resolution read-only input. Sampling a buffer also attached to that water draw is rejected. Other geometry bridges, general scene-color snapshots and broad mipmap/sampler properties remain incomplete.
+Supported water and entity-family geometry can read up to six distinct auxiliary `colortex1..15` buffers and their legacy aliases (`gdepth`, `gnormal`, `composite`, `gaux1..4`). Bindings use the current side after deferred. `examples/water-color-inputs` exercises opaque MRT, a deferred ping-pong switch, a half-resolution input and feedback; `examples/entity-colortex-feedback` covers the entity path. When an input is also an output attachment, Veyra ends the active render pass and copies the current image to a separate sampled snapshot before drawing with that pipeline. This defines Veyra's sampling behavior; Iris `gbuffers` feedback can race, so the result is not claimed to reproduce every pack's OpenGL scheduling. General scene-color inputs and broad mipmap/sampler properties remain incomplete.
 
 ## Noise texture sampler
 

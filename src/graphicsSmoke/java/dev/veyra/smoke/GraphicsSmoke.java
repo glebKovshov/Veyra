@@ -55,7 +55,7 @@ public final class GraphicsSmoke {
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             boolean entityFixture = currentRenderedItemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
-                    || entityMrtFixture;
+                    || fixture.equals("entity-colortex-feedback") || entityMrtFixture;
             if (entityFixture && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;

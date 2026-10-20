@@ -73,8 +73,9 @@ public final class ShaderPackAudit {
                                 TerrainShaderAdapter.adaptFragment(source, pack.hasShadowFragment(), program.equals("gbuffers_water"));
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
                                     || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
-                                EntityShaderAdapter.adaptFragment(source, program,
-                                        program.startsWith("gbuffers_hand"), pack.hasShadowFragment());
+                                EntityShaderAdapter.adaptGeometryFragment(source, program,
+                                        program.startsWith("gbuffers_hand"), pack.hasShadowFragment(),
+                                        -1, -1, ItemIdMap.UNMAPPED, true, false);
                             }
                             else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.

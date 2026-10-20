@@ -1,5 +1,5 @@
 #version 120
-/* RENDERTARGETS:0,1 */
+/* RENDERTARGETS:0,1,4 */
 uniform sampler2D gaux1;
 uniform sampler2D gaux2;
 uniform sampler2D colortex5;
@@ -21,4 +21,6 @@ void main() {
     vec4 signal = correct ? vec4(0.95, 0.02, 0.8, 1.0) : vec4(0.02, 0.8, 0.05, 1.0);
     gl_FragData[0] = signal;
     gl_FragData[1] = signal;
+    // Exercise same-image input/output. Veyra samples the pass-start snapshot and writes back here.
+    gl_FragData[2] = opaque;
 }
