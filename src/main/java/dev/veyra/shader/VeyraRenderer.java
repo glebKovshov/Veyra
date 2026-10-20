@@ -3073,6 +3073,11 @@ public final class VeyraRenderer {
             addGeometryColorTargets("gbuffers_line", lineFragment.get(), width, height,
                     colorTargetSettings, colorTargetIndices);
         }
+        var beaconBeamFragment = pack.readBeaconBeamFragment();
+        if (beaconBeamFragment.isPresent()) {
+            addGeometryColorTargets("gbuffers_beaconbeam", beaconBeamFragment.get(), width, height,
+                    colorTargetSettings, colorTargetIndices);
+        }
         for (ShaderPack.Program source : sources) {
             if (TerrainShaderAdapter.usesNoiseSampler(source.source())) {
                 VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
@@ -4314,16 +4319,45 @@ public final class VeyraRenderer {
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isBeaconBeamPipeline)
                 .toList();
-        String fragmentSource = pack.readBeaconBeamFragment()
+        String packFragment = pack.readBeaconBeamFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_beaconbeam.fsh."));
-        fragmentSource = BeaconBeamShaderAdapter.adaptFragment(fragmentSource);
-        String sourceHash = sha256("gbuffers_beaconbeam\n" + fragmentSource);
+        String programName = "gbuffers_beaconbeam";
+        FragmentOutputs outputLayout = FragmentOutputs.parse(
+                GlslPreprocessor.process(programName + ".fsh", packFragment));
+        GeometryBlendSettings blendSettings = pack.readGeometryBlendSettings(programName);
+        Optional<String> packVertexSource = pack.readBeaconBeamVertex();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         for (RenderPipeline original : candidates) {
+            String fragmentSource;
+            String vertexSource = null;
+            boolean usesNoiseSampler = false;
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs =
+                    BeaconBeamVertexShaderAdapter.nativeVaryings();
+            if (packVertexSource.isPresent()) {
+                String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                BeaconBeamVertexShaderAdapter.AdaptedStage adaptedVertex = BeaconBeamVertexShaderAdapter.adaptStage(
+                        minecraftVertex, packVertexSource.get(), programName);
+                vertexSource = adaptedVertex.source();
+                vertexOutputs = adaptedVertex.varyings();
+                usesNoiseSampler = adaptedVertex.usesNoiseSampler();
+            }
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.inspectSamplers(packFragment, programName,
+                            pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"));
+            usesNoiseSampler |= samplerInputs.usesNoiseSampler();
+            if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+            fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, programName,
+                    vertexOutputs, pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"));
+            validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
+            String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
+                    + '\n' + fragmentSource + '\n' + outputLayout + '\n' + blendSettings + '\n' + samplerInputs);
             BeaconBeamPipelineKey cacheKey = new BeaconBeamPipelineKey(original, sourceHash);
             RenderPipeline beaconPipeline = BEACON_BEAM_PIPELINE_CACHE.get(cacheKey);
             if (beaconPipeline == null) {
-                beaconPipeline = compileBeaconBeamPipeline(original, fragmentSource, sourceHash);
+                beaconPipeline = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                        vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 BEACON_BEAM_PIPELINE_CACHE.put(cacheKey, beaconPipeline);
             }
             pipelines.put(original, beaconPipeline);
@@ -4382,27 +4416,6 @@ public final class VeyraRenderer {
         return pipeline != null
                 && pipeline.getFragmentShader().equals(Identifier.withDefaultNamespace("core/rendertype_beacon_beam"))
                 && pipeline.getLocation().getPath().startsWith("pipeline/beacon_beam_");
-    }
-
-    private static RenderPipeline compileBeaconBeamPipeline(
-            RenderPipeline original, String fragmentSource, String sourceHash) throws IOException {
-        Identifier fragmentShader = Identifier.fromNamespaceAndPath(
-                "veyra", "shaderpack/beaconbeam/" + sourceHash);
-        RenderPipeline pipeline = copyPipelineWithFragment(original, fragmentShader);
-        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
-        ShaderSource source = (identifier, type) -> {
-            if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
-                return fragmentSource;
-            }
-            return shaderManager.getShader(identifier, type);
-        };
-        VeyraPipelineResources.track(pipeline);
-        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
-        if (!compiled.isValid()) {
-            throw new IOException("VulkanMod could not compile " + original.getLocation()
-                    + " with the selected beacon beam shader.");
-        }
-        return pipeline;
     }
 
     private static ParticlePipelineSet compileParticlePipelines(ShaderPack pack) throws IOException {

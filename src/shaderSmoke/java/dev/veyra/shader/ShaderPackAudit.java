@@ -69,8 +69,12 @@ public final class ShaderPackAudit {
                         if (!file.endsWith(".fsh")) continue;
                         String program = file.substring(0, file.length() - 4);
                         try {
-                            if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water"))
-                                TerrainShaderAdapter.adaptFragment(source, pack.hasShadowFragment(), program.equals("gbuffers_water"));
+                            if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water")) {
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs =
+                                        terrainVertexOutputs(pack, program, source);
+                                TerrainShaderAdapter.adaptFragment(source, pack.hasShadowFragment(),
+                                        program.equals("gbuffers_water"), vertexOutputs);
+                            }
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
                                     || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
                                 EntityShaderAdapter.adaptGeometryFragment(source, program,
@@ -110,5 +114,15 @@ public final class ShaderPackAudit {
             if (input == null) throw new IOException("VulkanMod cloud vertex shader is missing from the audit classpath.");
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private static Map<String, TerrainVertexShaderAdapter.PackVarying> terrainVertexOutputs(
+            ShaderPack pack, String program, String fragmentSource) throws IOException {
+        var vertex = pack.readStage(program + ".vsh");
+        if (vertex.isEmpty()) return Map.of();
+        Map<String, TerrainVertexShaderAdapter.PackVarying> descriptions =
+                TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+        var unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, descriptions);
+        return TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), unusedLocations);
     }
 }

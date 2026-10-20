@@ -786,6 +786,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return Optional.of(expandIncludes(fileName, source.get()));
     }
 
+    public Optional<String> readBeaconBeamVertex() throws IOException {
+        if (!supportsShaderPrograms()) return Optional.empty();
+        return readStage(BEACON_BEAM_PROGRAM + ".vsh");
+    }
+
     public Optional<String> readLightningFragment() throws IOException {
         if (!supportsShaderPrograms() || !hasLightningFragment) {
             return Optional.empty();
@@ -973,6 +978,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
         }
         validateBasicLineCapabilities();
+        validateBeaconBeamCapabilities();
         if (hasGlintFragment() && readStage(GLINT_PROGRAM + ".vsh").isEmpty()) {
             String fragment = readGlintFragment().orElseThrow(
                     () -> new IOException("The pack no longer contains an armor-glint fragment shader."));
@@ -1008,6 +1014,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                             adaptedVertex.texCoordInterpolation(), true);
                 } else if (program.equals(BASIC_PROGRAM) || program.equals(LINE_PROGRAM)) {
                     // The leash/line vertex formats and cross-stage varyings were checked above.
+                } else if (program.equals(BEACON_BEAM_PROGRAM)) {
+                    // The beacon vertex/fragment interface was linked and its outputs validated above.
                 } else {
                     throw new IOException("Cannot execute " + file
                             + ": custom vertex shaders for this gbuffers program are not implemented by Veyra.");
@@ -1020,6 +1028,20 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
             }
         }
+    }
+
+    private void validateBeaconBeamCapabilities() throws IOException {
+        if (!isProgramEnabled(BEACON_BEAM_PROGRAM) || !hasBeaconBeamFragment) return;
+        String fragment = readBeaconBeamFragment().orElseThrow(
+                () -> new IOException("The pack no longer contains gbuffers_beaconbeam.fsh."));
+        String activeFragment = GlslPreprocessor.process(BEACON_BEAM_PROGRAM + ".fsh", fragment);
+        FragmentOutputs.parse(activeFragment);
+        readGeometryBlendSettings(BEACON_BEAM_PROGRAM);
+        Optional<String> vertex = readBeaconBeamVertex();
+        Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = BeaconBeamVertexShaderAdapter.nativeVaryings();
+        if (vertex.isPresent()) outputs = BeaconBeamVertexShaderAdapter.validate(BEACON_BEAM_PROGRAM, vertex.get()).varyings();
+        TextureColorDistanceShaderAdapter.adaptFragment(fragment, BEACON_BEAM_PROGRAM, outputs,
+                hasShadowFragment(), true);
     }
 
     private void validateBasicLineCapabilities() throws IOException {
