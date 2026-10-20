@@ -1,6 +1,6 @@
 # Shader pack compatibility
 
-This page records the current measured compatibility of popular third-party shader packs. It is updated whenever the pinned audit results change. Results for earlier versions are summarized in the [changelog](../CHANGELOG.md) and attached to each [GitHub release](https://github.com/glebKovshov/Veyra/releases).
+This page records the current measured compatibility of popular third-party shader packs. It is updated whenever the pinned audit results change. Results for earlier versions can be found in the git history of the [`validation/`](../validation) reports.
 
 > [!IMPORTANT]
 > No third-party shader pack currently loads in Veyra. The numbers below are **source-level** results: they show how many fragment programs the adapters accept, not that a pack renders correctly.

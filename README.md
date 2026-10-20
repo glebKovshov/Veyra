@@ -35,7 +35,7 @@ VulkanMod is hooked through internal classes, so other VulkanMod versions need e
 - **Refresh list** rescans `shaderpacks` and recompiles the active pack from disk. A failed compilation keeps the previous pipelines; removing or breaking the active pack disables shaders.
 - **Disable shaders** turns shaders off for the session, even if the selection cannot be saved.
 
-Unsupported programs, inputs, and stages are reported in the game log with the program name and reason. They are never silently skipped.
+Unsupported programs, inputs, and stages are reported in the game log with the program name and reason. The known exceptions are listed in [Shader support → Not implemented](docs/shader-support.md#not-implemented).
 
 ## Example packs
 
@@ -47,7 +47,7 @@ Requirements: JDK 21. The Gradle wrapper is included.
 
 ```sh
 ./gradlew build                 # compile, run unit tests, remap the mod
-./gradlew validateShaders       # compile the example shaders with shaderc
+./gradlew validateShaders       # compile example terrain, entity, hand, and cloud shaders with shaderc
 ./gradlew packageExamplePacks   # package examples/ into a ZIP
 ```
 

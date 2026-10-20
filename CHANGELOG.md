@@ -2,7 +2,7 @@
 
 All notable changes to Veyra are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) with a `+mc<version>` build suffix for the target Minecraft version. All 0.2.0 releases target Minecraft 1.21.11 and VulkanMod 0.6.8 and are experimental prereleases.
 
-Current shader pack compatibility is tracked in [docs/compatibility.md](docs/compatibility.md), and verification results for each release are attached to its [GitHub release](https://github.com/glebKovshov/Veyra/releases).
+Current shader pack compatibility is tracked in [docs/compatibility.md](docs/compatibility.md), and current test results in [docs/validation.md](docs/validation.md).
 
 ## [Unreleased]
 

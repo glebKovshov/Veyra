@@ -2,7 +2,7 @@
 
 This document describes which parts of the Iris shader pack format Veyra currently supports. It describes the current `main` branch; see the [changelog](../CHANGELOG.md) for when each feature was added.
 
-Veyra is a compatibility layer in progress, not a general Iris or OptiFine port. Any program, input, sampler, or uniform not listed here should be treated as unsupported. Unsupported elements in an active program produce an explicit error instead of being silently ignored.
+Veyra is a compatibility layer in progress, not a general Iris or OptiFine port. Any program, input, sampler, or uniform not listed here should be treated as unsupported. Unsupported elements in an active program usually produce an explicit error. Exceptions that are currently ignored without an error are listed under [Not implemented](#not-implemented).
 
 - [Pack loading](#pack-loading)
 - [Geometry programs](#geometry-programs)
@@ -275,7 +275,8 @@ Terrain, entity-family, cloud, and sign text programs accept `fogColor`, `fogSta
 
 - Custom vertex stages for geometry programs other than clouds. An active non-cloud `gbuffers_*.vsh` whose fragment program exists is rejected, because Veyra would otherwise run VulkanMod's built-in vertex shader in its place.
 - Geometry, tessellation, compute, and `begin` stages (rejected with an error).
-- Other `gbuffers_*` programs and custom shadow vertex stages.
+- Other `gbuffers_*` programs.
+- Custom shadow vertex stages. A `shadow*.vsh` file is currently **ignored without an error**, and the shadow pass uses Veyra's synthesized vertex stage.
 - MRT for clouds and the remaining single-output geometry programs; genuine simultaneous MRT for post programs.
 - `depthtex3` and later, arbitrary Vulkan image formats, custom images and SSBOs.
 - Normal maps and animated specular maps.

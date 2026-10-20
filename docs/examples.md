@@ -2,7 +2,7 @@
 
 Every directory under [`examples/`](../examples) is a small original shader pack that exercises one feature. They are not meant to look good; most display a solid diagnostic color when the feature works.
 
-Build all examples with `./gradlew packageExamplePacks` and extract `build/distributions/veyra-example-packs-*.zip` into `shaderpacks`. The same archive is attached to every release. `./gradlew validateShaders` compiles each example with shaderc.
+Build all examples with `./gradlew packageExamplePacks` and extract `build/distributions/veyra-example-packs-*.zip` into `shaderpacks`. The same archive is attached to every release. `./gradlew validateShaders` compiles the examples' terrain, water, entity, hand, and cloud fragment programs with shaderc; the other example programs are only checked at runtime or by hand.
 
 Packs marked **CI** are also run in a real Minecraft client on software Vulkan (Lavapipe) by the [Graphics smoke](../.github/workflows/graphics-smoke.yml) workflow, which reads back the frame and checks the expected colors. See [Validation](validation.md).
 

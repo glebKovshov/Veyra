@@ -12,10 +12,10 @@ python3 scripts/verify_jar.py
 ```
 
 - `build` compiles and remaps the mod and runs the JUnit tests.
-- `validateShaders` compiles the example packs with shaderc.
+- `validateShaders` compiles the examples' terrain, water, entity, hand, and cloud fragment programs with shaderc.
 - `runClient` starts a development client with VulkanMod.
 
-Pull requests run the [Build](.github/workflows/build.yml) workflow. Changes to the renderer, shader loader, or graphics fixtures also run the [Graphics smoke](.github/workflows/graphics-smoke.yml) and [Shaderpack audit](.github/workflows/shaderpack-audit.yml) workflows.
+Pull requests run the [Build](.github/workflows/build.yml) workflow. Changes under `src/main`, the shader loader, and some fixture directories also run the [Graphics smoke](.github/workflows/graphics-smoke.yml) and [Shaderpack audit](.github/workflows/shaderpack-audit.yml) workflows.
 
 ## Pull requests
 
@@ -64,4 +64,4 @@ Releases are built and published by the [Release](.github/workflows/release.yml)
 4. Update the latest release link in `README.md` and, if results changed, `docs/compatibility.md` and `docs/validation.md`.
 5. After merging, push the tag `v<mod_version>` on the merge commit. The workflow checks that the tag matches `mod_version`, reruns all checks, and publishes the JAR, sources, example packs, and `SHA256SUMS.txt`. Versions containing `-` are published as prereleases.
 
-The workflow output and release assets serve as the verification record, so no follow-up pull request is needed after publishing.
+The committed audit reports, the changelog, and the release checksums are the durable record, so no follow-up pull request is needed after publishing. CI reports expire after 14 days; if they need to be kept, attach them to the release in the workflow instead of copying numbers into Markdown.

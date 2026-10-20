@@ -1,16 +1,16 @@
 # Validation
 
-This page describes how Veyra is tested, what each check proves, and what remains unverified. It reflects the current state of `main`. Per-release results (CI runs, checksums) are attached to each [GitHub release](https://github.com/glebKovshov/Veyra/releases) and kept in the workflow logs.
+This page describes how Veyra is tested, what each check proves, and what remains unverified. It reflects the current state of `main`. Each [GitHub release](https://github.com/glebKovshov/Veyra/releases) includes `SHA256SUMS.txt`, and the pinned audit results are committed under [`validation/`](../validation). CI logs and test, audit, and graphics reports are workflow artifacts kept for 14 days.
 
 ## Automated checks
 
 | Check | Workflow | Runs on | Proves |
 | --- | --- | --- | --- |
 | Build and unit tests | [Build](../.github/workflows/build.yml) | Every push and pull request | The mod compiles and remaps; JUnit regressions pass |
-| Shader compilation | Build | Every push and pull request | Example shaders preprocess, and those that do not need VulkanMod's descriptor conversion compile to SPIR-V with shaderc |
+| Shader compilation | Build | Every push and pull request | The examples' terrain, water, entity, hand, and cloud fragment programs preprocess, and those that do not need VulkanMod's descriptor conversion compile to SPIR-V with shaderc. Post, shadow, and other geometry examples are not covered |
 | Distributable check | Build | Every push and pull request | `scripts/verify_jar.py` finds the expected metadata, notices, licenses, and refmap in the JAR |
 | Pinned source audit | [Shaderpack audit](../.github/workflows/shaderpack-audit.yml) | Pull requests touching the shader loader | The adapters' results on four pinned third-party packs; see [Compatibility](compatibility.md) |
-| Graphics smoke | [Graphics smoke](../.github/workflows/graphics-smoke.yml) | Pull requests touching the renderer or fixtures | A real Minecraft client renders each fixture on Lavapipe; the frame is read back and checked, and no Vulkan validation error occurs before shutdown |
+| Graphics smoke | [Graphics smoke](../.github/workflows/graphics-smoke.yml) | Pull requests touching `src/main`, the harness, `build.gradle`, or some fixture directories (the path filter does not yet list every fixture) | A real Minecraft client renders each fixture on Lavapipe; the frame is read back and checked, and no Vulkan validation error occurs before shutdown |
 | Release | [Release](../.github/workflows/release.yml) | `v*` tags and `release/**` branches | All of the above on the exact release commit, then the JAR, sources, example packs, and `SHA256SUMS.txt` are published |
 
 ### Current results
@@ -18,7 +18,7 @@ This page describes how Veyra is tested, what each check proves, and what remain
 As of `0.2.0-beta.23`:
 
 - 244 JUnit tests pass with no failures, errors, or skips.
-- 53 example shaders are preprocessed and 50 are compiled directly to SPIR-V.
+- 53 example shader sources are preprocessed and 50 are compiled directly to SPIR-V.
 - All 22 graphics smoke jobs pass: 21 feature fixtures (marked **CI** in [Example packs](examples.md)) plus a vanilla baseline with shaders disabled. No fixture reports a runtime Vulkan validation error.
 - The pinned audit accepts 705 and rejects 12 geometry fragment programs across 75 configurations.
 
