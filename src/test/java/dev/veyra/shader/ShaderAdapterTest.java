@@ -149,6 +149,31 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void reconstructsTerrainTangentSpaceInputsFromPositionAndUvGradients() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                flat in vec3 normal, binormal, tangent;
+                in vec3 viewVector;
+                void main() {
+                    gl_FragColor = vec4(abs(normal + binormal + tangent + viewVector) / 64.0, 1.0);
+                }
+                """);
+
+        assertTrue(adapted.contains("dFdx(veyraViewPosition)"));
+        assertTrue(adapted.contains("dFdy(veyraViewPosition)"));
+        assertTrue(adapted.contains("dFdx(veyraTexCoord)"));
+        assertTrue(adapted.contains("dFdy(veyraTexCoord)"));
+        assertTrue(adapted.contains("#define normal veyraTerrainNormal()"));
+        assertTrue(adapted.contains("#define binormal veyraTerrainBinormal()"));
+        assertTrue(adapted.contains("#define tangent veyraTerrainTangent()"));
+        assertTrue(adapted.contains("#define viewVector veyraTerrainViewVector()"));
+        assertTrue(adapted.contains("void veyraShaderPackMain()"));
+        assertTrue(adapted.contains("veyraInitializeTerrainTangentFrame();\n    veyraShaderPackMain();"));
+        assertFalse(adapted.contains("flat in vec3 normal, binormal, tangent;"));
+        assertFalse(adapted.contains("in vec3 viewVector;"));
+    }
+
+    @Test
     void bridgesRawTerrainVertexColor() throws IOException {
         String adapted = TerrainShaderAdapter.adaptFragment("""
                 #version 120
@@ -171,7 +196,8 @@ class ShaderAdapterTest {
 
     @Test
     void reportsTheSpecificUnsupportedTerrainInput() {
-        for (String input : List.of("mc_Entity", "mc_midTexCoord", "midTexCoord", "viewNormal", "tangent", "at_tangent")) {
+        for (String input : List.of("mc_Entity", "mc_midTexCoord", "midTexCoord", "viewNormal",
+                "tangent", "binormal", "viewVector", "at_tangent")) {
             IOException error = assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(
                     "void main() { gl_FragColor = vec4(" + input + "); }\n"));
             assertTrue(error.getMessage().contains("input '" + input + "'"), error.getMessage());

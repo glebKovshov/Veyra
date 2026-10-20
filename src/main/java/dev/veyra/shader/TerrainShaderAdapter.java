@@ -22,13 +22,19 @@ public final class TerrainShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern COMMA_SEPARATED_VARYING_DECLARATION = Pattern.compile(
+            "(?m)^([\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s+)"
+                    + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)\\s*;"
+                    + "([\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$))");
+    private static final Pattern MAIN_FUNCTION_DECLARATION = Pattern.compile(
+            "(?m)^([\\t ]*void\\s+)main(\\s*\\()");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
     private static final Pattern UNSUPPORTED_GBUFFER_INPUT = Pattern.compile(
-            "\\b(mc_Entity|mc_midTexCoord|midTexCoord|viewNormal|tangent|at_tangent)\\b");
+            "\\b(mc_Entity|mc_midTexCoord|midTexCoord|viewNormal|tangent|binormal|viewVector|at_tangent)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
@@ -48,6 +54,9 @@ public final class TerrainShaderAdapter {
             Map.entry("shadowPos", new Varying("vec4", 6)),
             Map.entry("shadowCoord", new Varying("vec4", 6)),
             Map.entry("normal", new Varying("vec3", 7)),
+            Map.entry("tangent", new Varying("vec3", -1)),
+            Map.entry("binormal", new Varying("vec3", -1)),
+            Map.entry("viewVector", new Varying("vec3", -1)),
             Map.entry("vertexPos", new Varying("vec3", 7)),
             Map.entry("playerPos", new Varying("vec3", 7)),
             Map.entry("viewPos", new Varying("vec3", 10)),
@@ -192,6 +201,66 @@ public final class TerrainShaderAdapter {
             #define gl_FragColor veyraFragColor
             """;
 
+    /** Reconstructs Iris' terrain tangent frame from the rasterized position and UV gradients. */
+    private static final String TANGENT_SPACE_BRIDGE = """
+            vec3 veyraTerrainNormalValue;
+            vec3 veyraTerrainTangentValue;
+            vec3 veyraTerrainBinormalValue;
+            vec3 veyraTerrainViewVectorValue;
+            void veyraInitializeTerrainTangentFrame() {
+                vec3 positionDx = dFdx(veyraViewPosition);
+                vec3 positionDy = dFdy(veyraViewPosition);
+                vec2 texCoordDx = dFdx(veyraTexCoord);
+                vec2 texCoordDy = dFdy(veyraTexCoord);
+                vec3 faceNormal = cross(positionDx, positionDy);
+                if (!gl_FrontFacing) faceNormal = -faceNormal;
+                float normalLengthSquared = dot(faceNormal, faceNormal);
+                veyraTerrainNormalValue = normalLengthSquared > 1e-12
+                        ? faceNormal * inversesqrt(normalLengthSquared) : vec3(0.0, 0.0, 1.0);
+                float determinant = texCoordDx.x * texCoordDy.y - texCoordDx.y * texCoordDy.x;
+                vec3 fallbackAxis = abs(veyraTerrainNormalValue.z) < 0.999
+                        ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+                vec3 tangentDirection;
+                vec3 binormalDirection;
+                if (abs(determinant) < 1e-8) {
+                    tangentDirection = normalize(cross(fallbackAxis, veyraTerrainNormalValue));
+                    binormalDirection = normalize(cross(tangentDirection, veyraTerrainNormalValue));
+                } else {
+                    tangentDirection = (positionDx * texCoordDy.y - positionDy * texCoordDx.y) / determinant;
+                    tangentDirection -= veyraTerrainNormalValue * dot(veyraTerrainNormalValue, tangentDirection);
+                    float tangentLengthSquared = dot(tangentDirection, tangentDirection);
+                    tangentDirection = tangentLengthSquared > 1e-12
+                            ? tangentDirection * inversesqrt(tangentLengthSquared)
+                            : normalize(cross(fallbackAxis, veyraTerrainNormalValue));
+                    binormalDirection = (positionDy * texCoordDx.x - positionDx * texCoordDy.x) / determinant;
+                    binormalDirection -= veyraTerrainNormalValue * dot(veyraTerrainNormalValue, binormalDirection);
+                    binormalDirection -= tangentDirection * dot(tangentDirection, binormalDirection);
+                    float binormalLengthSquared = dot(binormalDirection, binormalDirection);
+                    binormalDirection = binormalLengthSquared > 1e-12
+                            ? binormalDirection * inversesqrt(binormalLengthSquared)
+                            : normalize(cross(tangentDirection, veyraTerrainNormalValue));
+                }
+                veyraTerrainTangentValue = tangentDirection;
+                veyraTerrainBinormalValue = binormalDirection;
+                veyraTerrainViewVectorValue = vec3(
+                        dot(tangentDirection, veyraViewPosition),
+                        dot(binormalDirection, veyraViewPosition),
+                        dot(veyraTerrainNormalValue, veyraViewPosition));
+            }
+            vec3 veyraTerrainNormal() {
+                return veyraTerrainNormalValue;
+            }
+            vec3 veyraTerrainTangent() {
+                return veyraTerrainTangentValue;
+            }
+            vec3 veyraTerrainBinormal() {
+                return veyraTerrainBinormalValue;
+            }
+            vec3 veyraTerrainViewVector() {
+                return veyraTerrainViewVectorValue;
+            }
+            """;
+
     private TerrainShaderAdapter() {
     }
 
@@ -288,7 +357,7 @@ public final class TerrainShaderAdapter {
                     + "'; supported Iris scalar/matrix uniforms and the built-in samplers are available.");
         }
 
-        Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
+        Matcher varyingMatcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         List<String> declaredVaryings = new ArrayList<>();
         while (varyingMatcher.find()) {
@@ -302,7 +371,7 @@ public final class TerrainShaderAdapter {
                 throw new IOException("gbuffers_terrain input '" + name + "' must use " + varying.type() + ".");
             }
             String location = varyingMatcher.group(1);
-            if (location != null && Integer.parseInt(location) != varying.location()) {
+            if (location != null && varying.location() >= 0 && Integer.parseInt(location) != varying.location()) {
                 throw new IOException("gbuffers_terrain input '" + name + "' uses an unsupported location.");
             }
             declaredVaryings.add(name);
@@ -324,8 +393,12 @@ public final class TerrainShaderAdapter {
         }
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         Matcher unsupportedInput = UNSUPPORTED_GBUFFER_INPUT.matcher(uncommented);
-        if (unsupportedInput.find()) {
+        while (unsupportedInput.find()) {
             String name = unsupportedInput.group(1);
+            if ((name.equals("tangent") || name.equals("binormal") || name.equals("viewVector"))
+                    && declaredVaryings.contains(name)) {
+                continue;
+            }
             throw new IOException("gbuffers_terrain input '" + name + "' is not provided by Veyra's terrain bridge yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {
@@ -375,7 +448,25 @@ public final class TerrainShaderAdapter {
         colorInputs.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(input -> colorBridge
                 .append("#define ").append(input.getKey()).append(' ').append(GeometryColorSamplers.samplerName(input.getValue())).append('\n'));
         bridge = colorBridge + bridge;
-        if (declaredVaryings.contains("normal")) {
+        boolean hasTangentSpaceInputs = declaredVaryings.contains("tangent")
+                || declaredVaryings.contains("binormal") || declaredVaryings.contains("viewVector");
+        if (hasTangentSpaceInputs) {
+            StringBuilder tangentSpaceMacros = new StringBuilder(TANGENT_SPACE_BRIDGE);
+            if (declaredVaryings.contains("normal")) {
+                tangentSpaceMacros.append("#define normal veyraTerrainNormal()\n");
+            }
+            if (declaredVaryings.contains("tangent")) {
+                tangentSpaceMacros.append("#define tangent veyraTerrainTangent()\n");
+            }
+            if (declaredVaryings.contains("binormal")) {
+                tangentSpaceMacros.append("#define binormal veyraTerrainBinormal()\n");
+            }
+            if (declaredVaryings.contains("viewVector")) {
+                tangentSpaceMacros.append("#define viewVector veyraTerrainViewVector()\n");
+            }
+            tangentSpaceMacros.append("#define texture Sampler0");
+            bridge = bridge.replace("#define texture Sampler0", tangentSpaceMacros.toString());
+        } else if (declaredVaryings.contains("normal")) {
             bridge = bridge.replace("#define texture Sampler0", """
                     vec3 veyraTerrainNormal() {
                         vec3 faceNormal = cross(dFdx(veyraTerrainPosition), dFdy(veyraTerrainPosition));
@@ -401,10 +492,17 @@ public final class TerrainShaderAdapter {
             bridge = bridge.replace("layout(binding = 6) uniform sampler2D VeyraNoiseSampler;",
                     "layout(binding = 5) uniform sampler2D VeyraNoiseSampler;");
         }
-        result.append(bridge
+        bridge = bridge
                 .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())
-                .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName));
-        return result.append(adapted).toString();
+                .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName);
+        if (hasTangentSpaceInputs) {
+            adapted = renameMainForTangentSpace(adapted);
+        }
+        result.append(bridge).append(adapted);
+        if (hasTangentSpaceInputs) {
+            result.append("\nvoid main() {\n    veyraInitializeTerrainTangentFrame();\n    veyraShaderPackMain();\n}\n");
+        }
+        return result.toString();
     }
 
     /** Appends the per-frame Iris uniforms evaluated by the renderer (see IrisExtraUniforms). */
@@ -545,6 +643,59 @@ public final class TerrainShaderAdapter {
         return adapted.replace(texCoordMarker,
                 texCoordMarker + "\n    const vec2 veyraMidTexCoord = vec2(MidTexCoord) * UV_INV;"
                         + "\n    veyraSignMidCoordPos = sign(texCoord0 - veyraMidTexCoord);");
+    }
+
+    private static String expandCommaSeparatedVaryings(String source) {
+        Matcher matcher = COMMA_SEPARATED_VARYING_DECLARATION.matcher(source);
+        StringBuffer expanded = new StringBuffer();
+        while (matcher.find()) {
+            String prefix = matcher.group(1);
+            String[] names = matcher.group(2).split("\\s*,\\s*");
+            String suffix = matcher.group(3);
+            StringBuilder declarations = new StringBuilder();
+            for (int index = 0; index < names.length; index++) {
+                if (index > 0) declarations.append('\n');
+                declarations.append(prefix).append(names[index]).append(';');
+                if (index == names.length - 1) declarations.append(suffix);
+            }
+            matcher.appendReplacement(expanded, Matcher.quoteReplacement(declarations.toString()));
+        }
+        matcher.appendTail(expanded);
+        return expanded.toString();
+    }
+
+    private static String renameMainForTangentSpace(String source) throws IOException {
+        Matcher matcher = MAIN_FUNCTION_DECLARATION.matcher(maskComments(source));
+        StringBuilder renamed = new StringBuilder(source.length() + 32);
+        int copiedThrough = 0;
+        int declarations = 0;
+        while (matcher.find()) {
+            declarations++;
+            int nameStart = matcher.start(1) + matcher.group(1).length();
+            int nameEnd = nameStart + "main".length();
+            renamed.append(source, copiedThrough, nameStart).append("veyraShaderPackMain");
+            copiedThrough = nameEnd;
+        }
+        if (declarations != 1) {
+            throw new IOException("gbuffers_terrain tangent-space inputs require exactly one top-level void main() entrypoint.");
+        }
+        return renamed.append(source, copiedThrough, source.length()).toString();
+    }
+
+    private static String maskComments(String source) {
+        Matcher matcher = COMMENTS.matcher(source);
+        StringBuffer masked = new StringBuffer();
+        while (matcher.find()) {
+            String comment = matcher.group();
+            StringBuilder whitespace = new StringBuilder(comment.length());
+            for (int index = 0; index < comment.length(); index++) {
+                char character = comment.charAt(index);
+                whitespace.append(character == '\r' || character == '\n' ? character : ' ');
+            }
+            matcher.appendReplacement(masked, Matcher.quoteReplacement(whitespace.toString()));
+        }
+        matcher.appendTail(masked);
+        return masked.toString();
     }
 
     private record Varying(String type, int location) {

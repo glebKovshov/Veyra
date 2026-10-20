@@ -10,6 +10,20 @@ The pinned audit covers 75 default/profile/dimension cases and all 5,178 preproc
 | BSL 10.1.8 | 7/9, 7/9, 7/9 | water: `mat`; clouds: active `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
+## Terrain tangent-space inputs (PR #26 candidate; not released)
+
+The beta.14 source audit rejected Complementary water at `viewVector`. PR #26 reconstructs a view-space terrain tangent frame from fragment derivatives of view position and UV, then adapts Iris `normal`, `tangent`, `binormal`, and `viewVector`. Comma-separated and interpolation-qualified varying declarations are normalized before validation. The frame is initialized in a wrapper before the shader-pack fragment `main`, keeping derivative evaluation outside shader-pack control flow. This reconstruction targets planar terrain faces; custom geometry with authored per-vertex tangents is not covered.
+
+Build [39377074639](https://github.com/glebKovshov/Veyra/actions/runs/39377074639), source audit [39377074590](https://github.com/glebKovshov/Veyra/actions/runs/39377074590), and all 17 Lavapipe fixtures in graphics run [39377074607](https://github.com/glebKovshov/Veyra/actions/runs/39377074607) passed on the PR head. The `geometry-view-space` fixture checks orthogonality and vector length, with 222,445 active magenta pixels, zero when disabled, and zero runtime Vulkan validation errors. This is synthetic evidence, not a third-party pack visual result.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Current blockers in this audit |
+| --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 6/10, 6/10, 6/10 | Terrain/water `mat`, translucent block/entity inputs, selected `shadowcomp.csh` compute; some terrain profiles also require `spriteBounds` |
+| BSL 10.1.8 | 6/9, 6/9, 6/9 | Terrain/water `mat`; active cloud `texture` sampler |
+| Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; attachment feedback in water; unsupported cloud inputs |
+
+The updated pinned audit still contains 75 cases / 5,178 sources and reports 432 geometry fragments accepted / 285 rejected, with `visualValidation=false` throughout. `viewVector` is no longer an error. The newly reached terrain/water `mat` inputs now reject 72 cases each. The table at the top is the published beta.14 snapshot; these PR results are a candidate and are not released.
+
 ## Entity-family multiple render targets (beta.14 prerelease)
 
 Entity, first-person hand, block-entity, and sign-text fragments can route supported explicit and legacy outputs to native color attachments. This extends the existing Vulkan MRT path to these geometry families; it does not add general MRT support to every geometry bridge or certify a complete third-party pack.

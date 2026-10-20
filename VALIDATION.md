@@ -14,6 +14,16 @@ Downloaded release asset `veyra-0.2.0-beta.14+mc1.21.11.jar`: **583,317 bytes**,
 
 No physical-GPU or third-party shaderpack visual result is claimed; beta.14 is experimental and the stable-release goal remains incomplete.
 
+## PR #26 terrain tangent-space candidate — 2026-10-20
+
+PR [#26](https://github.com/glebKovshov/Veyra/pull/26), head `b8df47e7d914374a753edb52d363ebb123110a87`, reconstructs terrain `normal`, `tangent`, `binormal`, and `viewVector` from screen-space derivatives of view position and UV. The frame is initialized at the fragment entrypoint before the pack's `main` executes. This candidate has not been merged or released.
+
+Build run [39377074639](https://github.com/glebKovshov/Veyra/actions/runs/39377074639) passed with **221 tests, 0 failures, 0 errors, 0 skipped**, 48 example shaders processed, and 45 direct Vulkan SPIR-V compilations. The uploaded PR JAR `veyra-0.2.0-beta.14+mc1.21.11.jar` is 585,453 bytes, SHA-256 `1f4025963e5b28aa27173270aaa34d4d70335955787f6fddd1d22543eb1f22ad`; it passes `scripts/verify_jar.py`. It carries beta.14 metadata and is not a release asset.
+
+Graphics smoke run [39377074607](https://github.com/glebKovshov/Veyra/actions/runs/39377074607) passed all 17 Lavapipe fixtures. The updated `geometry-view-space` fixture reported 222,445 active magenta pixels and 0 when shaders were disabled; runtime Vulkan validation errors were 0. Process shutdown still produced 10,031 validation diagnostics.
+
+Pinned source audit [39377074590](https://github.com/glebKovshov/Veyra/actions/runs/39377074590) passed with 75 cases / 5,178 stages and 432 geometry fragments accepted / 285 rejected. All 75 records retain `visualValidation=false`. Complementary's `viewVector` rejection is resolved; the updated report now reaches terrain/water `mat` rejections (72 each). The remaining blockers include translucent inputs and selected compute for Complementary, cloud `texture` for BSL, and `colortex4`, attachment feedback and cloud inputs for Sildur. This is source-audit and synthetic Lavapipe evidence only; no third-party pack or physical-GPU visual result is established.
+
 ## Beta.13 experimental release — 2026-10-20
 
 Published [Veyra 0.2.0-beta.13+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.13%2Bmc1.21.11) from tag `v0.2.0-beta.13+mc1.21.11`, target commit `0a275fe5d4b88aab3c033b65140b5fb48b949044`. Release workflow [39369824141](https://github.com/glebKovshov/Veyra/actions/runs/39369824141) passed the pinned source audit, all 16 Lavapipe fixtures, `build validateShaders packageExamplePacks`, distributable verification, and publication.

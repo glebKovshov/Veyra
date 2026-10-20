@@ -39,15 +39,15 @@ Terrain shadowtex1 reserves native slot 10. Auxiliary water sampler assignment s
 | Component | Current state | Needed for broad pack compatibility |
 | --- | --- | --- |
 | Pack discovery/options | ZIP/folder, dimensions, macros, profiles, screens, persistence | Wider option syntax/localization coverage and client UI testing |
-| Geometry vertex stage | Existing synthesized interfaces | Execute arbitrary pack vertex GLSL, required attributes, IDs and varyings |
-| Geometry color outputs | Native terrain MRT with per-target blend overrides; other geometry remains single-output | Entity/hand/block/cloud/shadow MRT, wider format/state semantics and runtime verification |
+| Geometry vertex stage | Synthesized interfaces from VulkanMod formats; terrain view position; PR #26 candidate derives a planar tangent frame from view-position/UV gradients | Execute arbitrary pack vertex GLSL and provide block/material IDs plus pack-specific vertex attributes |
+| Geometry color outputs | Native MRT for terrain and entity/hand/block-entity/sign-text families with per-target blend overrides | Cloud/shadow MRT, wider format/state semantics and additional runtime verification |
 | Post outputs | Separate fullscreen draws per output | Genuine MRT where simultaneous execution or side effects matter |
 | Textures/uniforms | Generated `noisetex`, depth/history, water opaque-depth and auxiliary-color sampling, completed shadow color and separate pre-translucent shadow depth, static resource-pack specular maps, shared frame uniforms; unused samplers removed | Normal/animated material maps, auxiliary-color inputs in other geometry bridges, attachment feedback, wider shadow/depth samplers, custom texture/image units and expression uniforms |
 | Additional stages | Explicit error for active unsupported stages | Compute dispatch/resources/barriers; geometry/tessellation stages and device checks |
 | Pack properties | Options, target/shadow settings, program conditions | Full state/property semantics, feature flags, custom images/SSBOs |
-| Runtime verification | Full build, unit tests, CPU shaderc/source audits; ten Lavapipe synthetic fixtures pass for terrain MRT, water depth/colors, static specular atlas/entity, shadow color terrain/entity and separate shadow depth water/entity and a four-phase post shadow chain | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
+| Runtime verification | Full build, unit tests, CPU shaderc/source audits; 17 Lavapipe synthetic fixtures pass, including terrain MRT, tangent-space inputs, water depth/colors, static specular atlas/entity, shadow inputs and a four-phase post shadow chain | Physical GPUs, third-party packs, visual scenes beyond the fixture, resize/reload/switch stress and sustained memory measurements |
 
-The ten synthetic client fixtures report no runtime validation errors before world shutdown. Process teardown still reports child-object diagnostics with variable counts; exact results are retained in VALIDATION.md and CI artifacts. Ownership is not identified, so process-wide cleanup is not yet validated. The broader shader-pack pipeline, other geometry families, visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
+The 17 synthetic client fixtures report no runtime validation errors before world shutdown. Process teardown still reports child-object diagnostics; the latest beta.14 and PR #26 runs each recorded 10,031 diagnostics. Exact results are retained in VALIDATION.md and CI artifacts. Ownership is not identified, so process-wide cleanup is not yet validated. The broader shader-pack pipeline, third-party visual correctness and leak behavior remain unconfirmed. No FPS improvement is claimed.
 
 ## Sources and licensing
 
