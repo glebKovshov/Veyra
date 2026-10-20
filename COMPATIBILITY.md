@@ -1,8 +1,18 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.21 published; current branch is unreleased
+# Shaderpack compatibility: Veyra 0.2.0-beta.22 experimental prerelease
 
-## Current branch audit (unreleased, 2026-10-20)
+## Beta.22 geometry color inputs and feedback snapshots (2026-10-20)
 
-The merged `main` plus the current geometry colortex-input branch was audited locally against the same four pinned archives: 75 default/profile/dimension records and 5,178 preprocessed stages. The adapters accept **705** and reject **12** geometry fragment/configuration cases. This improves the beta.21 checkpoint's 693/24 by resolving the 12 Complementary terrain `spriteBounds` cases from PR [#50](https://github.com/glebKovshov/Veyra/pull/50). The 12 remaining adapter rejections are Sildur's `LightC` custom vertex varying in four translucent geometry fragments across three dimensions. The current branch adds water and entity-family colortex inputs with explicit Vulkan feedback snapshots, but Sildur's fragments still reject at `LightC`; its default acceptance remains 3/15. Complementary `shadowcomp.csh` in selected profiles remains unsupported. Every audit row has `visualValidation: false`. The new bridge has passed local build/tests and shader compilation; Vulkan runtime smoke is pending CI. No third-party shaderpack visual or physical-GPU result is claimed.
+The beta.22 candidate includes geometry color-input support merged in PR [#51](https://github.com/glebKovshov/Veyra/pull/51) at [`bc253f5`](https://github.com/glebKovshov/Veyra/commit/bc253f51ece852688b5b26b59b877effea7ff091). Supported water and entity-family geometry can sample up to six distinct `colortex1..15` inputs. If an input is also a draw attachment, Veyra ends the active render pass, copies the source to a separate sampled snapshot, and keeps the original image writable as an output. This is Veyra's defined pre-draw snapshot behavior; it does not claim to reproduce Iris' potentially racy same-image feedback scheduling.
+
+The PR head passed Build [39437938448](https://github.com/glebKovshov/Veyra/actions/runs/39437938448), pinned source audit [39437938433](https://github.com/glebKovshov/Veyra/actions/runs/39437938433), and Graphics smoke [39437939525](https://github.com/glebKovshov/Veyra/actions/runs/39437939525), with **22/22** Lavapipe fixtures passing. The entity feedback fixture read back **18,648 active magenta pixels**, 0 disabled pixels, and **0 runtime Vulkan validation errors**. Process teardown still reports diagnostics; they are not runtime validation errors.
+
+The pinned audit covers 4 archives, 75 default/profile/dimension records, and 5,178 preprocessed stages: **705 accepted / 12 rejected** geometry fragments. Every record has `visualValidation: false`. The 12 rejections are four Sildur programs repeated across three dimensions; they require its pack-specific `LightC` varying. Selected Complementary profiles still require the unsupported `shadowcomp.csh` compute stage. No complete third-party pack or physical GPU has been visually validated.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | Selected profiles: unsupported `shadowcomp.csh` compute stage | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | No default geometry-fragment source blocker in the pinned audit | Full pack not tested |
+| Sildur's Vibrant 2.02 Extreme | 3/15, 3/15, 3/15 | `LightC` in four translucent geometry programs | Not tested |
 
 ## Beta.21 experimental prerelease - published (2026-10-20)
 
