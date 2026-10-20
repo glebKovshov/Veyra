@@ -759,7 +759,12 @@ public final class TerrainShaderAdapter {
                         + "\n    layout (location = 4) in int VeyraTerrainMaterialId;"
                         + "\n    layout (location = 5) in float VeyraTerrainRenderType;"
                         + "\n    layout (location = 6) in int VeyraTerrainPackedNormal;"
-                        + "\n    layout (location = 7) in vec4 VeyraTerrainTangent;");
+                        + "\n    layout (location = 7) in float VeyraTerrainTangentX;"
+                        + "\n    layout (location = 8) in float VeyraTerrainTangentY;"
+                        + "\n    layout (location = 9) in float VeyraTerrainTangentZ;"
+                        + "\n    layout (location = 10) in float VeyraTerrainTangentHandedness;"
+                        + "\n    #define VeyraTerrainTangent vec4(VeyraTerrainTangentX, VeyraTerrainTangentY,"
+                        + " VeyraTerrainTangentZ, VeyraTerrainTangentHandedness)");
         adapted = adapted.replace(outputMarker,
                 outputMarker + "\nlayout (location = 5) out vec2 veyraLightmapCoord;"
                         + "\nlayout (location = 6) out vec4 veyraShadowPos;"

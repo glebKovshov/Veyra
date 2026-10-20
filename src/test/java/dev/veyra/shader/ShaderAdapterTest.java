@@ -142,7 +142,11 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("layout (location = 4) in int VeyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 5) in float VeyraTerrainRenderType;"));
         assertTrue(vertex.contains("layout (location = 6) in int VeyraTerrainPackedNormal;"));
-        assertTrue(vertex.contains("layout (location = 7) in vec4 VeyraTerrainTangent;"));
+        assertTrue(vertex.contains("layout (location = 7) in float VeyraTerrainTangentX;"));
+        assertTrue(vertex.contains("layout (location = 8) in float VeyraTerrainTangentY;"));
+        assertTrue(vertex.contains("layout (location = 9) in float VeyraTerrainTangentZ;"));
+        assertTrue(vertex.contains("layout (location = 10) in float VeyraTerrainTangentHandedness;"));
+        assertTrue(vertex.contains("#define VeyraTerrainTangent vec4(VeyraTerrainTangentX, VeyraTerrainTangentY,"));
         assertTrue(vertex.contains("layout (location = 11) out flat int veyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 13) out flat vec2 veyraMcEntity;"));
         assertTrue(vertex.contains("layout (location = 14) out flat vec2 veyraAbsMidCoordPos;"));
@@ -549,6 +553,13 @@ class ShaderAdapterTest {
         assertEquals(24, TerrainMidTexCoord.RENDER_TYPE_OFFSET);
         assertEquals(28, TerrainMidTexCoord.PACKED_NORMAL_OFFSET);
         assertEquals(32, TerrainMidTexCoord.TANGENT_OFFSET);
+        assertEquals(11, TerrainMidTexCoord.VERTEX_FORMAT.getElements().size());
+        for (int location = 7; location <= 10; location++) {
+            var element = TerrainMidTexCoord.VERTEX_FORMAT.getElements().get(location);
+            assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Usage.GENERIC, element.usage());
+            assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Type.FLOAT, element.type());
+            assertEquals(1, element.count(), "VulkanMod only supports scalar generic FLOAT attributes");
+        }
     }
 
     @Test

@@ -26,8 +26,16 @@ public final class TerrainMidTexCoord {
                     VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
             .add("VeyraTerrainPackedNormal", new VertexFormatElement(6, 0,
                     VertexFormatElement.Type.INT, VertexFormatElement.Usage.GENERIC, 1))
-            .add("VeyraTerrainTangent", new VertexFormatElement(7, 0,
-                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 4))
+            // VulkanMod 0.6.8 only maps generic FLOAT attributes with one component.
+            // Keep the tangent as four scalar attributes so its pipeline builder accepts the format.
+            .add("VeyraTerrainTangentX", new VertexFormatElement(7, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainTangentY", new VertexFormatElement(8, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainTangentZ", new VertexFormatElement(9, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainTangentHandedness", new VertexFormatElement(10, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
             .build();
 
     private TerrainMidTexCoord() {
