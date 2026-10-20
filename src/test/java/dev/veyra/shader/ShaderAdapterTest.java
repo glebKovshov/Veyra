@@ -87,6 +87,7 @@ class ShaderAdapterTest {
         String fragment = TerrainShaderAdapter.adaptFragment("""
                 #version 120
                 varying vec3 viewPos;
+                varying float dist;
                 void main() { gl_FragColor = vec4(abs(viewPos) / 64.0, 1.0); }
                 """);
         String vertex = TerrainShaderAdapter.adaptVertex("""
@@ -108,12 +109,17 @@ class ShaderAdapterTest {
 
         assertTrue(fragment.contains("layout(location = 10) in vec3 veyraViewPosition;"));
         assertTrue(fragment.contains("#define viewPos veyraViewPosition"));
+        assertTrue(fragment.contains("layout(location = 16) in float veyraTerrainDistance;"));
+        assertTrue(fragment.contains("#define dist veyraTerrainDistance"));
         assertFalse(fragment.contains("varying vec3 viewPos;"));
+        assertFalse(fragment.contains("varying float dist;"));
         assertTrue(vertex.contains("layout (location = 10) out vec3 veyraViewPosition;"));
+        assertTrue(vertex.contains("layout (location = 16) out float veyraTerrainDistance;"));
         assertTrue(vertex.contains("float near;\n    float far;"));
         assertTrue(vertex.contains("mat4 gbufferModelView;"));
         assertTrue(vertex.indexOf("float near;") < vertex.indexOf("mat4 gbufferModelView;"));
         assertTrue(vertex.contains("veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;"));
+        assertTrue(vertex.contains("veyraTerrainDistance = length(veyraViewPosition);"));
         assertTrue(vertex.contains("layout (location = 3) in uvec2 MidTexCoord;"));
         assertTrue(vertex.contains("layout (location = 4) in int VeyraTerrainMaterialId;"));
         assertTrue(vertex.contains("layout (location = 5) in float VeyraTerrainRenderType;"));
@@ -127,6 +133,8 @@ class ShaderAdapterTest {
         assertTrue(vertex.contains("const vec2 veyraMidCoordOffset = texCoord0 - veyraMidCoord;"));
         assertTrue(vertex.contains("veyraSignMidCoordPos = sign(veyraMidCoordOffset);"));
         assertTrue(vertex.contains("veyraAbsMidCoordPos = abs(veyraMidCoordOffset);"));
+        assertTrue(vertex.contains("veyraBslTexCoord = vec4(sign(veyraMidCoordOffset) * 0.5 + 0.5, 0.0, 0.0);"));
+        assertTrue(vertex.contains("veyraBslTexCoordAM = vec4(min(texCoord0, veyraMidCoord - veyraMidCoordOffset), abs(veyraMidCoordOffset) * 2.0);"));
         assertTrue(vertex.contains("veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);"));
     }
 
@@ -151,6 +159,51 @@ class ShaderAdapterTest {
             assertFalse(adapted.contains("flat in " + materialType + " mat;"));
             assertFalse(adapted.contains("flat in vec2 mc_Entity;"));
         }
+    }
+
+    @Test
+    void bridgesBslTerrainRecolorFromPackBlockIdCategory() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying float recolor;
+                void main() { gl_FragColor = recolor > 0.5 ? vec4(1.0) : vec4(0.0); }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 11) flat in int veyraTerrainMaterialId;"));
+        assertTrue(adapted.contains("#define recolor ((veyraTerrainMaterialId / 100 == 151 || "
+                + "veyraTerrainMaterialId / 100 == 155 || veyraTerrainMaterialId / 100 == 156) ? 1.0 : 0.0)"));
+        assertFalse(adapted.contains("varying float recolor;"));
+    }
+
+    @Test
+    void bridgesBslTerrainDirectionalInputsFromIrisUniforms() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec3 sunVec, upVec, eastVec;
+                void main() { gl_FragColor = vec4(normalize(sunVec) + normalize(upVec) + normalize(eastVec), 1.0); }
+                """);
+
+        assertTrue(adapted.contains("vec3 sunPosition;"));
+        assertTrue(adapted.contains("mat4 gbufferModelView;"));
+        assertTrue(adapted.contains("#define sunVec normalize(sunPosition)"));
+        assertTrue(adapted.contains("#define upVec normalize(gbufferModelView[1].xyz)"));
+        assertTrue(adapted.contains("#define eastVec normalize(gbufferModelView[0].xyz)"));
+        assertFalse(adapted.contains("varying vec3 sunVec"));
+    }
+
+    @Test
+    void bridgesBslAdvancedMaterialUvVaryingsFromTerrainTextureCenters() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec4 vTexCoord, vTexCoordAM;
+                void main() { gl_FragColor = vec4(vTexCoord.st * vTexCoordAM.pq + vTexCoordAM.st, 0.0, 1.0); }
+                """);
+
+        assertTrue(adapted.contains("layout(location = 17) in vec4 veyraBslTexCoord;"));
+        assertTrue(adapted.contains("layout(location = 18) in vec4 veyraBslTexCoordAM;"));
+        assertTrue(adapted.contains("#define vTexCoord veyraBslTexCoord"));
+        assertTrue(adapted.contains("#define vTexCoordAM veyraBslTexCoordAM"));
+        assertFalse(adapted.contains("varying vec4 vTexCoord"));
     }
 
     @Test

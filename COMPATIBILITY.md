@@ -1,4 +1,14 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.18 prerelease
+# Shaderpack compatibility: Veyra beta.18 release and current source candidate
+
+## Current source candidate after beta.18 — not released
+
+The working candidate on `feature/bsl-terrain-water-varyings` adds terrain distance, BSL material recolor, water direction, and BSL advanced-material UV bridges. Its pinned source audit covers 75 cases / 5,178 preprocessed stages and accepts **672 / rejects 45** geometry fragments; every case has `visualValidation: false`. The candidate is not in the published beta.18 JAR. Its synthetic graphics checks still need CI confirmation, and no third-party pack has been visually tested.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining source/profile blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | selected profiles: terrain `spriteBounds` and unsupported `shadowcomp.csh` compute stage | Not tested |
+| BSL 10.1.8 | 8/9, 8/9, 8/9 | clouds: active `texture` sampler | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
 
 ## Beta.18 legacy fog inputs
 

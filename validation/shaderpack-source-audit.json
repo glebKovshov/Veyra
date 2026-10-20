@@ -341,15 +341,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -363,15 +361,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -385,15 +381,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -407,15 +401,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -429,15 +421,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -451,15 +441,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -829,15 +817,13 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -851,15 +837,13 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -873,15 +857,13 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -895,15 +877,13 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -917,15 +897,13 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -939,15 +917,13 @@
     "profiles": 5,
     "stages": 59,
     "preprocessed": 59,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 16,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -1317,15 +1293,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -1339,15 +1313,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -1361,15 +1333,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -1383,15 +1353,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -1405,15 +1373,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },
@@ -1427,15 +1393,13 @@
     "profiles": 5,
     "stages": 63,
     "preprocessed": 63,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 3,
+    "geometryFragmentsAccepted": 8,
+    "geometryFragmentsRejected": 1,
     "geometryVertexStages": 18,
     "computeStages": 1,
-    "errorCount": 3,
+    "errorCount": 1,
     "errors": [
-      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex."
     ],
     "visualValidation": false
   },

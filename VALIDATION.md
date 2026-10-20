@@ -1,5 +1,11 @@
 # Veyra 0.2 validation status
 
+## Current source candidate after beta.18 — not released
+
+The current branch `feature/bsl-terrain-water-varyings` passes local forced JDK 21 `test validateShaders build packageExamplePacks --rerun-tasks`: **234 tests, 0 failures/errors/skips**, 50 example shaders processed, and 47 direct Vulkan SPIR-V compilations. Its local 593,550-byte JAR passes `scripts/verify_jar.py`, but uses the beta.18 version string and is not a release artifact.
+
+The refreshed pinned audit covers 75 cases / 5,178 stages and accepts **672 / rejects 45** geometry fragments; all records retain `visualValidation=false`. BSL accepts 8/9 defaults in each dimension after the new terrain/water bridges. GitHub Lavapipe validation, merge, release packaging, and downloaded-asset checksum verification are still pending. Third-party pack visuals and physical-GPU behavior remain unverified.
+
 ## Beta.18 experimental prerelease: legacy fog bridge — 2026-10-20
 
 Beta.18 is published from annotated tag [`v0.2.0-beta.18+mc1.21.11`](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.18%2Bmc1.21.11) at merge commit [`e3428eb`](https://github.com/glebKovshov/Veyra/commit/e3428eb782a0d715b1b1bd22e167c34c48b9bf94). Release workflow [39400531356](https://github.com/glebKovshov/Veyra/actions/runs/39400531356) and Tag Build [39400531360](https://github.com/glebKovshov/Veyra/actions/runs/39400531360) passed. The source-audit artifact [12253973732](https://github.com/glebKovshov/Veyra/actions/runs/39400531356/artifacts/12253973732) records 75 cases / 5,178 stages and **636 accepted / 81 rejected** geometry fragments; all records have `visualValidation=false`. Release graphics passed all **19/19 Lavapipe fixtures**.

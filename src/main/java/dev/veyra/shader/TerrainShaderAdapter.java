@@ -57,9 +57,16 @@ public final class TerrainShaderAdapter {
             Map.entry("tangent", new Varying("vec3", -1)),
             Map.entry("binormal", new Varying("vec3", -1)),
             Map.entry("viewVector", new Varying("vec3", -1)),
+            Map.entry("sunVec", new Varying("vec3", -1)),
+            Map.entry("upVec", new Varying("vec3", -1)),
+            Map.entry("eastVec", new Varying("vec3", -1)),
             Map.entry("vertexPos", new Varying("vec3", 7)),
             Map.entry("playerPos", new Varying("vec3", 7)),
             Map.entry("viewPos", new Varying("vec3", 10)),
+            Map.entry("dist", new Varying("float", 16)),
+            Map.entry("recolor", new Varying("float", -1)),
+            Map.entry("vTexCoord", new Varying("vec4", 17)),
+            Map.entry("vTexCoordAM", new Varying("vec4", 18)),
             Map.entry("mat", new Varying("int", 11)),
             Map.entry("mc_Entity", new Varying("vec2", 13)),
             Map.entry("signMidCoordPos", new Varying("vec2", 12)),
@@ -166,6 +173,9 @@ public final class TerrainShaderAdapter {
             layout(location = 13) flat in vec2 veyraMcEntity;
             layout(location = 14) flat in vec2 veyraAbsMidCoordPos;
             layout(location = 15) flat in vec2 veyraMidCoord;
+            layout(location = 16) in float veyraTerrainDistance;
+            layout(location = 17) in vec4 veyraBslTexCoord;
+            layout(location = 18) in vec4 veyraBslTexCoordAM;
             layout(location = 0) out vec4 veyraFragColor;
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
@@ -189,6 +199,9 @@ public final class TerrainShaderAdapter {
             #define shadowPos veyraShadowPos
             #define shadowCoord veyraShadowPos
             #define viewPos veyraViewPosition
+            #define dist veyraTerrainDistance
+            #define vTexCoord veyraBslTexCoord
+            #define vTexCoordAM veyraBslTexCoordAM
             #define vertexPos veyraTerrainPosition
             #define playerPos veyraTerrainPosition
             #define signMidCoordPos veyraSignMidCoordPos
@@ -442,6 +455,19 @@ public final class TerrainShaderAdapter {
         if (declaredVaryings.contains("mc_Entity")) {
             terrainMaterialMacros.append("#define mc_Entity veyraMcEntity\n");
         }
+        if (declaredVaryings.contains("recolor")) {
+            terrainMaterialMacros.append("#define recolor ((veyraTerrainMaterialId / 100 == 151 || "
+                    + "veyraTerrainMaterialId / 100 == 155 || veyraTerrainMaterialId / 100 == 156) ? 1.0 : 0.0)\n");
+        }
+        if (declaredVaryings.contains("sunVec")) {
+            terrainMaterialMacros.append("#define sunVec normalize(sunPosition)\n");
+        }
+        if (declaredVaryings.contains("upVec")) {
+            terrainMaterialMacros.append("#define upVec normalize(gbufferModelView[1].xyz)\n");
+        }
+        if (declaredVaryings.contains("eastVec")) {
+            terrainMaterialMacros.append("#define eastVec normalize(gbufferModelView[0].xyz)\n");
+        }
         String bridge = FRAGMENT_BRIDGE
                 .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
                 .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
@@ -639,7 +665,10 @@ public final class TerrainShaderAdapter {
                         + "\nlayout (location = 12) out vec2 veyraSignMidCoordPos;"
                         + "\nlayout (location = 13) out flat vec2 veyraMcEntity;"
                         + "\nlayout (location = 14) out flat vec2 veyraAbsMidCoordPos;"
-                        + "\nlayout (location = 15) out flat vec2 veyraMidCoord;");
+                        + "\nlayout (location = 15) out flat vec2 veyraMidCoord;"
+                        + "\nlayout (location = 16) out float veyraTerrainDistance;"
+                        + "\nlayout (location = 17) out vec4 veyraBslTexCoord;"
+                        + "\nlayout (location = 18) out vec4 veyraBslTexCoordAM;");
         String lightmapMarker = "vertexColor = Color * sample_lightmap2(Sampler2, Position.a);";
         if (!adapted.contains(lightmapMarker)) {
             throw new IOException("VulkanMod's terrain lightmap encoding changed; Veyra cannot bridge gbuffers_terrain inputs.");
@@ -667,6 +696,7 @@ public final class TerrainShaderAdapter {
                         + "\n    veyraSphericalVertexDistance = length(pos);"
                         + "\n    veyraCylindricalVertexDistance = max(length(pos.xz), abs(pos.y));"
                         + "\n    veyraViewPosition = (gbufferModelView * vec4(pos, 1.0)).xyz;"
+                        + "\n    veyraTerrainDistance = length(veyraViewPosition);"
                         + "\n    veyraTerrainMaterialId = VeyraTerrainMaterialId;"
                         + "\n    veyraMcEntity = vec2(float(VeyraTerrainMaterialId), VeyraTerrainRenderType);");
         String texCoordMarker = "texCoord0 = UV0 * UV_INV;";
@@ -680,7 +710,9 @@ public final class TerrainShaderAdapter {
                         + "\n    veyraMidCoord = (textureMatrix * vec4(veyraRawMidTexCoord, 0.0, 1.0)).xy;"
                         + "\n    const vec2 veyraMidCoordOffset = texCoord0 - veyraMidCoord;"
                         + "\n    veyraSignMidCoordPos = sign(veyraMidCoordOffset);"
-                        + "\n    veyraAbsMidCoordPos = abs(veyraMidCoordOffset);");
+                        + "\n    veyraAbsMidCoordPos = abs(veyraMidCoordOffset);"
+                        + "\n    veyraBslTexCoord = vec4(sign(veyraMidCoordOffset) * 0.5 + 0.5, 0.0, 0.0);"
+                        + "\n    veyraBslTexCoordAM = vec4(min(texCoord0, veyraMidCoord - veyraMidCoordOffset), abs(veyraMidCoordOffset) * 2.0);");
     }
 
     private static String expandCommaSeparatedVaryings(String source) {
