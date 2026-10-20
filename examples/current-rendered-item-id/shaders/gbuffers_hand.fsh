@@ -1,10 +1,11 @@
 #version 120
 uniform int currentRenderedItemId;
+varying float isMainHand;
 
 void main() {
-    if (currentRenderedItemId == 42) {
+    if (currentRenderedItemId == 42 && isMainHand > 0.5) {
         gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
-    } else if (currentRenderedItemId == 43) {
+    } else if (currentRenderedItemId == 43 && isMainHand < 0.5) {
         gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
     } else {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);

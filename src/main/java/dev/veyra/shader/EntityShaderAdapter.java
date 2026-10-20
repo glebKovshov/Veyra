@@ -92,7 +92,8 @@ public final class EntityShaderAdapter {
             Map.entry("overlayColor", new Varying("vec4")),
             Map.entry("normal", new Varying("vec3")),
             Map.entry("viewPos", new Varying("vec3")),
-            Map.entry("viewNormal", new Varying("vec3")));
+            Map.entry("viewNormal", new Varying("vec3")),
+            Map.entry("isMainHand", new Varying("float")));
     private static final Map<String, Varying> SUPPORTED_TEXT_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -150,6 +151,14 @@ public final class EntityShaderAdapter {
                                        int currentRenderedItemId, boolean entityColorAvailable) throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
                 entityId, blockEntityId, currentRenderedItemId, entityColorAvailable);
+    }
+
+    static String adaptFragment(String source, String programName, boolean handPass,
+                                boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                int currentRenderedItemId, boolean entityColorAvailable,
+                                boolean isMainHand) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -220,6 +229,10 @@ public final class EntityShaderAdapter {
 
     public static boolean requiresViewNormalInput(String source) {
         return requiresVarying(source, "viewNormal");
+    }
+
+    public static boolean requiresMainHandInput(String source) {
+        return requiresVarying(source, "isMainHand");
     }
 
     private static boolean requiresVarying(String source, String name) {
@@ -446,6 +459,15 @@ public final class EntityShaderAdapter {
                                         boolean handPass, boolean shadowSamplerAvailable,
                                         int entityId, int blockEntityId,
                                         int currentRenderedItemId, boolean entityColorAvailable) throws IOException {
+        return adaptFragment(source, programName, textPipeline, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, false);
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline,
+                                        boolean handPass, boolean shadowSamplerAvailable,
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -520,6 +542,7 @@ public final class EntityShaderAdapter {
         boolean suppliesSphericalDistance = false;
         boolean suppliesCylindricalDistance = false;
         boolean suppliesLightmapCoord = false;
+        boolean suppliesMainHand = false;
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -530,6 +553,12 @@ public final class EntityShaderAdapter {
             }
             if (!varying.type().equals(type)) {
                 throw new IOException(programName + " input '" + name + "' must use " + varying.type() + ".");
+            }
+            if (name.equals("isMainHand")) {
+                if (!handPass) {
+                    throw new IOException(programName + " input 'isMainHand' is available only in first-person hand programs.");
+                }
+                suppliesMainHand = true;
             }
             if (name.equals("normal")) {
                 suppliesNormal = true;
@@ -648,6 +677,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_COLOR_ALIAS__
                 __VEYRA_VIEW_POSITION_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
+                __VEYRA_IS_MAIN_HAND_VALUE__
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
                 out vec4 veyraEntityFragColor;
@@ -700,6 +730,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_VIEW_NORMAL_INPUT__
                 __VEYRA_NORMAL_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
+                __VEYRA_IS_MAIN_HAND_VALUE__
                 in vec2 texCoord0;
                 out vec4 veyraEntityFragColor;
                 __VEYRA_FOG_BRIDGE__
@@ -730,6 +761,8 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
                 .replace("__VEYRA_VIEW_NORMAL_INPUT__", suppliesViewNormal ? "in vec3 viewNormal;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
+                .replace("__VEYRA_IS_MAIN_HAND_VALUE__", suppliesMainHand
+                        ? "const float isMainHand = " + (isMainHand ? "1.0" : "0.0") + ";\n" : "")
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler

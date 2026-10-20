@@ -342,6 +342,7 @@ public final class VeyraRenderer {
     private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
     private static final ThreadLocal<Integer> HAND_RENDER_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final ThreadLocal<Deque<Boolean>> HAND_SIDE_SUBMISSION_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Integer> BLOCK_ENTITY_SUBMISSION_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<Deque<Integer>> ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> BLOCK_ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
@@ -1533,6 +1534,17 @@ public final class VeyraRenderer {
         }
     }
 
+    /** Pushes the logical hand for one first-person item render. */
+    public static void beginHandItemSubmission(boolean mainHand) {
+        HAND_SIDE_SUBMISSION_CONTEXT.get().push(mainHand);
+    }
+
+    public static void endHandItemSubmission() {
+        Deque<Boolean> hands = HAND_SIDE_SUBMISSION_CONTEXT.get();
+        if (!hands.isEmpty()) hands.pop();
+        if (hands.isEmpty()) HAND_SIDE_SUBMISSION_CONTEXT.remove();
+    }
+
     public static void beginBlockEntitySubmission() {
         BLOCK_ENTITY_SUBMISSION_DEPTH.set(BLOCK_ENTITY_SUBMISSION_DEPTH.get() + 1);
         BLOCK_ENTITY_IDENTIFIER_CONTEXT.get().push(BlockIdMap.UNMAPPED);
@@ -1597,6 +1609,9 @@ public final class VeyraRenderer {
         Deque<Integer> itemIdentifiers = RENDERED_ITEM_IDENTIFIER_CONTEXT.get();
         boolean item = !itemIdentifiers.isEmpty();
         int itemId = item ? itemIdentifiers.peek() : ItemIdMap.UNMAPPED;
+        Deque<Boolean> handSides = HAND_SIDE_SUBMISSION_CONTEXT.get();
+        boolean mainHand = !handSides.isEmpty() && handSides.peek();
+        if (handSides.isEmpty()) HAND_SIDE_SUBMISSION_CONTEXT.remove();
         if (!blockEntity && !entity && !(item && isHandRendering())) return originalType;
         RenderPipeline original = originalType.pipeline();
         if (VeyraShadowRenderer.isRendering()) {
@@ -1605,7 +1620,7 @@ public final class VeyraRenderer {
             EntityPipelineSet set = blockEntity ? shadowBlockEntityPipelineSet : shadowEntityPipelineSet;
             int entityId = entity ? entityIdentifiers.peek() : EntityIdMap.UNMAPPED;
             int blockId = blockEntity ? currentBlockEntityIdentifier() : BlockIdMap.UNMAPPED;
-            shadowPipeline = entityPipelineVariant(set, original, entityId, blockId, itemId);
+            shadowPipeline = entityPipelineVariant(set, original, entityId, blockId, itemId, false);
             return shadowPipeline == null ? originalType : replaceRenderTypePipeline(originalType,
                     shadowPipeline, blockEntity ? "_veyra_shadow_block" : "_veyra_shadow_entity");
         }
@@ -1620,7 +1635,7 @@ public final class VeyraRenderer {
             }
             EntityPipelineSet pipelines = getHandPipelineSet(pack);
             RenderPipeline replacement = entityPipelineVariant(pipelines, original,
-                    EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, itemId);
+                    EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, itemId, mainHand);
             return replacement == null ? originalType
                     : replaceRenderTypePipeline(originalType, replacement, "_veyra_hand_item");
         }
@@ -1631,7 +1646,7 @@ public final class VeyraRenderer {
             }
             EntityPipelineSet pipelines = getBlockEntityPipelineSet(pack);
             RenderPipeline replacement = entityPipelineVariant(pipelines, original,
-                    EntityIdMap.UNMAPPED, currentBlockEntityIdentifier(), itemId);
+                    EntityIdMap.UNMAPPED, currentBlockEntityIdentifier(), itemId, false);
             if (replacement == null) return originalType;
             if (!blockEntityPipelineRoutingLogged) {
                 VeyraClient.LOGGER.info("Routing block entity pipeline {} through {} from shader pack '{}'.",
@@ -1644,7 +1659,7 @@ public final class VeyraRenderer {
         if (!pack.hasEntityFragment() || !isEntityRenderPipeline(original)) return originalType;
         getEntityPipeline(original);
         RenderPipeline replacement = entityPipelineVariant(entityPipelineSet, original,
-                entityIdentifiers.peek(), BlockIdMap.UNMAPPED, itemId);
+                entityIdentifiers.peek(), BlockIdMap.UNMAPPED, itemId, false);
         if (replacement == null) {
             return originalType;
         }
@@ -1936,7 +1951,7 @@ public final class VeyraRenderer {
 
     private static RenderPipeline entityPipelineVariant(EntityPipelineSet set, RenderPipeline original,
                                                         int entityId, int blockEntityId,
-                                                        int currentRenderedItemId) {
+                                                        int currentRenderedItemId, boolean mainHand) {
         if (set == null) return null;
         RenderPipeline base = set.pipelines().get(original);
         EntityPipelineSpec spec = set.variantSources().get(original);
@@ -1945,11 +1960,12 @@ public final class VeyraRenderer {
         int selectedBlockId = spec.usesBlockEntityId() ? blockEntityId : BlockIdMap.UNMAPPED;
         int selectedItemId = spec.usesCurrentRenderedItemId()
                 ? currentRenderedItemId : ItemIdMap.UNMAPPED;
+        boolean selectedMainHand = spec.usesIsMainHand() && mainHand;
         if (selectedEntityId == EntityIdMap.UNMAPPED && selectedBlockId == BlockIdMap.UNMAPPED
-                && selectedItemId == ItemIdMap.UNMAPPED) return base;
+                && selectedItemId == ItemIdMap.UNMAPPED && !selectedMainHand) return base;
 
         EntityIdentifierPair identifiers = new EntityIdentifierPair(
-                selectedEntityId, selectedBlockId, selectedItemId);
+                selectedEntityId, selectedBlockId, selectedItemId, selectedMainHand);
         RenderPipeline cached = set.variants().getOrDefault(original, Map.of()).get(identifiers);
         if (cached != null) return cached;
         if (set.failedVariants().getOrDefault(original, Set.of()).contains(identifiers)) return base;
@@ -1959,7 +1975,7 @@ public final class VeyraRenderer {
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId)
                     : EntityShaderAdapter.adaptFragment(spec.fragmentSource(), spec.programName(), spec.handPass(),
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
-                            !isItemEntityTranslucentCullPipeline(original));
+                            !isItemEntityTranslucentCullPipeline(original), selectedMainHand);
             String sourceHash = sha256(spec.programName() + '\n' + fragmentSource);
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, spec.programName(), sourceHash);
             RenderPipeline pipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -1978,9 +1994,10 @@ public final class VeyraRenderer {
         } catch (IOException exception) {
             set.failedVariants().computeIfAbsent(original, ignored -> new HashSet<>()).add(identifiers);
             VeyraClient.LOGGER.warn("Could not compile {} pipeline variant for entityId={}, blockEntityId={}, "
-                            + "and currentRenderedItemId={}; "
+                            + "currentRenderedItemId={}, isMainHand={}; "
                             + "using the unmapped shader variant: {}",
-                    spec.programName(), selectedEntityId, selectedBlockId, selectedItemId, exception.getMessage());
+                    spec.programName(), selectedEntityId, selectedBlockId, selectedItemId, selectedMainHand,
+                    exception.getMessage());
             return base;
         }
     }
@@ -6298,7 +6315,8 @@ public final class VeyraRenderer {
         }
     }
 
-    private record EntityIdentifierPair(int entityId, int blockEntityId, int currentRenderedItemId) {
+    private record EntityIdentifierPair(int entityId, int blockEntityId, int currentRenderedItemId,
+                                        boolean isMainHand) {
     }
 
     private record EntityPipelineSpec(String programName, String fragmentSource,
@@ -6317,6 +6335,10 @@ public final class VeyraRenderer {
         private boolean usesCurrentRenderedItemId() {
             return EntityShaderAdapter.usesEntityIdentifier(
                     fragmentSource, programName, "currentRenderedItemId");
+        }
+
+        private boolean usesIsMainHand() {
+            return handPass && EntityShaderAdapter.requiresMainHandInput(fragmentSource);
         }
     }
 
