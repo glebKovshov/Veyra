@@ -1,5 +1,11 @@
 # Veyra 0.2 validation status
 
+## Beta.16 release candidate — 2026-10-20
+
+PR [#31](https://github.com/glebKovshov/Veyra/pull/31) added the terrain `absMidCoordPos` varying and merged to `main` at `7084b8e035e416f5e625fc6bfad6a76bd601e197`. On its final source head, [Build #458](https://github.com/glebKovshov/Veyra/actions/runs/39385648498) passed with 227 tests, 0 failures, 0 errors, and 0 skipped; `validateShaders` processed 50 example shaders and compiled 47 directly to Vulkan SPIR-V, including the new midpoint fixture. JAR verification passed using beta.15 metadata; release CI must rebuild the beta.16 artifact.
+
+[Graphics smoke #174](https://github.com/glebKovshov/Veyra/actions/runs/39385648591) passed all 19 Lavapipe fixtures. The midpoint fixture read back 56,892 active magenta pixels and 165,648 pixels from the opposite midpoint region, with 0 disabled magenta pixels and 0 runtime validation errors; process teardown still reported 10,031 diagnostics. [Pinned source audit #135](https://github.com/glebKovshov/Veyra/actions/runs/39385648634), artifact [12247886091](https://github.com/glebKovshov/Veyra/actions/runs/39385648634/artifacts/12247886091), passed 75 cases across 4 pinned packs / 5,178 shader stages: 486 geometry fragments accepted / 231 rejected. Every case has `visualValidation=false`; no third-party pack or physical GPU is validated by these results.
+
 ## Beta.15 experimental prerelease — 2026-10-20
 
 Published [Veyra 0.2.0-beta.15+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.15%2Bmc1.21.11) from annotated tag `v0.2.0-beta.15+mc1.21.11` at commit `b3b6d0e0d46efb62a22e3769509f785e6961481e`. Release workflow [39382531868](https://github.com/glebKovshov/Veyra/actions/runs/39382531868) passed all source, graphics, build, and publication jobs.

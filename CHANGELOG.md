@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.16 - 2026-10-20 (prerelease)
+
+- Bridge Iris terrain `absMidCoordPos` from the existing per-quad midpoint UV without changing the compressed vertex format or stride.
+- Add regression, shaderc, and Lavapipe coverage for the absolute midpoint signal.
+- Refresh the 75-case pinned source audit: 486 geometry fragments accepted / 231 rejected. No third-party shaderpack is visually validated.
+
 ## 0.2.0-beta.15 - 2026-10-20 (prerelease)
 
 - Append Iris `block.properties` IDs and the `mc_Entity` fluid marker to VulkanMod terrain vertices; expose them to terrain shaders as `mat` and `mc_Entity`.

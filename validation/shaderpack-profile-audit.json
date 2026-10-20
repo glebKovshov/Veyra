@@ -9,16 +9,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -32,16 +31,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -55,16 +53,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -78,16 +75,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -101,16 +97,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -124,16 +119,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -147,16 +141,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -170,16 +163,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -193,16 +185,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -216,16 +207,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -239,16 +229,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -262,16 +251,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -285,16 +273,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -308,16 +295,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -331,16 +317,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -354,16 +339,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -384,8 +368,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -406,8 +390,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -428,8 +412,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -450,8 +434,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -472,8 +456,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -487,16 +471,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -510,16 +493,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -533,16 +515,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -556,16 +537,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -579,16 +559,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -602,16 +581,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -625,16 +603,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -648,16 +625,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -671,16 +647,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -694,16 +669,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -717,16 +691,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -740,16 +713,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -763,16 +735,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -786,16 +757,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -809,16 +779,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -832,16 +801,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -862,8 +830,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -884,8 +852,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -906,8 +874,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -928,8 +896,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -950,8 +918,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -965,16 +933,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -988,16 +955,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1011,16 +977,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1034,16 +999,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1057,16 +1021,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1080,16 +1043,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1103,16 +1065,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1126,16 +1087,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1149,16 +1109,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1172,16 +1131,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1195,16 +1153,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1218,16 +1175,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1241,16 +1197,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1264,16 +1219,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1287,16 +1241,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1310,16 +1263,15 @@
     "profiles": 8,
     "stages": 73,
     "preprocessed": 73,
-    "geometryFragmentsAccepted": 6,
-    "geometryFragmentsRejected": 4,
+    "geometryFragmentsAccepted": 7,
+    "geometryFragmentsRejected": 3,
     "geometryVertexStages": 21,
     "computeStages": 1,
-    "errorCount": 4,
+    "errorCount": 3,
     "errors": [
       "gbuffers_block_translucent.fsh adapter: gbuffers_block_translucent uses inputs that Veyra's entity bridge does not provide yet.",
       "gbuffers_entities_translucent.fsh adapter: gbuffers_entities_translucent uses inputs that Veyra's entity bridge does not provide yet.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'midCoord' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1340,8 +1292,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1362,8 +1314,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1384,8 +1336,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1406,8 +1358,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   },
@@ -1428,8 +1380,8 @@
     "errorCount": 3,
     "errors": [
       "gbuffers_clouds.fsh adapter: gbuffers_clouds active sampler 'texture' is not supported; cloud shaders can sample scene color or noisetex.",
-      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet.",
-      "gbuffers_water.fsh adapter: gbuffers_terrain input 'mat' is not provided by Veyra's terrain bridge yet."
+      "gbuffers_terrain.fsh adapter: gbuffers_terrain input 'recolor' is not provided by Veyra's terrain bridge yet.",
+      "gbuffers_water.fsh adapter: gbuffers_terrain input 'dist' is not provided by Veyra's terrain bridge yet."
     ],
     "visualValidation": false
   }
