@@ -1,14 +1,20 @@
 # Shaderpack compatibility: development 0.2
 
-## Terrain interface and pinned source audit (beta.11 candidate)
+## Pinned source audit (current working tree)
 
-The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **126** geometry fragment programs and rejects **591**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
+The pinned audit covers 75 default/profile/dimension cases and all 5,178 preprocessed stages. It accepts **180** geometry fragment programs and rejects **537**; every case has `visualValidation: false`. These source checks do not establish a complete shaderpack pipeline or rendered output.
 
 | Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Remaining default blockers | In-game pack result |
 | --- | --- | --- | --- |
-| Complementary Reimagined / Unbound r5.9.3 | 2/10, 2/10, 2/10 | water: unsupported `viewVector`; entity/block/hand/spidereyes: `entityColor`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
-| BSL 10.1.8 | 2/9, 2/9, 2/9 | water: `mat`; entities: `entityColor`; hand: `isMainHand`; block: unsupported entity inputs; clouds: `texture` sampler | Not tested |
+| Complementary Reimagined / Unbound r5.9.3 | 3/10, 3/10, 3/10 | block/entities/glowing/hand: writes beyond color attachment 0; translucent block/entities: unsupported inputs; water: `viewVector`; selected profiles: `shadowcomp.csh` compute stage | Not tested |
+| BSL 10.1.8 | 2/9, 2/9, 2/9 | water: `mat`; entity/block: unsupported inputs; hand: `isMainHand`; clouds: `texture` sampler | Not tested |
 | Sildur's Vibrant 2.02 Extreme | 0/5, 0/5, 0/5 | `colortex4` in translucent geometry; water samples an attachment; clouds require unsupported inputs | Not tested |
+
+## Entity overlay, lightmap aliases, and adapter diagnostics (working tree)
+
+Iris defines `entityColor` as the current entity overlay and documents its compatibility mapping to the `vaUV1` overlay attribute ([uniform reference](https://github.com/IrisShaders/docs/blob/main/src/content/docs/current/Reference/Uniforms/rendering.mdx#entitycolor), [compatibility mapping](https://github.com/IrisShaders/docs/blob/main/src/content/docs/current/How%20To/compatibility_vs_core.mdx)). Minecraft 1.21.11's standard entity vertex shader samples that overlay into `overlayColor`; Veyra now maps the Iris uniform to this varying. The item-entity pipeline that does not emit an overlay varying and sign/text programs keep the transparent zero fallback.
+
+The entity bridge also normalizes Iris's `lmCoord` spelling to the existing `lmcoord` lightmap input. The fresh source audit no longer reports `entityColor` or `lmCoord` as blockers. It also no longer mistakes Complementary's locally declared `vec3 viewPos` variables for missing fragment inputs; those programs now reach the next real limit, writing beyond color attachment 0. Complementary still reaches `viewVector` in water, and BSL retains unsupported entity inputs. These changes are source-adapter checks only; no third-party pack has been visually validated.
 
 Beta.8 added terrain aliases `lmCoord` and `color`; beta.9 added terrain `viewPos`. Beta.10 extends VulkanMod's 16-byte compressed terrain vertex to 20 bytes, appending two unsigned 16-bit midpoint UV components per quad. The terrain writer computes the average UV from each group of four vertices, while existing position, lightmap, UV0 and color bytes retain their offsets. Iris defines `mc_midTexCoord` as the center UV of the current quad, calculated per quad ([Iris attribute reference](https://shaders.properties/current/reference/attributes/mc_midtexcoord/)). The adapted vertex shader computes `signMidCoordPos = sign(texCoord0 - mc_midTexCoord)`. Terrain aliases `vertexPos` and `playerPos` use the existing camera-relative terrain position; `glColorRaw` uses the raw unpacked terrain color before lightmap multiplication.
 

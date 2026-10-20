@@ -22,6 +22,8 @@ public final class ShaderPackUniformAdapter {
             "entityId", "int", "blockEntityId", "int", "currentRenderedItemId", "int", "entityColor", "vec4");
     private static final Pattern ENTITY_ATTRIBUTE_PROGRAM = Pattern.compile(
             "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*)|.*sign_text.*");
+    private static final Pattern ENTITY_COLOR_PROGRAM = Pattern.compile(
+            "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|textured(?:_lit)?)");
     private static final Pattern CURRENT_RENDERED_ITEM_PROGRAM = Pattern.compile(
             "gbuffers_(?:entities\\w*|block\\w*|hand\\w*|spidereyes|armor_glint|text\\w*|textured(?:_lit)?)|.*sign_text.*|shadow_(?:entities|block)");
 
@@ -29,6 +31,10 @@ public final class ShaderPackUniformAdapter {
     }
 
     public static AdaptedShader extract(String source, String programName) throws IOException {
+        return extract(source, programName, supportsEntityColorProgram(programName));
+    }
+
+    static AdaptedShader extract(String source, String programName, boolean entityColorAvailable) throws IOException {
         Matcher matcher = UNIFORM_DECLARATION.matcher(source);
         StringBuffer withoutUniforms = new StringBuffer();
         StringBuilder declarations = new StringBuilder();
@@ -45,6 +51,16 @@ public final class ShaderPackUniformAdapter {
             if (unbound != null) {
                 matcher.appendReplacement(withoutUniforms, "");
                 macros.append(unbound);
+                continue;
+            }
+            if (name.equals("entityColor")) {
+                if (!type.equals("vec4")) {
+                    throw new IOException(programName + " uniform 'entityColor' must use vec4.");
+                }
+                matcher.appendReplacement(withoutUniforms, "");
+                macros.append(entityColorAvailable
+                        ? "#define entityColor overlayColor\n"
+                        : "const vec4 entityColor = vec4(0.0);\n");
                 continue;
             }
             TerrainShaderAdapter.ShaderUniform uniform = supportedUniforms.get(name);
@@ -99,9 +115,16 @@ public final class ShaderPackUniformAdapter {
         if (!type.equals(UNBOUND_ENTITY_VALUES.get(name))) {
             return false;
         }
-        Pattern boundPrograms = name.equals("currentRenderedItemId")
-                ? CURRENT_RENDERED_ITEM_PROGRAM : ENTITY_ATTRIBUTE_PROGRAM;
+        Pattern boundPrograms = switch (name) {
+            case "currentRenderedItemId" -> CURRENT_RENDERED_ITEM_PROGRAM;
+            case "entityColor" -> ENTITY_COLOR_PROGRAM;
+            default -> ENTITY_ATTRIBUTE_PROGRAM;
+        };
         return !boundPrograms.matcher(programName).matches();
+    }
+
+    static boolean supportsEntityColorProgram(String programName) {
+        return ENTITY_COLOR_PROGRAM.matcher(programName).matches();
     }
 
     /** True when Veyra replaces this identifier with a per-render entity, block, or item constant. */

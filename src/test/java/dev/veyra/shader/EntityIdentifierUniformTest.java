@@ -12,6 +12,11 @@ class EntityIdentifierUniformTest {
             uniform int currentRenderedItemId;
             void main() { gl_FragColor = vec4(float(blockEntityId + entityId + currentRenderedItemId)); }
             """;
+    private static final String ENTITY_COLOR_SOURCE = """
+            #version 120
+            uniform vec4 entityColor;
+            void main() { gl_FragColor = entityColor; }
+            """;
 
     @Test
     void terrainAndCloudsReceiveIrisFallbackValues() throws IOException {
@@ -63,5 +68,32 @@ class EntityIdentifierUniformTest {
         assertEquals("const vec4 entityColor = vec4(0.0);\n",
                 ShaderPackUniformAdapter.unboundEntityDeclaration("gbuffers_terrain", "vec4", "entityColor"));
         assertNull(ShaderPackUniformAdapter.unboundEntityDeclaration("gbuffers_entities", "vec4", "entityColor"));
+    }
+
+    @Test
+    void entityColorUsesMinecraftOverlayForEntityPipelines() throws IOException {
+        String entities = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_entities");
+        assertTrue(entities.contains("#define entityColor overlayColor"), entities);
+        assertTrue(entities.contains("in vec4 overlayColor;"), entities);
+        assertFalse(entities.contains("uniform vec4 entityColor"), entities);
+        assertFalse(entities.contains("const vec4 entityColor"), entities);
+
+        String handFallback = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_textured");
+        assertTrue(handFallback.contains("#define entityColor overlayColor"), handFallback);
+
+        String itemEntity = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_entities",
+                false, false, -1, -1, ItemIdMap.UNMAPPED, false);
+        assertTrue(itemEntity.contains("const vec4 entityColor = vec4(0.0);"), itemEntity);
+        assertFalse(itemEntity.contains("#define entityColor overlayColor"), itemEntity);
+    }
+
+    @Test
+    void entityColorDefaultsToTransparentOnPipelinesWithoutEntityOverlay() throws IOException {
+        String signText = EntityShaderAdapter.adaptTextFragment(ENTITY_COLOR_SOURCE, "gbuffers_textured");
+        assertTrue(signText.contains("const vec4 entityColor = vec4(0.0);"), signText);
+        assertFalse(signText.contains("#define entityColor overlayColor"), signText);
+
+        String text = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_text");
+        assertTrue(text.contains("const vec4 entityColor = vec4(0.0);"), text);
     }
 }

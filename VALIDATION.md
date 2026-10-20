@@ -1,5 +1,13 @@
 # 0.2 development validation status
 
+## Entity overlay and lightmap adapter candidate — 2026-10-20
+
+The working tree now maps Iris `entityColor` to Minecraft's entity `overlayColor`, supplies the transparent fallback when the active pipeline has no overlay varying, and accepts Iris's `lmCoord` spelling. The entity adapter no longer mistakes a local `viewPos` variable for a missing fragment input. The unsupported-uniform checks now keep horizontal whitespace on one line, and unused sampler references are collected in one identifier pass.
+
+JDK 21.0.12.1 `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` passed: **209 tests, 0 failures/errors/skips**; 47 example shader sources were processed and 44 compiled directly to Vulkan SPIR-V. The entity overlay, item-entity fallback, and entity lightmap alias fixtures also compiled to SPIR-V. `scripts/verify_jar.py` passed on the local beta.12 candidate JAR (578,363 bytes; SHA-256 `E2863108087BB5E4D519D053A36BB54864116F8677BE55DCCCFE2F8E6851471C`). This is a local candidate, not yet the published beta.12 asset.
+
+The fresh pinned source audit covers 4 packs, 12 defaults, 63 declared profile/dimension cases, and 5,178 preprocessed stages. It accepts 180 geometry fragments and rejects 537; no record reports an `entityColor` or `lmCoord` error, and every record remains `visualValidation=false`. The `viewPos` false positive is gone, but the newly unblocked Complementary entity/block/hand programs require outputs beyond color attachment 0. Translucent inputs, Complementary water `viewVector`, BSL water `mat`, clouds `texture`, and Sildur's `colortex4`/feedback remain blockers. This does not establish third-party-pack rendering or stable-release readiness.
+
 ## Beta.10 published prerelease — 2026-10-20
 
 On JDK 21.0.12.1, `test validateShaders build packageExamplePacks --rerun-tasks` passed at beta.10: **199 JUnit tests, 0 failures/errors/skips**, 43 example stages processed, 40 compiled directly to Vulkan SPIR-V, plus conditional-include, entity-ID, shadow, cloud and terrain-view-position fixtures. The remapped `veyra-0.2.0-beta.10+mc1.21.11.jar` is 571,279 bytes, SHA-256 `0cc561a569e0e2ce8d20955ec6c271b41a5e616d5adac2b006e660edcde08a8c`, and passes `scripts/verify_jar.py`.

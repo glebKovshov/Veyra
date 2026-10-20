@@ -27,7 +27,7 @@ public final class ColorDistanceShaderAdapter {
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE = Pattern.compile(
             "\\b(?:texture|texture2D|textureLod|texelFetch)\\s*\\(");
-    private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile("(?m)^\\s*uniform\\b");
+    private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Map<String, String> INPUT_TYPES = Map.ofEntries(
             Map.entry("color", "vec4"),
             Map.entry("glcolor", "vec4"),

@@ -18,7 +18,7 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?float\\s+alphaTestRef\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^\\s*uniform\\b");
+    private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern ENTITY_IDENTIFIER_UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
@@ -69,7 +69,11 @@ public final class EntityShaderAdapter {
     private static final Pattern GL_POSITION_ASSIGNMENT = Pattern.compile("\\bgl_Position\\s*=");
     private static final Pattern VIEW_POSITION_REFERENCE = Pattern.compile("\\bviewPos\\b");
     private static final Pattern VIEW_NORMAL_REFERENCE = Pattern.compile("\\bviewNormal\\b");
-    private static final Pattern LIGHTMAP_REFERENCE = Pattern.compile("\\b(?:lmcoord|lightMapCoord)\\b");
+    private static final Pattern VIEW_POSITION_VARIABLE_DECLARATION = Pattern.compile(
+            "\\b(?:bool|int|uint|float|double|[biu]?vec[234]|dvec[234]|[biu]?mat[234](?:x[234])?|dmat[234](?:x[234])?)\\s+viewPos\\b");
+    private static final Pattern VIEW_NORMAL_VARIABLE_DECLARATION = Pattern.compile(
+            "\\b(?:bool|int|uint|float|double|[biu]?vec[234]|dvec[234]|[biu]?mat[234](?:x[234])?|dmat[234](?:x[234])?)\\s+viewNormal\\b");
+    private static final Pattern LIGHTMAP_REFERENCE = Pattern.compile("\\b(?:lmcoord|lightMapCoord|lmCoord)\\b");
     private static final Pattern LIGHTMAP_ASSIGNMENT = Pattern.compile("\\blmcoord\\s*=");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
@@ -83,6 +87,7 @@ public final class EntityShaderAdapter {
             Map.entry("cylindricalVertexDistance", new Varying("float")),
             Map.entry("lmcoord", new Varying("vec2")),
             Map.entry("lightMapCoord", new Varying("vec2")),
+            Map.entry("lmCoord", new Varying("vec2")),
             Map.entry("lightMapColor", new Varying("vec4")),
             Map.entry("overlayColor", new Varying("vec4")),
             Map.entry("normal", new Varying("vec3")),
@@ -99,6 +104,7 @@ public final class EntityShaderAdapter {
             Map.entry("cylindricalVertexDistance", new Varying("float")),
             Map.entry("lmcoord", new Varying("vec2")),
             Map.entry("lightMapCoord", new Varying("vec2")),
+            Map.entry("lmCoord", new Varying("vec2")),
             Map.entry("viewPos", new Varying("vec3")));
 
     private EntityShaderAdapter() {
@@ -136,6 +142,14 @@ public final class EntityShaderAdapter {
                                        int currentRenderedItemId) throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
                 entityId, blockEntityId, currentRenderedItemId);
+    }
+
+    /** Adapts an entity fragment while indicating whether its Minecraft vertex pipeline emits overlayColor. */
+    public static String adaptFragment(String source, String programName, boolean handPass,
+                                       boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                       int currentRenderedItemId, boolean entityColorAvailable) throws IOException {
+        return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -192,7 +206,8 @@ public final class EntityShaderAdapter {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
-            if (matcher.group(3).equals("lmcoord") || matcher.group(3).equals("lightMapCoord")) {
+            if (matcher.group(3).equals("lmcoord") || matcher.group(3).equals("lightMapCoord")
+                    || matcher.group(3).equals("lmCoord")) {
                 return true;
             }
         }
@@ -223,8 +238,8 @@ public final class EntityShaderAdapter {
     }
 
     /**
-     * Minecraft 1.21.11's item-entity vertex shader declares UV1 as a float even though
-     * NEW_ENTITY supplies that overlay attribute as a signed integer pair.
+     * Minecraft 1.21.11's item-entity vertex shader declares UV1 as a float despite NEW_ENTITY supplying
+     * an integer pair.
      */
     static String adaptItemEntityVertexFormat(String source, String programName) throws IOException {
         if (source == null || source.isBlank()) {
@@ -422,6 +437,15 @@ public final class EntityShaderAdapter {
                                         boolean handPass, boolean shadowSamplerAvailable,
                                         int entityId, int blockEntityId,
                                         int currentRenderedItemId) throws IOException {
+        return adaptFragment(source, programName, textPipeline, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId,
+                !textPipeline && ShaderPackUniformAdapter.supportsEntityColorProgram(programName));
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline,
+                                        boolean handPass, boolean shadowSamplerAvailable,
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -481,7 +505,7 @@ public final class EntityShaderAdapter {
         IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
         adapted = fogUniforms.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, programName);
+                ShaderPackUniformAdapter.extract(adapted, programName, entityColorAvailable);
         adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");
@@ -525,7 +549,7 @@ public final class EntityShaderAdapter {
             if (name.equals("cylindricalVertexDistance")) {
                 suppliesCylindricalDistance = true;
             }
-            if (name.equals("lmcoord") || name.equals("lightMapCoord")) {
+            if (name.equals("lmcoord") || name.equals("lightMapCoord") || name.equals("lmCoord")) {
                 suppliesLightmapCoord = true;
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
@@ -566,10 +590,12 @@ public final class EntityShaderAdapter {
         if (!suppliesNormal && !textPipeline && NORMAL_REFERENCE.matcher(uncommented).find()) {
             throw new IOException(programName + " uses 'normal' without declaring it as a fragment input.");
         }
-        if (!suppliesViewPosition && VIEW_POSITION_REFERENCE.matcher(uncommented).find()) {
+        if (!suppliesViewPosition && VIEW_POSITION_REFERENCE.matcher(uncommented).find()
+                && !VIEW_POSITION_VARIABLE_DECLARATION.matcher(uncommented).find()) {
             throw new IOException(programName + " uses 'viewPos' without declaring it as a fragment input.");
         }
-        if (!suppliesViewNormal && VIEW_NORMAL_REFERENCE.matcher(uncommented).find()) {
+        if (!suppliesViewNormal && VIEW_NORMAL_REFERENCE.matcher(uncommented).find()
+                && !VIEW_NORMAL_VARIABLE_DECLARATION.matcher(uncommented).find()) {
             throw new IOException(programName + " uses 'viewNormal' without declaring it as a fragment input.");
         }
         if (!suppliesLightmapCoord && LIGHTMAP_REFERENCE.matcher(uncommented).find()) {
@@ -613,6 +639,7 @@ public final class EntityShaderAdapter {
                 .replaceAll("\\btexcoord\\b", "texCoord0")
                 .replaceAll("\\btexCoord\\b", "texCoord0")
                 .replaceAll("\\blightMapCoord\\b", "lmcoord")
+                .replaceAll("\\blmCoord\\b", "lmcoord")
                 .replaceAll("\\bglcolor\\b|\\bglColor\\b|\\bgl_Color\\b", "veyraEntityColor");
 
         String bridge = textPipeline ? """
