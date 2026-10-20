@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — next batched experimental prerelease
+
+- Fix the beta.25 cloud-renderer Mixin target remapping failure. The fix is already in merged main code; the published beta.25 release asset remains unchanged until the next batch release.
+- Add supported custom vertex execution for basic/line and beacon beam programs, then block-entity/entity/first-person hand programs. These stages run after Minecraft's native setup and link checked pack varyings; missing native attributes fail with an explicit diagnostic.
+- Add separate entity, block-entity, and hand GPU fixtures. On NVIDIA RTX 3070 they read back 18,532/0, 2,428/0, and 47,282/0 active/disabled magenta pixels respectively; all three logs have no Vulkan validation errors.
+- The current pinned source audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: 709 geometry fragments accepted / 8 rejected. Every case has `visualValidation=false`; no full third-party pack visual result is claimed.
+- Remaining pack blockers include Complementary `gbuffers_damagedblock.vsh` and selected compute stages, BSL `mc_Entity` in `gbuffers_block.vsh`, and Sildur `shadowData` plus `gbuffers_skybasic.vsh`.
+
 ## 0.2.0-beta.25 - 2026-10-20 (experimental prerelease)
 
 - Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link checked color, UV, and fog-distance outputs to the adapted fragment stage. Bridge legacy position/UV inputs, texture matrices, Iris fog fields, and `noisetex`; map `gl_Color` to white where Minecraft's `POSITION_TEX` vertex format has no color input.

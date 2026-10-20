@@ -77,9 +77,11 @@ public final class ShaderPackAudit {
                             }
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
                                     || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
+                                        entityVertexOutputs(pack, program);
                                 EntityShaderAdapter.adaptGeometryFragment(source, program,
                                         program.startsWith("gbuffers_hand"), pack.hasShadowFragment(),
-                                        -1, -1, ItemIdMap.UNMAPPED, true, false);
+                                        -1, -1, ItemIdMap.UNMAPPED, true, false, vertexVaryings);
                             }
                             else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.
@@ -124,5 +126,18 @@ public final class ShaderPackAudit {
                 TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
         var unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, descriptions);
         return TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), unusedLocations);
+    }
+
+    private static Map<String, TerrainVertexShaderAdapter.PackVarying> entityVertexOutputs(
+            ShaderPack pack, String program) throws IOException {
+        var vertex = pack.readStage(program + ".vsh");
+        if (vertex.isEmpty()) return Map.of();
+        try {
+            return EntityVertexShaderAdapter.describeVaryings(program, vertex.get());
+        } catch (IOException unsupportedVertex) {
+            // Keep fragment-adapter statistics independent when the pack-level preflight has
+            // already reported that this custom vertex stage cannot execute.
+            return Map.of();
+        }
     }
 }

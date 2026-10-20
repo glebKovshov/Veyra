@@ -145,7 +145,8 @@ class ShaderPackOptionsTest {
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
 
         Path unsupported = Files.createDirectories(root.resolve("unsupported-geometry/shaders"));
-        Files.writeString(unsupported.resolve("gbuffers_entities.vsh"), "void main(){gl_Position=vec4(0.0);}\n");
+        Files.writeString(unsupported.resolve("gbuffers_entities.vsh"),
+                "#version 120\nattribute vec4 at_tangent;\nvoid main(){gl_Position=vec4(at_tangent);}\n");
         Files.writeString(unsupported.resolve("gbuffers_entities.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
         IOException error = assertThrows(IOException.class,
                 () -> ShaderPack.inspect(unsupported.getParent()).validatePipelineCapabilities());

@@ -1,5 +1,19 @@
 # Shaderpack compatibility: Veyra 0.2.0-beta.25 experimental prerelease
 
+## Unreleased block/entity/hand vertex development batch
+
+The unpublished development batch executes supported custom `gbuffers_block`, `gbuffers_entities`, and `gbuffers_hand` vertex stages after Minecraft's native `NEW_ENTITY` setup. It bridges position, color, UV0/UV1/UV2, normal, and the legacy matrix aliases that map to native values. Pack varyings use locations 16–31 and link to fragment inputs only when type, interpolation, and any explicit location match. Hand depth scaling is applied after the pack entry point. Unprovided attributes such as `mc_Entity`, `mc_midTexCoord`, `at_tangent`, and `at_midBlock` are rejected with a named capability error. The implementation also supports `noisetex` in custom entity vertex stages.
+
+On an NVIDIA GeForce RTX 3070, the synthetic Minecraft 1.21.11 / Fabric Loader 0.18.4 / VulkanMod 0.6.8 fixtures passed separately: **entity 18,532 / 0, block entity 2,428 / 0, first-person hand 47,282 / 0** active/disabled magenta pixels. No Vulkan validation errors were found in the three fixture logs. These are adapter-path checks; they do not certify third-party pack visuals.
+
+The refreshed pinned source audit covers 4 archives / 75 profile-dimension cases / 5,178 stages: **709 geometry fragments accepted / 8 rejected**. Every row has `visualValidation=false`. Remaining first whole-pack capability blockers are `gbuffers_damagedblock.vsh` for Complementary Reimagined and Unbound (54 cases), BSL `gbuffers_block.vsh` reading unavailable `mc_Entity` (18 cases), Sildur block-translucent `shadowData` (2 cases), and Sildur `gbuffers_skybasic.vsh` (1 case). The 8 fragment rejections are four Sildur programs requiring `shadowData` in two dimension cases. No complete third-party pack has been visually validated, and the stable goal remains incomplete. The published beta.25 release JAR does not contain this batch.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Whole-pack source blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | `gbuffers_damagedblock.vsh`; selected profiles also declare unsupported `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | `gbuffers_block.vsh` requires `mc_Entity`, which is absent from `NEW_ENTITY` | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 5/5, 1/5, 1/5 | Block-translucent `shadowData` in Nether/End; unsupported `gbuffers_skybasic.vsh` in Overworld | Not tested |
+
 ## Beta.25 armor-glint vertex compatibility
 
 Beta.25 executes a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and links checked color, UV, and fog-distance outputs to the adapted fragment stage. The bridge exposes legacy position/UV aliases, the texture matrix, Iris fog uniforms, and `noisetex`. Minecraft 1.21.11's native glint vertex format provides `Position` and `UV0` but no color input, so legacy `gl_Color` maps to white. The fragment bridge maps `texture`, `gtexture`, and Iris `tex` to Minecraft's `Sampler0`. Shared preprocessing removes unreachable helpers and unused uniforms/samplers while active unsupported reads remain explicit errors.

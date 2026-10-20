@@ -21,7 +21,8 @@ class ShaderAdapterTest {
         try (Stream<Path> files = Files.walk(Path.of("examples"))) {
             return files.filter(Files::isRegularFile).filter(path -> {
                 String name = path.getFileName().toString();
-                return name.matches("gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|clouds)\\.fsh");
+                return name.matches("gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|"
+                        + "block(?:_translucent)?|hand(?:_water)?|spidereyes|clouds)\\.fsh");
             }).sorted().map(path -> DynamicTest.dynamicTest(path.toString(), () -> {
                 String name = path.getFileName().toString();
                 String source = ShaderIncludes.expand(name, Files.readString(path), included -> {
@@ -37,19 +38,26 @@ class ShaderAdapterTest {
                 String programName = name.substring(0, name.length() - 4);
                 Path vertexPath = path.getParent().resolve(programName + ".vsh");
                 var packVaryings = Files.exists(vertexPath)
-                        ? TerrainVertexShaderAdapter.validateAndGetVaryings(programName,
-                                ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
-                                    Path file = vertexPath.getParent().resolve(included);
-                                    return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
-                                }))
+                        ? EntityVertexShaderAdapter.supportsProgram(programName)
+                                ? EntityVertexShaderAdapter.describeVaryings(programName,
+                                        ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
+                                            Path file = vertexPath.getParent().resolve(included);
+                                            return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
+                                        }))
+                                : TerrainVertexShaderAdapter.validateAndGetVaryings(programName,
+                                        ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
+                                            Path file = vertexPath.getParent().resolve(included);
+                                            return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
+                                        }))
                         : java.util.Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);
-                } else if (name.startsWith("gbuffers_entities")) {
+                } else if (EntityVertexShaderAdapter.supportsProgram(programName)) {
                     adapted = EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
-                            false, Files.exists(path.getParent().resolve("shadow.fsh")), -1, -1,
+                            programName.startsWith("gbuffers_hand"),
+                            Files.exists(path.getParent().resolve("shadow.fsh")), -1, -1,
                             ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
-                                    name.substring(0, name.length()-4)), false);
+                                    name.substring(0, name.length()-4)), false, packVaryings);
                 } else {
                     adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
                             packVaryings);

@@ -16,7 +16,8 @@ public class ShaderCompileSmoke {
         try {
             try (var files = Files.walk(Path.of("examples"))) {
                 for (Path path : files.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().matches(
-                        "gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|hand|clouds)\\.fsh")).sorted().toList()) {
+                        "gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|block(?:_translucent)?|"
+                                + "hand(?:_water)?|spidereyes|clouds)\\.fsh")).sorted().toList()) {
                     String name = path.getFileName().toString();
                     String source = ShaderIncludes.expand(name, Files.readString(path), included -> {
                         Path file = path.getParent().resolve(included);
@@ -25,22 +26,38 @@ public class ShaderCompileSmoke {
                     source = GlslPreprocessor.process(name, source);
                     String programName = name.substring(0, name.length() - 4);
                     Path vertexPath = path.getParent().resolve(programName + ".vsh");
-                    var packVaryings = Files.exists(vertexPath)
-                            ? TerrainVertexShaderAdapter.validateAndGetVaryings(programName,
-                                    ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
-                                        Path file = vertexPath.getParent().resolve(included);
-                                        return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
-                                    }))
-                            : Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                     Path properties = path.getParent().resolve("shaders.properties");
                     CustomUniforms.activate(Files.exists(properties)
                             ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
+                    Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings = Map.of();
+                    if (Files.exists(vertexPath)) {
+                        String packVertex = ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
+                            Path file = vertexPath.getParent().resolve(included);
+                            return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
+                        });
+                        if (EntityVertexShaderAdapter.supportsProgram(programName)) {
+                            boolean hand = programName.startsWith("gbuffers_hand");
+                            String nativeVertex = EntityShaderAdapter.adaptVertexShader(entityNativeVertexSource(),
+                                    false, programName,
+                                    EntityShaderAdapter.requiresNormalInput(source),
+                                    EntityShaderAdapter.requiresLightmapInput(source),
+                                    EntityShaderAdapter.requiresViewPositionInput(source),
+                                    EntityShaderAdapter.requiresViewNormalInput(source), false);
+                            EntityVertexShaderAdapter.AdaptedStage adaptedVertex = EntityVertexShaderAdapter.adaptStage(
+                                    nativeVertex, packVertex, programName, hand);
+                            compileVertex(compiler, options, adaptedVertex.source(),
+                                    path.getParent().getFileName() + "/" + programName + ".vsh", true);
+                            packVaryings = adaptedVertex.varyings();
+                        } else {
+                            packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, packVertex);
+                        }
+                    }
                     String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
-                            : name.startsWith("gbuffers_entities") || name.equals("gbuffers_hand.fsh")
+                            : EntityVertexShaderAdapter.supportsProgram(programName)
                             ? EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
-                            name.equals("gbuffers_hand.fsh"), Files.exists(path.getParent().resolve("shadow.fsh")),
+                            programName.startsWith("gbuffers_hand"), Files.exists(path.getParent().resolve("shadow.fsh")),
                             -1, -1, ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
-                                    name.substring(0, name.length()-4)), false)
+                                    name.substring(0, name.length()-4)), false, packVaryings)
                             : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
                                     packVaryings);
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
@@ -388,6 +405,17 @@ public class ShaderCompileSmoke {
                     """, "gbuffers_entities", false, false, -1, -1,
                     ItemIdMap.UNMAPPED, true, false);
             compile(compiler, options, entityColorFeedback, "entity-colortex-feedback-snapshot", true);
+            EntityVertexShaderAdapter.AdaptedStage entityNoiseVertex = EntityVertexShaderAdapter.adaptStage(
+                    entityNativeVertexSource(), """
+                            #version 120
+                            uniform sampler2D noisetex;
+                            varying vec3 LightC;
+                            void main() {
+                                gl_Position = ftransform() + texture2D(noisetex, vec2(0.5));
+                                LightC = vec3(1.0, 0.0, 1.0);
+                            }
+                            """, "gbuffers_entities", false);
+            compileVertex(compiler, options, entityNoiseVertex.source(), "entity-noisetex-vertex", true);
             Path mainHandFixture = Path.of("examples/current-rendered-item-id/shaders/gbuffers_hand.fsh");
             String mainHandPackSource = GlslPreprocessor.process(
                     mainHandFixture.getFileName().toString(), Files.readString(mainHandFixture));
@@ -655,7 +683,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
@@ -678,6 +706,34 @@ public class ShaderCompileSmoke {
             if (success != expected) throw new AssertionError(name + ": " + shaderc_result_get_error_message(result));
             System.out.println("PASS " + name);
         } finally { shaderc_result_release(result); }
+    }
+
+    private static String entityNativeVertexSource() {
+        return """
+                #version 460
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 2) in vec2 UV0;
+                layout(location = 3) in ivec2 UV1;
+                layout(location = 4) in ivec2 UV2;
+                layout(location = 5) in vec3 Normal;
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out vec2 texCoord0;
+                layout(location = 2) out vec4 lightMapColor;
+                layout(location = 3) out vec4 overlayColor;
+                layout(set = 0, binding = 0, std140) uniform DynamicTransforms {
+                    mat4 ModelViewMat;
+                    mat4 ProjMat;
+                    mat4 TextureMat;
+                };
+                void main() {
+                    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                    vertexColor = Color;
+                    texCoord0 = (TextureMat * vec4(UV0, 0.0, 1.0)).xy;
+                    lightMapColor = vec4(vec2(UV2), 0.0, 1.0);
+                    overlayColor = vec4(vec2(UV1), 0.0, 1.0);
+                }
+                """;
     }
 
     private static String appendCloudUniformFields(String source,

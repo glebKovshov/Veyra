@@ -2018,8 +2018,10 @@ public final class VeyraRenderer {
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId)
                     : EntityShaderAdapter.adaptGeometryFragment(spec.fragmentSource(), spec.programName(), spec.handPass(),
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
-                            !isItemEntityTranslucentCullPipeline(original), selectedMainHand);
-            String sourceHash = sha256(spec.programName() + '\n' + fragmentSource);
+                            !isItemEntityTranslucentCullPipeline(original), selectedMainHand,
+                            spec.vertexVaryings());
+            String sourceHash = sha256(spec.programName() + '\n' + fragmentSource + '\n'
+                    + (spec.vertexSource() == null ? "" : spec.vertexSource()));
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, spec.programName(), sourceHash,
                     spec.outputLayout(), spec.blendSettings(), spec.shadowPass());
             RenderPipeline pipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -2031,7 +2033,8 @@ public final class VeyraRenderer {
                         : compileEntityPipeline(original, fragmentSource, sourceHash,
                                 spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
                                 spec.requiresViewNormal(), false, spec.handPass(), spec.programName(),
-                                spec.outputLayout(), spec.blendSettings(), spec.colorInputs());
+                                spec.outputLayout(), spec.blendSettings(), spec.colorInputs(),
+                                spec.vertexSource(), spec.vertexVaryings());
                 ENTITY_PIPELINE_CACHE.put(cacheKey, pipeline);
             }
             set.variants().computeIfAbsent(original, ignored -> new HashMap<>()).put(identifiers, pipeline);
@@ -3858,14 +3861,22 @@ public final class VeyraRenderer {
             Set<Integer> colorInputs = Set.of();
             FragmentOutputs outputLayout = null;
             GeometryBlendSettings blendSettings = null;
+            String packVertexSource = null;
+            Map<String, TerrainVertexShaderAdapter.PackVarying> packVertexVaryings = Map.of();
             try {
                 rawFragmentSource = (hand ? pack.readHandFragment(programName) : pack.readEntityFragment(programName))
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                Optional<String> customVertex = pack.readStage(programName + ".vsh");
+                if (customVertex.isPresent()) {
+                    packVertexSource = customVertex.get();
+                    packVertexVaryings = EntityVertexShaderAdapter.describeVaryings(programName, packVertexSource);
+                }
                 outputLayout = FragmentOutputs.parse(rawFragmentSource);
                 blendSettings = pack.readGeometryBlendSettings(programName);
                 colorInputs = GeometryColorSamplers.indices(GeometryColorSamplers.read(rawFragmentSource));
                 fragmentSource = rawFragmentSource;
-                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)
+                        || packVertexSource != null && TerrainShaderAdapter.usesNoiseSampler(packVertexSource)) {
                     VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 }
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
@@ -3874,7 +3885,8 @@ public final class VeyraRenderer {
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptGeometryFragment(
                         fragmentSource, programName, hand, pack.hasShadowFragment(), -1, -1,
-                        ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original), false);
+                        ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original), false,
+                        packVertexVaryings);
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -3883,7 +3895,8 @@ public final class VeyraRenderer {
                         programName, original.getLocation(), exception.getMessage());
                 continue;
             }
-            String sourceHash = sha256(programName + '\n' + fragmentSource);
+            String sourceHash = sha256(programName + '\n' + fragmentSource + '\n'
+                    + (packVertexSource == null ? "" : packVertexSource));
             EntityPipelineKey cacheKey = new EntityPipelineKey(
                     original, programName, sourceHash, outputLayout, blendSettings, false);
             RenderPipeline entityPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -3892,7 +3905,7 @@ public final class VeyraRenderer {
                     entityPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, requiresNormal, requiresLightmap,
                             requiresViewPosition, requiresViewNormal, false, hand, programName,
-                            outputLayout, blendSettings, colorInputs);
+                            outputLayout, blendSettings, colorInputs, packVertexSource, packVertexVaryings);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -3906,7 +3919,8 @@ public final class VeyraRenderer {
             pipelines.put(original, entityPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
-                    false, hand, false, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs));
+                    false, hand, false, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs,
+                    packVertexSource, packVertexVaryings));
         }
         if (pipelines.isEmpty() && (hand
                 ? pack.hasHandFragment() || pack.hasHandWaterFragment()
@@ -3951,7 +3965,7 @@ public final class VeyraRenderer {
             pipelines.put(original, shadowPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
-                    true, false, false, false, outputLayout, null, Set.of()));
+                    true, false, false, false, outputLayout, null, Set.of(), null, Map.of()));
         }
         if (pipelines.isEmpty()) {
             throw new IOException("Minecraft's entity render pipelines were not found for the shadow pass.");
@@ -4021,14 +4035,22 @@ public final class VeyraRenderer {
             Set<Integer> colorInputs = Set.of();
             FragmentOutputs outputLayout = null;
             GeometryBlendSettings blendSettings = null;
+            String packVertexSource = null;
+            Map<String, TerrainVertexShaderAdapter.PackVarying> packVertexVaryings = Map.of();
             try {
                 rawFragmentSource = pack.readBlockFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                Optional<String> customVertex = pack.readStage(programName + ".vsh");
+                if (customVertex.isPresent()) {
+                    packVertexSource = customVertex.get();
+                    packVertexVaryings = EntityVertexShaderAdapter.describeVaryings(programName, packVertexSource);
+                }
                 outputLayout = FragmentOutputs.parse(rawFragmentSource);
                 blendSettings = pack.readGeometryBlendSettings(programName);
                 colorInputs = GeometryColorSamplers.indices(GeometryColorSamplers.read(rawFragmentSource));
                 fragmentSource = rawFragmentSource;
-                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+                if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)
+                        || packVertexSource != null && TerrainShaderAdapter.usesNoiseSampler(packVertexSource)) {
                     VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 }
                 requiresNormal = EntityShaderAdapter.requiresNormalInput(fragmentSource);
@@ -4037,7 +4059,8 @@ public final class VeyraRenderer {
                 requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(fragmentSource);
                 fragmentSource = EntityShaderAdapter.adaptGeometryFragment(
                         fragmentSource, programName, false, pack.hasShadowFragment(), -1, -1,
-                        ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original), false);
+                        ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original), false,
+                        packVertexVaryings);
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -4046,7 +4069,8 @@ public final class VeyraRenderer {
                         programName, original.getLocation(), exception.getMessage());
                 continue;
             }
-            String sourceHash = sha256(programName + '\n' + fragmentSource);
+            String sourceHash = sha256(programName + '\n' + fragmentSource + '\n'
+                    + (packVertexSource == null ? "" : packVertexSource));
             EntityPipelineKey cacheKey = new EntityPipelineKey(
                     original, programName, sourceHash, outputLayout, blendSettings, false);
             RenderPipeline blockPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -4055,7 +4079,7 @@ public final class VeyraRenderer {
                     blockPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, requiresNormal, requiresLightmap,
                             requiresViewPosition, requiresViewNormal, false, false, programName,
-                            outputLayout, blendSettings, colorInputs);
+                            outputLayout, blendSettings, colorInputs, packVertexSource, packVertexVaryings);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -4069,7 +4093,8 @@ public final class VeyraRenderer {
             pipelines.put(original, blockPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
-                    false, false, false, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs));
+                    false, false, false, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs,
+                    packVertexSource, packVertexVaryings));
         }
         compileSignTextPipelines(pack, pipelines, variantSources);
         if (pipelines.isEmpty() && !pack.blockPrograms().isEmpty()) {
@@ -4133,7 +4158,7 @@ public final class VeyraRenderer {
             pipelines.put(original, textPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     false, requiresLightmap, requiresViewPosition, false,
-                    false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, Set.of()));
+                    false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, Set.of(), null, Map.of()));
         }
     }
 
@@ -4251,13 +4276,39 @@ public final class VeyraRenderer {
             boolean shadowPass, boolean handPass, String programName,
             FragmentOutputs outputLayout, GeometryBlendSettings blendSettings,
             Set<Integer> colorInputs) throws IOException {
+        return compileEntityPipeline(original, fragmentSource, sourceHash,
+                requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
+                shadowPass, handPass, programName, outputLayout, blendSettings, colorInputs,
+                null, Map.of());
+    }
+
+    private static RenderPipeline compileEntityPipeline(
+            RenderPipeline original, String fragmentSource, String sourceHash,
+            boolean requiresNormal, boolean requiresLightmap,
+            boolean requiresViewPosition, boolean requiresViewNormal,
+            boolean shadowPass, boolean handPass, String programName,
+            FragmentOutputs outputLayout, GeometryBlendSettings blendSettings,
+            Set<Integer> colorInputs,
+            String shaderPackVertexSource,
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/entities/" + sourceHash);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
         boolean itemEntityPipeline = isItemEntityTranslucentCullPipeline(original);
-        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
+        if (shaderPackVertexSource != null) {
+            String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
+            if (itemEntityPipeline) {
+                vertexSource = EntityShaderAdapter.adaptItemEntityVertexFormat(vertexSource, programName);
+            }
+            String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
+                    vertexSource, shadowPass, programName,
+                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, false);
+            adaptedVertex = EntityVertexShaderAdapter.adaptStage(
+                    minecraftVertex, shaderPackVertexSource, programName, handPass).source();
+            vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
+        } else if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
                 || itemEntityPipeline) {
             String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
             if (itemEntityPipeline) {
@@ -4270,7 +4321,9 @@ public final class VeyraRenderer {
         }
         Identifier selectedVertexShader = vertexShader;
         String selectedVertexSource = adaptedVertex;
-        boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;");
+        boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;")
+                || selectedVertexSource != null
+                && selectedVertexSource.contains("uniform sampler2D VeyraNoiseSampler;");
         boolean usesShadowSampler = fragmentSource.contains("uniform sampler2D Sampler3;");
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
@@ -6792,7 +6845,9 @@ public final class VeyraRenderer {
                                       boolean requiresViewPosition, boolean requiresViewNormal,
                                       boolean shadowPass, boolean handPass, boolean textPipeline,
                                       boolean shadowSamplerAvailable, FragmentOutputs outputLayout,
-                                      GeometryBlendSettings blendSettings, Set<Integer> colorInputs) {
+                                      GeometryBlendSettings blendSettings, Set<Integer> colorInputs,
+                                      String vertexSource,
+                                      Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings) {
         private boolean usesEntityId() {
             return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId");
         }
