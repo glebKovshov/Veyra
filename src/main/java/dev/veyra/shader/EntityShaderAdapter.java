@@ -775,7 +775,7 @@ public final class EntityShaderAdapter {
                 #endif
                 #define alphaTestRef ALPHA_CUTOUT
                 """;
-        bridge = bridge.replace("__VEYRA_ENTITY_OUTPUTS__", outputLayout.declarations());
+        bridge = bridge.replace("__VEYRA_ENTITY_OUTPUTS__", "");
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
                 .replace("__VEYRA_COLOR_ALIAS__", suppliesLegacyColor ? "#define color veyraEntityColor\n" : "")
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
@@ -825,6 +825,7 @@ public final class EntityShaderAdapter {
         result.append(bridge);
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
+        result.append(outputLayout.declarations());
         return result.append(adapted).toString();
     }
 

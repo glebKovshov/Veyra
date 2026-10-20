@@ -11,6 +11,7 @@ class EntityFragmentOutputsTest {
         String source = """
                 #version 120
                 /* RENDERTARGETS:0,12 */
+                uniform float fogStart;
                 layout(location = 0) out vec4 sceneColor;
                 layout(location = 1) out vec4 materialColor;
                 void main() {
@@ -27,6 +28,8 @@ class EntityFragmentOutputsTest {
         assertTrue(adapted.contains("materialColor = vec4(0.8, 0.1, 0.7, 1.0);"), adapted);
         assertEquals(1, occurrences(adapted, "out vec4 sceneColor;"));
         assertEquals(1, occurrences(adapted, "out vec4 materialColor;"));
+        assertTrue(adapted.indexOf("layout(std140) uniform Fog")
+                < adapted.indexOf("layout(location = 0) out vec4 sceneColor;"), adapted);
     }
 
     @Test
