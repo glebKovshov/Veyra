@@ -105,6 +105,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -306,6 +307,7 @@ public final class VeyraRenderer {
     private static GlintPipelineSet glintPipelineSet;
     private static SkyPipelineSet skyBasicPipelineSet;
     private static SkyPipelineSet skyTexturedPipelineSet;
+    private static final ThreadLocal<Integer> SKY_RENDER_STAGE = new ThreadLocal<>();
     private static WorldBorderPipelineSet worldBorderPipelineSet;
     private static DamagedBlockPipelineSet damagedBlockPipelineSet;
     private static BeaconBeamPipelineSet beaconBeamPipelineSet;
@@ -2349,8 +2351,14 @@ public final class VeyraRenderer {
                 return null;
             }
         }
-        return skyTexturedPipelineSet == null ? null : skyTexturedPipelineSet.pipelines().get(original);
+        return skyTexturedPipelineSet == null ? null
+                : skyTexturedPipelineSet.pipeline(original, SKY_RENDER_STAGE.get());
     }
+
+    public static void beginSkySunStage() { SKY_RENDER_STAGE.set(IrisRenderStages.sunStage()); }
+    public static void beginSkyMoonStage() { SKY_RENDER_STAGE.set(IrisRenderStages.moonStage()); }
+    public static void beginSkyVoidStage() { SKY_RENDER_STAGE.set(IrisRenderStages.voidStage()); }
+    public static void endSkyRenderStage() { SKY_RENDER_STAGE.remove(); }
 
     public static RenderPipeline getWorldBorderPipeline(RenderPipeline original) {
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
@@ -4661,16 +4669,49 @@ public final class VeyraRenderer {
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isLightningPipeline)
                 .toList();
-        String fragmentSource = pack.readLightningFragment()
+        String packFragment = pack.readLightningFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_lightning.fsh."));
-        fragmentSource = ColorDistanceShaderAdapter.adaptFragment(fragmentSource, "gbuffers_lightning", false);
-        String sourceHash = sha256("gbuffers_lightning\n" + fragmentSource);
+        String programName = "gbuffers_lightning";
+        FragmentOutputs outputLayout = FragmentOutputs.parse(
+                GlslPreprocessor.process(programName + ".fsh", packFragment));
+        GeometryBlendSettings blendSettings = pack.readGeometryBlendSettings(programName);
+        Optional<String> packVertex = pack.readStage(programName + ".vsh");
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
+            String vertexSource = null;
+            String fragmentSource;
+            boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
+            if (packVertex.isPresent()) {
+                String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                        minecraftVertex, packVertex.get(), programName, BasicVertexShaderAdapter.Format.LIGHTNING);
+                vertexSource = adaptedVertex.source();
+                samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
+                        packFragment, programName, pack.hasShadowFragment(),
+                        original.getSamplers().contains("Sampler2"));
+                usesNoiseSampler = adaptedVertex.usesNoiseSampler() || samplerInputs.usesNoiseSampler();
+                if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                        packFragment, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
+                        original.getSamplers().contains("Sampler2"));
+                validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
+            } else {
+                fragmentSource = ColorDistanceShaderAdapter.adaptFragment(packFragment, programName, false);
+            }
+            String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
+                    + '\n' + fragmentSource + '\n' + (vertexSource == null ? "" : outputLayout)
+                    + '\n' + (vertexSource == null ? "" : blendSettings) + '\n' + samplerInputs);
             LightningPipelineKey cacheKey = new LightningPipelineKey(original, sourceHash);
             RenderPipeline lightningPipeline = LIGHTNING_PIPELINE_CACHE.get(cacheKey);
             if (lightningPipeline == null) {
-                lightningPipeline = compileLightningPipeline(original, fragmentSource, sourceHash);
+                lightningPipeline = vertexSource == null
+                        ? compileLightningPipeline(original, fragmentSource, sourceHash)
+                        : compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                                vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 LIGHTNING_PIPELINE_CACHE.put(cacheKey, lightningPipeline);
             }
             pipelines.put(original, lightningPipeline);
@@ -5093,14 +5134,41 @@ public final class VeyraRenderer {
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_skytextured.fsh or its gbuffers_textured fallback."));
         String programName = pack.hasSkyTexturedFragment() ? "gbuffers_skytextured" : "gbuffers_textured";
         boolean isFallback = !pack.hasSkyTexturedFragment();
+        boolean stageSpecialized = IrisRenderStages.hasRenderStageUniform(source);
+        Optional<String> packVertex = pack.readStage("gbuffers_skytextured.vsh");
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
+        Map<RenderPipeline, Map<Integer, RenderPipeline>> stagePipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
             boolean hasColor = original.getVertexShader()
                     .equals(Identifier.withDefaultNamespace("core/position_tex_color"));
-            String fragmentSource;
+            String vertexSource = null;
+            boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
+            FragmentOutputs outputLayout = null;
+            GeometryBlendSettings blendSettings = null;
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs = null;
             try {
-                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
-                        source, programName, hasColor, false);
+                if (packVertex.isPresent()) {
+                    String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    BasicVertexShaderAdapter.Format format = hasColor
+                            ? BasicVertexShaderAdapter.Format.SKY_TEXTURED_COLOR
+                            : BasicVertexShaderAdapter.Format.SKY_TEXTURED;
+                    BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                            minecraftVertex, packVertex.get(), "gbuffers_skytextured", format);
+                    vertexSource = adaptedVertex.source();
+                    vertexOutputs = adaptedVertex.varyings();
+                    samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
+                            source, programName, pack.hasShadowFragment(),
+                            original.getSamplers().contains("Sampler2"));
+                    usesNoiseSampler = adaptedVertex.usesNoiseSampler() || samplerInputs.usesNoiseSampler();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                    outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
+                    blendSettings = pack.readGeometryBlendSettings(programName);
+                    validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
+                }
             } catch (IOException exception) {
                 if (!isFallback) {
                     throw exception;
@@ -5109,20 +5177,56 @@ public final class VeyraRenderer {
                         original.getLocation().getPath(), exception.getMessage());
                 continue;
             }
-            String sourceHash = sha256(programName + '\n' + fragmentSource);
-            SkyPipelineKey cacheKey = new SkyPipelineKey(original, sourceHash);
-            RenderPipeline replacement = SKY_TEXTURED_PIPELINE_CACHE.get(cacheKey);
-            if (replacement == null) {
-                replacement = compileColorDistancePipeline(
-                        original, programName, fragmentSource, sourceHash);
-                SKY_TEXTURED_PIPELINE_CACHE.put(cacheKey, replacement);
+
+            List<Integer> renderStages = stageSpecialized
+                    ? IrisRenderStages.skyTexturedStages(original.getLocation().getPath())
+                    : java.util.Collections.singletonList(null);
+            Map<Integer, RenderPipeline> variants = new LinkedHashMap<>();
+            RenderPipeline defaultPipeline = null;
+            for (Integer renderStage : renderStages) {
+                String fragmentSource;
+                try {
+                    if (vertexOutputs != null) {
+                        fragmentSource = renderStage == null
+                                ? TextureColorDistanceShaderAdapter.adaptFragment(source, programName, vertexOutputs,
+                                        pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"))
+                                : TextureColorDistanceShaderAdapter.adaptFragment(source, programName, vertexOutputs,
+                                        pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"), renderStage);
+                    } else if (renderStage == null) {
+                        fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                                source, programName, hasColor, false);
+                    } else {
+                        fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                                source, programName, hasColor, false, renderStage);
+                    }
+                } catch (IOException exception) {
+                    if (!isFallback) throw exception;
+                    VeyraClient.LOGGER.debug("Skipping {} because the gbuffers_textured fallback requires inputs the sky pipeline does not provide: {}",
+                            original.getLocation().getPath(), exception.getMessage());
+                    variants.clear();
+                    defaultPipeline = null;
+                    break;
+                }
+                String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
+                        + '\n' + fragmentSource + '\n' + renderStage + '\n'
+                        + outputLayout + '\n' + blendSettings + '\n' + samplerInputs);
+                SkyPipelineKey cacheKey = new SkyPipelineKey(original, sourceHash);
+                RenderPipeline replacement = SKY_TEXTURED_PIPELINE_CACHE.get(cacheKey);
+                if (replacement == null) {
+                    replacement = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                            vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
+                    SKY_TEXTURED_PIPELINE_CACHE.put(cacheKey, replacement);
+                }
+                if (defaultPipeline == null) defaultPipeline = replacement;
+                if (renderStage != null) variants.put(renderStage, replacement);
             }
-            pipelines.put(original, replacement);
+            if (defaultPipeline != null) pipelines.put(original, defaultPipeline);
+            if (stageSpecialized && !variants.isEmpty()) stagePipelines.put(original, Map.copyOf(variants));
         }
         if (pipelines.isEmpty() && !isFallback) {
             throw new IOException("VulkanMod's Minecraft textured sky render pipelines were not found.");
         }
-        return new SkyPipelineSet(pipelines);
+        return new SkyPipelineSet(pipelines, stagePipelines);
     }
 
     private static boolean isSkyTexturedPipeline(RenderPipeline pipeline) {
@@ -5141,23 +5245,52 @@ public final class VeyraRenderer {
                 .toList();
         String source = pack.readTexturedFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_textured.fsh."));
+        String programName = "gbuffers_textured";
+        Optional<String> packVertex = pack.readStage(programName + ".vsh");
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
+            String vertexSource = null;
             String fragmentSource;
+            boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
+            FragmentOutputs outputLayout = null;
+            GeometryBlendSettings blendSettings = null;
             try {
-                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
-                        source, "gbuffers_textured", false, false);
+                if (packVertex.isPresent()) {
+                    String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                            minecraftVertex, packVertex.get(), programName, BasicVertexShaderAdapter.Format.TEXTURED);
+                    vertexSource = adaptedVertex.source();
+                    samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
+                            source, programName, pack.hasShadowFragment(),
+                            original.getSamplers().contains("Sampler2"));
+                    usesNoiseSampler = adaptedVertex.usesNoiseSampler() || samplerInputs.usesNoiseSampler();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
+                            original.getSamplers().contains("Sampler2"));
+                    outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
+                    blendSettings = pack.readGeometryBlendSettings(programName);
+                    validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
+                } else {
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                            source, programName, false, false);
+                }
             } catch (IOException exception) {
                 VeyraClient.LOGGER.debug("Skipping the gbuffers_textured world-border pipeline because its inputs are unsupported: {}",
                         exception.getMessage());
                 return new WorldBorderPipelineSet(Map.of());
             }
-            String sourceHash = sha256("gbuffers_textured\n" + fragmentSource);
+            String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
+                    + '\n' + fragmentSource + '\n' + outputLayout + '\n' + blendSettings + '\n' + samplerInputs);
             TexturedPipelineKey cacheKey = new TexturedPipelineKey(original, sourceHash);
             RenderPipeline replacement = TEXTURED_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
-                replacement = compileColorDistancePipeline(
-                        original, "gbuffers_textured", fragmentSource, sourceHash);
+                replacement = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                        vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 TEXTURED_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);
@@ -6980,7 +7113,17 @@ public final class VeyraRenderer {
     private record GlintPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
     }
 
-    private record SkyPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
+    private record SkyPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines,
+                                  Map<RenderPipeline, Map<Integer, RenderPipeline>> stagePipelines) {
+        private SkyPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
+            this(pipelines, Map.of());
+        }
+
+        private RenderPipeline pipeline(RenderPipeline original, Integer stage) {
+            Map<Integer, RenderPipeline> variants = stagePipelines.get(original);
+            if (variants == null) return pipelines.get(original);
+            return stage == null ? null : variants.get(stage);
+        }
     }
 
     private record WorldBorderPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {

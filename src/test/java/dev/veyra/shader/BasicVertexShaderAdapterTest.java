@@ -53,6 +53,48 @@ class BasicVertexShaderAdapterTest {
             }
             """;
 
+    private static final String NATIVE_LIGHTNING_VERTEX = """
+            #version 460
+            layout(location = 0) in vec3 Position;
+            layout(location = 1) in vec4 Color;
+            layout(location = 0) out vec4 vertexColor;
+            layout(location = 1) out float sphericalVertexDistance;
+            layout(location = 2) out float cylindricalVertexDistance;
+            layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                mat4 ModelViewMat;
+                mat4 ProjMat;
+                mat4 TextureMat;
+                vec4 ColorModulator;
+                vec2 ScreenSize;
+                vec3 ModelOffset;
+            };
+            void main() {
+                gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                vertexColor = Color;
+                sphericalVertexDistance = 0.0;
+                cylindricalVertexDistance = 0.0;
+            }
+            """;
+
+    private static final String NATIVE_TEXTURED_VERTEX = """
+            #version 460
+            layout(location = 0) in vec3 Position;
+            layout(location = 1) in vec2 UV0;
+            layout(location = 0) out vec2 texCoord0;
+            layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                mat4 ModelViewMat;
+                mat4 ProjMat;
+                mat4 TextureMat;
+                vec4 ColorModulator;
+                vec2 ScreenSize;
+                vec3 ModelOffset;
+            };
+            void main() {
+                gl_Position = ProjMat * ModelViewMat * vec4(Position + ModelOffset, 1.0);
+                texCoord0 = UV0;
+            }
+            """;
+
     @Test
     void adaptsLeashInputsAndLinksFlatColorAndLightmapOutputs() throws IOException {
         BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(
@@ -200,5 +242,127 @@ class BasicVertexShaderAdapterTest {
                         }
                         """, BasicVertexShaderAdapter.Format.STARS));
         assertTrue(error.getMessage().contains("vaNormal"));
+    }
+
+    @Test
+    void adaptsLightningLegacyInputsToThePositionColorFormatAndLinksPackVaryings() throws IOException {
+        BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(
+                NATIVE_LIGHTNING_VERTEX, """
+                        #version 130
+                        out vec2 texCoord;
+                        out vec2 lmCoord;
+                        out vec3 normal;
+                        flat out vec4 glColor;
+                        void main() {
+                            gl_Position = ftransform();
+                            texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                            lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                            normal = normalize(gl_NormalMatrix * gl_Normal);
+                            glColor = gl_Color;
+                        }
+                        """, "gbuffers_lightning", BasicVertexShaderAdapter.Format.LIGHTNING);
+
+        assertTrue(adapted.source().contains("#define gl_Color Color"));
+        assertTrue(adapted.source().contains("#define gl_Normal vec3(0.0, 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define gl_MultiTexCoord0 vec4(0.0, 0.0, 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define gl_MultiTexCoord1 vec4(0.0, 0.0, 0.0, 1.0)"));
+        assertTrue(adapted.varyings().containsKey("texCoord"));
+        assertTrue(adapted.varyings().containsKey("lmCoord"));
+        assertEquals(0, adapted.varyings().get("glColor").location());
+
+        String fragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                #version 130
+                in vec2 texCoord;
+                flat in vec4 glColor;
+                uniform sampler2D tex;
+                void main() { gl_FragColor = texture2D(tex, texCoord) * glColor; }
+                """, "gbuffers_lightning", adapted.varyings(), false, false);
+        assertTrue(fragment.contains("layout(location = 0) flat in vec4 vertexColor;"));
+        assertTrue(fragment.contains("layout(location = 6) in vec2 texCoord0;"));
+    }
+
+    @Test
+    void adaptsTexturedSkyFormatsAndRetainsWorldBorderVertexInputs() throws IOException {
+        String skyVertex = """
+                #version 120
+                varying vec2 texCoord;
+                flat varying vec4 color;
+                void main() {
+                    gl_Position = ftransform();
+                    texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    color = gl_Color;
+                }
+                """;
+        for (BasicVertexShaderAdapter.Format format : new BasicVertexShaderAdapter.Format[] {
+                BasicVertexShaderAdapter.Format.SKY_TEXTURED,
+                BasicVertexShaderAdapter.Format.SKY_TEXTURED_COLOR }) {
+            BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(
+                    format == BasicVertexShaderAdapter.Format.SKY_TEXTURED
+                            ? NATIVE_TEXTURED_VERTEX : NATIVE_TEXTURED_VERTEX.replace(
+                                    "layout(location = 1) in vec2 UV0;",
+                                    "layout(location = 1) in vec2 UV0;\nlayout(location = 2) in vec4 Color;")
+                                    .replace("layout(location = 0) out vec2 texCoord0;",
+                                            "layout(location = 0) out vec2 texCoord0;\nlayout(location = 1) out vec4 vertexColor;")
+                                    .replace("texCoord0 = UV0;", "texCoord0 = UV0; vertexColor = Color;"),
+                    skyVertex, "gbuffers_skytextured", format);
+            assertTrue(adapted.source().contains("#define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)"));
+            assertTrue(adapted.varyings().containsKey("texCoord"));
+            assertEquals(0, adapted.varyings().get("color").location());
+        }
+
+        String texturedVertex = """
+                #version 120
+                attribute vec4 mc_Entity;
+                attribute vec4 mc_midTexCoord;
+                varying vec2 texcoord;
+                varying vec4 color;
+                void main() {
+                    gl_Position = ftransform();
+                    texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    color = gl_Color + vec4(normalize(gl_NormalMatrix * gl_Normal), 0.0);
+                }
+                """;
+        BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(
+                NATIVE_TEXTURED_VERTEX, texturedVertex, "gbuffers_textured",
+                BasicVertexShaderAdapter.Format.TEXTURED);
+        assertTrue(adapted.source().contains("#define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define gl_Color vec4(1.0)"));
+        assertTrue(adapted.source().contains("#define gl_Vertex vec4(Position + ModelOffset, 1.0)"));
+        assertFalse(adapted.source().contains("attribute vec4 mc_Entity"));
+        assertFalse(adapted.source().contains("attribute vec4 mc_midTexCoord"));
+    }
+
+    @Test
+    void rejectsActiveMissingTexturedAttributesButAllowsUnusedDeclarations() throws IOException {
+        String source = """
+                #version 120
+                attribute vec4 mc_Entity;
+                void main() { gl_Position = ftransform(); }
+                """;
+        BasicVertexShaderAdapter.adaptStage(NATIVE_TEXTURED_VERTEX, source,
+                "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED);
+        IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
+                NATIVE_TEXTURED_VERTEX, source.replace("gl_Position = ftransform();",
+                        "gl_Position = ftransform() + vec4(mc_Entity.xyz, 0.0);"),
+                "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED));
+        assertTrue(error.getMessage().contains("mc_Entity"));
+    }
+
+    @Test
+    void linksTextureFragmentToNativeTexCoordWhenPackVertexDoesNotReplaceIt() throws IOException {
+        String packVertex = "#version 120\nvoid main() { gl_Position = ftransform(); }\n";
+        BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                NATIVE_TEXTURED_VERTEX, packVertex, "gbuffers_textured",
+                BasicVertexShaderAdapter.Format.TEXTURED);
+        assertEquals(31, adaptedVertex.varyings().get("texCoord0").location());
+
+        String adaptedFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec2 texCoord0;
+                uniform sampler2D gtexture;
+                void main() { gl_FragColor = texture2D(gtexture, texCoord0); }
+                """, "gbuffers_textured", adaptedVertex.varyings(), false, false);
+        assertTrue(adaptedFragment.contains("layout(location = 31) in vec2 texCoord0;"));
+        assertTrue(adaptedVertex.source().contains("VEYRA_BASIC_NATIVE_TEXCOORD"));
     }
 }

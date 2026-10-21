@@ -23,6 +23,7 @@
     "ThreadBuilderPackMixin",
     "LevelRendererMixin",
     "WorldRendererMixin",
+    "SkyRendererMixin",
     "VkRenderPassMixin",
     "VulkanCloudRendererMixin",
     "VkCommandEncoderMixin",

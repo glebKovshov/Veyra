@@ -1,6 +1,7 @@
 package dev.veyra.shader;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -42,6 +43,22 @@ final class IrisRenderStages {
 
     private IrisRenderStages() { }
 
+    static int sunStage() { return Stage.SUN.ordinal(); }
+    static int moonStage() { return Stage.MOON.ordinal(); }
+    static int voidStage() { return Stage.VOID.ordinal(); }
+
+    static List<Integer> skyTexturedStages(String pipelinePath) {
+        return switch (pipelinePath) {
+            case "pipeline/celestial" -> List.of(Stage.SUN.ordinal(), Stage.MOON.ordinal(), Stage.VOID.ordinal());
+            case "pipeline/end_sky" -> List.of(Stage.VOID.ordinal());
+            default -> List.of();
+        };
+    }
+
+    static boolean hasRenderStageUniform(String source) {
+        return UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(source)).find();
+    }
+
     static Map<String, String> macros() {
         Map<String, String> macros = new LinkedHashMap<>();
         for (Stage stage : Stage.values()) {
@@ -55,7 +72,7 @@ final class IrisRenderStages {
             case SKY -> Stage.SKY.ordinal();
             case STARS -> Stage.STARS.ordinal();
             case SUNRISE_SUNSET -> Stage.SUNSET.ordinal();
-            case LEASH, LINE -> null;
+            case LEASH, LINE, LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR -> null;
         };
     }
 

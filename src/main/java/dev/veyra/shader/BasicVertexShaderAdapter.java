@@ -12,7 +12,10 @@ import java.util.regex.Pattern;
 
 /** Adapts Iris basic/leash and line vertex stages to Minecraft's distinct native vertex formats. */
 final class BasicVertexShaderAdapter {
-    enum Format { LEASH, LINE, SKY, STARS, SUNRISE_SUNSET }
+    enum Format {
+        LEASH, LINE, SKY, STARS, SUNRISE_SUNSET,
+        LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR
+    }
 
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
@@ -89,6 +92,7 @@ final class BasicVertexShaderAdapter {
         String nativeMainName = switch (format) {
             case LINE -> "veyraMinecraftLineMain";
             case LEASH -> "veyraMinecraftLeashMain";
+            case LIGHTNING -> "veyraMinecraftLightningMain";
             default -> "veyraMinecraftSkyMain";
         };
         String generatedMain;
@@ -98,6 +102,7 @@ final class BasicVertexShaderAdapter {
         generatedMain = switch (format) {
             case LINE -> lineMain(widenFallbackLines);
             case LEASH -> leashMain();
+            case LIGHTNING -> lightningMain();
             default -> skyMain(format);
         };
 
@@ -117,6 +122,11 @@ final class BasicVertexShaderAdapter {
             case SKY, STARS -> "layout(location=0) in vec3 Position;\n";
             case SUNRISE_SUNSET -> "layout(location=0) in vec3 Position;\n"
                     + "layout(location=1) in vec4 Color;\n";
+            case LIGHTNING -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n";
+            case SKY_TEXTURED, TEXTURED -> "layout(location=0) in vec3 Position;\n"
+                    + "layout(location=1) in vec2 UV0;\n";
+            case SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "layout(location=0) in vec3 Position;\n"
+                    + "layout(location=1) in vec2 UV0;\nlayout(location=2) in vec4 Color;\n";
         };
         String outputs = switch (format) {
             case LEASH, LINE, SUNRISE_SUNSET -> "layout(location=0) out vec4 vertexColor;\n"
@@ -124,13 +134,27 @@ final class BasicVertexShaderAdapter {
                     + "layout(location=2) out float cylindricalVertexDistance;\n";
             case SKY -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\n";
             case STARS -> "";
+            case LIGHTNING -> "layout(location=0) out vec4 vertexColor;\n"
+                    + "layout(location=1) out float sphericalVertexDistance;\n"
+                    + "layout(location=2) out float cylindricalVertexDistance;\n";
+            case SKY_TEXTURED, TEXTURED -> "out vec2 texCoord0;\n";
+            case SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "out vec2 texCoord0;\nout vec4 vertexColor;\n";
+        };
+        String textureOutput = switch (format) {
+            case SKY_TEXTURED, TEXTURED, SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "texCoord0 = UV0;";
+            default -> "";
+        };
+        String colorOutput = switch (format) {
+            case LIGHTNING, SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "vertexColor = Color;";
+            default -> "";
         };
         String base = "#version 460\n" + inputs + outputs
                 + "layout(set=0,binding=0,std140) uniform NativeTransforms { mat4 ModelViewMat; mat4 ProjMat; "
-                + "mat4 TextureMat; vec4 ColorModulator; vec2 ScreenSize; };\n"
+                + "mat4 TextureMat; vec4 ColorModulator; vec2 ScreenSize; vec3 ModelOffset; };\n"
                 + "void main(){gl_Position=ProjMat*ModelViewMat*vec4(Position,1.0);"
-                + (format == Format.SUNRISE_SUNSET ? "vertexColor=Color;" : "")
+                + textureOutput + colorOutput
                 + (format == Format.SKY ? "sphericalVertexDistance=1.0;cylindricalVertexDistance=1.0;" : "")
+                + (format == Format.LIGHTNING ? "sphericalVertexDistance=0.0;cylindricalVertexDistance=0.0;" : "")
                 + "}\n";
         return adaptStage(base, shaderPackSource, programName, format);
     }
@@ -179,7 +203,7 @@ final class BasicVertexShaderAdapter {
                     + format.name().toLowerCase() + " vertex format.");
         }
 
-        OutputBridge outputs = extractOutputs(source, programName);
+        OutputBridge outputs = extractOutputs(source, programName, format);
         source = outputs.source();
         source = removeUnusedAttributes(source, programName, format);
         uncommented = ShaderSource.maskBlockAndLineComments(source);
@@ -233,12 +257,13 @@ final class BasicVertexShaderAdapter {
         return new SamplerBridge(adapted, bridge, usesNoise);
     }
 
-    private static OutputBridge extractOutputs(String source, String programName) throws IOException {
+    private static OutputBridge extractOutputs(String source, String programName, Format format) throws IOException {
         Matcher matcher = OUTPUT.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuilder clean = new StringBuilder(source.length());
         StringBuilder declarations = new StringBuilder();
         Map<String, TerrainVertexShaderAdapter.PackVarying> varyings = new LinkedHashMap<>();
         Set<Integer> occupied = new HashSet<>(Set.of(0, 1, 2, 3, 4, 5));
+        if (isTextureFormat(format)) occupied.add(31);
         Set<String> emittedVariables = new HashSet<>();
         int nextLocation = 6;
         int cursor = 0;
@@ -302,7 +327,15 @@ final class BasicVertexShaderAdapter {
         while (matcher.find()) {
             String name = matcher.group(4), type = matcher.group(3);
             TerrainVertexShaderAdapter.PackVarying output = required.get(name);
-            if (output == null) continue;
+            if (output == null) {
+                if (isTextureFormat(format) && name.equals("texCoord0")) {
+                    rewritten.append(source, copiedThrough, matcher.start()).append(matcher.group(1))
+                            .append(parserSafeOutput("VEYRA_BASIC_NATIVE_TEXCOORD", 31,
+                                    "smooth", type, name));
+                    copiedThrough = matcher.end();
+                }
+                continue;
+            }
             if (!output.type().equals(type)) throw new IOException(programName + " native output '" + name + "' has type " + type + ".");
             if (!found.add(name)) throw new IOException("Minecraft's " + programName + " vertex shader declares output '" + name + "' twice.");
             String declaration = parserSafeOutput("VEYRA_BASIC_NATIVE_OUTPUT_" + output.location(), output.location(),
@@ -313,7 +346,7 @@ final class BasicVertexShaderAdapter {
         rewritten.append(source, copiedThrough, source.length());
         for (String requiredName : required.keySet()) {
             if (!found.contains(requiredName)) {
-                if (!isSkyFormat(format)) throw new IOException("Minecraft's " + programName
+                if (!isSkyFormat(format) && !isTextureFormat(format)) throw new IOException("Minecraft's " + programName
                         + " vertex shader does not declare " + requiredName + ".");
                 TerrainVertexShaderAdapter.PackVarying output = required.get(requiredName);
                 rewritten.append("\n").append(parserSafeOutput("VEYRA_BASIC_NATIVE_OUTPUT_"
@@ -325,18 +358,36 @@ final class BasicVertexShaderAdapter {
     }
 
     private static String nativeInputBridge(Format format) {
-        String lightmap = format == Format.LEASH ? "vec4(vec2(UV2), 0.0, 1.0)" : "vec4(240.0, 240.0, 0.0, 1.0)";
+        String lightmap = switch (format) {
+            case LEASH -> "vec4(vec2(UV2), 0.0, 1.0)";
+            case LINE -> "vec4(240.0, 240.0, 0.0, 1.0)";
+            default -> "vec4(0.0, 0.0, 0.0, 1.0)";
+        };
         String color = switch (format) {
             case SKY, STARS -> "ColorModulator";
-            case SUNRISE_SUNSET -> "Color";
+            case SUNRISE_SUNSET, LIGHTNING -> "Color";
             case LEASH, LINE -> "vec4((Color * ColorModulator).rgb, ColorModulator.a)";
+            case SKY_TEXTURED -> "vec4(1.0)";
+            case SKY_TEXTURED_COLOR -> "Color";
+            case TEXTURED -> "vec4(1.0)";
+            case TEXTURED_COLOR -> "Color";
         };
+        String vertex = format == Format.TEXTURED
+                ? "vec4(Position + ModelOffset, 1.0)" : "vec4(Position + veyraVertexOffset, 1.0)";
+        String normal = format == Format.LINE ? "Normal" : "vec3(0.0, 0.0, 1.0)";
+        String texture0 = hasTextureCoordinate(format)
+                ? "vec4(UV0, 0.0, 1.0)"
+                : format == Format.LIGHTNING ? "vec4(0.0, 0.0, 0.0, 1.0)"
+                        : "vec4(0.5, 0.5, 0.0, 1.0)";
+        String coreInputs = (hasTextureCoordinate(format) ? "#define vaUV0 UV0\n" : "")
+                + (hasNormalInput(format) ? "#define vaNormal Normal\n" : "")
+                + (format == Format.LEASH ? "#define vaUV2 UV2\n" : "");
         return """
                 vec3 veyraVertexOffset = vec3(0.0);
-                #define gl_Vertex vec4(Position + veyraVertexOffset, 1.0)
+                #define gl_Vertex %s
                 #define gl_Color %s
-                #define gl_Normal vec3(0.0, 0.0, 1.0)
-                #define gl_MultiTexCoord0 vec4(0.5, 0.5, 0.0, 1.0)
+                #define gl_Normal %s
+                #define gl_MultiTexCoord0 %s
                 #define gl_MultiTexCoord1 %s
                 #define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)
                 #define gl_ModelViewMatrix ModelViewMat
@@ -344,16 +395,20 @@ final class BasicVertexShaderAdapter {
                 #define gl_NormalMatrix transpose(inverse(mat3(ModelViewMat)))
                 #define gl_VertexID gl_VertexIndex
                 #define vaPosition Position
-                #define vaNormal Normal
                 #define projectionMatrix ProjMat
                 #define modelViewMatrix ModelViewMat
                 #define ftransform() ((ProjMat * ModelViewMat) * gl_Vertex)
                 #define gl_FogFragCoord veyraFogFragCoord
-                """.formatted(color, lightmap);
+                %s
+                """.formatted(vertex, color, normal, texture0, lightmap, coreInputs);
     }
 
     private static String leashMain() {
         return "void main() { veyraMinecraftLeashMain(); veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
+    }
+
+    private static String lightningMain() {
+        return "void main() { veyraMinecraftLightningMain(); veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
     }
 
     private static String lineMain(boolean widen) {
@@ -385,9 +440,14 @@ final class BasicVertexShaderAdapter {
     }
 
     private static String skyMain(Format format) {
-        String initializeColor = format == Format.SKY || format == Format.STARS
-                ? "vertexColor = ColorModulator; " : "";
+        String initializeColor = switch (format) {
+            case SKY, STARS -> "vertexColor = ColorModulator; ";
+            case SKY_TEXTURED -> "vertexColor = vec4(1.0); ";
+            case TEXTURED -> "vertexColor = vec4(1.0); ";
+            default -> "";
+        };
         String initializeDistances = format == Format.STARS || format == Format.SUNRISE_SUNSET
+                || isTextureFormat(format)
                 ? "sphericalVertexDistance = 0.0; cylindricalVertexDistance = 0.0; " : "";
         return "void main() { veyraMinecraftSkyMain(); " + initializeColor + initializeDistances
                 + "veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
@@ -395,6 +455,20 @@ final class BasicVertexShaderAdapter {
 
     private static boolean isSkyFormat(Format format) {
         return format == Format.SKY || format == Format.STARS || format == Format.SUNRISE_SUNSET;
+    }
+
+    private static boolean isTextureFormat(Format format) {
+        return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
+                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR;
+    }
+
+    private static boolean hasTextureCoordinate(Format format) {
+        return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
+                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR;
+    }
+
+    private static boolean hasNormalInput(Format format) {
+        return format == Format.LINE;
     }
 
     private static String parserSafeOutput(String macro, int location, String interpolation, String type, String name) {
@@ -438,14 +512,13 @@ final class BasicVertexShaderAdapter {
         effective.put("gl_Color", color);
         effective.put("sphericalVertexDistance", spherical);
         effective.put("cylindricalVertexDistance", cylindrical);
-        if (outputs.containsKey("texcoord") || outputs.containsKey("texCoord") || outputs.containsKey("texCoord0")) {
+        if (isTextureFormat(format)) {
             TerrainVertexShaderAdapter.PackVarying texCoord = aliasedOutput(outputs,
-                    Set.of("texcoord", "texCoord", "texCoord0"), null);
-            if (texCoord != null) {
-                effective.put("texcoord", texCoord);
-                effective.put("texCoord", texCoord);
-                effective.put("texCoord0", texCoord);
-            }
+                    Set.of("texcoord", "texCoord", "texCoord0"),
+                    defaultOutput("vec2", "smooth", 31, "texCoord0"));
+            effective.put("texcoord", texCoord);
+            effective.put("texCoord", texCoord);
+            effective.put("texCoord0", texCoord);
         }
         if (outputs.containsKey("lmcoord") || outputs.containsKey("lmCoord") || outputs.containsKey("lightMapCoord")) {
             TerrainVertexShaderAdapter.PackVarying lightmap = aliasedOutput(outputs,

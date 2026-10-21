@@ -30,14 +30,16 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture, skyBasicVertexFixture, beaconBeamFixture, blockVertexFixture,
+            glintMrtFixture, basicVertexFixture, skyBasicVertexFixture, skyTexturedStageFixture,
+            beaconBeamFixture, blockVertexFixture,
             damagedBlockVertexFixture, handVertexFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
             disabledBasicMrtPixels, activeBeaconBeamGreenPixels, disabledBeaconBeamGreenPixels,
-            activeBeaconBeamMrtPixels, disabledBeaconBeamMrtPixels;
+            activeBeaconBeamMrtPixels, disabledBeaconBeamMrtPixels,
+            activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -69,6 +71,7 @@ public final class GraphicsSmoke {
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
             basicVertexFixture = fixture.equals("basic-vertex-execution");
             skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
+            skyTexturedStageFixture = fixture.equals("skytextured-stage-variants");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
             blockVertexFixture = fixture.equals("block-vertex-execution");
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
@@ -152,7 +155,7 @@ public final class GraphicsSmoke {
             client.options.hideGui = !itemFixture;
             client.player.setXRot(entityFixture || beaconBeamFixture ? 15.0F
                     : damagedBlockVertexFixture ? 20.0F
-                    : cloudFixture || skyBasicVertexFixture ? -60.0F : 35.0F);
+                    : cloudFixture || skyBasicVertexFixture || skyTexturedStageFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
@@ -165,9 +168,9 @@ public final class GraphicsSmoke {
                     throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
                 pending = true;
                 requested = true; captureActive = true;
-            } else if (!vanillaBaseline && stage == 1 && worldTicks >= baselineAt) {
+            } else if (!vanillaBaseline && (stage == 1 || stage == 2) && worldTicks >= baselineAt) {
                 pending = true;
-                requested = true; captureActive = false;
+                requested = true; captureActive = skyTexturedStageFixture && stage == 2;
             }
         } catch (Throwable failure) { finish(client, failure, -1); }
     }
@@ -193,7 +196,7 @@ public final class GraphicsSmoke {
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     && !glintMrtFixture && !basicVertexFixture && !skyBasicVertexFixture && !beaconBeamFixture
-                    && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
+                    && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -323,12 +326,17 @@ public final class GraphicsSmoke {
                                 NativeImage glintMrtImage, NativeImage basicMrtImage) {
         int colored = 0;
         int opposite = 0;
+        int skyMoonGreen = 0;
         int renderedItemGreen = 0;
         int glintMrtPixels = 0;
         int basicMrtPixels = 0;
         try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
-            image.writeToFile(output.resolve(active ? "mrt-active.png" : "shaders-disabled.png"));
+            String imageName = skyTexturedStageFixture
+                    ? active && stage == 2 ? "skytextured-moon-active.png"
+                            : active ? "skytextured-sun-active.png" : "skytextured-disabled.png"
+                    : active ? "mrt-active.png" : "shaders-disabled.png";
+            image.writeToFile(output.resolve(imageName));
             if (glintMrtImage != null) {
                 glintMrtImage.writeToFile(output.resolve("glint-mrt-colortex4.png"));
                 for (int y = 0; y < glintMrtImage.getHeight(); y++) for (int x = 0; x < glintMrtImage.getWidth(); x++) {
@@ -350,12 +358,14 @@ public final class GraphicsSmoke {
                 int pixel = image.getPixel(x, y);
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
+                if (skyTexturedStageFixture && green > 220 && red < 24 && blue < 24) skyMoonGreen++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
                 if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture || beaconBeamFixture)
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
             int oppositeCount = opposite;
+            int skyMoonGreenCount = skyMoonGreen;
             int renderedItemGreenCount = renderedItemGreen;
             int glintMrtPixelCount = glintMrtPixels;
             int basicMrtPixelCount = basicMrtPixels;
@@ -363,6 +373,38 @@ public final class GraphicsSmoke {
                 if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
                 } else if (active) {
+                    if (skyTexturedStageFixture && stage == 0) {
+                        activeSkySunPixels = count;
+                        activePixels = count;
+                        if (activeSkySunPixels < 100) {
+                            finish(client, new IllegalStateException("The celestial SUN render-stage signal was absent: "
+                                    + activeSkySunPixels), activeSkySunPixels);
+                            return;
+                        }
+                        var server = client.getSingleplayerServer();
+                        if (server == null) {
+                            finish(client, new IllegalStateException("The sky render-stage fixture has no singleplayer server"), -1);
+                            return;
+                        }
+                        server.execute(() -> server.overworld().setDayTime(18000L));
+                        stage = 2;
+                        baselineAt = worldTicks + 100;
+                        pending = false;
+                        return;
+                    }
+                    if (skyTexturedStageFixture && stage == 2) {
+                        activeSkyMoonPixels = skyMoonGreenCount;
+                        if (activeSkyMoonPixels < 100) {
+                            finish(client, new IllegalStateException("The celestial MOON render-stage signal was absent: "
+                                    + activeSkyMoonPixels), activeSkyMoonPixels);
+                            return;
+                        }
+                        VeyraRenderer.disable();
+                        baselineAt = worldTicks + 80;
+                        stage = 1;
+                        pending = false;
+                        return;
+                    }
                     activePixels = count;
                     activeOppositeMidTexCoordPixels = oppositeCount;
                     activeCurrentRenderedItemGreenPixels = renderedItemGreenCount;
@@ -397,7 +439,16 @@ public final class GraphicsSmoke {
                     int minPixels = currentRenderedItemFixture || blockVertexFixture
                             || damagedBlockVertexFixture || handVertexFixture ? 100 : 2000;
                     Throwable failure;
-                    if (beaconBeamFixture) {
+                    if (skyTexturedStageFixture) {
+                        disabledSkySunPixels = count;
+                        disabledSkyMoonPixels = skyMoonGreenCount;
+                        failure = disabledSkySunPixels * 4 >= activeSkySunPixels
+                                || disabledSkyMoonPixels * 4 >= activeSkyMoonPixels
+                                ? new IllegalStateException("The sky-textured stage signals were absent or unchanged after disabling: sun active/disabled="
+                                        + activeSkySunPixels + "/" + disabledSkySunPixels
+                                        + ", moon active/disabled=" + activeSkyMoonPixels + "/" + disabledSkyMoonPixels)
+                                : null;
+                    } else if (beaconBeamFixture) {
                         failure = activeBeaconBeamGreenPixels < 100 || activeBeaconBeamMrtPixels < 100
                                 || disabledBeaconBeamGreenPixels * 4 >= activeBeaconBeamGreenPixels
                                 || disabledBeaconBeamMrtPixels * 4 >= activeBeaconBeamMrtPixels
@@ -464,6 +515,10 @@ public final class GraphicsSmoke {
                     + ",\"disabledBeaconBeamGreenPixels\":" + disabledBeaconBeamGreenPixels
                     + ",\"activeBeaconBeamMrtPixels\":" + activeBeaconBeamMrtPixels
                     + ",\"disabledBeaconBeamMrtPixels\":" + disabledBeaconBeamMrtPixels
+                    + ",\"activeSkyTexturedSunPixels\":" + activeSkySunPixels
+                    + ",\"activeSkyTexturedMoonPixels\":" + activeSkyMoonPixels
+                    + ",\"disabledSkyTexturedSunPixels\":" + disabledSkySunPixels
+                    + ",\"disabledSkyTexturedMoonPixels\":" + disabledSkyMoonPixels
                     + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);
