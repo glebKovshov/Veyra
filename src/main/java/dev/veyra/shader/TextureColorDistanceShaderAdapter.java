@@ -434,7 +434,7 @@ public final class TextureColorDistanceShaderAdapter {
                 .replaceAll("\\bshadow2D\\s*\\(", "veyraTextureShadowSample(");
         return new SamplerBridge(result, bridge.toString(), new SamplerInputs(
                 usesNoise, usesShadow, usesSpecular, usesLightmap, usesShadowColor, usesOpaqueShadow,
-                Set.copyOf(geometryIndices)));
+                Set.copyOf(geometryIndices), Set.of()));
     }
 
     static SamplerInputs inspectSamplers(String source, String programName,
@@ -448,8 +448,16 @@ public final class TextureColorDistanceShaderAdapter {
 
     record SamplerInputs(boolean usesNoiseSampler, boolean usesShadowSampler, boolean usesSpecularSampler,
                          boolean usesLightmapSampler, boolean usesShadowColor, boolean usesOpaqueShadow,
-                         Set<Integer> geometryColorInputs) {
-        static SamplerInputs empty() { return new SamplerInputs(false, false, false, false, false, false, Set.of()); }
+                         Set<Integer> geometryColorInputs, Set<String> customImageSamplers) {
+        static SamplerInputs empty() {
+            return new SamplerInputs(false, false, false, false, false, false, Set.of(), Set.of());
+        }
+
+        SamplerInputs withCustomImageSamplers(Set<String> samplers) {
+            return new SamplerInputs(usesNoiseSampler, usesShadowSampler, usesSpecularSampler,
+                    usesLightmapSampler, usesShadowColor, usesOpaqueShadow,
+                    geometryColorInputs, Set.copyOf(samplers));
+        }
     }
 
     private record SamplerBridge(String source, String bridge, SamplerInputs inputs) { }

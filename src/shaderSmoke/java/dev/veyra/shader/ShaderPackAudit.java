@@ -103,6 +103,7 @@ public final class ShaderPackAudit {
                             }
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
                                     || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
                                         entityVertexOutputs(pack, program);
                                 EntityShaderAdapter.adaptGeometryFragment(source, program,
@@ -123,6 +124,7 @@ public final class ShaderPackAudit {
                                 pack.readGeometryBlendSettings(program);
                             }
                             else if (program.equals("gbuffers_weather")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
                                         pack.readStage(program + ".vsh").isPresent()
                                                 ? BasicVertexShaderAdapter.describeVaryings(program,

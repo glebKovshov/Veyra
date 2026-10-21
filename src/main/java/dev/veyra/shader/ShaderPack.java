@@ -1110,16 +1110,27 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String extension = file.substring(dot + 1);
             // Iris allows suffixed compute stages belonging to one parent program.
             String parent = extension.equals("csh") ? program.replaceFirst("_[a-z]+$", "") : program;
-            if (IGNORED_IRIS_PROGRAMS.contains(parent)) continue;
+            // Colorwheel adds optional Flywheel-only programs that Veyra has no draw route for.
+            // They remain inert here, as they do when Colorwheel itself is not installed.
+            if (IGNORED_IRIS_PROGRAMS.contains(parent) || parent.startsWith("clrwl_")) continue;
             if (!isProgramEnabled(parent)) continue;
             if (configuration.customImages() && Set.of("vsh", "fsh").contains(extension)
                     && !TERRAIN_PROGRAMS.contains(program) && !SHADOW_PROGRAMS.contains(program)) {
                 var images = ShaderPackImageBindings.prepare(file, readStage(file).orElseThrow(), readImageProperties());
                 if (!images.resources().isEmpty()) {
-                    if (!program.equals("gbuffers_clouds")) {
+                    boolean basicFragment = program.equals(BASIC_PROGRAM) && extension.equals("fsh");
+                    boolean texturedFragment = program.equals(TEXTURED_PROGRAM) && extension.equals("fsh");
+                    boolean entityFragment = extension.equals("fsh") && isNativeEntityFragment(program);
+                    boolean postFragment = extension.equals("fsh") && isPostProcessingProgram(program);
+                    if (!program.equals("gbuffers_clouds") && !basicFragment && !texturedFragment
+                            && !entityFragment && !postFragment) {
                         throw new IOException("Custom images for " + file + " are not integrated yet.");
                     }
-                    if (extension.equals("fsh")) {
+                    if ((texturedFragment || entityFragment || postFragment)
+                            && images.resources().stream().anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
+                        throw new IOException(program + " cannot write graphics storage images through Minecraft's native RenderPipeline.");
+                    }
+                    if (program.equals("gbuffers_clouds") && extension.equals("fsh")) {
                         Set<String> customSamplers = images.resources().stream()
                                 .filter(resource -> !resource.storageImage()).map(ComputeShaderAdapter.OpaqueResource::name)
                                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -1251,6 +1262,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String fragmentProgram = hasSkyTexturedFragment ? SKY_TEXTURED_PROGRAM : TEXTURED_PROGRAM;
         String fragment = readSkyTexturedFragment().orElseThrow(
                 () -> new IOException("The pack no longer contains a sky-textured or textured fragment shader."));
+        fragment = prepareColorDistanceImageFragment(fragmentProgram, fragment);
         List<Integer> renderStages = IrisRenderStages.hasRenderStageUniform(fragment)
                 ? IrisRenderStages.skyTexturedStages("pipeline/celestial") : java.util.Collections.singletonList(null);
         for (Integer renderStage : renderStages) {
@@ -1267,6 +1279,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (vertex.isEmpty()) return;
         String fragment = readTexturedFragment().orElseThrow(
                 () -> new IOException("The pack no longer contains gbuffers_textured.fsh."));
+        fragment = prepareColorDistanceImageFragment(TEXTURED_PROGRAM, fragment);
         validateTextureVertexProgram(TEXTURED_PROGRAM, TEXTURED_PROGRAM, fragment, vertex.get(),
                 BasicVertexShaderAdapter.Format.TEXTURED, null);
     }
@@ -1280,6 +1293,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 : hasTexturedLitFragment ? TEXTURED_LIT_PROGRAM : TEXTURED_PROGRAM;
         String fragment = readWeatherFragment(fragmentProgram).orElseThrow(
                 () -> new IOException("The pack no longer contains a weather or textured fallback fragment shader."));
+        fragment = prepareColorDistanceImageFragment(fragmentProgram, fragment);
         validateTextureVertexProgram(program, fragmentProgram, fragment, vertex.get(),
                 BasicVertexShaderAdapter.Format.WEATHER, null);
         readGeometryBlendSettings(fragmentProgram);
@@ -1294,6 +1308,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private void validateTextureFragmentLink(String program, String fragment,
             Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs, Integer renderStage) throws IOException {
+        fragment = prepareColorDistanceImageFragment(program, fragment);
         String activeFragment = GlslPreprocessor.process(program + ".fsh", fragment);
         FragmentOutputs.parse(activeFragment);
         readGeometryBlendSettings(program);
@@ -1330,10 +1345,50 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (fragment.isEmpty()) {
             throw new IOException("The pack no longer contains " + program + ".fsh.");
         }
-        EntityShaderAdapter.adaptGeometryFragment(fragment.get(), program, hand, hasShadowFragment(),
+        String fragmentSource = configuration.customImages()
+                ? prepareEntityImageFragment(program, fragment.get()) : fragment.get();
+        EntityShaderAdapter.adaptGeometryFragment(fragmentSource, program, hand, hasShadowFragment(),
                 EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
                 true, false, varyings);
         readGeometryBlendSettings(program);
+    }
+
+    private String prepareColorDistanceImageFragment(String program, String fragment) throws IOException {
+        if (!configuration.customImages() || !program.equals(TEXTURED_PROGRAM)) return fragment;
+        var prepared = ShaderPackImageBindings.prepare(program + ".fsh", fragment, readImageProperties());
+        if (prepared.resources().stream().anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
+            throw new IOException(program + " cannot write graphics storage images through Minecraft's native RenderPipeline.");
+        }
+        return prepared.source();
+    }
+
+    private String prepareEntityImageFragment(String program, String fragment) throws IOException {
+        var prepared = ShaderPackImageBindings.prepare(program + ".fsh", fragment, readImageProperties());
+        if (prepared.resources().stream().anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
+            throw new IOException(program + " cannot write graphics storage images through Minecraft's native RenderPipeline.");
+        }
+        return prepared.source();
+    }
+
+    private static boolean isNativeEntityFragment(String program) {
+        return program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
+                || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes");
+    }
+
+    private static boolean isPostProcessingProgram(String program) {
+        if (program.equals("final")) return true;
+        for (String prefix : MULTI_PASS_PROGRAMS) {
+            if (program.equals(prefix)) return true;
+            if (!program.startsWith(prefix)) continue;
+            String suffix = program.substring(prefix.length());
+            if (suffix.isEmpty() || !suffix.chars().allMatch(Character::isDigit)) continue;
+            try {
+                if (Integer.parseInt(suffix) <= MAX_PASS_SUFFIX) return true;
+            } catch (NumberFormatException ignored) {
+                // The pass suffix is outside the names supported by readPrograms().
+            }
+        }
+        return false;
     }
 
     private void validateBeaconBeamCapabilities() throws IOException {
@@ -1355,6 +1410,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (hasBasicFragment) {
             String fragment = readBasicFragment().orElseThrow(
                     () -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
+            fragment = prepareBasicImageFragment(fragment);
             validateBasicLineProgram(BASIC_PROGRAM, fragment, basicVertex,
                     BasicVertexShaderAdapter.Format.LEASH);
             readGeometryBlendSettings(BASIC_PROGRAM);
@@ -1365,11 +1421,21 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String fragment = hasLineFragment
                     ? readLineFragment().orElseThrow(() -> new IOException("The pack no longer contains gbuffers_line.fsh."))
                     : readBasicFragment().orElseThrow(() -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
+            if (!hasLineFragment) fragment = prepareBasicImageFragment(fragment);
             Optional<String> lineVertex = readStage(LINE_PROGRAM + ".vsh").or(() -> basicVertex);
             validateBasicLineProgram(fragmentProgram, fragment, lineVertex,
                     BasicVertexShaderAdapter.Format.LINE);
             readGeometryBlendSettings(fragmentProgram);
         }
+    }
+
+    private String prepareBasicImageFragment(String source) throws IOException {
+        if (!configuration.customImages()) return source;
+        var prepared = ShaderPackImageBindings.prepare(BASIC_PROGRAM + ".fsh", source, readImageProperties());
+        if (prepared.resources().stream().anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
+            throw new IOException("gbuffers_basic cannot write graphics storage images through Minecraft's native RenderPipeline.");
+        }
+        return prepared.source();
     }
 
     private void validateSkyBasicCapabilities() throws IOException {
@@ -1380,6 +1446,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String fragmentProgram = hasSkyBasicFragment ? SKY_BASIC_PROGRAM : BASIC_PROGRAM;
         String fragment = readSkyBasicFragment().orElseThrow(
                 () -> new IOException("The pack no longer contains a sky-basic or basic fragment shader."));
+        if (!hasSkyBasicFragment) fragment = prepareBasicImageFragment(fragment);
         FragmentOutputs.parse(GlslPreprocessor.process(fragmentProgram + ".fsh", fragment));
         readGeometryBlendSettings(fragmentProgram);
         for (BasicVertexShaderAdapter.Format format : List.of(

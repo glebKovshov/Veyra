@@ -21,7 +21,8 @@ final class ShaderPackImageBindings {
     private ShaderPackImageBindings() { }
 
     static PreparedStage prepare(String file, String source, ShaderPackImageProperties properties) throws IOException {
-        String active = GlslPreprocessor.process(file, source, Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+        String active = GlslPreprocessor.process(file, source, Map.of(
+                "IRIS_FEATURE_CUSTOM_IMAGES", "1", "IRIS_FEATURE_COMPUTE_SHADERS", "1"));
         active = UnreachableGlslFunctions.removeUnreachable(active, "main");
         var declarations = UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(active));
         List<Declaration> custom = new ArrayList<>();
@@ -100,17 +101,7 @@ final class ShaderPackImageBindings {
 
         String decorate(String adapted, PreparedStage stage) throws IOException {
             if (stage.resources().isEmpty()) return adapted;
-            var version = VERSION.matcher(adapted);
-            if (!version.find()) throw new IOException("The adapted graphics stage has no #version directive.");
-            int insertion = version.end();
-            String masked = ShaderSource.maskBlockAndLineComments(adapted);
-            while (insertion < adapted.length()) {
-                int end = adapted.indexOf('\n', insertion);
-                end = end < 0 ? adapted.length() : end + 1;
-                String line = masked.substring(insertion, end).strip();
-                if (!line.isEmpty() && !line.startsWith("#extension")) break;
-                insertion = end;
-            }
+            int insertion = declarationInsertion(adapted);
             StringBuilder uniforms = new StringBuilder();
             for (var stageResource : stage.resources()) {
                 var bound = resources.get(stageResource.name());
@@ -123,6 +114,44 @@ final class ShaderPackImageBindings {
             }
             return adapted.substring(0, insertion) + uniforms + adapted.substring(insertion);
         }
+    }
+
+    /** Adds sampler declarations for Minecraft RenderPipeline's native sampler linker. */
+    static String decorateNativeSamplers(String adapted, PreparedStage stage) throws IOException {
+        if (stage.resources().isEmpty()) return adapted;
+        int insertion = declarationInsertion(adapted);
+        StringBuilder uniforms = new StringBuilder();
+        for (var resource : stage.resources()) {
+            if (resource.storageImage()) {
+                throw new IOException("Native RenderPipeline does not support graphics storage image '"
+                        + resource.name() + "'.");
+            }
+            if (!resource.qualifier().isEmpty()) {
+                throw new IOException("Native RenderPipeline does not support sampler qualifiers on '"
+                        + resource.name() + "'.");
+            }
+            // VulkanMod 0.6.8 only recognizes sampler2D while assigning native descriptor bindings.
+            // The parser leaves these directives intact, so shaderc sees the real sampler type.
+            uniforms.append("#define sampler2D ").append(resource.glslType()).append('\n')
+                    .append("uniform sampler2D ").append(resource.name()).append(";\n")
+                    .append("#undef sampler2D\n");
+        }
+        return adapted.substring(0, insertion) + uniforms + adapted.substring(insertion);
+    }
+
+    private static int declarationInsertion(String adapted) throws IOException {
+        var version = VERSION.matcher(adapted);
+        if (!version.find()) throw new IOException("The adapted graphics stage has no #version directive.");
+        int insertion = version.end();
+        String masked = ShaderSource.maskBlockAndLineComments(adapted);
+        while (insertion < adapted.length()) {
+            int end = adapted.indexOf('\n', insertion);
+            end = end < 0 ? adapted.length() : end + 1;
+            String line = masked.substring(insertion, end).strip();
+            if (!line.isEmpty() && !line.startsWith("#extension")) break;
+            insertion = end;
+        }
+        return insertion;
     }
 
     private record Declaration(int start, int end, ComputeShaderAdapter.OpaqueResource resource) { }

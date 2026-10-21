@@ -7,7 +7,6 @@ import net.vulkanmod.render.engine.VkCommandEncoder;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.texture.VulkanImage;
-import net.vulkanmod.vulkan.texture.VTextureSelector;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -36,11 +35,11 @@ public abstract class GraphicsDescriptorsMixin {
                     boundRenderPass == null ? "none" : veyra$describe(boundRenderPass.getFramebuffer()));
         }
         for (var descriptor : nativePipeline.getImageDescriptors()) {
-            var image = VTextureSelector.getImage(descriptor.imageIdx);
+            VulkanImage image = descriptor.getImage();
             String key = pipeline.getLocation() + ":" + descriptor.name;
             if (image != null && veyra$seen.add(key)) LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                    "Descriptor evidence: pipeline={} sampler={} index={} image={} handle={} layout={}",
-                    pipeline.getLocation(), descriptor.name, descriptor.imageIdx, image.name,
+                    "Descriptor evidence: pipeline={} sampler={} binding={} image={} handle={} layout={}",
+                    pipeline.getLocation(), descriptor.name, descriptor.getBinding(), image.name,
                     Long.toHexString(image.getId()), image.getCurrentLayout());
         }
     }

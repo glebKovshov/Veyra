@@ -30,7 +30,9 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture, skyBasicVertexFixture, skyTexturedStageFixture,
+            glintMrtFixture, basicVertexFixture, basicCustomImageFixture, entityCustomImageFixture,
+            compositeCustomImageFixture,
+            skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
             damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
@@ -39,6 +41,7 @@ public final class GraphicsSmoke {
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
             disabledBasicMrtPixels, activeBeaconBeamGreenPixels, disabledBeaconBeamGreenPixels,
             activeBeaconBeamMrtPixels, disabledBeaconBeamMrtPixels,
+            activeEntityCustomImageGreenPixels, disabledEntityCustomImageGreenPixels,
             activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
@@ -73,7 +76,10 @@ public final class GraphicsSmoke {
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
-            basicVertexFixture = fixture.equals("basic-vertex-execution");
+            basicCustomImageFixture = fixture.equals("basic-custom-image");
+            entityCustomImageFixture = fixture.equals("entity-custom-image");
+            compositeCustomImageFixture = fixture.equals("composite-custom-image");
+            basicVertexFixture = fixture.equals("basic-vertex-execution") || basicCustomImageFixture;
             skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
             skyTexturedStageFixture = fixture.equals("skytextured-stage-variants");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
@@ -102,7 +108,7 @@ public final class GraphicsSmoke {
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
-                    || fixture.equals("entity-vertex-execution") || blockVertexFixture;
+                    || fixture.equals("entity-vertex-execution") || blockVertexFixture || entityCustomImageFixture;
             if ((entityFixture || beaconBeamFixture || damagedBlockVertexFixture) && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -221,6 +227,7 @@ public final class GraphicsSmoke {
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     && !glintMrtFixture && !basicVertexFixture && !skyBasicVertexFixture && !beaconBeamFixture
+                    && !entityCustomImageFixture && !compositeCustomImageFixture
                     && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     && !weatherVertexFixture && !particleVertexFixture && !texturedDefaultAttributesFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
@@ -247,7 +254,7 @@ public final class GraphicsSmoke {
                 glintMrtReadback = new Buffer("Veyra glint MRT evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
                 glintMrtReadback.createBuffer((long) width * height * 4);
             }
-            var basicMrtSource = (basicVertexFixture || beaconBeamFixture) && captureActive
+            var basicMrtSource = (basicVertexFixture && !basicCustomImageFixture || beaconBeamFixture) && captureActive
                     ? VeyraRenderer.geometryColorAttachment(6) : null;
             if (basicMrtSource != null) {
                 if (basicMrtSource.width != width || basicMrtSource.height != height
@@ -390,7 +397,8 @@ public final class GraphicsSmoke {
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
                 if (skyTexturedStageFixture && green > 220 && red < 24 && blue < 24) skyMoonGreen++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
-                if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture || beaconBeamFixture)
+                if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture
+                        || beaconBeamFixture || entityCustomImageFixture)
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
@@ -442,6 +450,7 @@ public final class GraphicsSmoke {
                     activeGlintMrtPixels = glintMrtPixelCount;
                     activeBasicGreenPixels = renderedItemGreenCount;
                     activeBasicMrtPixels = basicMrtPixelCount;
+                    if (entityCustomImageFixture) activeEntityCustomImageGreenPixels = renderedItemGreenCount;
                     if (beaconBeamFixture) {
                         activeBeaconBeamGreenPixels = renderedItemGreenCount;
                         activeBeaconBeamMrtPixels = basicMrtPixelCount;
@@ -462,11 +471,12 @@ public final class GraphicsSmoke {
                     disabledGlintGreenPixels = renderedItemGreenCount;
                     disabledBasicGreenPixels = renderedItemGreenCount;
                     disabledBasicMrtPixels = basicMrtPixelCount;
+                    if (entityCustomImageFixture) disabledEntityCustomImageGreenPixels = renderedItemGreenCount;
                     if (beaconBeamFixture) {
                         disabledBeaconBeamGreenPixels = renderedItemGreenCount;
                         disabledBeaconBeamMrtPixels = basicMrtPixelCount;
                     }
-                    int minPixels = currentRenderedItemFixture || blockVertexFixture
+                    int minPixels = currentRenderedItemFixture || blockVertexFixture || entityCustomImageFixture
                             || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture || particleVertexFixture
                             || texturedDefaultAttributesFixture ? 100 : 2000;
                     Throwable failure;
@@ -487,6 +497,16 @@ public final class GraphicsSmoke {
                                 + activeBeaconBeamGreenPixels + "/" + disabledBeaconBeamGreenPixels
                                 + ", colortex6 active/disabled=" + activeBeaconBeamMrtPixels + "/"
                                 + disabledBeaconBeamMrtPixels) : null;
+                    } else if (entityCustomImageFixture) {
+                        failure = activeEntityCustomImageGreenPixels < 100
+                                || disabledEntityCustomImageGreenPixels * 4 >= activeEntityCustomImageGreenPixels
+                                ? new IllegalStateException("The entity custom-image signal was absent or unchanged: scene green active/disabled="
+                                        + activeEntityCustomImageGreenPixels + "/" + disabledEntityCustomImageGreenPixels) : null;
+                    } else if (basicCustomImageFixture) {
+                        failure = activeBasicGreenPixels < 100
+                                || disabledBasicGreenPixels * 4 >= activeBasicGreenPixels
+                                ? new IllegalStateException("The basic custom-image signal was absent or unchanged: scene green active/disabled="
+                                        + activeBasicGreenPixels + "/" + disabledBasicGreenPixels) : null;
                     } else if (basicVertexFixture) {
                         failure = activeBasicGreenPixels < 100 || activeBasicMrtPixels < 100
                                 || disabledBasicGreenPixels * 4 >= activeBasicGreenPixels
@@ -540,6 +560,8 @@ public final class GraphicsSmoke {
                     + ",\"activeGlintMrtPixels\":" + activeGlintMrtPixels
                     + ",\"activeBasicGreenPixels\":" + activeBasicGreenPixels
                     + ",\"disabledBasicGreenPixels\":" + disabledBasicGreenPixels
+                    + ",\"activeEntityCustomImageGreenPixels\":" + activeEntityCustomImageGreenPixels
+                    + ",\"disabledEntityCustomImageGreenPixels\":" + disabledEntityCustomImageGreenPixels
                     + ",\"activeBasicMrtPixels\":" + activeBasicMrtPixels
                     + ",\"disabledBasicMrtPixels\":" + disabledBasicMrtPixels
                     + ",\"activeBeaconBeamGreenPixels\":" + activeBeaconBeamGreenPixels

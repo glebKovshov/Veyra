@@ -18,6 +18,17 @@ class ShaderPackImageBindingsTest {
         assertTrue(runtime.readStage("gbuffers_terrain.fsh").orElseThrow().contains("floodfill_sampler"));
     }
 
+    @Test void compositePostPassCanConsumeTheSharedComputeImages() throws Exception {
+        var pack = ShaderPack.inspect(java.nio.file.Path.of("examples/composite-custom-image")).withRuntimeFeatures();
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+        var composite = pack.readPrograms().stream().filter(program -> program.name().equals("composite"))
+                .findFirst().orElseThrow();
+        var prepared = ShaderPackImageBindings.prepare("composite.fsh", composite.source(), pack.readImageProperties());
+        assertEquals("floodfill_sampler", prepared.resources().getFirst().name());
+        String nativeSource = ShaderPackImageBindings.decorateNativeSamplers("#version 450\nvoid main(){}", prepared);
+        assertTrue(nativeSource.contains("#define sampler2D usampler3D\nuniform sampler2D floodfill_sampler;"));
+    }
+
     @Test void sharesBindingsAcrossVertexAndFragmentWhilePreservingNativeSamplers() throws Exception {
         var properties = ShaderPackImageProperties.parse(PROPERTIES);
         var vertex = ShaderPackImageBindings.prepare("shadow.vsh", """
@@ -61,6 +72,52 @@ class ShaderPackImageBindingsTest {
         String decorated = ShaderPackImageBindings.plan(3, stage).decorate(adapted, stage);
         assertTrue(decorated.indexOf("#extension") < decorated.indexOf("layout(set"));
         assertTrue(decorated.indexOf("layout(set") < decorated.indexOf("void main"));
+    }
+
+    @Test void emitsUnlocatedSamplerDeclarationsForNativeRenderPipelineAndRejectsStorageImages() throws Exception {
+        var properties = ShaderPackImageProperties.parse(PROPERTIES);
+        var sampler = ShaderPackImageBindings.prepare("gbuffers_basic.fsh", """
+                #version 120
+                uniform usampler3D voxel_sampler;
+                void main(){uvec4 c=texelFetch(voxel_sampler,ivec3(0),0);}
+                """, properties);
+        String nativeSource = ShaderPackImageBindings.decorateNativeSamplers(
+                "#version 460\n#extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable\nvoid main(){}\n", sampler);
+        assertTrue(nativeSource.contains("#define sampler2D usampler3D\nuniform sampler2D voxel_sampler;\n#undef sampler2D"));
+        assertTrue(nativeSource.indexOf("#extension") < nativeSource.indexOf("uniform sampler2D"));
+        assertFalse(nativeSource.contains("layout(set"));
+
+        var storage = ShaderPackImageBindings.prepare("gbuffers_basic.fsh", """
+                writeonly uniform uimage3D voxel_img;
+                void main(){imageStore(voxel_img,ivec3(0),uvec4(1));}
+                """, properties);
+        IOException error = assertThrows(IOException.class, () ->
+                ShaderPackImageBindings.decorateNativeSamplers("#version 460\nvoid main(){}", storage));
+        assertTrue(error.getMessage().contains("graphics storage image"));
+    }
+
+    @Test void keepsSharedImagesLinkedThroughEntityAndTexturedFragmentAdapters() throws Exception {
+        var properties = ShaderPackImageProperties.parse(PROPERTIES);
+        String packFragment = """
+                #version 120
+                uniform usampler3D voxel_sampler;
+                void main(){
+                    uint value=texelFetch(voxel_sampler,ivec3(0),0).r;
+                    gl_FragColor=value==5u?vec4(0,1,0,1):vec4(1,0,0,1);
+                }
+                """;
+        var stage = ShaderPackImageBindings.prepare("gbuffers_entities.fsh", packFragment, properties);
+        assertEquals("voxel_sampler", stage.resources().getFirst().name());
+        String entity = EntityShaderAdapter.adaptGeometryFragment(stage.source(), "gbuffers_entities",
+                false, true, -1, -1, ItemIdMap.UNMAPPED, true, false, java.util.Map.of());
+        String entityNative = ShaderPackImageBindings.decorateNativeSamplers(entity, stage);
+        assertTrue(entityNative.contains("#define sampler2D usampler3D\nuniform sampler2D voxel_sampler;"));
+
+        String textured = TextureColorDistanceShaderAdapter.adaptFragment(
+                stage.source(), "gbuffers_textured", false);
+        String texturedNative = ShaderPackImageBindings.decorateNativeSamplers(textured, stage);
+        assertTrue(texturedNative.contains("#define sampler2D usampler3D\nuniform sampler2D voxel_sampler;"));
+        assertFalse(stage.source().contains("uniform usampler3D voxel_sampler;"));
     }
 
     @Test void ignoresUnusedImageDeclarationsButRejectsActiveMissingResources() throws Exception {
