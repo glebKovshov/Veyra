@@ -53,13 +53,8 @@ public abstract class TerrainBufferBuilderMixin {
         MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.RENDER_TYPE_OFFSET,
                 TerrainMaterialContext.renderType());
         MemoryUtil.memPutInt(currentVertex + TerrainMidTexCoord.PACKED_NORMAL_OFFSET, packedNormal);
-        MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.MID_BLOCK_OFFSET,
-                TerrainMaterialContext.midBlockOffset(0, x));
-        MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.MID_BLOCK_OFFSET + Float.BYTES,
-                TerrainMaterialContext.midBlockOffset(1, y));
-        MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.MID_BLOCK_OFFSET + 2L * Float.BYTES,
-                TerrainMaterialContext.midBlockOffset(2, z));
-        MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.EMISSION_OFFSET, TerrainMaterialContext.emission());
+        MemoryUtil.memPutInt(currentVertex + TerrainMidTexCoord.MID_BLOCK_OFFSET,
+                TerrainMaterialContext.packedMidBlock(x, y, z));
 
         if ((this.vertices & 3) != 0) return;
 

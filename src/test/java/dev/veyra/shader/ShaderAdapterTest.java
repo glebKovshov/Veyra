@@ -580,15 +580,16 @@ class ShaderAdapterTest {
         assertEquals(0.5F, TerrainMidTexCoord.center(0.0F, 1.0F, 1.0F, 0.0F));
         assertEquals((short) 16384, TerrainMidTexCoord.pack(0.5F));
         assertEquals(Short.MIN_VALUE, TerrainMidTexCoord.pack(1.0F));
-        assertEquals(64, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
+        assertEquals(52, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
         assertEquals(20, TerrainMidTexCoord.MATERIAL_ID_OFFSET);
         assertEquals(24, TerrainMidTexCoord.RENDER_TYPE_OFFSET);
         assertEquals(28, TerrainMidTexCoord.PACKED_NORMAL_OFFSET);
         assertEquals(32, TerrainMidTexCoord.TANGENT_OFFSET);
         assertEquals(48, TerrainMidTexCoord.MID_BLOCK_OFFSET);
-        assertEquals(60, TerrainMidTexCoord.EMISSION_OFFSET);
-        assertEquals(15, TerrainMidTexCoord.VERTEX_FORMAT.getElements().size());
-        for (int location = 7; location <= 14; location++) {
+        assertEquals(12, TerrainMidTexCoord.VERTEX_FORMAT.getElements().size());
+        assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Type.INT,
+                TerrainMidTexCoord.VERTEX_FORMAT.getElements().get(11).type());
+        for (int location = 7; location <= 10; location++) {
             var element = TerrainMidTexCoord.VERTEX_FORMAT.getElements().get(location);
             assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Usage.GENERIC, element.usage());
             assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Type.FLOAT, element.type());
@@ -598,6 +599,11 @@ class ShaderAdapterTest {
 
     @Test
     void midBlockUsesOriginalBlockCenterForBoundaryAndOffsetVertices() throws IOException {
+        int packed = TerrainMidTexCoord.packMidBlock(-32.0F, 48.9F, -48.9F, 15);
+        assertEquals(-32, (byte) packed);
+        assertEquals(48, (byte) (packed >>> 8));
+        assertEquals(-48, (byte) (packed >>> 16));
+        assertEquals(15, packed >>> 24);
         assertEquals(32.0F, TerrainMidTexCoord.midBlockOffset(15.0F, 15.0F));
         assertEquals(-32.0F, TerrainMidTexCoord.midBlockOffset(15.0F, 16.0F));
         assertEquals(48.0F, TerrainMidTexCoord.midBlockOffset(0.0F, -0.25F));

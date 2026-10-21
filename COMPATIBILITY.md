@@ -6,7 +6,7 @@ The compute branch now executes pack vertex stages for terrain shadow variants, 
 
 The full source audit accepts 864 geometry fragments and compiles all 18 active compute stages. New shadow preflight exposed BSL renderStage requirements; a focused rerun after native-shadow-layer specialization passed all 18 BSL cases without capability/adapter errors. Native stage values follow VulkanMod's actual compacted draw layers.
 
-A development GPU probe verified r16ui 3D-image clearing, nearest integer sampling, actual compute dispatch and readback of 64 texels. The combined shadow-stage fixture passed 222,796 active / 0 disabled control pixels. This probe is included in the terrain-varying CI fixture. Shared shadow/scene image descriptors and shaderpack-frame dispatch remain unfinished and gated. Shadow MRT and entity shadow vertex execution are not provided by this candidate. The interim extended vertex layout is 64 bytes and needs packing before release.
+A development GPU probe verified r16ui 3D-image clearing, nearest integer sampling, actual compute dispatch and readback of 64 texels. After packing the mid-block/emission input into one integer attribute, the combined shadow-stage fixture passed 223,237 active / 0 disabled control pixels. The vertex layout is 52 bytes with 12 attributes. This probe is included in the terrain-varying CI fixture. Shared shadow/scene image descriptors and shaderpack-frame dispatch remain unfinished and gated. Shadow MRT and entity shadow vertex execution are not provided by this candidate.
 
 ## Weather, textured-default, and translucent-particle vertex support
 

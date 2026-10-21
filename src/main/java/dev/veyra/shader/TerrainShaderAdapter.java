@@ -775,11 +775,11 @@ public final class TerrainShaderAdapter {
                         + "\n    layout (location = 8) in float VeyraTerrainTangentY;"
                         + "\n    layout (location = 9) in float VeyraTerrainTangentZ;"
                         + "\n    layout (location = 10) in float VeyraTerrainTangentHandedness;"
-                        + "\n    layout (location = 11) in float VeyraTerrainMidBlockX;"
-                        + "\n    layout (location = 12) in float VeyraTerrainMidBlockY;"
-                        + "\n    layout (location = 13) in float VeyraTerrainMidBlockZ;"
-                        + "\n    layout (location = 14) in float VeyraTerrainEmission;"
-                        + "\n    #define VeyraTerrainMidBlock vec4(VeyraTerrainMidBlockX, VeyraTerrainMidBlockY, VeyraTerrainMidBlockZ, VeyraTerrainEmission)"
+                        + "\n    layout (location = 11) in int VeyraTerrainPackedMidBlock;"
+                        + "\n    #define VeyraTerrainMidBlock vec4(float(bitfieldExtract(VeyraTerrainPackedMidBlock, 0, 8)),"
+                        + " float(bitfieldExtract(VeyraTerrainPackedMidBlock, 8, 8)),"
+                        + " float(bitfieldExtract(VeyraTerrainPackedMidBlock, 16, 8)),"
+                        + " float(bitfieldExtract(uint(VeyraTerrainPackedMidBlock), 24, 8)))"
                         + "\n    #define VeyraTerrainTangent vec4(VeyraTerrainTangentX, VeyraTerrainTangentY,"
                         + " VeyraTerrainTangentZ, VeyraTerrainTangentHandedness)");
         adapted = adapted.replace(outputMarker,

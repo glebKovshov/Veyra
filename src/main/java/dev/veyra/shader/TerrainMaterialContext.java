@@ -26,12 +26,11 @@ public final class TerrainMaterialContext {
         origin[2] = z;
     }
 
-    public static float midBlockOffset(int axis, float vertexPosition) {
-        return TerrainMidTexCoord.midBlockOffset(ORIGIN.get()[axis], vertexPosition);
-    }
-
-    public static int emission() {
-        return CURRENT.get().emission();
+    public static int packedMidBlock(float x, float y, float z) {
+        float[] origin = ORIGIN.get();
+        return TerrainMidTexCoord.packMidBlock(TerrainMidTexCoord.midBlockOffset(origin[0], x),
+                TerrainMidTexCoord.midBlockOffset(origin[1], y), TerrainMidTexCoord.midBlockOffset(origin[2], z),
+                CURRENT.get().emission());
     }
 
     public static int materialId() {
