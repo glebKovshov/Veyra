@@ -1,24 +1,23 @@
-# Veyra 0.2.0-beta.29+mc1.21.11 — experimental prerelease
+# Veyra 0.2.0-beta.30+mc1.21.11 - experimental prerelease
 
-Beta.29 batches supported lightning, textured-sky, and world-border vertex execution. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
+Beta.30 bundles a CloudRenderer crash fix with expanded textured-shader compatibility. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.29+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.30+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
-## Changes since beta.28
+## Changes since beta.29
 
-- Execute supported custom `gbuffers_lightning.vsh`, both native `gbuffers_skytextured.vsh` formats, and `gbuffers_textured.vsh` for the world border. Validate vertex-to-fragment varying links before pipeline creation.
-- Specialize sky-textured `renderStage` variants for SUN, MOON, and VOID celestial draws and VOID End-sky draws. Support core `textureSize()` for supported 2D samplers.
-- Keep native textured coordinates within Vulkan's vertex-output component limits.
-- The beta.25 `CloudRenderer` Mixin crash was fixed in beta.26 and remains fixed in this release.
+- Fix the CloudRenderer startup crash when Mixin searches for `Tesselator.begin`. The nested Minecraft invocation is now remapped while the enclosing VulkanMod method selector remains unremapped. The published beta.25 and beta.29 JARs were both confirmed to lack the runtime mapping; this release contains it.
+- Bind Minecraft's live lightmap as `Sampler2` for supported world-border and sky-textured pipelines.
+- Link custom `vec4 normal` outputs in `gbuffers_textured` and ignore unused fragment varying declarations before interface linking.
 
 ## Validation and known limits
 
-Feature PR [#77](https://github.com/glebKovshov/Veyra/pull/77) merged into `main` at `e4f96f8`. Build [39551772481](https://github.com/glebKovshov/Veyra/actions/runs/39551772481), pinned source audit [39551772538](https://github.com/glebKovshov/Veyra/actions/runs/39551772538), and Graphics smoke [39551772493](https://github.com/glebKovshov/Veyra/actions/runs/39551772493) passed; all **34/34** Lavapipe fixtures passed.
+Feature PR [#80](https://github.com/glebKovshov/Veyra/pull/80) merged into `main` at `a1ade554`. Build [39563491000](https://github.com/glebKovshov/Veyra/actions/runs/39563491000), pinned source audit [39563491016](https://github.com/glebKovshov/Veyra/actions/runs/39563491016), and Graphics smoke [39563491037](https://github.com/glebKovshov/Veyra/actions/runs/39563491037) passed.
 
-The local versioned JDK 21 build passed **330 tests**; 85 example shaders were processed and 98 stages compiled directly to Vulkan SPIR-V. On an NVIDIA GeForce RTX 3070, the synthetic sky-stage fixture read back **14,249 active SUN pixels / 10,517 active MOON pixels / 0 after disabling Veyra**. These fixtures test named paths, not full third-party shaderpack visuals.
+The local JDK 21 build passed **334 tests**; 85 example shaders were processed and 98 stages compiled directly to Vulkan SPIR-V. The graphics-smoke Java sources compiled locally; the CI graphics workflow completed successfully.
 
-The pinned audit covers 4 archives, 63 profile/dimension cases, and 5,178 stages: **781 geometry fragments accepted / 8 rejected**. Remaining first source blockers include `gbuffers_textured` requesting the unavailable Minecraft lightmap sampler (72 records), Sildur's unsupported `normal` output type (3), and Sildur `shadowData` fragments in Nether and End. Selected Complementary profiles also declare unsupported `shadowcomp.csh` compute. Every audit record has `visualValidation=false`; no complete third-party shaderpack has been visually validated. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results.
+The pinned audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: **789 geometry fragments accepted / 0 rejected**. The remaining first capability blockers are custom `gbuffers_weather.vsh` execution (72 profile/dimension records) and Sildur's active `mc_Entity` input in `gbuffers_textured.vsh` (3 records). Every audit record has `visualValidation=false`; no complete third-party shaderpack has been visually validated. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results.
