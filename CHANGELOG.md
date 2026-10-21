@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.29 - 2026-10-21 (experimental prerelease)
+
+- Add supported custom `gbuffers_lightning.vsh`, both native `gbuffers_skytextured.vsh` formats, and the `gbuffers_textured.vsh` world-border path, with checked vertex/fragment varying links and explicit capability validation.
+- Specialize Iris `renderStage` for SUN, MOON, and VOID on celestial draws and VOID on end-sky draws. Keep native textured coordinates within Vulkan's vertex-output component limits.
+- Allow core `textureSize()` queries for supported 2D samplers and add compiler, unit, example-pack, Lavapipe, and physical-GPU smoke coverage.
+- Pass 330 local tests, 85 shader examples, 98 direct SPIR-V compilations, and all 34/34 CI Lavapipe fixtures. The refreshed pinned audit accepts 781 and rejects 8 geometry fragments; full third-party shaderpack visuals remain unverified.
+
 ## 0.2.0-beta.28 - 2026-10-21 (experimental prerelease)
 
 - Add Iris `MC_RENDER_STAGE_*` macros and bind `renderStage` to the values available in the sky, stars, and sunrise/sunset pipelines.
