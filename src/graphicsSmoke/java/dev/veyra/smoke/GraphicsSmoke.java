@@ -106,7 +106,8 @@ public final class GraphicsSmoke {
             boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture
                     || handVertexFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
-                    || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
+                    || fixture.equals("shadow-color-entity") || fixture.equals("shadow-color-mrt")
+                    || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
                     || fixture.equals("entity-vertex-execution") || blockVertexFixture || entityCustomImageFixture;
             if ((entityFixture || beaconBeamFixture || damagedBlockVertexFixture) && !entityFixtureStarted && worldTicks >= 20

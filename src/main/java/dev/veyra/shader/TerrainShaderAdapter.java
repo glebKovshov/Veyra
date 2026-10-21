@@ -322,7 +322,13 @@ public final class TerrainShaderAdapter {
 
     /** Water inputs are available after the opaque copy and deferred phase. */
     public static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable) throws IOException {
-        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, Map.of());
+        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, Map.of(), false);
+    }
+
+    static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
+                                boolean pipelineNoiseSamplerAvailable) throws IOException {
+        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, Map.of(),
+                pipelineNoiseSamplerAvailable);
     }
 
     static void validatePackVaryingLinks(String programName, String fragmentSource,
@@ -348,6 +354,12 @@ public final class TerrainShaderAdapter {
 
     static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings) throws IOException {
+        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, packVaryings, false);
+    }
+
+    static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings,
+                                boolean pipelineNoiseSamplerAvailable) throws IOException {
         Map<String, Integer> colorInputs = waterInputsAvailable ? GeometryColorSamplers.read(source) : Map.of();
         FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
         source = fragmentOutputs.rewriteLegacy(source);
@@ -362,7 +374,7 @@ public final class TerrainShaderAdapter {
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = SHADOW_MATRIX_UNIFORM.matcher(adapted).replaceAll("");
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
-        boolean noiseSamplerAvailable = usesNoiseSampler(adapted);
+        boolean noiseSamplerAvailable = usesNoiseSampler(adapted) || pipelineNoiseSamplerAvailable;
         ShadowColorSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
         ShadowDepthSampler.validate(source, shadowSamplerAvailable, GeometryColorSamplers.indices(colorInputs).size());
 
@@ -375,7 +387,8 @@ public final class TerrainShaderAdapter {
                     && !sampler.equals("specular")
                     && !colorInputs.containsKey(sampler)
                     && !(sampler.equals("depthtex1") && waterInputsAvailable)
-                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1"))
+                    || ShadowColorSampler.isSampler(sampler)) && shadowSamplerAvailable)) {
                 throw new IOException("gbuffers_terrain uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
@@ -589,9 +602,11 @@ public final class TerrainShaderAdapter {
             bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowDepthSampler.NAME + ";\n"
                     + "#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
         }
-        if (ShadowColorSampler.used(source)) {
-            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowColorSampler.NAME + ";\n"
-                    + "#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
+        for (int index : new java.util.TreeSet<>(ShadowColorSampler.indices(source))) {
+            String sampler = ShadowColorSampler.samplerName(index);
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + sampler + ";\n"
+                    + "#define shadowcolor" + index + " " + sampler + "\n"
+                    + (index == 0 ? "#define shadowcolor " + sampler + "\n" : "") + bridge;
         }
         StringBuilder colorBridge = new StringBuilder();
         for (int index : GeometryColorSamplers.indices(colorInputs)) {

@@ -387,6 +387,27 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
     }
 
+    /** Collects shadowcolor attachments written by shadow programs or sampled by active fragment programs. */
+    public Set<Integer> readShadowColorTargetIndices() throws IOException {
+        Set<Integer> indices = new java.util.TreeSet<>();
+        for (String file : stageFiles().stream().filter(name -> name.endsWith(".fsh")).sorted().toList()) {
+            Optional<String> source = configuration.customImages() ? readCustomImageStage(file) : readStage(file);
+            if (source.isEmpty()) continue;
+            String active = UnreachableGlslFunctions.removeUnreachable(
+                    GlslPreprocessor.process(file, source.get()), "main");
+            indices.addAll(ShadowColorSampler.indices(active));
+            String program = file.substring(0, file.length() - 4);
+            if (SHADOW_PROGRAMS.contains(program) && isProgramEnabled(program)) {
+                indices.addAll(FragmentOutputs.parse(active).targets());
+            }
+        }
+        if (indices.stream().anyMatch(index -> index > 1)) {
+            throw new IOException("Shadow color targets 2..7 require Iris' HIGHER_SHADOWCOLOR feature, which Veyra does not advertise yet.");
+        }
+        if (hasShadowFragment()) indices.add(0);
+        return Set.copyOf(indices);
+    }
+
     /** Iris' endFlashShadows directive: End shadows follow the end flash instead of the sun or moon. */
     public boolean readEndFlashShadows() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
@@ -1204,9 +1225,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (!hasShadowFragment()) return;
         for (String program : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
             String fragment = readShadowFragment(program).orElseThrow();
-            if (!FragmentOutputs.parse(fragment).sceneOnly()) {
-                throw new IOException("Multiple shadow color attachments are not implemented yet.");
-            }
             Optional<String> vertex = readShadowVertex(program);
             if (vertex.isEmpty()) continue;
             String vertexSource = vertex.get();

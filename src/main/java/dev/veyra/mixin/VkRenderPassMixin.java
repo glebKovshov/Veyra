@@ -6,6 +6,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
+import dev.veyra.vulkan.VeyraGeometryTargets;
 import dev.veyra.vulkan.VeyraSpecularTextures;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
@@ -26,6 +27,7 @@ public abstract class VkRenderPassMixin {
         RenderPipeline active = pass.getPipeline();
         if (active == null) return;
         var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
+        if (pipeline != null) VeyraGeometryTargets.beforeBind(pipeline);
         String pipelinePath = active.getLocation().getPath();
         boolean lightmapPipeline = pipelinePath.equals("pipeline/world_border")
                 || pipelinePath.equals("pipeline/celestial") || pipelinePath.equals("pipeline/end_sky");

@@ -16,14 +16,25 @@ class ShaderPackTest {
     @TempDir Path directory;
 
     @Test
-    void rejectsShadowMrtBeforeAllocationEvenWithoutVertexStage() throws IOException {
+    void acceptsShadowMrtBeforeAllocationEvenWithoutVertexStage() throws IOException {
         Path shaders = Files.createDirectories(directory.resolve("shadow-mrt/shaders"));
         Files.writeString(shaders.resolve("final.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
         Files.writeString(shaders.resolve("shadow.fsh"),
                 "/* DRAWBUFFERS:01 */\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.0); }\n");
         ShaderPack pack = ShaderPack.inspect(shaders.getParent());
-        IOException error = assertThrows(IOException.class, pack::validatePipelineCapabilities);
-        assertTrue(error.getMessage().contains("Multiple shadow color attachments"), error.getMessage());
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+        assertEquals(java.util.Set.of(0, 1), pack.readShadowColorTargetIndices());
+    }
+
+    @Test
+    void rejectsHigherShadowColorTargetsUntilTheIrisFeatureIsAdvertised() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("shadow-higher/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
+        Files.writeString(shaders.resolve("shadow.fsh"),
+                "/* DRAWBUFFERS:012 */\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.0); gl_FragData[2] = vec4(0.0); }\n");
+        ShaderPack pack = ShaderPack.inspect(shaders.getParent());
+        IOException error = assertThrows(IOException.class, pack::readShadowColorTargetIndices);
+        assertTrue(error.getMessage().contains("HIGHER_SHADOWCOLOR"), error.getMessage());
     }
 
     @Test

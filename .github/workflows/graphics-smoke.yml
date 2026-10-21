@@ -87,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-mrt, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -145,6 +145,10 @@ jobs:
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
           assert result['status']=='passed', result
+          if '${{ matrix.fixture }}' == 'shadow-color-mrt':
+              entity_route=re.search(r'Framebuffer evidence: pipeline=veyra:pipeline/shadow_entities.*bound=MRT\[[^\]]*shadowcolor1',text)
+              assert entity_route, 'The entity shadow pipeline did not route through both shadow color attachments'
+              print('Entity shadow MRT route:', entity_route.group(0))
           if '${{ matrix.fixture }}' == 'terrain-vertex-varyings':
               probe=json.loads(pathlib.Path('build/reports/graphics-smoke/compute-image-probe.json').read_text())
               assert probe == {'status':'passed','format':'r16ui','texels':64,'expected':42}, probe

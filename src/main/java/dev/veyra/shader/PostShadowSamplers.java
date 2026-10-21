@@ -7,17 +7,27 @@ import java.util.regex.Pattern;
 /** Post-stage bindings for the shadow producer's existing images. */
 public final class PostShadowSamplers {
     public enum Input {
-        DEPTH("VeyraShadowDepth", false), OPAQUE_DEPTH("VeyraShadowOpaqueDepth", false), COLOR("VeyraShadowColor", true);
+        DEPTH("VeyraShadowDepth", false, "shadowtex0"),
+        OPAQUE_DEPTH("VeyraShadowOpaqueDepth", false, "shadowtex1"),
+        COLOR("VeyraShadowColor", true, "shadowcolor0"),
+        COLOR1("VeyraShadowColor1", true, "shadowcolor1");
         private final String name;
         private final boolean bilinear;
-        Input(String name, boolean bilinear) { this.name = name; this.bilinear = bilinear; }
+        private final String shaderName;
+        Input(String name, boolean bilinear, String shaderName) {
+            this.name = name;
+            this.bilinear = bilinear;
+            this.shaderName = shaderName;
+        }
         public String inputName() { return name; }
         public String samplerName() { return name + "Sampler"; }
         public boolean bilinear() { return bilinear; }
+        public int shadowColorIndex() { return this == COLOR ? 0 : this == COLOR1 ? 1 : -1; }
     }
     public record Adapted(String source, Set<Input> inputs) { }
     private static final Map<String, Input> NAMES = Map.of("shadowtex0", Input.DEPTH,
-            "shadowtex1", Input.OPAQUE_DEPTH, "shadowcolor0", Input.COLOR, "shadowcolor", Input.COLOR);
+            "shadowtex1", Input.OPAQUE_DEPTH, "shadowcolor0", Input.COLOR,
+            "shadowcolor1", Input.COLOR1, "shadowcolor", Input.COLOR);
     private static final Pattern DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(\\w+)\\s+(shadow(?:tex\\w*|color\\w*|))\\s*;[\\t ]*");
     private static final Pattern REFERENCE = Pattern.compile("\\bshadow(?:tex\\w*|color\\w*)\\b");
     private PostShadowSamplers() { }
@@ -43,7 +53,7 @@ public final class PostShadowSamplers {
             String name = declarations.group(2), type = declarations.group(1);
             Input input = NAMES.get(name);
             if (input == null) throw new IOException("Unsupported post shadow sampler: " + name);
-            if (!type.equals("sampler2D") && !(input != Input.COLOR && type.equals("sampler2DShadow")))
+            if (!type.equals("sampler2D") && !(input.shadowColorIndex() < 0 && type.equals("sampler2DShadow")))
                 throw new IOException(name + " has an unsupported sampler type: " + type);
             if (!seen.add(name)) throw new IOException(name + " is declared more than once.");
             declarations.appendReplacement(body, "");
@@ -84,8 +94,11 @@ public final class PostShadowSamplers {
                 """);
         for (Input input : Input.values()) if (inputs.contains(input))
             bridge.append("uniform sampler2D ").append(input.samplerName()).append(";\n");
-        NAMES.entrySet().stream().sorted(Map.Entry.comparingByKey()).filter(e -> inputs.contains(e.getValue()))
-                .forEach(e -> bridge.append("#define ").append(e.getKey()).append(' ').append(e.getValue().samplerName()).append('\n'));
+        for (Input input : Input.values()) {
+            if (!inputs.contains(input)) continue;
+            bridge.append("#define ").append(input.shaderName).append(' ').append(input.samplerName()).append('\n');
+            if (input == Input.COLOR) bridge.append("#define shadowcolor ").append(input.samplerName()).append('\n');
+        }
         return bridge.toString();
     }
 }

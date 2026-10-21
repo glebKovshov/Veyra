@@ -11,14 +11,16 @@ class PostShadowSamplersTest {
                 uniform sampler2D shadowtex0;
                 uniform sampler2D shadowtex1;
                 uniform sampler2D shadowcolor0;
+                uniform sampler2D shadowcolor1;
                 uniform sampler2D shadowcolor;
-                void main(){gl_FragColor=texture2D(shadowtex0,vec2(0))+texture2D(shadowtex1,vec2(0))+texture2D(shadowcolor0,vec2(0))+texture2D(shadowcolor,vec2(0));}
+                void main(){gl_FragColor=texture2D(shadowtex0,vec2(0))+texture2D(shadowtex1,vec2(0))+texture2D(shadowcolor0,vec2(0))+texture2D(shadowcolor1,vec2(0))+texture2D(shadowcolor,vec2(0));}
                 """, true);
-        assertEquals(3, adapted.inputs().size());
+        assertEquals(4, adapted.inputs().size());
         String bridge = PostShadowSamplers.bridge(adapted.inputs());
         assertTrue(bridge.contains("#define shadowtex0 VeyraShadowDepthSampler"));
         assertTrue(bridge.contains("#define shadowtex1 VeyraShadowOpaqueDepthSampler"));
         assertTrue(bridge.contains("#define shadowcolor VeyraShadowColorSampler"));
+        assertTrue(bridge.contains("#define shadowcolor1 VeyraShadowColor1Sampler"));
         assertTrue(PostShadowSamplers.Input.COLOR.bilinear());
         assertFalse(PostShadowSamplers.Input.OPAQUE_DEPTH.bilinear());
         assertTrue(PostShadowSamplers.bilinear("VeyraShadowColor"));

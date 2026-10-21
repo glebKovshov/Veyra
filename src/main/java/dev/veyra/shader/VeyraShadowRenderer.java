@@ -37,9 +37,12 @@ import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_STORE_OP_STORE;
@@ -57,14 +60,18 @@ public final class VeyraShadowRenderer {
     private static final Matrix4f shadowProjectionInverse = new Matrix4f();
 
     private static TextureTarget target;
+    private static final Map<Integer, TextureTarget> additionalColorTargets = new HashMap<>();
+    private static Set<Integer> shadowColorTargetIndices = Set.of(0);
     private static Framebuffer framebuffer;
     private static RenderPass renderPass;
     private static RenderPass translucentRenderPass;
     private static final dev.veyra.vulkan.VeyraDepthTextureSnapshot opaqueDepth = new dev.veyra.vulkan.VeyraDepthTextureSnapshot("shadowtex1");
     private static GpuTextureView opaqueBinding;
     private static GpuTextureView depthTextureView;
-    private static GpuTextureView colorBinding;
+    /** Indexed texture-table bindings currently pointing at one of the owned shadow color views. */
+    private static final Map<Integer, GpuTextureView> colorBindings = new HashMap<>();
     private static GpuSampler shadowSampler;
+    private static int opaqueBindingSlot = -1;
     private static RenderBuffers shadowRenderBuffers;
     private static SubmitNodeStorage shadowSubmitNodeStorage;
     private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
@@ -97,7 +104,26 @@ public final class VeyraShadowRenderer {
     }
 
     public static GpuTextureView shadowColorTextureView() {
-        return target == null ? null : target.getColorTextureView();
+        return shadowColorTextureView(0);
+    }
+
+    public static GpuTextureView shadowColorTextureView(int index) {
+        if (index == 0) return target == null ? null : target.getColorTextureView();
+        TextureTarget colorTarget = additionalColorTargets.get(index);
+        return colorTarget == null ? null : colorTarget.getColorTextureView();
+    }
+
+    public static net.vulkanmod.vulkan.texture.VulkanImage shadowColorAttachment(int index) {
+        GpuTextureView view = shadowColorTextureView(index);
+        if (view == null || view.isClosed()) throw new IllegalStateException("shadowcolor" + index + " is not allocated.");
+        return ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage();
+    }
+
+    public static Framebuffer shadowFramebuffer() { return framebuffer; }
+    public static RenderPass shadowResumePass() { return translucentRenderPass; }
+
+    public static Set<Integer> shadowColorTargetIndices() {
+        return shadowColorTargetIndices;
     }
 
     public static GpuTextureView shadowDepthTextureView() {
@@ -109,32 +135,40 @@ public final class VeyraShadowRenderer {
     }
 
     public static void bindTerrainShadowColor(GraphicsPipeline pipeline) {
-        var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
-        if (descriptor == null) return;
-        var view = shadowColorTextureView();
-        if (rendering || view == null || view.isClosed())
-            throw new IllegalStateException("shadowcolor0 requires the completed shadow color attachment.");
-        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        descriptor.isReadOnlyLayout = false; // The producing render pass owns the transition.
-        colorBinding = view;
-        ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage()
-                .setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
-        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
-        VTextureSelector.bindTexture(descriptor.imageIdx,
-                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+        for (int index = 0; index <= ShadowColorSampler.MAX_INDEX; index++) {
+            String sampler = ShadowColorSampler.samplerName(index);
+            var descriptor = pipeline.getImageDescriptor(sampler);
+            if (descriptor == null) continue;
+            var view = shadowColorTextureView(index);
+            if (rendering || view == null || view.isClosed())
+                throw new IllegalStateException("shadowcolor" + index + " requires its completed shadow color attachment.");
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false; // The producing render pass owns the transition.
+            var image = ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage();
+            image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
+            int slot = descriptor.imageIdx;
+            VRenderSystem.setShaderTexture(slot, view);
+            VTextureSelector.bindTexture(slot, image);
+            colorBindings.put(slot, view);
+        }
     }
 
     public static void bindEntityShadowColor(VkRenderPass pass, GraphicsPipeline pipeline) {
-        var descriptor = pipeline.getImageDescriptor(ShadowColorSampler.NAME);
-        if (descriptor == null) return;
-        var view = shadowColorTextureView();
-        if (rendering || view == null || view.isClosed())
-            throw new IllegalStateException("shadowcolor0 requires the completed shadow color attachment.");
-        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        descriptor.isReadOnlyLayout = false;
-        pass.bindTexture(ShadowColorSampler.NAME, view, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
-        VTextureSelector.bindTexture(descriptor.imageIdx,
-                ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+        for (int index = 0; index <= ShadowColorSampler.MAX_INDEX; index++) {
+            String sampler = ShadowColorSampler.samplerName(index);
+            var descriptor = pipeline.getImageDescriptor(sampler);
+            if (descriptor == null) continue;
+            var view = shadowColorTextureView(index);
+            if (rendering || view == null || view.isClosed())
+                throw new IllegalStateException("shadowcolor" + index + " requires its completed shadow color attachment.");
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
+            int slot = descriptor.imageIdx;
+            colorBindings.put(slot, view);
+            pass.bindTexture(sampler, view, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            VTextureSelector.bindTexture(slot,
+                    ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
+        }
     }
 
     public static void bindTerrainOpaqueDepth(GraphicsPipeline pipeline) {
@@ -145,6 +179,7 @@ public final class VeyraShadowRenderer {
         descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         descriptor.isReadOnlyLayout = false;
         opaqueBinding = view;
+        opaqueBindingSlot = descriptor.imageIdx;
         var image = ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage();
         image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
         VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
@@ -193,7 +228,13 @@ public final class VeyraShadowRenderer {
     }
 
     public static void configure(ShadowSettings settings) {
-        if (shadowSettings.resolution() != settings.resolution()) {
+        configure(settings, Set.of(0));
+    }
+
+    public static void configure(ShadowSettings settings, Set<Integer> colorTargets) {
+        Set<Integer> requestedColors = Set.copyOf(new TreeSet<>(colorTargets));
+        if (shadowSettings.resolution() != settings.resolution()
+                || !shadowColorTargetIndices.equals(requestedColors)) {
             release();
         }
         if (!shadowSettings.equals(settings)) {
@@ -203,6 +244,7 @@ public final class VeyraShadowRenderer {
                     settings.entityShadowDistanceMultiplier(), settings.shadowTranslucent());
         }
         shadowSettings = settings;
+        shadowColorTargetIndices = requestedColors;
     }
 
     public static boolean shouldRenderBlockEntity(BlockPos blockPos) {
@@ -248,6 +290,7 @@ public final class VeyraShadowRenderer {
             updateShadowMatrixUniformBuffers();
             // Resources must exist and be cleared before the first shadow draw, including a lazy pack load.
             VeyraRenderer.prepareShadowTerrainPipelines();
+            clearAdditionalShadowColors();
 
             Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
                     ? new DistanceLimitedFrustum(shadowModelView, shadowProjection, cameraPosition,
@@ -294,7 +337,7 @@ public final class VeyraShadowRenderer {
             try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
                 ((net.vulkanmod.render.engine.VkGpuTexture) target.getDepthTexture()).getVulkanImage()
                         .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                ((net.vulkanmod.render.engine.VkGpuTexture) target.getColorTexture()).getVulkanImage()
+                for (int index : shadowColorTargetIndices) shadowColorAttachment(index)
                         .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
             VeyraRenderer.dispatchShadowCompute();
@@ -323,18 +366,33 @@ public final class VeyraShadowRenderer {
     }
 
     public static void release() {
+        dev.veyra.vulkan.VeyraGeometryTargets.releaseTargets();
         if (rendering) {
             Renderer.getInstance().endRenderPass();
             rendering = false;
         }
         VRenderSystem.setShaderTexture(3, null);
-        if (colorBinding != null) {
-            if (VRenderSystem.getShaderTexture(ShadowColorSampler.TERRAIN_SLOT) == colorBinding)
-                VRenderSystem.setShaderTexture(ShadowColorSampler.TERRAIN_SLOT, null);
-            var image = ((net.vulkanmod.render.engine.VkGpuTexture) colorBinding.texture()).getVulkanImage();
-            if (VTextureSelector.getImage(ShadowColorSampler.TERRAIN_SLOT) == image)
-                VTextureSelector.bindTexture(ShadowColorSampler.TERRAIN_SLOT, VTextureSelector.getWhiteTexture());
-            colorBinding = null;
+        for (Map.Entry<Integer, GpuTextureView> entry : colorBindings.entrySet()) {
+            int slot = entry.getKey();
+            GpuTextureView binding = entry.getValue();
+            if (VRenderSystem.getShaderTexture(slot) == binding) VRenderSystem.setShaderTexture(slot, null);
+            if (binding != null && !binding.isClosed()) {
+                var image = ((net.vulkanmod.render.engine.VkGpuTexture) binding.texture()).getVulkanImage();
+                if (VTextureSelector.getImage(slot) == image)
+                    VTextureSelector.bindTexture(slot, VTextureSelector.getWhiteTexture());
+            }
+        }
+        colorBindings.clear();
+        if (opaqueBinding != null && opaqueBindingSlot >= 0) {
+            if (VRenderSystem.getShaderTexture(opaqueBindingSlot) == opaqueBinding)
+                VRenderSystem.setShaderTexture(opaqueBindingSlot, null);
+            if (opaqueBinding != null && !opaqueBinding.isClosed()) {
+                var image = ((net.vulkanmod.render.engine.VkGpuTexture) opaqueBinding.texture()).getVulkanImage();
+                if (VTextureSelector.getImage(opaqueBindingSlot) == image)
+                    VTextureSelector.bindTexture(opaqueBindingSlot, VTextureSelector.getWhiteTexture());
+            }
+            opaqueBinding = null;
+            opaqueBindingSlot = -1;
         }
         depthTextureView = null;
         if (shadowSampler != null) {
@@ -344,14 +402,6 @@ public final class VeyraShadowRenderer {
         if (framebuffer != null) {
             framebuffer.cleanUp(false);
             framebuffer = null;
-        }
-        if (opaqueBinding != null) {
-            if (VRenderSystem.getShaderTexture(ShadowDepthSampler.TERRAIN_SLOT) == opaqueBinding)
-                VRenderSystem.setShaderTexture(ShadowDepthSampler.TERRAIN_SLOT, null);
-            var image = ((net.vulkanmod.render.engine.VkGpuTexture) opaqueBinding.texture()).getVulkanImage();
-            if (VTextureSelector.getImage(ShadowDepthSampler.TERRAIN_SLOT) == image)
-                VTextureSelector.bindTexture(ShadowDepthSampler.TERRAIN_SLOT, VTextureSelector.getWhiteTexture());
-            opaqueBinding = null;
         }
         opaqueDepth.close();
         Set<RenderPass> retiredPasses = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
@@ -370,6 +420,8 @@ public final class VeyraShadowRenderer {
             target.destroyBuffers();
             target = null;
         }
+        additionalColorTargets.values().forEach(TextureTarget::destroyBuffers);
+        additionalColorTargets.clear();
         releaseFeatureDispatcher();
         shadowModelView.identity();
         shadowProjection.identity();
@@ -401,9 +453,25 @@ public final class VeyraShadowRenderer {
         resumeBuilder.getDepthAttachmentInfo().setOps(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE)
                 .setFinalLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         translucentRenderPass = resumeBuilder.build();
+        for (int index : shadowColorTargetIndices) {
+            if (index == 0) continue;
+            additionalColorTargets.put(index, new TextureTarget("Veyra shadowcolor" + index,
+                    shadowSettings.resolution(), shadowSettings.resolution(), false));
+        }
         // The target owns this view. Sampling its native depth view avoids creating a second
         // Vulkan view object for the same image, which can upset VulkanMod's descriptor binding.
         depthTextureView = target.getDepthTextureView();
+    }
+
+    private static void clearAdditionalShadowColors() {
+        if (shadowColorTargetIndices.stream().noneMatch(index -> index > 0)) return;
+        var encoder = RenderSystem.getDevice().createCommandEncoder();
+        for (int index : shadowColorTargetIndices) {
+            if (index == 0) continue; // The base shadow render pass clears color0 and depth.
+            TextureTarget colorTarget = additionalColorTargets.get(index);
+            if (colorTarget == null) throw new IllegalStateException("shadowcolor" + index + " was not allocated.");
+            VeyraRenderer.clearColorTarget(encoder, colorTarget, 0x00000000);
+        }
     }
 
     private static void ensureShadowSampler() {

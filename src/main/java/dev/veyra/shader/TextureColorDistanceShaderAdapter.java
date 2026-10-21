@@ -373,7 +373,7 @@ public final class TextureColorDistanceShaderAdapter {
                     || name.equals("Sampler0");
             boolean irisSampler = allowIrisSamplers && (name.equals("lightmap") || name.equals("noisetex")
                     || name.equals("specular") || name.equals("shadowtex0") || name.equals("shadowtex1")
-                    || name.equals("shadowcolor") || name.equals("shadowcolor0")
+                    || ShadowColorSampler.isSampler(name)
                     || geometryInputs.containsKey(name));
             if (!recognized && !irisSampler) {
                 throw new IOException(programName + " uses unsupported sampler '" + name + "'.");
@@ -400,7 +400,9 @@ public final class TextureColorDistanceShaderAdapter {
         boolean usesSpecular = allowIrisSamplers && TerrainShaderAdapter.usesSpecularSampler(uncommented);
         boolean usesShadow = allowIrisSamplers && EntityShaderAdapter.usesShadowSampler(uncommented);
         boolean usesOpaqueShadow = allowIrisSamplers && ShadowDepthSampler.used(uncommented);
-        boolean usesShadowColor = allowIrisSamplers && ShadowColorSampler.used(uncommented);
+        Set<Integer> shadowColorInputs = allowIrisSamplers
+                ? ShadowColorSampler.indices(uncommented) : Set.of();
+        boolean usesShadowColor = !shadowColorInputs.isEmpty();
         StringBuilder bridge = new StringBuilder();
         if (usesLightmap) bridge.append("uniform sampler2D Sampler2;\n#define lightmap Sampler2\n");
         if (usesNoise) bridge.append("uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n");
@@ -408,9 +410,7 @@ public final class TextureColorDistanceShaderAdapter {
         if (usesShadow) bridge.append("uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n");
         if (usesOpaqueShadow) bridge.append("uniform sampler2D ").append(ShadowDepthSampler.NAME)
                 .append(";\n#define shadowtex1 ").append(ShadowDepthSampler.NAME).append('\n');
-        if (usesShadowColor) bridge.append("uniform sampler2D ").append(ShadowColorSampler.NAME)
-                .append(";\n#define shadowcolor0 ").append(ShadowColorSampler.NAME)
-                .append("\n#define shadowcolor ").append(ShadowColorSampler.NAME).append('\n');
+        bridge.append(ShadowColorSampler.bridge(shadowColorInputs));
         for (Map.Entry<String, Integer> input : geometryInputs.entrySet()) {
             bridge.append("uniform sampler2D ").append(GeometryColorSamplers.samplerName(input.getValue()))
                     .append(";\n#define ").append(input.getKey()).append(' ')
@@ -434,7 +434,7 @@ public final class TextureColorDistanceShaderAdapter {
                 .replaceAll("\\bshadow2D\\s*\\(", "veyraTextureShadowSample(");
         return new SamplerBridge(result, bridge.toString(), new SamplerInputs(
                 usesNoise, usesShadow, usesSpecular, usesLightmap, usesShadowColor, usesOpaqueShadow,
-                Set.copyOf(geometryIndices), Set.of()));
+                Set.copyOf(geometryIndices), Set.of(), Set.copyOf(shadowColorInputs)));
     }
 
     static SamplerInputs inspectSamplers(String source, String programName,
@@ -448,15 +448,16 @@ public final class TextureColorDistanceShaderAdapter {
 
     record SamplerInputs(boolean usesNoiseSampler, boolean usesShadowSampler, boolean usesSpecularSampler,
                          boolean usesLightmapSampler, boolean usesShadowColor, boolean usesOpaqueShadow,
-                         Set<Integer> geometryColorInputs, Set<String> customImageSamplers) {
+                         Set<Integer> geometryColorInputs, Set<String> customImageSamplers,
+                         Set<Integer> shadowColorInputs) {
         static SamplerInputs empty() {
-            return new SamplerInputs(false, false, false, false, false, false, Set.of(), Set.of());
+            return new SamplerInputs(false, false, false, false, false, false, Set.of(), Set.of(), Set.of());
         }
 
         SamplerInputs withCustomImageSamplers(Set<String> samplers) {
             return new SamplerInputs(usesNoiseSampler, usesShadowSampler, usesSpecularSampler,
                     usesLightmapSampler, usesShadowColor, usesOpaqueShadow,
-                    geometryColorInputs, Set.copyOf(samplers));
+                    geometryColorInputs, Set.copyOf(samplers), shadowColorInputs);
         }
     }
 

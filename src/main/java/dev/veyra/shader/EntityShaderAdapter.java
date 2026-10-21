@@ -611,7 +611,8 @@ public final class EntityShaderAdapter {
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
                     && !geometryColorInputs.containsKey(sampler)
-                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1"))
+                    || ShadowColorSampler.isSampler(sampler)) && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
@@ -924,9 +925,7 @@ public final class EntityShaderAdapter {
         if (ShadowDepthSampler.used(source)) {
             bridge = "uniform sampler2D " + ShadowDepthSampler.NAME + ";\n#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
         }
-        if (ShadowColorSampler.used(source)) {
-            bridge = "uniform sampler2D " + ShadowColorSampler.NAME + ";\n#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
-        }
+        bridge = ShadowColorSampler.bridge(ShadowColorSampler.indices(source)) + bridge;
         StringBuilder geometryColorBridge = new StringBuilder();
         for (int index : GeometryColorSamplers.indices(geometryColorInputs)) {
             geometryColorBridge.append("uniform sampler2D ")
