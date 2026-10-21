@@ -333,6 +333,21 @@ public class ShaderCompileSmoke {
             count++;
             compiled += 2;
 
+            Path particleFixture = Path.of("examples/particles-translucent-vertex-execution/shaders");
+            String particlePackVertex = GlslPreprocessor.process("gbuffers_particles_translucent.vsh",
+                    Files.readString(particleFixture.resolve("gbuffers_particles_translucent.vsh")));
+            String particlePackFragment = GlslPreprocessor.process("gbuffers_particles_translucent.fsh",
+                    Files.readString(particleFixture.resolve("gbuffers_particles_translucent.fsh")));
+            BasicVertexShaderAdapter.AdaptedStage particleVertex = BasicVertexShaderAdapter.adaptStage(
+                    weatherNativeVertexSource(), particlePackVertex, "gbuffers_particles_translucent",
+                    BasicVertexShaderAdapter.Format.WEATHER);
+            String particleFragment = TextureColorDistanceShaderAdapter.adaptFragment(particlePackFragment,
+                    "gbuffers_particles_translucent", particleVertex.varyings(), false, true);
+            compileVertex(compiler, options, particleVertex.source(), "translucent-particle-pack-vertex", true);
+            compile(compiler, options, particleFragment, "translucent-particle-pack-fragment", true);
+            count++;
+            compiled += 2;
+
             String skyTexturedPackVertexSource = """
                     #version 130
                     varying vec2 texCoord;
@@ -391,6 +406,29 @@ public class ShaderCompileSmoke {
                     """, "gbuffers_textured", texturedVertex.varyings(), false, false);
             compileVertex(compiler, options, texturedVertex.source(), "textured-pack-vertex", true);
             compile(compiler, options, texturedFragment, "textured-pack-fragment", true);
+            count++;
+            compiled += 2;
+
+            BasicVertexShaderAdapter.AdaptedStage texturedDefaultInputsVertex = BasicVertexShaderAdapter.validate(
+                    "gbuffers_textured", """
+                            #version 120
+                            attribute vec4 mc_Entity;
+                            attribute vec4 mc_midTexCoord;
+                            varying float defaultInputs;
+                            void main() {
+                                gl_Position = ftransform();
+                                defaultInputs = mc_Entity.w + mc_midTexCoord.w;
+                            }
+                            """, BasicVertexShaderAdapter.Format.TEXTURED);
+            String texturedDefaultInputsFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 120
+                    varying float defaultInputs;
+                    void main() { gl_FragColor = vec4(defaultInputs * 0.5, 0.0, 1.0, 1.0); }
+                    """, "gbuffers_textured", texturedDefaultInputsVertex.varyings(), false, false);
+            compileVertex(compiler, options, texturedDefaultInputsVertex.source(),
+                    "textured-default-vertex-attributes-vertex", true);
+            compile(compiler, options, texturedDefaultInputsFragment,
+                    "textured-default-vertex-attributes-fragment", true);
             count++;
             compiled += 2;
             Path beaconFixture = Path.of("examples/beaconbeam-vertex-execution/shaders");
@@ -867,7 +905,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather-particle vertex/lightmap/varyings, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather and translucent-particle vertex/lightmap/varyings, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

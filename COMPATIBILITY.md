@@ -1,10 +1,12 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.30 published; weather batch in progress
+# Shaderpack compatibility: Veyra 0.2.0-beta.30 published; next feature batch under validation
 
-## Weather vertex execution work in progress
+## Weather, textured-default, and translucent-particle vertex support
 
-The active `feature/weather-vertex-execution` branch executes supported `gbuffers_weather.vsh` programs against Minecraft's particle vertex format, preserves native lightmap/fog outputs, and links the pack varyings to the weather fragment or textured fallback. The four-pack pinned audit now accepts **864 geometry fragment cases and rejects 0** across 75 default/profile/dimension rows and 5,178 stages. No row has an adapter error or weather capability error. The remaining whole-pack capability blockers are 18 Complementary `shadowcomp.csh` stages and 3 Sildur `mc_Entity` inputs. All 75 rows retain `visualValidation=false`; the new rainy-world Lavapipe fixture has not completed yet.
+Weather vertex execution merged into `main` in PR [#82](https://github.com/glebKovshov/Veyra/pull/82), commit `8872b50`. The current feature candidate adds the world-border `gbuffers_textured.vsh` generic defaults for `mc_Entity` and `mc_midTexCoord`, comment-safe uniform and sampler scans, and custom `gbuffers_particles_translucent.vsh` execution.
 
-Local JDK 21 checks passed **336 tests**, processed 86 example shaders, and compiled 100 stages directly to Vulkan SPIR-V. This branch is not merged or released.
+The four-pack pinned source audit covers 75 default/profile/dimension rows and 5,178 stages. It accepts **864 geometry-fragment adapter results and rejects 0**; **57/75** rows have no capability error. The remaining 18 blockers are selected Complementary `shadowcomp.csh` compute stages, which are not implemented. All rows retain `visualValidation=false`.
+
+Synthetic GPU fixtures on an NVIDIA RTX 3070 produced **142,776 active / 0 disabled** magenta pixels for textured defaults and **9,583 / 0** for translucent particles. These exercise specific adapters and do not establish full third-party-pack visual compatibility. JDK 21 checks pass **338 tests**, 88 shader examples, and 104 direct Vulkan SPIR-V compilations. The candidate has not yet been merged or released.
 
 ## Beta.30 CloudRenderer fix and textured lightmap support
 

@@ -49,7 +49,7 @@ final class BasicVertexShaderAdapter {
     private static final Pattern UNSUPPORTED_SKY_INPUT = Pattern.compile(
             "\\b(vaNormal|Normal|UV2|LineWidth)\\b");
     private static final Pattern UNSUPPORTED_WEATHER_INPUT = Pattern.compile(
-            "\\b(vaNormal|Normal|LineWidth|gl_Normal)\\b");
+            "\\b(vaNormal|Normal|LineWidth)\\b");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern FOG_COORD = Pattern.compile("\\bgl_FogFragCoord\\b");
     private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile(
@@ -395,6 +395,7 @@ final class BasicVertexShaderAdapter {
         };
         String vertex = format == Format.TEXTURED
                 ? "vec4(Position + ModelOffset, 1.0)" : "vec4(Position + veyraVertexOffset, 1.0)";
+        // OpenGL's legacy current normal defaults to +Z when the particle format has no normal array.
         String normal = format == Format.LINE ? "Normal" : "vec3(0.0, 0.0, 1.0)";
         String texture0 = hasTextureCoordinate(format)
                 ? "vec4(UV0, 0.0, 1.0)"
@@ -605,17 +606,37 @@ final class BasicVertexShaderAdapter {
         StringBuilder cleaned = new StringBuilder(source.length());
         int copiedThrough = 0;
         while (matcher.find()) {
-            String name = matcher.group(2);
+            String type = matcher.group(1), name = matcher.group(2);
             String withoutDeclaration = masked.substring(0, matcher.start()) + " ".repeat(matcher.end() - matcher.start())
                     + masked.substring(matcher.end());
-            if (Pattern.compile("\\b" + Pattern.quote(name) + "\\b").matcher(withoutDeclaration).find()) {
-                throw new IOException(programName + ".vsh vertex input '" + name
-                        + "' is not present in Minecraft's " + format.name().toLowerCase() + " vertex format.");
+            boolean used = Pattern.compile("\\b" + Pattern.quote(name) + "\\b").matcher(withoutDeclaration).find();
+            if (used) {
+                String defaultAttribute = nativeDefaultAttribute(format, type, name, programName);
+                if (defaultAttribute == null) {
+                    throw new IOException(programName + ".vsh vertex input '" + name
+                            + "' is not present in Minecraft's " + format.name().toLowerCase() + " vertex format.");
+                }
+                cleaned.append(source, copiedThrough, matcher.start()).append(defaultAttribute);
+                copiedThrough = matcher.end();
+            } else {
+                cleaned.append(source, copiedThrough, matcher.start());
+                copiedThrough = matcher.end();
             }
-            cleaned.append(source, copiedThrough, matcher.start());
-            copiedThrough = matcher.end();
         }
         return cleaned.append(source, copiedThrough, source.length()).toString();
+    }
+
+    private static String nativeDefaultAttribute(Format format, String type, String name, String programName)
+            throws IOException {
+        if (format != Format.TEXTURED || !(name.equals("mc_Entity") || name.equals("mc_midTexCoord"))) {
+            return null;
+        }
+        if (!type.equals("vec4")) {
+            throw new IOException(programName + ".vsh input '" + name + "' must be declared as vec4.");
+        }
+        // Iris maps WORLD_BORDER to TEXTURED but does not extend this POSITION_TEX format.
+        // Match OpenGL's generic-attribute default for pack declarations absent from that format.
+        return "#define " + name + " vec4(0.0, 0.0, 0.0, 1.0)\n";
     }
 
     private static MainFunction findMain(String source, String owner) throws IOException {

@@ -35,8 +35,9 @@ public final class ShaderPackUniformAdapter {
     }
 
     static AdaptedShader extract(String source, String programName, boolean entityColorAvailable) throws IOException {
-        Matcher matcher = UNIFORM_DECLARATION.matcher(source);
-        StringBuffer withoutUniforms = new StringBuffer();
+        Matcher matcher = UNIFORM_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(source));
+        StringBuilder withoutUniforms = new StringBuilder(source.length());
+        int uniformCursor = 0;
         StringBuilder declarations = new StringBuilder();
         List<UniformField> fields = new ArrayList<>();
         StringBuilder macros = new StringBuilder();
@@ -49,7 +50,8 @@ public final class ShaderPackUniformAdapter {
             String name = matcher.group(2);
             String unbound = unboundEntityDeclaration(programName, type, name);
             if (unbound != null) {
-                matcher.appendReplacement(withoutUniforms, "");
+                withoutUniforms.append(source, uniformCursor, matcher.start());
+                uniformCursor = matcher.end();
                 macros.append(unbound);
                 continue;
             }
@@ -57,7 +59,8 @@ public final class ShaderPackUniformAdapter {
                 if (!type.equals("vec4")) {
                     throw new IOException(programName + " uniform 'entityColor' must use vec4.");
                 }
-                matcher.appendReplacement(withoutUniforms, "");
+                withoutUniforms.append(source, uniformCursor, matcher.start());
+                uniformCursor = matcher.end();
                 macros.append(entityColorAvailable
                         ? "#define entityColor overlayColor\n"
                         : "const vec4 entityColor = vec4(0.0);\n");
@@ -91,9 +94,10 @@ public final class ShaderPackUniformAdapter {
                             .append(bufferName).append(" != 0)\n");
                 }
             }
-            matcher.appendReplacement(withoutUniforms, "");
+            withoutUniforms.append(source, uniformCursor, matcher.start());
+            uniformCursor = matcher.end();
         }
-        matcher.appendTail(withoutUniforms);
+        withoutUniforms.append(source, uniformCursor, source.length());
         return new AdaptedShader(withoutUniforms.toString(), declarations.toString(),
                 List.copyOf(fields), macros.toString());
     }

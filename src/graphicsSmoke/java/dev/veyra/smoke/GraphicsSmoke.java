@@ -31,8 +31,8 @@ public final class GraphicsSmoke {
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
             glintMrtFixture, basicVertexFixture, skyBasicVertexFixture, skyTexturedStageFixture,
-            beaconBeamFixture, blockVertexFixture,
-            damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture;
+            beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
+            damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
@@ -73,10 +73,26 @@ public final class GraphicsSmoke {
             skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
             skyTexturedStageFixture = fixture.equals("skytextured-stage-variants");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
+            texturedDefaultAttributesFixture = fixture.equals("textured-default-vertex-attributes");
             weatherVertexFixture = fixture.equals("weather-vertex-execution");
+            particleVertexFixture = fixture.equals("particles-translucent-vertex-execution");
             blockVertexFixture = fixture.equals("block-vertex-execution");
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
             handVertexFixture = fixture.equals("hand-vertex-execution");
+            if (texturedDefaultAttributesFixture && worldTicks == 1) {
+                var border = client.level.getWorldBorder();
+                border.setCenter(client.player.getX(), client.player.getZ());
+                border.setSize(4.0);
+            }
+            if (particleVertexFixture && stage == 0 && worldTicks >= 40 && worldTicks < 160
+                    && worldTicks % 2 == 0) {
+                var center = client.player.getEyePosition().add(client.player.getLookAngle().scale(3.0));
+                for (int index = 0; index < 4; index++) {
+                    var position = center.add((index - 1.5) * 0.2, (index % 2) * 0.2, 0.0);
+                    client.level.addParticle(net.minecraft.core.particles.ParticleTypes.CLOUD, true, true,
+                            position.x, position.y, position.z, 0.0, 0.0, 0.0);
+                }
+            }
             boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture
                     || handVertexFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
@@ -198,7 +214,7 @@ public final class GraphicsSmoke {
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     && !glintMrtFixture && !basicVertexFixture && !skyBasicVertexFixture && !beaconBeamFixture
                     && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
-                    && !weatherVertexFixture
+                    && !weatherVertexFixture && !particleVertexFixture && !texturedDefaultAttributesFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -439,7 +455,8 @@ public final class GraphicsSmoke {
                         disabledBeaconBeamMrtPixels = basicMrtPixelCount;
                     }
                     int minPixels = currentRenderedItemFixture || blockVertexFixture
-                            || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture ? 100 : 2000;
+                            || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture || particleVertexFixture
+                            || texturedDefaultAttributesFixture ? 100 : 2000;
                     Throwable failure;
                     if (skyTexturedStageFixture) {
                         disabledSkySunPixels = count;
