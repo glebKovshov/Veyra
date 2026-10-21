@@ -119,21 +119,102 @@ tasks.register('validateShaders', JavaExec) {
     mainClass = 'dev.veyra.shader.ShaderCompileSmoke'
 }
 
-tasks.register('auditShaderPacks', JavaExec) {
+// Each audit case installs global adapter state (custom uniforms, ID maps), so cases run in separate
+// JVMs rather than threads. Records are printed back in argument order, as a single JVM would.
+abstract class ShaderPackAuditTask extends DefaultTask {
+    @javax.inject.Inject
+    abstract org.gradle.process.ExecOperations getExecOperations()
+
+    @Classpath
+    abstract ConfigurableFileCollection getAuditClasspath()
+
+    @Input
+    abstract ListProperty<String> getAuditArguments()
+
+    @Input
+    abstract Property<Integer> getWorkers()
+
+    @Input
+    abstract Property<String> getWorkerHeap()
+
+    @TaskAction
+    void audit() {
+        // --dimension/--profile apply to every following path; expand them into self-contained cases.
+        List<List<String>> cases = []
+        String dimension = '--dimension=0'
+        String profile = '--profile='
+        for (String argument : auditArguments.get()) {
+            if (argument.startsWith('--dimension=')) dimension = argument
+            else if (argument.startsWith('--profile=')) profile = argument
+            else cases.add([dimension, profile, argument])
+        }
+        if (cases.isEmpty()) throw new GradleException('Supply pack paths with -PshaderPacks or -PshaderPackAuditArguments.')
+        int count = Math.max(1, Math.min(cases.size(), workers.get()))
+        // Strided assignment gives every worker a mix of heavy and light packs.
+        List<List<Integer>> assignments = (0..<count).collect { int worker -> (worker..<cases.size()).step(count) }
+        logger.lifecycle("Auditing ${cases.size()} shaderpack cases in ${count} parallel JVMs.")
+        def pool = java.util.concurrent.Executors.newFixedThreadPool(count)
+        List<Map> results
+        try {
+            def futures = assignments.collect { List<Integer> indices ->
+                pool.submit({
+                    def output = new ByteArrayOutputStream()
+                    def errors = new ByteArrayOutputStream()
+                    def result = execOperations.javaexec { spec ->
+                        spec.classpath(auditClasspath)
+                        spec.mainClass.set('dev.veyra.shader.ShaderPackAudit')
+                        spec.maxHeapSize = workerHeap.get()
+                        spec.jvmArgs('-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8')
+                        spec.args(indices.collectMany { cases[it] })
+                        spec.standardOutput = output
+                        spec.errorOutput = errors
+                        spec.ignoreExitValue = true
+                    }
+                    [indices: indices, exit: result.exitValue,
+                     output: output.toString('UTF-8'), errors: errors.toString('UTF-8')]
+                } as java.util.concurrent.Callable)
+            }
+            results = futures.collect { it.get() }
+        } finally {
+            pool.shutdownNow()
+        }
+        String[] records = new String[cases.size()]
+        Set<String> diagnostics = new LinkedHashSet<>()
+        List<String> failures = []
+        results.each { Map result ->
+            List<String> lines = result.output.readLines()
+            List<String> json = lines.findAll { it.startsWith('{') && it.contains('"pack":') }
+            diagnostics.addAll(lines.findAll { !it.isBlank() && !(it.startsWith('{') && it.contains('"pack":')) })
+            if (!result.errors.isBlank()) System.err.print(result.errors)
+            if (result.exit != 0 || json.size() != result.indices.size()) {
+                failures.add("exit ${result.exit}, ${json.size()}/${result.indices.size()} records for "
+                        + result.indices.collect { cases[it][2] + ' ' + cases[it][1] + ' ' + cases[it][0] }.join('; '))
+            }
+            json.eachWithIndex { String line, int index -> if (index < result.indices.size()) records[result.indices[index]] = line }
+        }
+        diagnostics.each { println it }
+        records.each { if (it != null) println it }
+        if (!failures.isEmpty()) throw new GradleException('Shaderpack audit workers failed:\n' + failures.join('\n'))
+    }
+}
+
+tasks.register('auditShaderPacks', ShaderPackAuditTask) {
     group = 'verification'
-    description = 'Read-only source audit of external pack paths supplied with -PshaderPacks=path1,path2.'
+    description = 'Read-only source audit of external pack paths supplied with -PshaderPacks=path1,path2. ' +
+            'Cases run in parallel JVMs: -PshaderPackAuditWorkers (default: all logical CPUs), -PshaderPackAuditHeap (default 1536m).'
     dependsOn tasks.named('shaderSmokeClasses')
     // Minecraft's Biomes class supplies the vanilla biome order that BiomesMixin records at runtime.
-    classpath = sourceSets.shaderSmoke.runtimeClasspath + sourceSets.main.compileClasspath
-    mainClass = 'dev.veyra.shader.ShaderPackAudit'
+    auditClasspath.from(sourceSets.shaderSmoke.runtimeClasspath, sourceSets.main.compileClasspath)
     if (project.hasProperty('shaderPackAuditArguments')) {
-        def auditArguments = new groovy.json.JsonSlurper().parse(file(project.property('shaderPackAuditArguments')))
-        if (!(auditArguments instanceof List) || !auditArguments.every { it instanceof String }) {
+        def parsed = new groovy.json.JsonSlurper().parse(file(project.property('shaderPackAuditArguments')))
+        if (!(parsed instanceof List) || !parsed.every { it instanceof String }) {
             throw new GradleException('Shaderpack audit arguments must be a JSON array of strings.')
         }
-        args auditArguments
+        auditArguments.addAll(parsed)
     }
-    if (project.hasProperty('shaderPacks')) args project.property('shaderPacks').toString().split(',')
+    if (project.hasProperty('shaderPacks')) auditArguments.addAll(project.property('shaderPacks').toString().split(',') as List)
+    workers = (project.findProperty('shaderPackAuditWorkers') ?: Runtime.runtime.availableProcessors()).toString().toInteger()
+    workerHeap = (project.findProperty('shaderPackAuditHeap') ?: '1536m').toString()
 }
 
 // Development-only client integration harness; never included in the distributable mod.
