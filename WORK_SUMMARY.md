@@ -1,23 +1,16 @@
-## Следующий блок большого beta.27 пакета: skybasic VSH — runtime и source audit пройдены (2026-10-21)
+## Beta.27 batch: damaged-block + skybasic — интеграция (2026-10-21)
 
-- В существующем worktree `feature/skybasic-vertex-execution` добавлено исполнение `gbuffers_skybasic.vsh` для трёх Minecraft pipeline: sky, stars и sunrise/sunset. В preflight проверяются реальные vertex formats и связи varyings с `gbuffers_skybasic.fsh` либо fallback `gbuffers_basic.fsh`.
-- Полный JDK 21 `test validateShaders build compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon` прошёл: **308 тестов без failures/errors/skips; 82 example shaders обработаны, 86 стадий скомпилированы в Vulkan SPIR-V**. Кандидатный JAR проходит `scripts/verify_jar.py`, но пока имеет beta.26 metadata.
-- Реальный skybasic smoke на RTX 3070 прошёл: все 3 sky pipeline загрузились, **226,435 активных magenta pixels / 0 после выключения шейдеров**, `status=passed`. Это синтетическая проверка pipeline, не визуальная совместимость с полным сторонним pack; локально validation layer не включена.
-- Исправлена подготовка smoke: fixture id сопоставляется с каталогом `gbuffers-skybasic-vertex-execution`; readback sky проверяет основной framebuffer, камера направлена в небо. Повторный клиентский прогон прошёл.
-- Pinned source audit: 4 SHA-512-pinned архива, 75 profile/dimension cases и 5,178 stages; **781 geometry fragment programs accepted / 8 rejected**. Ошибка `gbuffers_skybasic.vsh` снята, но остаются 12 случаев `renderStage`, 1 `gbuffers_skytextured.vsh`, 54 `entityId`, 6 `mc_Entity` и 2 `shadowData`. Все 75 записей имеют `visualValidation=false`; внешние shaderpacks целиком визуально не подтверждены.
-- Публичным релизом остаётся beta.26; beta.27 пока не выпускалась. Эта skybasic-работа ещё не прошла CI и интеграцию с актуальным `main`.
-
-## Beta.27 damaged-block batch: PR #70 слит, все CI проверки зелёные (2026-10-21)
-
-- PR [#70](https://github.com/glebKovshov/Veyra/pull/70) слит в `main` commit `17409ce`. GitHub Build, pinned source audit и **30/30 Lavapipe graphics fixtures** прошли.
-- Исправлен mismatch crumbling `UV2`: исходник VulkanMod адаптируется перед компиляцией в `VkGpuDevice.getCachedShaderSrc`. `damagedblock-vertex-execution` прошёл Vulkan validation, прежний `VUID-VkGraphicsPipelineCreateInfo-Input-08733` устранён.
-- Release asset не менялся: текущий кандидат проходит проверку состава JAR, но сохраняет beta.26 metadata; новый prerelease ещё не публиковался.
-
+- PR [#70](https://github.com/glebKovshov/Veyra/pull/70) с damaged-block vertex support слит в `main` commit `17409ce`; GitHub Build, pinned source audit и **30/30 Lavapipe graphics fixtures** прошли. Ошибка crumbling `UV2` устранена в `VkGpuDevice.getCachedShaderSrc`; fixture прошёл Vulkan validation.
+- В `feature/skybasic-vertex-execution` добавлены `gbuffers_skybasic.vsh` stages для sky, stars и sunrise/sunset, с проверкой реальных vertex formats и varyings. До интеграции с PR #70: **308 тестов, 82 example shaders, 86 Vulkan SPIR-V stages**; RTX 3070 smoke загрузил все три pipeline и получил **226,435 активных magenta pixels / 0 при отключении**.
+- Skybasic smoke harness исправлен: fixture использует корректный каталог, основной framebuffer и камеру, направленную в небо. Патчи сохранены в `2f01859`.
+- До skybasic изменений pinned source audit содержал 4 SHA-512-pinned архива, 75 profile/dimension cases и 5,178 stages; **781 geometry fragment accepted / 8 rejected**. Оставались blockers `renderStage` (12), `gbuffers_skytextured.vsh` (1), `entityId` (54), `mc_Entity` (6) и `shadowData` (2); полная визуальная проверка pack не выполнена (`visualValidation=false`).
+- Интеграция skybasic с актуальным `main` разрешена. В этой объединённой ветке ещё предстоят полная локальная проверка и GitHub CI; публичный релиз — beta.26. Следующий релиз должен накопить оба функциональных пакета согласно пожеланию выпускать реже.
 ## Beta.26 опубликована; cloud crash fix доступен в release — 2026-10-21
 
 - PR [#68](https://github.com/glebKovshov/Veyra/pull/68) слит в main commit d9e58ea598555d24a02375f3e6fa2d56d1013bf3; tag v0.2.0-beta.26+mc1.21.11 опубликован. Release workflow [39516955852](https://github.com/glebKovshov/Veyra/actions/runs/39516955852) и tag Build [39516955962](https://github.com/glebKovshov/Veyra/actions/runs/39516955962) завершились успешно. В Release прошли pinned source audit, 31/31 graphics smoke fixtures, build/tests, проверка distributable и публикация.
 - Скачанный с GitHub install JAR размером 731,597 bytes имеет SHA-256 e9c80bf1d6914e275bb817a13859eb1b290b6feb0d1c1ae95254b021d5938be9; хеш совпал с SHA256SUMS.txt, а scripts/verify_jar.py подтвердил Minecraft 1.21.11 / VulkanMod 0.6.8 / Veyra beta.26. Release также содержит sources JAR (265,175 bytes) и example-packs ZIP (84,319 bytes).
 - Исправление beta.25 CloudRenderer Mixin crash входит в beta.26: remap для @At(INVOKE) selector Tesselator.begin включён. Опубликованный beta.25 asset не заменялся и остаётся затронутым. Приложенный crash log имеет время 00:09:35; JAR с исправлением был установлен в профиль позже, в 01:00:24. На момент этой записи текущий профильный JAR — beta.25-named preview с SHA-256 28abd0bbe39f5b18620df9c8a8265047fefa18db486a15ae8881166ae8592549; его метаданные проверены. Профиль можно запустить повторно; для публичного релизного артефакта используйте beta.26.
+- После повторной проверки лога профиль обновлён на официальный beta.26 JAR (SHA-256 e9c80bf1d6914e275bb817a13859eb1b290b6feb0d1c1ae95254b021d5938be9); scripts/verify_jar.py прошёл. Предыдущий beta.25 JAR сохранён вне mods/ как резервная копия.
 - Pinned audit по-прежнему source-only: 4 архива, 75 записей / 5,178 stages, 709 geometry fragments accepted / 8 rejected; visualValidation=false во всех записях. Полная визуальная совместимость с shaderpacks и стабильная цель не заявляются завершёнными.
 
 ## Beta.26 release batch — PR #67 слит (2026-10-21)

@@ -55,6 +55,11 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+ivec2\\s+UV1\\s*;");
     private static final Pattern ITEM_ENTITY_OVERLAY_ASSIGNMENT = Pattern.compile(
             "(?m)^([\\t ]*texCoord1\\s*=\\s*)UV1(\\s*;)");
+    private static final Pattern BLOCK_LIGHTMAP_ATTRIBUTE = Pattern.compile(
+            "(?m)^([\\t ]*)(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?"
+                    + "in\\s+(?:i?vec2)(\\s+UV2\\s*;[\\t ]*(?://[^\\r\\n]*)?)");
+    private static final Pattern BLOCK_LIGHTMAP_ASSIGNMENT = Pattern.compile(
+            "(\\btexCoord2\\s*=\\s*)UV2(\\s*;)");
     private static final Pattern LIGHTMAP_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec2\\s+lmcoord\\s*;");
     private static final Pattern VIEW_POSITION_VERTEX_ATTRIBUTE = Pattern.compile(
@@ -327,6 +332,40 @@ public final class EntityShaderAdapter {
 
     static String adaptItemEntityVertexFormat(String source, String programName) throws IOException {
         return adaptOverlayVertexFormat(source, programName);
+    }
+
+    /** Minecraft's crumbling pipeline uses BLOCK attributes, whose UV2 input is an integer pair at location 3. */
+    public static String adaptBlockVertexFormat(String source, String programName) throws IOException {
+        if (source == null || source.isBlank()) {
+            throw new IOException(programName + " cannot adapt the BLOCK vertex format because its VulkanMod vertex shader is empty.");
+        }
+        Matcher lightmap = BLOCK_LIGHTMAP_ATTRIBUTE.matcher(source);
+        if (!lightmap.find()) {
+            throw new IOException(programName + " cannot adapt the BLOCK vertex format because UV2's shader input changed.");
+        }
+        StringBuffer adapted = new StringBuffer();
+        do {
+            String location = lightmap.group(2);
+            if (location != null && !location.equals("3")) {
+                throw new IOException(programName + " cannot adapt the BLOCK vertex format because UV2 moved from location 3.");
+            }
+            String explicitLocation = location == null ? "" : "layout(location=" + location + ") ";
+            lightmap.appendReplacement(adapted, Matcher.quoteReplacement(
+                    lightmap.group(1) + explicitLocation + "in ivec2" + lightmap.group(3)));
+        } while (lightmap.find());
+        lightmap.appendTail(adapted);
+        return castBlockLightmapAssignment(adapted.toString());
+    }
+
+    private static String castBlockLightmapAssignment(String source) {
+        Matcher assignment = BLOCK_LIGHTMAP_ASSIGNMENT.matcher(source);
+        StringBuffer adapted = new StringBuffer();
+        while (assignment.find()) {
+            assignment.appendReplacement(adapted, Matcher.quoteReplacement(
+                    assignment.group(1) + "vec2(UV2)" + assignment.group(2)));
+        }
+        assignment.appendTail(adapted);
+        return adapted.toString();
     }
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName,
