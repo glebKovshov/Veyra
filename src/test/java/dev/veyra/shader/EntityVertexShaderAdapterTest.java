@@ -54,6 +54,126 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void linksDamagedBlockFragmentToCustomVertexVaryings() throws Exception {
+        String vertex = """
+                #version 120
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                void main() {
+                    gl_Position = ftransform();
+                    texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    glcolor = gl_Color;
+                }
+                """;
+        String fragment = """
+                #version 120
+                uniform sampler2D texture;
+                uniform float alphaTestRef;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                void main() {
+                    vec4 color = texture2D(texture, texcoord) * glcolor;
+                    if (color.a < alphaTestRef) discard;
+                    gl_FragColor = color;
+                }
+                """;
+        var outputs = EntityVertexShaderAdapter.describeVaryings("gbuffers_damagedblock", vertex);
+
+        String adapted = DamagedBlockShaderAdapter.adaptFragment(fragment, "gbuffers_damagedblock",
+                outputs, false, false);
+
+        assertEquals(16, outputs.get("texcoord").location());
+        assertEquals(17, outputs.get("glcolor").location());
+        assertTrue(adapted.contains("layout(location = 16) in vec2 texCoord0;"));
+        assertTrue(adapted.contains("layout(location = 17) in vec4 vertexColor;"));
+        assertFalse(adapted.contains("uniform float alphaTestRef"));
+    }
+
+    @Test
+    void mapsDamagedBlockLightmapAliasThroughTheBlockVertexFormat() throws Exception {
+        String nativeBlock = EntityShaderAdapter.adaptBlockVertexFormat("""
+                #version 460
+                layout(location=0) in vec3 Position;
+                layout(location=1) in vec4 Color;
+                layout(location=2) in vec2 UV0;
+                layout(location=3) in vec2 UV2;
+                layout(location=4) in vec3 Normal;
+                layout(location=0) out vec4 vertexColor;
+                layout(location=1) out vec2 texCoord0;
+                layout(location=2) out vec2 texCoord2;
+                uniform mat4 ModelViewMat;
+                uniform mat4 ProjMat;
+                void main() {
+                    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                    vertexColor = Color;
+                    texCoord0 = UV0;
+                    texCoord2 = UV2;
+                }
+                """, "gbuffers_damagedblock");
+        String pack = """
+                #version 120
+                varying vec2 lmCoord;
+                void main() {
+                    gl_Position = ftransform();
+                    lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                }
+                """;
+
+        String blockFormat = EntityShaderAdapter.adaptBlockVertexFormat(
+                nativeBlock, "gbuffers_damagedblock");
+        String adapted = EntityVertexShaderAdapter.adaptStage(
+                blockFormat, pack, "gbuffers_damagedblock", false).source();
+
+        assertTrue(adapted.contains("layout(location=3) in ivec2 UV2;"), adapted);
+        assertTrue(adapted.contains("texCoord2 = vec2(UV2);"), adapted);
+        assertTrue(adapted.contains("#define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)"), adapted);
+        assertFalse(adapted.contains("#define gl_MultiTexCoord2"), adapted);
+    }
+
+    @Test
+    void rejectsEntityOverlayInputForDamagedBlockBecauseBlockFormatDoesNotProvideIt() {
+        String pack = """
+                #version 120
+                attribute vec2 UV1;
+                void main(){gl_Position=ftransform();}
+                """;
+
+        IOException error = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.validate("gbuffers_damagedblock", pack, false));
+
+        assertTrue(error.getMessage().contains("UV1"));
+        assertTrue(error.getMessage().contains("BLOCK vertex format"));
+    }
+
+    @Test
+    void rejectsUnavailableSecondLegacyTextureCoordinateForDamagedBlock() {
+        String pack = """
+                #version 120
+                void main(){gl_Position=ftransform()+gl_MultiTexCoord2;}
+                """;
+
+        IOException error = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.validate("gbuffers_damagedblock", pack, false));
+
+        assertTrue(error.getMessage().contains("gl_MultiTexCoord2"));
+        assertTrue(error.getMessage().contains("BLOCK vertex format"));
+    }
+
+    @Test
+    void rejectsUnavailableLightmapSamplerInDamagedBlockPipeline() throws Exception {
+        String vertex = "#version 120\nvarying vec2 lmcoord;\n"
+                + "void main(){gl_Position=ftransform();lmcoord=vec2(0.0);}\n";
+        String fragment = "#version 120\nuniform sampler2D lightmap;\nvarying vec2 lmcoord;\n"
+                + "void main(){gl_FragColor=texture2D(lightmap,lmcoord);}\n";
+        var outputs = EntityVertexShaderAdapter.describeVaryings("gbuffers_damagedblock", vertex);
+
+        IOException error = assertThrows(IOException.class, () -> DamagedBlockShaderAdapter.adaptFragment(
+                fragment, "gbuffers_damagedblock", outputs, false, false));
+
+        assertTrue(error.getMessage().contains("lightmap sampler"));
+    }
+
+    @Test
     void appliesHandDepthAfterTheShaderPackEntryPoint() throws Exception {
         String pack = "#version 120\nvoid main(){gl_Position=ftransform();}\n";
         String adapted = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "gbuffers_hand", true).source();

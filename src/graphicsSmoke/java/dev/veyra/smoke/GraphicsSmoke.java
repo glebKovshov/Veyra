@@ -30,7 +30,9 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture, beaconBeamFixture, blockVertexFixture, handVertexFixture;
+            glintMrtFixture, basicVertexFixture, beaconBeamFixture, blockVertexFixture,
+            damagedBlockVertexFixture, handVertexFixture;
+    private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
@@ -68,6 +70,7 @@ public final class GraphicsSmoke {
             basicVertexFixture = fixture.equals("basic-vertex-execution");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
             blockVertexFixture = fixture.equals("block-vertex-execution");
+            damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
             handVertexFixture = fixture.equals("hand-vertex-execution");
             boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture
                     || handVertexFixture;
@@ -75,7 +78,7 @@ public final class GraphicsSmoke {
                     || fixture.equals("shadow-color-entity") || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
                     || fixture.equals("entity-vertex-execution") || blockVertexFixture;
-            if ((entityFixture || beaconBeamFixture) && !entityFixtureStarted && worldTicks >= 20
+            if ((entityFixture || beaconBeamFixture || damagedBlockVertexFixture) && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
                 var server = client.getSingleplayerServer();
@@ -84,7 +87,14 @@ public final class GraphicsSmoke {
                 double playerX = client.player.getX(), playerY = client.player.getY(), playerZ = client.player.getZ();
                 server.execute(() -> {
                     try {
-                        if (beaconBeamFixture) {
+                        if (damagedBlockVertexFixture) {
+                            damagedBlockPosition = net.minecraft.core.BlockPos.containing(
+                                    playerX - 4.0, playerY - 1.0, playerZ + 4.0);
+                            server.overworld().setBlock(damagedBlockPosition,
+                                    net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 3);
+                            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                                    "Placed damaged-block vertex fixture at {}", damagedBlockPosition);
+                        } else if (beaconBeamFixture) {
                             var beacon = net.minecraft.core.BlockPos.containing(playerX - 4.0, playerY, playerZ + 4.0);
                             for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++) {
                                 server.overworld().setBlock(beacon.below().offset(x, 0, z),
@@ -134,8 +144,13 @@ public final class GraphicsSmoke {
                 });
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
+            if (damagedBlockVertexFixture && damagedBlockPosition != null
+                    && client.level.getBlockState(damagedBlockPosition).isSolid()) {
+                client.levelRenderer.destroyBlockProgress(-9876, damagedBlockPosition, 6);
+            }
             client.options.hideGui = !itemFixture;
-            client.player.setXRot(entityFixture || beaconBeamFixture ? 15.0F : cloudFixture ? -60.0F : 35.0F);
+            client.player.setXRot(entityFixture || beaconBeamFixture ? 15.0F
+                    : damagedBlockVertexFixture ? 20.0F : cloudFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
@@ -176,7 +191,7 @@ public final class GraphicsSmoke {
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     && !glintMrtFixture && !basicVertexFixture && !beaconBeamFixture
-                    && !blockVertexFixture && !handVertexFixture
+                    && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -377,7 +392,8 @@ public final class GraphicsSmoke {
                         disabledBeaconBeamGreenPixels = renderedItemGreenCount;
                         disabledBeaconBeamMrtPixels = basicMrtPixelCount;
                     }
-                    int minPixels = currentRenderedItemFixture || blockVertexFixture || handVertexFixture ? 100 : 2000;
+                    int minPixels = currentRenderedItemFixture || blockVertexFixture
+                            || damagedBlockVertexFixture || handVertexFixture ? 100 : 2000;
                     Throwable failure;
                     if (beaconBeamFixture) {
                         failure = activeBeaconBeamGreenPixels < 100 || activeBeaconBeamMrtPixels < 100

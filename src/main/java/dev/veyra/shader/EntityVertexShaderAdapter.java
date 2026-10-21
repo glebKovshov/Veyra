@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Runs Iris block/entity/hand vertex programs after Minecraft's native NEW_ENTITY setup. */
+/** Runs Iris block/entity/hand vertex programs after Minecraft's native vertex setup. */
 final class EntityVertexShaderAdapter {
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
@@ -41,6 +41,7 @@ final class EntityVertexShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:sampler\\w+|\\w+)\\s+\\w+\\s*;");
     private static final Pattern MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
+    private static final Pattern LEGACY_BLOCK_OVERLAY_INPUT = Pattern.compile("\\bgl_MultiTexCoord2\\b");
     private static final Pattern LEGACY_INPUT = Pattern.compile(
             "\\b(gl_MultiTexCoord[3-7]|gl_VertexID|gl_InstanceID|gl_ClipVertex|gl_FrontColor|gl_BackColor|"
                     + "mc_Entity|at_tangent|mc_midTexCoord|at_midBlock|mc_midBlock)\\b");
@@ -53,19 +54,26 @@ final class EntityVertexShaderAdapter {
             + "0.0, 0.00390625, 0.0, 0.0, "
             + "0.0, 0.0, 0.00390625, 0.0, "
             + "0.03125, 0.03125, 0.03125, 1.0)";
-    private static final Map<String, NativeAttribute> NATIVE_ATTRIBUTES = Map.of(
+    private static final Map<String, NativeAttribute> NEW_ENTITY_ATTRIBUTES = Map.of(
             "Position", new NativeAttribute("vec3", 0),
             "Color", new NativeAttribute("vec4", 1),
             "UV0", new NativeAttribute("vec2", 2),
             "UV1", new NativeAttribute("ivec2", 3),
             "UV2", new NativeAttribute("ivec2", 4),
             "Normal", new NativeAttribute("vec3", 5));
+    private static final Map<String, NativeAttribute> BLOCK_ATTRIBUTES = Map.of(
+            "Position", new NativeAttribute("vec3", 0),
+            "Color", new NativeAttribute("vec4", 1),
+            "UV0", new NativeAttribute("vec2", 2),
+            "UV2", new NativeAttribute("ivec2", 3),
+            "Normal", new NativeAttribute("vec3", 4));
 
     private EntityVertexShaderAdapter() { }
 
     static boolean supportsProgram(String programName) {
         return programName.startsWith("gbuffers_entities") || programName.startsWith("gbuffers_block")
-                || programName.startsWith("gbuffers_hand") || programName.equals("gbuffers_spidereyes");
+                || programName.startsWith("gbuffers_hand") || programName.equals("gbuffers_spidereyes")
+                || programName.equals("gbuffers_damagedblock");
     }
 
     static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
@@ -84,19 +92,7 @@ final class EntityVertexShaderAdapter {
         nativeSource = nativeSource.substring(0, nativeMain.start()) + "void veyraMinecraftEntityMain()"
                 + nativeSource.substring(nativeMain.end());
 
-        String bridge = """
-                #define gl_Vertex vec4(Position, 1.0)
-                #define gl_Color Color
-                #define gl_Normal Normal
-                #define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)
-                #define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)
-                #define gl_MultiTexCoord2 vec4(vec2(UV1), 0.0, 1.0)
-                #define gl_ModelViewMatrix ModelViewMat
-                #define gl_ProjectionMatrix ProjMat
-                #define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)
-                #define gl_NormalMatrix transpose(inverse(mat3(ModelViewMat)))
-                #define ftransform() ((ProjMat * ModelViewMat) * vec4(Position, 1.0))
-                """;
+        String bridge = nativeBridge(programName);
         String wrapper = "\nvoid main() { veyraMinecraftEntityMain(); veyraShaderPackMain();"
                 + (handPass ? " gl_Position.z *= 0.125;" : "") + " }\n";
         String source = nativeSource + "\n" + pack.outputDeclarations() + bridge
@@ -106,33 +102,10 @@ final class EntityVertexShaderAdapter {
     }
 
     static AdaptedStage validate(String programName, String shaderPackSource, boolean handPass) throws IOException {
-        String base = """
-                #version 460
-                layout(location=0) in vec3 Position;
-                layout(location=1) in vec4 Color;
-                layout(location=2) in vec2 UV0;
-                layout(location=3) in ivec2 UV1;
-                layout(location=4) in ivec2 UV2;
-                layout(location=5) in vec3 Normal;
-                layout(location=0) out vec4 vertexColor;
-                layout(location=1) out vec2 texCoord0;
-                layout(location=2) out vec4 lightMapColor;
-                layout(location=3) out vec4 overlayColor;
-                uniform mat4 ModelViewMat;
-                uniform mat4 ProjMat;
-                uniform mat4 TextureMat;
-                void main() { gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0); }
-                """;
+        String base = validationNativeSource(programName);
         PreparedStage prepared = prepare(shaderPackSource, programName);
         String adapted = base + "\n" + prepared.outputDeclarations()
-                + "#define gl_Vertex vec4(Position, 1.0)\n#define gl_Color Color\n#define gl_Normal Normal\n"
-                + "#define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)\n"
-                + "#define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)\n"
-                + "#define gl_MultiTexCoord2 vec4(vec2(UV1), 0.0, 1.0)\n"
-                + "#define gl_ModelViewMatrix ModelViewMat\n#define gl_ProjectionMatrix ProjMat\n"
-                + "#define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)\n"
-                + "#define gl_NormalMatrix transpose(inverse(mat3(ModelViewMat)))\n"
-                + "#define ftransform() ((ProjMat * ModelViewMat) * vec4(Position, 1.0))\n"
+                + nativeBridge(programName)
                 + prepared.uniformBridge() + prepared.source().replaceFirst(
                         "(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain(");
         if (handPass) adapted += "\n// hand-depth is applied by the runtime wrapper after the pack entrypoint\n";
@@ -176,7 +149,12 @@ final class EntityVertexShaderAdapter {
         }
         Matcher unsupportedInput = LEGACY_INPUT.matcher(ShaderSource.maskBlockAndLineComments(source));
         if (unsupportedInput.find()) throw new IOException(programName + ".vsh uses legacy interface '"
-                + unsupportedInput.group(1) + "', which is not provided by Minecraft's NEW_ENTITY vertex format.");
+                + unsupportedInput.group(1) + "', which is not provided by Minecraft's "
+                + vertexFormatName(programName) + " vertex format.");
+        if (usesBlockFormat(programName)
+                && LEGACY_BLOCK_OVERLAY_INPUT.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
+            throw new IOException(programName + ".vsh uses legacy interface 'gl_MultiTexCoord2', which is not provided by Minecraft's BLOCK vertex format.");
+        }
 
         source = expandCommaOutputs(source);
         OutputBridge outputs = extractOutputs(source, programName);
@@ -272,15 +250,17 @@ final class EntityVertexShaderAdapter {
 
     private static String removeAttributes(String source, String programName) throws IOException {
         Matcher matcher = ATTRIBUTE.matcher(ShaderSource.maskBlockAndLineComments(source));
+        Map<String, NativeAttribute> nativeAttributes = nativeAttributes(programName);
         StringBuilder clean = new StringBuilder(source.length());
         int cursor = 0;
         while (matcher.find()) {
             String name = matcher.group(3), type = matcher.group(2);
-            NativeAttribute attribute = NATIVE_ATTRIBUTES.get(name);
+            NativeAttribute attribute = nativeAttributes.get(name);
             if (attribute == null) throw new IOException(programName + ".vsh attribute '" + name
-                    + "' is not provided by Minecraft's NEW_ENTITY vertex format.");
-            if (!attribute.type().equals(type) && !(name.equals("UV1") && type.equals("vec2"))
-                    && !(name.equals("UV2") && type.equals("vec2"))) {
+                    + "' is not provided by Minecraft's " + vertexFormatName(programName) + " vertex format.");
+            boolean legacyFloatUv = !usesBlockFormat(programName)
+                    && (name.equals("UV1") || name.equals("UV2")) && type.equals("vec2");
+            if (!attribute.type().equals(type) && !legacyFloatUv) {
                 throw new IOException(programName + ".vsh attribute '" + name + "' must use " + attribute.type() + ".");
             }
             if (matcher.group(1) != null && Integer.parseInt(matcher.group(1)) != attribute.location()) {
@@ -291,6 +271,62 @@ final class EntityVertexShaderAdapter {
         }
         clean.append(source, cursor, source.length());
         return clean.toString();
+    }
+
+    private static boolean usesBlockFormat(String programName) {
+        return programName.equals("gbuffers_damagedblock");
+    }
+
+    private static String vertexFormatName(String programName) {
+        return usesBlockFormat(programName) ? "BLOCK" : "NEW_ENTITY";
+    }
+
+    private static Map<String, NativeAttribute> nativeAttributes(String programName) {
+        return usesBlockFormat(programName) ? BLOCK_ATTRIBUTES : NEW_ENTITY_ATTRIBUTES;
+    }
+
+    private static String nativeBridge(String programName) {
+        String lightmapAliases = usesBlockFormat(programName)
+                ? """
+                #define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)
+                """
+                : """
+                #define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)
+                #define gl_MultiTexCoord2 vec4(vec2(UV1), 0.0, 1.0)
+                """;
+        return """
+                #define gl_Vertex vec4(Position, 1.0)
+                #define gl_Color Color
+                #define gl_Normal Normal
+                #define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)
+                """ + lightmapAliases + """
+                #define gl_ModelViewMatrix ModelViewMat
+                #define gl_ProjectionMatrix ProjMat
+                #define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)
+                #define gl_NormalMatrix transpose(inverse(mat3(ModelViewMat)))
+                #define ftransform() ((ProjMat * ModelViewMat) * vec4(Position, 1.0))
+                """;
+    }
+
+    private static String validationNativeSource(String programName) {
+        StringBuilder source = new StringBuilder("""
+                #version 460
+                """);
+        nativeAttributes(programName).entrySet().stream()
+                .sorted(java.util.Comparator.comparingInt(entry -> entry.getValue().location()))
+                .forEach(entry -> source.append("layout(location=").append(entry.getValue().location())
+                        .append(") in ").append(entry.getValue().type()).append(' ').append(entry.getKey()).append(';')
+                        .append('\n'));
+        return source.append("""
+                layout(location=0) out vec4 vertexColor;
+                layout(location=1) out vec2 texCoord0;
+                layout(location=2) out vec4 lightMapColor;
+                layout(location=3) out vec4 overlayColor;
+                uniform mat4 ModelViewMat;
+                uniform mat4 ProjMat;
+                uniform mat4 TextureMat;
+                void main() { gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0); }
+                """).toString();
     }
 
     private static String expandCommaOutputs(String source) {

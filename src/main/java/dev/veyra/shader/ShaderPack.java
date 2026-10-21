@@ -216,6 +216,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 : readTerrainFragment("gbuffers_terrain");
     }
 
+    public Optional<String> readDamagedBlockVertex() throws IOException {
+        return readStage(DAMAGED_BLOCK_PROGRAM + ".vsh");
+    }
+
     public List<Program> readPrograms() throws IOException {
         if (!supportsShaderPrograms()) {
             throw new IOException(issue);
@@ -1037,13 +1041,22 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private boolean isEntityVertexProgram(String program) {
         return blockPrograms.contains(program) || entityPrograms.contains(program)
                 || HAND_PROGRAM.equals(program) && hasHandFragment
-                || HAND_WATER_PROGRAM.equals(program) && hasHandWaterFragment;
+                || HAND_WATER_PROGRAM.equals(program) && hasHandWaterFragment
+                || DAMAGED_BLOCK_PROGRAM.equals(program) && hasDamagedBlockFragment;
     }
 
     private void validateEntityVertexProgram(String program, String vertexSource) throws IOException {
         boolean hand = HAND_PROGRAM.equals(program) || HAND_WATER_PROGRAM.equals(program);
         Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
                 EntityVertexShaderAdapter.validate(program, vertexSource, hand).varyings();
+        if (DAMAGED_BLOCK_PROGRAM.equals(program)) {
+            String fragment = readDamagedBlockFragment().orElseThrow(
+                    () -> new IOException("The pack no longer contains gbuffers_damagedblock.fsh."));
+            DamagedBlockShaderAdapter.adaptFragment(fragment, program, varyings,
+                    hasShadowFragment(), false);
+            readGeometryBlendSettings(program);
+            return;
+        }
         Optional<String> fragment = hand ? readHandFragment(program)
                 : blockPrograms.contains(program) ? readBlockFragment(program) : readEntityFragment(program);
         if (fragment.isEmpty()) {
