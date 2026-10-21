@@ -4972,16 +4972,43 @@ public final class VeyraRenderer {
                 .toList();
         String source = pack.readSkyBasicFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_skybasic.fsh."));
+        String fragmentProgram = pack.hasSkyBasicFragment() ? "gbuffers_skybasic" : "gbuffers_basic";
+        Optional<String> packVertexSource = pack.readStage("gbuffers_skybasic.vsh");
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
             String location = original.getLocation().getPath();
             boolean hasDistances = location.equals("pipeline/sky");
             boolean hasColor = location.equals("pipeline/sunrise_sunset");
-            String programName = pack.hasSkyBasicFragment() ? "gbuffers_skybasic" : "gbuffers_basic";
+            String programName = fragmentProgram;
             String fragmentSource;
+            String adaptedVertexSource = null;
+            boolean usesNoiseSampler = false;
+            FragmentOutputs outputLayout = null;
+            GeometryBlendSettings blendSettings = null;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
             try {
-                fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
-                        source, programName, false, hasColor, hasDistances);
+                if (packVertexSource.isPresent()) {
+                    String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                            minecraftVertex, packVertexSource.get(), "gbuffers_skybasic",
+                            skyBasicVertexFormat(original));
+                    adaptedVertexSource = adaptedVertex.source();
+                    boolean lightmapAvailable = original.getSamplers().contains("Sampler2");
+                    samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
+                            source, programName, pack.hasShadowFragment(), lightmapAvailable);
+                    usesNoiseSampler = adaptedVertex.usesNoiseSampler() || samplerInputs.usesNoiseSampler();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(), lightmapAvailable);
+                    outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
+                    blendSettings = pack.readGeometryBlendSettings(programName);
+                    validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
+                } else {
+                    fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
+                            source, programName, false, hasColor, hasDistances);
+                }
             } catch (IOException exception) {
                 if (!pack.hasSkyBasicFragment()) {
                     VeyraClient.LOGGER.debug("Skipping {} because the gbuffers_basic fallback requires inputs the sky pipeline does not provide: {}",
@@ -4990,12 +5017,15 @@ public final class VeyraRenderer {
                 }
                 throw exception;
             }
-            String sourceHash = sha256(programName + '\n' + fragmentSource);
+            String sourceHash = sha256(programName + '\n'
+                    + (adaptedVertexSource == null ? "" : adaptedVertexSource) + '\n'
+                    + fragmentSource + '\n' + outputLayout + '\n' + blendSettings + '\n' + samplerInputs);
             SkyPipelineKey cacheKey = new SkyPipelineKey(original, sourceHash);
             RenderPipeline replacement = SKY_BASIC_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
                 replacement = compileColorDistancePipeline(
-                        original, programName, fragmentSource, sourceHash);
+                        original, programName, fragmentSource, sourceHash, adaptedVertexSource,
+                        usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 SKY_BASIC_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);
@@ -5004,6 +5034,16 @@ public final class VeyraRenderer {
             throw new IOException("VulkanMod's Minecraft basic sky render pipelines were not found.");
         }
         return new SkyPipelineSet(pipelines);
+    }
+
+    private static BasicVertexShaderAdapter.Format skyBasicVertexFormat(RenderPipeline pipeline) throws IOException {
+        return switch (pipeline.getLocation().getPath()) {
+            case "pipeline/sky" -> BasicVertexShaderAdapter.Format.SKY;
+            case "pipeline/stars" -> BasicVertexShaderAdapter.Format.STARS;
+            case "pipeline/sunrise_sunset" -> BasicVertexShaderAdapter.Format.SUNRISE_SUNSET;
+            default -> throw new IOException("Minecraft's " + pipeline.getLocation()
+                    + " is not a supported basic-sky pipeline.");
+        };
     }
 
     private static boolean isSkyBasicPipeline(RenderPipeline pipeline) {

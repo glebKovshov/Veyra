@@ -152,6 +152,53 @@ class ShaderPackOptionsTest {
                 () -> ShaderPack.inspect(unsupported.getParent()).validatePipelineCapabilities());
         assertTrue(error.getMessage().contains("gbuffers_entities.vsh"));
     }
+
+    @Test void skyBasicVertexStagesLinkAcrossNativeSkyPipelineFormats() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("sky-basic/shaders"));
+        Files.writeString(shader.resolve("gbuffers_skybasic.vsh"), """
+                #version 120
+                varying vec4 glColor;
+                void main() {
+                    gl_Position = ftransform();
+                    glColor = gl_Color;
+                }
+                """);
+        Path fragment = shader.resolve("gbuffers_skybasic.fsh");
+        Files.writeString(fragment, """
+                #version 120
+                varying vec4 glColor;
+                void main() { gl_FragColor = glColor; }
+                """);
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+
+        Files.writeString(fragment, """
+                #version 120
+                varying vec2 skyCoordinate;
+                void main() { gl_FragColor = vec4(skyCoordinate, 0.0, 1.0); }
+                """);
+        IOException error = assertThrows(IOException.class,
+                () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("skyCoordinate"));
+    }
+
+    @Test void skyBasicVertexCanUseTheBasicFragmentFallback() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("sky-basic-fallback/shaders"));
+        Files.writeString(shader.resolve("gbuffers_skybasic.vsh"), """
+                #version 120
+                varying vec4 color;
+                void main() {
+                    gl_Position = ftransform();
+                    color = gl_Color;
+                }
+                """);
+        Files.writeString(shader.resolve("gbuffers_basic.fsh"), """
+                #version 120
+                varying vec4 color;
+                void main() { gl_FragColor = color; }
+                """);
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+    }
+
     @Test void glintFragmentMrtIsValidatedEvenWithoutACustomVertexStage() throws IOException {
         Path shader = Files.createDirectories(root.resolve("glint-mrt/shaders"));
         Path fragment = shader.resolve("gbuffers_armor_glint.fsh");

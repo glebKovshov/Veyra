@@ -30,7 +30,7 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture, beaconBeamFixture, blockVertexFixture,
+            glintMrtFixture, basicVertexFixture, skyBasicVertexFixture, beaconBeamFixture, blockVertexFixture,
             damagedBlockVertexFixture, handVertexFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
@@ -68,6 +68,7 @@ public final class GraphicsSmoke {
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
             basicVertexFixture = fixture.equals("basic-vertex-execution");
+            skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
             blockVertexFixture = fixture.equals("block-vertex-execution");
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
@@ -150,7 +151,8 @@ public final class GraphicsSmoke {
             }
             client.options.hideGui = !itemFixture;
             client.player.setXRot(entityFixture || beaconBeamFixture ? 15.0F
-                    : damagedBlockVertexFixture ? 20.0F : cloudFixture ? -60.0F : 35.0F);
+                    : damagedBlockVertexFixture ? 20.0F
+                    : cloudFixture || skyBasicVertexFixture ? -60.0F : 35.0F);
             client.player.setYRot(45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
@@ -190,7 +192,7 @@ public final class GraphicsSmoke {
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
-                    && !glintMrtFixture && !basicVertexFixture && !beaconBeamFixture
+                    && !glintMrtFixture && !basicVertexFixture && !skyBasicVertexFixture && !beaconBeamFixture
                     && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
@@ -417,6 +419,10 @@ public final class GraphicsSmoke {
                     } else if (terrainVertexExecutionFixture) {
                         failure = activePixels >= minPixels || count >= minPixels
                                 ? new IllegalStateException("The terrain vertex main did not clip its magenta geometry: active="
+                                + activePixels + ", disabled=" + count) : null;
+                    } else if (skyBasicVertexFixture) {
+                        failure = activePixels < 2000 || count * 4 >= activePixels
+                                ? new IllegalStateException("The sky-basic vertex-stage signal was absent or unchanged: active="
                                 + activePixels + ", disabled=" + count) : null;
                     } else {
                         failure = activePixels < minPixels || count * 4 >= activePixels

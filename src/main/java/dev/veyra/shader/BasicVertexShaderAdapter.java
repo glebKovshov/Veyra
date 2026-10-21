@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 
 /** Adapts Iris basic/leash and line vertex stages to Minecraft's distinct native vertex formats. */
 final class BasicVertexShaderAdapter {
-    enum Format { LEASH, LINE }
+    enum Format { LEASH, LINE, SKY, STARS, SUNRISE_SUNSET }
 
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
@@ -41,6 +41,8 @@ final class BasicVertexShaderAdapter {
                     + "out\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;");
     private static final Pattern UNSUPPORTED_LEGACY_INPUT = Pattern.compile(
             "\\b(gl_MultiTexCoord[3-7]|at_midBlock|mc_midBlock)\\b");
+    private static final Pattern UNSUPPORTED_SKY_INPUT = Pattern.compile(
+            "\\b(vaNormal|Normal|UV2|LineWidth)\\b");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern FOG_COORD = Pattern.compile("\\bgl_FogFragCoord\\b");
     private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile(
@@ -84,16 +86,20 @@ final class BasicVertexShaderAdapter {
         String base = minecraftSource.substring(0, version.end()) + extensions + minecraftSource.substring(version.end());
         base = patchBaseOutputs(base, pack.outputs(), programName, format);
         MainFunction baseMain = findMain(base, "Minecraft's " + format.name().toLowerCase() + " vertex shader");
-        String nativeMainName = format == Format.LINE ? "veyraMinecraftLineMain" : "veyraMinecraftLeashMain";
+        String nativeMainName = switch (format) {
+            case LINE -> "veyraMinecraftLineMain";
+            case LEASH -> "veyraMinecraftLeashMain";
+            default -> "veyraMinecraftSkyMain";
+        };
         String generatedMain;
         base = base.substring(0, baseMain.start()) + "void " + nativeMainName + "();\n" + base.substring(baseMain.start());
         baseMain = findMain(base, "Minecraft's " + format.name().toLowerCase() + " vertex shader");
         base = base.substring(0, baseMain.start()) + "void " + nativeMainName + "()" + base.substring(baseMain.end());
-        if (format == Format.LINE) {
-            generatedMain = lineMain(widenFallbackLines);
-        } else {
-            generatedMain = leashMain();
-        }
+        generatedMain = switch (format) {
+            case LINE -> lineMain(widenFallbackLines);
+            case LEASH -> leashMain();
+            default -> skyMain(format);
+        };
 
         String bridge = nativeInputBridge(format);
         return new AdaptedStage(base + "\n" + pack.outputDeclarations() + bridge + pack.uniformBridge()
@@ -102,17 +108,30 @@ final class BasicVertexShaderAdapter {
     }
 
     static AdaptedStage validate(String programName, String shaderPackSource, Format format) throws IOException {
-        String base = "#version 460\n"
-                + "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
-                + (format == Format.LEASH
-                    ? "layout(location=2) in ivec2 UV2;\n"
-                    : "layout(location=2) in vec3 Normal;\nlayout(location=3) in float LineWidth;\nuniform vec2 ScreenSize;\n")
-                + "layout(location=0) out vec4 vertexColor;\n"
-                + "layout(location=1) out float sphericalVertexDistance;\n"
-                + "layout(location=2) out float cylindricalVertexDistance;\n"
-                + "uniform mat4 ModelViewMat; uniform mat4 ProjMat; uniform mat4 TextureMat; uniform vec4 ColorModulator;\n"
+        String inputs = switch (format) {
+            case LEASH -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
+                    + "layout(location=2) in ivec2 UV2;\n";
+            case LINE -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
+                    + "layout(location=2) in vec3 Normal;\nlayout(location=3) in float LineWidth;\n"
+                    + "uniform vec2 ScreenSize;\n";
+            case SKY, STARS -> "layout(location=0) in vec3 Position;\n";
+            case SUNRISE_SUNSET -> "layout(location=0) in vec3 Position;\n"
+                    + "layout(location=1) in vec4 Color;\n";
+        };
+        String outputs = switch (format) {
+            case LEASH, LINE, SUNRISE_SUNSET -> "layout(location=0) out vec4 vertexColor;\n"
+                    + "layout(location=1) out float sphericalVertexDistance;\n"
+                    + "layout(location=2) out float cylindricalVertexDistance;\n";
+            case SKY -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\n";
+            case STARS -> "";
+        };
+        String base = "#version 460\n" + inputs + outputs
+                + "layout(set=0,binding=0,std140) uniform NativeTransforms { mat4 ModelViewMat; mat4 ProjMat; "
+                + "mat4 TextureMat; vec4 ColorModulator; vec2 ScreenSize; };\n"
                 + "void main(){gl_Position=ProjMat*ModelViewMat*vec4(Position,1.0);"
-                + "vertexColor=Color;sphericalVertexDistance=0.0;cylindricalVertexDistance=0.0;}\n";
+                + (format == Format.SUNRISE_SUNSET ? "vertexColor=Color;" : "")
+                + (format == Format.SKY ? "sphericalVertexDistance=1.0;cylindricalVertexDistance=1.0;" : "")
+                + "}\n";
         return adaptStage(base, shaderPackSource, programName, format);
     }
 
@@ -152,6 +171,12 @@ final class BasicVertexShaderAdapter {
         Matcher legacy = UNSUPPORTED_LEGACY_INPUT.matcher(uncommented);
         if (legacy.find()) throw new IOException(programName + ".vsh input '" + legacy.group(1)
                 + "' is not present in Minecraft's " + format.name().toLowerCase() + " vertex format.");
+        if (isSkyFormat(format)) {
+            Matcher unsupportedSkyInput = UNSUPPORTED_SKY_INPUT.matcher(uncommented);
+            if (unsupportedSkyInput.find()) throw new IOException(programName + ".vsh input '"
+                    + unsupportedSkyInput.group(1) + "' is not present in Minecraft's "
+                    + format.name().toLowerCase() + " vertex format.");
+        }
 
         OutputBridge outputs = extractOutputs(source, programName);
         source = outputs.source();
@@ -286,8 +311,13 @@ final class BasicVertexShaderAdapter {
         }
         rewritten.append(source, copiedThrough, source.length());
         for (String requiredName : required.keySet()) {
-            if (!found.contains(requiredName)) throw new IOException("Minecraft's " + programName
-                    + " vertex shader does not declare " + requiredName + ".");
+            if (!found.contains(requiredName)) {
+                if (!isSkyFormat(format)) throw new IOException("Minecraft's " + programName
+                        + " vertex shader does not declare " + requiredName + ".");
+                TerrainVertexShaderAdapter.PackVarying output = required.get(requiredName);
+                rewritten.append("\n").append(parserSafeOutput("VEYRA_BASIC_NATIVE_OUTPUT_"
+                        + output.location(), output.location(), output.interpolation(), output.type(), requiredName));
+            }
         }
         rewritten.append("\n").append(parserSafeOutput("VEYRA_BASIC_FOG_COORD", 5, "smooth", "float", "veyraFogFragCoord"));
         return rewritten.toString();
@@ -295,10 +325,15 @@ final class BasicVertexShaderAdapter {
 
     private static String nativeInputBridge(Format format) {
         String lightmap = format == Format.LEASH ? "vec4(vec2(UV2), 0.0, 1.0)" : "vec4(240.0, 240.0, 0.0, 1.0)";
+        String color = switch (format) {
+            case SKY, STARS -> "ColorModulator";
+            case SUNRISE_SUNSET -> "Color";
+            case LEASH, LINE -> "vec4((Color * ColorModulator).rgb, ColorModulator.a)";
+        };
         return """
                 vec3 veyraVertexOffset = vec3(0.0);
                 #define gl_Vertex vec4(Position + veyraVertexOffset, 1.0)
-                #define gl_Color vec4((Color * ColorModulator).rgb, ColorModulator.a)
+                #define gl_Color %s
                 #define gl_Normal vec3(0.0, 0.0, 1.0)
                 #define gl_MultiTexCoord0 vec4(0.5, 0.5, 0.0, 1.0)
                 #define gl_MultiTexCoord1 %s
@@ -313,7 +348,7 @@ final class BasicVertexShaderAdapter {
                 #define modelViewMatrix ModelViewMat
                 #define ftransform() ((ProjMat * ModelViewMat) * gl_Vertex)
                 #define gl_FogFragCoord veyraFogFragCoord
-                """.formatted(lightmap);
+                """.formatted(color, lightmap);
     }
 
     private static String leashMain() {
@@ -346,6 +381,19 @@ final class BasicVertexShaderAdapter {
                     }
                 }
                 """;
+    }
+
+    private static String skyMain(Format format) {
+        String initializeColor = format == Format.SKY || format == Format.STARS
+                ? "vertexColor = ColorModulator; " : "";
+        String initializeDistances = format == Format.STARS || format == Format.SUNRISE_SUNSET
+                ? "sphericalVertexDistance = 0.0; cylindricalVertexDistance = 0.0; " : "";
+        return "void main() { veyraMinecraftSkyMain(); " + initializeColor + initializeDistances
+                + "veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
+    }
+
+    private static boolean isSkyFormat(Format format) {
+        return format == Format.SKY || format == Format.STARS || format == Format.SUNRISE_SUNSET;
     }
 
     private static String parserSafeOutput(String macro, int location, String interpolation, String type, String name) {

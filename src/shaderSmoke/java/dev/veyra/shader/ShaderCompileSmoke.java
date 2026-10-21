@@ -227,6 +227,70 @@ public class ShaderCompileSmoke {
                     Files.readString(basicFixture.resolve("gbuffers_basic.fsh")), "gbuffers_basic",
                     basicPackVertex.varyings(), false, true);
             compile(compiler, options, basicPackFragment, "basic-pack-leash-fragment", true);
+            Path skyFixture = Path.of("examples/gbuffers-skybasic-vertex-execution/shaders");
+            String skyPackVertexSource = GlslPreprocessor.process("gbuffers_skybasic.vsh",
+                    Files.readString(skyFixture.resolve("gbuffers_skybasic.vsh")));
+            String skyPackFragmentSource = Files.readString(skyFixture.resolve("gbuffers_skybasic.fsh"));
+            Map<BasicVertexShaderAdapter.Format, String> nativeSkyVertices = new LinkedHashMap<>();
+            nativeSkyVertices.put(BasicVertexShaderAdapter.Format.SKY, """
+                    #version 460
+                    layout(location = 0) in vec3 Position;
+                    out float sphericalVertexDistance;
+                    out float cylindricalVertexDistance;
+                    layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                        mat4 ModelViewMat;
+                        mat4 ProjMat;
+                        mat4 TextureMat;
+                        vec4 ColorModulator;
+                        vec2 ScreenSize;
+                    };
+                    void main() {
+                        gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                        sphericalVertexDistance = 1.0;
+                        cylindricalVertexDistance = 1.0;
+                    }
+                    """);
+            nativeSkyVertices.put(BasicVertexShaderAdapter.Format.STARS, """
+                    #version 460
+                    layout(location = 0) in vec3 Position;
+                    layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                        mat4 ModelViewMat;
+                        mat4 ProjMat;
+                        mat4 TextureMat;
+                        vec4 ColorModulator;
+                        vec2 ScreenSize;
+                    };
+                    void main() { gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0); }
+                    """);
+            nativeSkyVertices.put(BasicVertexShaderAdapter.Format.SUNRISE_SUNSET, """
+                    #version 460
+                    layout(location = 0) in vec3 Position;
+                    layout(location = 1) in vec4 Color;
+                    out vec4 vertexColor;
+                    layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                        mat4 ModelViewMat;
+                        mat4 ProjMat;
+                        mat4 TextureMat;
+                        vec4 ColorModulator;
+                        vec2 ScreenSize;
+                    };
+                    void main() {
+                        gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                        vertexColor = Color;
+                    }
+                    """);
+            for (var entry : nativeSkyVertices.entrySet()) {
+                var skyVertex = BasicVertexShaderAdapter.adaptStage(entry.getValue(), skyPackVertexSource,
+                        "gbuffers_skybasic", entry.getKey());
+                compileVertex(compiler, options, skyVertex.source(),
+                        "skybasic-" + entry.getKey().name().toLowerCase() + "-vertex", true);
+                String skyFragment = TextureColorDistanceShaderAdapter.adaptFragment(skyPackFragmentSource,
+                        "gbuffers_skybasic", skyVertex.varyings(), false, false);
+                compile(compiler, options, skyFragment,
+                        "skybasic-" + entry.getKey().name().toLowerCase() + "-fragment", true);
+            }
+            count++;
+            compiled += nativeSkyVertices.size() * 2;
             Path beaconFixture = Path.of("examples/beaconbeam-vertex-execution/shaders");
             String beaconPackVertexSource = GlslPreprocessor.process("gbuffers_beaconbeam.vsh",
                     Files.readString(beaconFixture.resolve("gbuffers_beaconbeam.vsh")));
@@ -688,7 +752,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
