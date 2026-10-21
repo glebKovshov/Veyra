@@ -1,5 +1,15 @@
 # Shaderpack compatibility: Veyra 0.2.0-beta.27 experimental prerelease
 
+## Unreleased compatibility batch based on beta.27
+
+The current feature branch adds Iris renderStage constants to the supported sky-basic vertex and fragment pipelines. It also binds entityId, blockEntityId, and currentRenderedItemId as per-render constants in supported custom entity, block, and hand vertex stages; selected identifier values are part of the compiled-pipeline cache key.
+
+Unused attribute vec4 mc_Entity declarations are removed from vertex stages only when no active code reads the attribute. Active reads remain rejected because Minecraft's NEW_ENTITY format does not supply mc_Entity. Veyra also skips the legacy gbuffers_entities_glowing program, which [Iris does not recognize as one of its programs](https://github.com/IrisShaders/docs/blob/main/src/content/docs/current/Reference/Programs/gbuffers.mdx).
+
+The refreshed pinned source audit covers 4 archives, 12 defaults, 63 declared-profile/dimension cases, and 5,178 stages. It accepts **781 geometry fragment programs and rejects 8**; the 8 fragment adapter errors are in Sildur shadowData inputs. The remaining first capability blockers are gbuffers_lightning.vsh (54 cases), gbuffers_skytextured.vsh (13), gbuffers_textured.vsh (6), and Sildur shadowData (2). gbuffers_lightning is an Iris-supported program, so it remains an explicit Veyra limitation. All 75 records retain visualValidation=false; no full third-party shaderpack visual validation is claimed.
+
+This batch is not part of the published beta.27 JAR. Local adapter tests, shader validation, build, and JAR metadata verification have passed. Synthetic `runGraphicsSmoke` fixtures on an NVIDIA RTX 3070 passed for entity vertex execution (18,532 active / 0 disabled magenta pixels), sky-basic vertex execution (226,295 / 0), and `currentRenderedItemId` (13,984 / 0 green pixels). These fixtures validate named rendering paths, not full third-party shaderpack visuals. CI and PR integration remain pending; see WORK_SUMMARY.md.
+
 ## Beta.27 damaged-block and sky-basic vertex execution
 
 Beta.27 executes supported `gbuffers_damagedblock.vsh` stages after Minecraft's native crumbling setup using its actual `BLOCK` format: `Position` location 0, `Color` 1, `UV0` 2, integer `UV2` 3, and `Normal` 4. Legacy `gl_MultiTexCoord1` reads lightmap UV2. VulkanMod's crumbling shader source is adapted before native Vulkan shader compilation. Missing inputs such as entity overlay values remain rejected during preflight.

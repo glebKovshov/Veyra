@@ -54,6 +54,31 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void bindsEntityIdentifiersInCustomVertexStagesPerRenderVariant() throws Exception {
+        for (String[] identifier : new String[][] {
+                {"gbuffers_entities", "entityId", "37"},
+                {"gbuffers_block", "blockEntityId", "18"},
+                {"gbuffers_hand", "currentRenderedItemId", "9"}
+        }) {
+            String program = identifier[0];
+            String name = identifier[1];
+            int value = Integer.parseInt(identifier[2]);
+            String pack = "uniform int " + name + ";\n"
+                    + "void main() { gl_Position = vec4(float(" + name + ")); }\n";
+
+            EntityVertexShaderAdapter.AdaptedStage adapted = EntityVertexShaderAdapter.adaptStage(
+                    NATIVE, pack, program, program.equals("gbuffers_hand"),
+                    name.equals("entityId") ? value : EntityIdMap.UNMAPPED,
+                    name.equals("blockEntityId") ? value : BlockIdMap.UNMAPPED,
+                    name.equals("currentRenderedItemId") ? value : ItemIdMap.UNMAPPED);
+
+            assertTrue(EntityShaderAdapter.usesEntityIdentifier(pack, program, name));
+            assertTrue(adapted.source().contains("const int " + name + " = " + value + ";"), adapted.source());
+            assertFalse(adapted.source().contains("uniform int " + name), adapted.source());
+        }
+    }
+
+    @Test
     void linksDamagedBlockFragmentToCustomVertexVaryings() throws Exception {
         String vertex = """
                 #version 120
@@ -261,5 +286,46 @@ class EntityVertexShaderAdapterTest {
         IOException error = assertThrows(IOException.class,
                 () -> EntityVertexShaderAdapter.validate("gbuffers_entities", pack, false));
         assertTrue(error.getMessage().contains("gl_FrontColor"));
+    }
+
+    @Test
+    void removesUnusedMcEntityDeclarationFromBlockVertexProgram() throws Exception {
+        String pack = """
+                #version 120
+                attribute vec4 mc_Entity;
+                void main(){gl_Position=ftransform();}
+                """;
+
+        String adapted = EntityVertexShaderAdapter.validate("gbuffers_block", pack, false).source();
+
+        assertFalse(adapted.contains("mc_Entity"), adapted);
+    }
+
+    @Test
+    void removesUnusedMcEntityDeclarationFromEntityVertexProgram() throws Exception {
+        String pack = """
+                #version 120
+                attribute vec4 mc_Entity;
+                void main(){gl_Position=ftransform();}
+                """;
+
+        String adapted = EntityVertexShaderAdapter.validate("gbuffers_entities", pack, false).source();
+
+        assertFalse(adapted.contains("mc_Entity"), adapted);
+    }
+
+    @Test
+    void rejectsBlockVertexProgramThatReadsMcEntity() {
+        String pack = """
+                #version 120
+                attribute vec4 mc_Entity;
+                void main(){gl_Position=ftransform()+vec4(mc_Entity.x);}
+                """;
+
+        IOException error = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.validate("gbuffers_block", pack, false));
+
+        assertTrue(error.getMessage().contains("mc_Entity"));
+        assertTrue(error.getMessage().contains("NEW_ENTITY vertex format"));
     }
 }

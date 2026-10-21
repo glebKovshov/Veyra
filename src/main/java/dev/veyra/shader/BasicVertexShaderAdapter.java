@@ -151,6 +151,7 @@ final class BasicVertexShaderAdapter {
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
         source = UnreachableGlslFunctions.removeUnreachable(source, "main");
         source = UnusedUniformDeclarations.removeUnused(source);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forSkyFormat(format), programName);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION.matcher(source);
         while (extensionMatcher.find()) extensions.add(extensionMatcher.group().strip());

@@ -64,6 +64,22 @@ class TextureColorDistanceShaderAdapterTest {
     }
 
     @Test
+    void bindsRenderStageInSkyBasicFragmentVariants() throws IOException {
+        String source = """
+                #version 120
+                uniform int renderStage;
+                void main() { gl_FragColor = vec4(float(renderStage)); }
+                """;
+
+        for (int stage : new int[] {1, 6, 2}) {
+            String adapted = TextureColorDistanceShaderAdapter.adaptFragment(
+                    source, "gbuffers_skybasic", Map.of(), false, false, stage);
+            assertTrue(adapted.contains("const int renderStage = " + stage + ";"), adapted);
+            assertFalse(adapted.contains("uniform int renderStage"), adapted);
+        }
+    }
+
+    @Test
     void mapsLegacyFragmentOutputsToShaderpackColorAttachments() throws IOException {
         String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
                 /* RENDERTARGETS: 0,4 */

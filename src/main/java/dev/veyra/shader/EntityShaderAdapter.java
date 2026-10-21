@@ -950,9 +950,9 @@ public final class EntityShaderAdapter {
         return result.append(adapted).toString();
     }
 
-    private static String bindEntityIdentifiers(String source, String programName,
-                                                int entityId, int blockEntityId,
-                                                int currentRenderedItemId) {
+    static String bindEntityIdentifiers(String source, String programName,
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId) {
         Matcher matcher = ENTITY_IDENTIFIER_UNIFORM.matcher(source);
         StringBuffer bound = new StringBuffer();
         while (matcher.find()) {

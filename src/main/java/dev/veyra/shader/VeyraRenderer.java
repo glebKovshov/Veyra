@@ -2021,7 +2021,7 @@ public final class VeyraRenderer {
                             !isItemEntityTranslucentCullPipeline(original), selectedMainHand,
                             spec.vertexVaryings());
             String sourceHash = sha256(spec.programName() + '\n' + fragmentSource + '\n'
-                    + (spec.vertexSource() == null ? "" : spec.vertexSource()));
+                    + (spec.vertexSource() == null ? "" : spec.vertexSource()) + '\n' + identifiers);
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, spec.programName(), sourceHash,
                     spec.outputLayout(), spec.blendSettings(), spec.shadowPass());
             RenderPipeline pipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -2034,7 +2034,8 @@ public final class VeyraRenderer {
                                 spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
                                 spec.requiresViewNormal(), false, spec.handPass(), spec.programName(),
                                 spec.outputLayout(), spec.blendSettings(), spec.colorInputs(),
-                                spec.vertexSource(), spec.vertexVaryings());
+                                spec.vertexSource(), spec.vertexVaryings(), selectedEntityId,
+                                selectedBlockId, selectedItemId);
                 ENTITY_PIPELINE_CACHE.put(cacheKey, pipeline);
             }
             set.variants().computeIfAbsent(original, ignored -> new HashMap<>()).put(identifiers, pipeline);
@@ -4291,6 +4292,23 @@ public final class VeyraRenderer {
             Set<Integer> colorInputs,
             String shaderPackVertexSource,
             Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings) throws IOException {
+        return compileEntityPipeline(original, fragmentSource, sourceHash,
+                requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
+                shadowPass, handPass, programName, outputLayout, blendSettings, colorInputs,
+                shaderPackVertexSource, vertexVaryings,
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED);
+    }
+
+    private static RenderPipeline compileEntityPipeline(
+            RenderPipeline original, String fragmentSource, String sourceHash,
+            boolean requiresNormal, boolean requiresLightmap,
+            boolean requiresViewPosition, boolean requiresViewNormal,
+            boolean shadowPass, boolean handPass, String programName,
+            FragmentOutputs outputLayout, GeometryBlendSettings blendSettings,
+            Set<Integer> colorInputs,
+            String shaderPackVertexSource,
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+            int entityId, int blockEntityId, int currentRenderedItemId) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/entities/" + sourceHash);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
@@ -4306,7 +4324,8 @@ public final class VeyraRenderer {
                     vertexSource, shadowPass, programName,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, false);
             adaptedVertex = EntityVertexShaderAdapter.adaptStage(
-                    minecraftVertex, shaderPackVertexSource, programName, handPass).source();
+                    minecraftVertex, shaderPackVertexSource, programName, handPass,
+                    entityId, blockEntityId, currentRenderedItemId).source();
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         } else if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
                 || itemEntityPipeline) {
@@ -4980,6 +4999,7 @@ public final class VeyraRenderer {
             String location = original.getLocation().getPath();
             boolean hasDistances = location.equals("pipeline/sky");
             boolean hasColor = location.equals("pipeline/sunrise_sunset");
+            Integer renderStage = IrisRenderStages.forSkyPipeline(location);
             String programName = fragmentProgram;
             String fragmentSource;
             String adaptedVertexSource = null;
@@ -5001,7 +5021,8 @@ public final class VeyraRenderer {
                     usesNoiseSampler = adaptedVertex.usesNoiseSampler() || samplerInputs.usesNoiseSampler();
                     if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
-                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(), lightmapAvailable);
+                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
+                            lightmapAvailable, renderStage);
                     outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
                     blendSettings = pack.readGeometryBlendSettings(programName);
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
@@ -6924,16 +6945,19 @@ public final class VeyraRenderer {
                                       String vertexSource,
                                       Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings) {
         private boolean usesEntityId() {
-            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId");
+            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId")
+                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "entityId");
         }
 
         private boolean usesBlockEntityId() {
-            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId");
+            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId")
+                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "blockEntityId");
         }
 
         private boolean usesCurrentRenderedItemId() {
             return EntityShaderAdapter.usesEntityIdentifier(
-                    fragmentSource, programName, "currentRenderedItemId");
+                    fragmentSource, programName, "currentRenderedItemId")
+                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "currentRenderedItemId");
         }
 
         private boolean usesIsMainHand() {
