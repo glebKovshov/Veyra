@@ -249,6 +249,25 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void bridgesTerrainVertexNativeSamplersAndPreservesTextureFunction() throws IOException {
+        String source = TerrainVertexShaderAdapter.adapt("#version 450\nvoid main(){gl_Position=vec4(0);}", """
+                uniform sampler2D texture;
+                uniform sampler2D tex;
+                uniform sampler2D gtexture;
+                uniform sampler2D lightmap;
+                void main(){ gl_Position=ftransform(); gl_Position += texture2DLod(texture,vec2(0),0.0)
+                    + texture(tex,vec2(0)) + texture2D(gtexture,vec2(0)) + texture2DLod(lightmap,vec2(0),0.0); }
+                """, "shadow_solid");
+        assertTrue(source.contains("layout(binding = 3) uniform sampler2D VeyraTerrainVertexAlbedo;"));
+        assertTrue(source.contains("layout(binding = 4) uniform sampler2D VeyraTerrainVertexLightmap;"));
+        assertTrue(source.contains("textureLod(VeyraTerrainVertexAlbedo,"));
+        assertTrue(source.contains("texture(VeyraTerrainVertexAlbedo,"));
+        assertFalse(source.contains("uniform sampler2D tex;"));
+        assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate("shadow_solid",
+                "uniform samplerCube tex;\nvoid main(){gl_Position=texture(tex,vec3(0));}"));
+    }
+
+    @Test
     void rejectsTerrainVertexInterfacesThatHaveNoMatchingVulkanInputsOrFragmentBridge() throws IOException {
         IOException attribute = assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate(
                 "gbuffers_terrain", "#version 120\nattribute vec3 mc_midBlock;\nvoid main(){}\n"));

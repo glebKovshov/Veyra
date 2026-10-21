@@ -221,16 +221,21 @@ final class TerrainVertexShaderAdapter {
         StringBuilder withoutSamplers = new StringBuilder(source.length());
         int copiedThrough = 0;
         int noiseDeclarations = 0;
+        Set<String> nativeSamplers = new HashSet<>();
         while (matcher.find()) {
             String type = matcher.group(1);
             String name = matcher.group(2);
-            if (!name.equals("noisetex")) {
+            boolean nativeSampler = Set.of("tex", "texture", "gtexture", "lightmap").contains(name);
+            if (!name.equals("noisetex") && !nativeSampler) {
                 throw new IOException(programName + ".vsh uses unsupported sampler '" + name + "'.");
             }
             if (!type.equals("sampler2D")) {
-                throw new IOException(programName + ".vsh sampler 'noisetex' must use sampler2D.");
+                throw new IOException(programName + ".vsh sampler '" + name + "' must use sampler2D.");
             }
-            if (++noiseDeclarations > 1) {
+            if (nativeSampler && !nativeSamplers.add(name)) {
+                throw new IOException(programName + ".vsh declares sampler '" + name + "' more than once.");
+            }
+            if (!nativeSampler && ++noiseDeclarations > 1) {
                 throw new IOException(programName + ".vsh declares sampler 'noisetex' more than once.");
             }
             withoutSamplers.append(source, copiedThrough, matcher.start());
@@ -243,11 +248,22 @@ final class TerrainVertexShaderAdapter {
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "textureGrad(")
                 .replaceAll("\\btexture2DProj\\s*\\(", "textureProj(")
                 .replaceAll("\\btexture2D\\s*\\(", "texture(");
+        for (String name : nativeSamplers) {
+            // The legacy variable named texture must not replace the modern texture() function.
+            adapted = adapted.replaceAll("\\b" + name + "\\b" + (name.equals("texture") ? "(?!\\s*\\()" : ""),
+                    name.equals("lightmap") ? "VeyraTerrainVertexLightmap" : "VeyraTerrainVertexAlbedo");
+        }
         boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(adapted);
         String declarationsAndMacros = usesNoiseSampler
                 ? "layout(binding = " + noiseSamplerBinding + ") uniform sampler2D VeyraNoiseSampler;\n"
                 + "#define noisetex VeyraNoiseSampler\n"
                 : "";
+        if (nativeSamplers.stream().anyMatch(name -> !name.equals("lightmap"))) {
+            declarationsAndMacros += "layout(binding = 3) uniform sampler2D VeyraTerrainVertexAlbedo;\n";
+        }
+        if (nativeSamplers.contains("lightmap")) {
+            declarationsAndMacros += "layout(binding = 4) uniform sampler2D VeyraTerrainVertexLightmap;\n";
+        }
         return new SamplerBridge(adapted, declarationsAndMacros);
     }
 

@@ -830,6 +830,19 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_terrain");
             compileVertex(compiler, options, terrainCustomVertex, "terrain-custom-vertex-main", true);
+            compileVertex(compiler, options, TerrainVertexShaderAdapter.adapt(terrainVertex, """
+                    #version 120
+                    uniform sampler2D texture;
+                    uniform sampler2D tex;
+                    uniform sampler2D gtexture;
+                    uniform sampler2D lightmap;
+                    void main() {
+                        gl_Position = ftransform();
+                        gl_Position += texture2DLod(texture, vec2(0.5), 0.0)
+                            + texture(tex, vec2(0.5)) + texture2D(gtexture, vec2(0.5))
+                            + texture2DLod(lightmap, vec2(0.5), 0.0);
+                    }
+                    """, "shadow_solid"), "shadow-native-vertex-texture-aliases", true);
             Path imageFixture = Path.of("examples/custom-image-compute/shaders");
             var imageFixtureProperties = ShaderPackImageProperties.parse(Files.readString(imageFixture.resolve("shaders.properties")));
             var imageShadowVertex = ShaderPackImageBindings.prepare("shadow.vsh",
