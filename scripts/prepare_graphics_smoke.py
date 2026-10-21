@@ -46,7 +46,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'beaconbeam-vertex-execution', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'beaconbeam-vertex-execution', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     arguments = parser.parse_args()
     fixture = arguments.fixture
@@ -94,7 +94,8 @@ def main():
         output.write(bytes([10]) + string("") + payload(10, {"Data": (10, data)}))
     pack = root / 'shaderpacks' / fixture
     if fixture != 'vanilla-baseline':
-        shutil.copytree(pathlib.Path('examples') / fixture, pack, dirs_exist_ok=True)
+        example_name = 'gbuffers-skybasic-vertex-execution' if fixture == 'skybasic-vertex-execution' else fixture
+        shutil.copytree(pathlib.Path('examples') / example_name, pack, dirs_exist_ok=True)
     if fixture == 'water-post-shadow-inputs':
         # Exercise full post adapter scans across expanded include-style blank regions.
         for stage in ['prepare', 'deferred', 'composite', 'final']:

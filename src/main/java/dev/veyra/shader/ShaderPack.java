@@ -982,6 +982,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
         }
         validateBasicLineCapabilities();
+        validateSkyBasicCapabilities();
         validateBeaconBeamCapabilities();
         if (hasGlintFragment() && readStage(GLINT_PROGRAM + ".vsh").isEmpty()) {
             String fragment = readGlintFragment().orElseThrow(
@@ -1000,7 +1001,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (!isProgramEnabled(parent)) continue;
             if (extension.equals("vsh") && program.startsWith("gbuffers_")
                     && !program.equals("gbuffers_clouds")
-                    && readRawShader(programPath(program + ".fsh")).isPresent()) {
+                    && (readRawShader(programPath(program + ".fsh")).isPresent()
+                            || program.equals(SKY_BASIC_PROGRAM) && hasBasicFragment)) {
                 if (TERRAIN_PROGRAMS.contains(program)) {
                     // Terrain VSH signatures, capacity, and fragment links were checked above with
                     // locations freed by unused VulkanMod outputs.
@@ -1018,6 +1020,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                             adaptedVertex.texCoordInterpolation(), true);
                 } else if (program.equals(BASIC_PROGRAM) || program.equals(LINE_PROGRAM)) {
                     // The leash/line vertex formats and cross-stage varyings were checked above.
+                } else if (program.equals(SKY_BASIC_PROGRAM)) {
+                    // The three native sky pipeline formats and their cross-stage links were checked above.
                 } else if (program.equals(BEACON_BEAM_PROGRAM)) {
                     // The beacon vertex/fragment interface was linked and its outputs validated above.
                 } else if (isEntityVertexProgram(program)) {
@@ -1101,6 +1105,27 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             validateBasicLineProgram(fragmentProgram, fragment, lineVertex,
                     BasicVertexShaderAdapter.Format.LINE);
             readGeometryBlendSettings(fragmentProgram);
+        }
+    }
+
+    private void validateSkyBasicCapabilities() throws IOException {
+        if (!hasSkyBasicFragment && !hasBasicFragment) return;
+        Optional<String> vertex = readStage(SKY_BASIC_PROGRAM + ".vsh");
+        if (vertex.isEmpty()) return;
+
+        String fragmentProgram = hasSkyBasicFragment ? SKY_BASIC_PROGRAM : BASIC_PROGRAM;
+        String fragment = readSkyBasicFragment().orElseThrow(
+                () -> new IOException("The pack no longer contains a sky-basic or basic fragment shader."));
+        FragmentOutputs.parse(GlslPreprocessor.process(fragmentProgram + ".fsh", fragment));
+        readGeometryBlendSettings(fragmentProgram);
+        for (BasicVertexShaderAdapter.Format format : List.of(
+                BasicVertexShaderAdapter.Format.SKY,
+                BasicVertexShaderAdapter.Format.STARS,
+                BasicVertexShaderAdapter.Format.SUNRISE_SUNSET)) {
+            Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = BasicVertexShaderAdapter
+                    .validate(SKY_BASIC_PROGRAM, vertex.get(), format).varyings();
+            TextureColorDistanceShaderAdapter.adaptFragment(fragment, fragmentProgram, outputs,
+                    hasShadowFragment(), false);
         }
     }
 

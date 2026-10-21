@@ -134,4 +134,50 @@ class BasicVertexShaderAdapterTest {
         assertTrue(adapted.source().contains("#define vaNormal Normal"));
         assertFalse(adapted.source().contains("vec4 linePosEnd"));
     }
+
+    @Test
+    void executesSkyBasicVertexStagesAcrossTheThreeNativeSkyFormats() throws IOException {
+        String vertex = """
+                #version 120
+                varying vec4 glColor;
+                void main() {
+                    gl_Position = ftransform();
+                    glColor = gl_Color;
+                }
+                """;
+        String fragment = """
+                #version 120
+                varying vec4 glColor;
+                void main() { gl_FragColor = glColor; }
+                """;
+
+        for (BasicVertexShaderAdapter.Format format : new BasicVertexShaderAdapter.Format[] {
+                BasicVertexShaderAdapter.Format.SKY,
+                BasicVertexShaderAdapter.Format.STARS,
+                BasicVertexShaderAdapter.Format.SUNRISE_SUNSET }) {
+            BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.validate(
+                    "gbuffers_skybasic", vertex, format);
+            String linkedFragment = TextureColorDistanceShaderAdapter.adaptFragment(
+                    fragment, "gbuffers_skybasic", adapted.varyings(), false, false);
+
+            assertTrue(adapted.source().contains("veyraShaderPackMain();"));
+            assertTrue(adapted.source().contains("#define gl_Color "
+                    + (format == BasicVertexShaderAdapter.Format.SUNRISE_SUNSET ? "Color" : "ColorModulator")));
+            assertEquals(0, adapted.varyings().get("glColor").location());
+            assertTrue(linkedFragment.contains("layout(location = 0) in vec4 vertexColor;"));
+        }
+    }
+
+    @Test
+    void rejectsSkyVertexInputsMissingFromTheNativeFormats() {
+        IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
+                "gbuffers_skybasic", """
+                        #version 120
+                        void main() {
+                            gl_Position = ftransform();
+                            vec3 value = vaNormal;
+                        }
+                        """, BasicVertexShaderAdapter.Format.STARS));
+        assertTrue(error.getMessage().contains("vaNormal"));
+    }
 }
