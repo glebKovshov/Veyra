@@ -24,6 +24,8 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern LEADING_VARYING_INTERPOLATION = Pattern.compile(
+            "(?m)^([\\t ]*)(flat|smooth|noperspective)([\\t ]+)(varying|in)([\\t ]+)");
     private static final Pattern COMMA_SEPARATED_VARYING_DECLARATION = Pattern.compile(
             "(?m)^([\\t ]*(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s+)"
                     + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)\\s*;"
@@ -234,7 +236,7 @@ public final class EntityShaderAdapter {
     }
 
     public static boolean requiresNormalInput(String source) {
-        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
             if (matcher.group(4).equals("normal")) {
@@ -245,7 +247,7 @@ public final class EntityShaderAdapter {
     }
 
     public static boolean requiresLightmapInput(String source) {
-        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
             if (matcher.group(4).equals("lmcoord") || matcher.group(4).equals("lightMapCoord")
@@ -273,7 +275,7 @@ public final class EntityShaderAdapter {
     }
 
     private static boolean requiresVarying(String source, String name) {
-        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(uncommented));
         while (matcher.find()) {
             if (matcher.group(4).equals(name)) {
@@ -300,6 +302,22 @@ public final class EntityShaderAdapter {
         }
         matcher.appendTail(expanded);
         return expanded.toString();
+    }
+
+    /** GLSL permits interpolation before the storage qualifier (for example, {@code flat in int id}). */
+    private static String normalizeLeadingVaryingInterpolation(String source) {
+        String input = source == null ? "" : source;
+        Matcher matcher = LEADING_VARYING_INTERPOLATION
+                .matcher(ShaderSource.maskBlockAndLineComments(input));
+        StringBuilder normalized = new StringBuilder(input.length());
+        int cursor = 0;
+        while (matcher.find()) {
+            normalized.append(input, cursor, matcher.start())
+                    .append(matcher.group(1)).append(matcher.group(4)).append(' ')
+                    .append(matcher.group(2)).append(matcher.group(5));
+            cursor = matcher.end();
+        }
+        return normalized.append(input, cursor, input.length()).toString();
     }
 
     private static String ensureUniformDeclaration(String source, String type, String name) {
@@ -636,7 +654,8 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
-        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
+        source = normalizeLeadingVaryingInterpolation(
+                IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName));
         FragmentOutputs outputLayout = FragmentOutputs.parse(source);
 
         String adapted = bindEntityIdentifiers(source.replace("\uFEFF", ""), programName,

@@ -254,6 +254,36 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void linksLeadingFlatShadowInputToTheSelectedShadowVertexStage() throws Exception {
+        String vertex = """
+                #version 120
+                attribute vec4 mc_Entity;
+                flat varying int mat;
+                void main() {
+                    mat = int(mc_Entity.x + 0.5);
+                    gl_Position = ftransform();
+                }
+                """;
+        String fragment = """
+                #version 460
+                flat in int mat;
+                void main() { gl_FragColor = vec4(float(mat)); }
+                """;
+
+        EntityVertexShaderAdapter.AdaptedStage adaptedVertex =
+                EntityVertexShaderAdapter.adaptStage(NATIVE, vertex, "shadow_entities", false);
+        String adaptedFragment = EntityShaderAdapter.adaptGeometryFragment(fragment,
+                "shadow_entities", false, true, -1, -1, ItemIdMap.UNMAPPED,
+                false, false, adaptedVertex.varyings());
+
+        assertTrue(adaptedVertex.source().contains("flat out int veyraEntityVarying_mat;"));
+        assertTrue(adaptedVertex.source().contains("mat = int(vec4(0.0).x + 0.5);"));
+        assertFalse(adaptedVertex.source().contains("attribute vec4 mc_Entity"));
+        assertTrue(adaptedFragment.contains("layout(location = 16) flat in int veyraEntityPackInput_16;"));
+        assertTrue(adaptedFragment.contains("float(veyraEntityPackInput_16)"));
+    }
+
+    @Test
     void linksNoiseSamplerOnlyOnceIntoCustomVertexStage() throws Exception {
         String pack = """
                 #version 120

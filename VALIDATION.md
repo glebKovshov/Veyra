@@ -1,5 +1,12 @@
 # Veyra 0.2 validation status
 
+
+## Shadow entity-stage linking follow-up - 2026-10-22
+
+The entity shadow pipeline now composes Minecraft's native vertex stage with the selected pack `shadow.vsh` and links its varyings to the matching fragment stage. The extended `shadow-color-entity` fixture passes on an NVIDIA RTX 3070: the actual entity shadow pipeline consumed `flat mat` from the custom vertex stage and produced **18,764 active readback pixels**. The JDK 21 full local run passed **392 tests**, preprocessed **96** example shaders, directly compiled **112** to Vulkan SPIR-V, built the distributables, and passed `scripts/verify_jar.py`. Its unpublished beta.30-metadata JAR is **849,405 bytes**, SHA-256 `1aa80289549b5511af4558d8be8be4eaac4d74d1083dac8a78b993d937ab6a49`.
+
+The refreshed four-pack audit in `validation/` contains 12 defaults and 63 profile cases across 5,178 declared stages (5,124 preprocessed). It accepts **594** and rejects **270** geometry fragments; **18/18** active compute stages compile. The 54 Complementary rows still report missing entity/hand `mc_midTexCoord` inputs and unsupported cloud `renderStage`; only 21/75 rows have no capability or adapter error. Every row remains `visualValidation=false`. The RTX `COMPLEMENTARY` profile run stops on `gbuffers_entities.vsh`'s active `mc_midTexCoord`, before visual validation. The synthetic fixture fixes and verifies the shadow vertex-to-fragment varying contract but does not certify a real Complementary profile. PR #84 remains draft and the release goal remains incomplete.
+
 ## Weather vertex execution candidate — source validation passed
 
 On `feature/weather-vertex-execution`, the pinned source/profile/dimension audit passed for 4 SHA-512-pinned packs, 12 defaults, 63 declared-profile cases, and 5,178 stages: **864 geometry fragments accepted / 0 rejected / 0 adapter errors**. No audited pack reports a `gbuffers_weather.vsh` capability error. The 21 remaining whole-pack capability errors are 18 selected Complementary `shadowcomp.csh` stages and 3 Sildur `mc_Entity` inputs. All 75 audit rows retain `visualValidation=false`.

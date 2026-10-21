@@ -157,7 +157,9 @@ final class EntityVertexShaderAdapter {
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "textureGrad(")
                 .replaceAll("\\btexture2DProj\\s*\\(", "textureProj(")
                 .replaceAll("\\btexture2D\\s*\\(", "texture(");
-        source = removeUnusedMcEntityDeclaration(source, programName);
+        source = isEntityShadowProgram(programName)
+                ? replaceShadowEntityMaterialInput(source, programName)
+                : removeUnusedMcEntityDeclaration(source, programName);
         Matcher textureMatrix = TEXTURE_MATRIX.matcher(ShaderSource.maskBlockAndLineComments(source));
         while (textureMatrix.find()) {
             if (!Set.of("0", "1").contains(textureMatrix.group(1))) {
@@ -228,6 +230,37 @@ final class EntityVertexShaderAdapter {
         }
         clean.append(source, cursor, source.length());
         return clean.toString();
+    }
+
+    /** Entity and block-entity shadow draws have no block-material vertex attribute; zero is the Iris sentinel. */
+    private static String replaceShadowEntityMaterialInput(String source, String programName) throws IOException {
+        String masked = ShaderSource.maskBlockAndLineComments(source);
+        Matcher declarations = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(masked);
+        StringBuilder withoutDeclarations = new StringBuilder(source.length());
+        int cursor = 0;
+        while (declarations.find()) {
+            withoutDeclarations.append(source, cursor, declarations.start());
+            cursor = declarations.end();
+        }
+        withoutDeclarations.append(source, cursor, source.length());
+        String clean = withoutDeclarations.toString();
+        String cleanMasked = ShaderSource.maskBlockAndLineComments(clean);
+        if (Pattern.compile("(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:attribute|in)\\s+[^;]*\\bmc_Entity\\b[^;]*;")
+                .matcher(cleanMasked).find()) {
+            throw new IOException(programName + ".vsh declares mc_Entity with an unsupported vertex attribute layout.");
+        }
+        Matcher references = Pattern.compile("\\bmc_Entity\\b").matcher(cleanMasked);
+        StringBuilder replaced = new StringBuilder(clean.length());
+        cursor = 0;
+        while (references.find()) {
+            replaced.append(clean, cursor, references.start()).append("vec4(0.0)");
+            cursor = references.end();
+        }
+        return replaced.append(clean, cursor, clean.length()).toString();
+    }
+
+    private static boolean isEntityShadowProgram(String programName) {
+        return programName.equals("shadow_entities") || programName.equals("shadow_block");
     }
 
     private static SamplerBridge adaptSamplers(String source, String programName) throws IOException {
