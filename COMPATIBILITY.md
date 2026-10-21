@@ -8,7 +8,7 @@ The pinned audit now covers 4 archives, 12 defaults, 63 declared-profile/dimensi
 
 Feature PR [#77](https://github.com/glebKovshov/Veyra/pull/77) merged into `main` at `e4f96f8`. Build [39551772481](https://github.com/glebKovshov/Veyra/actions/runs/39551772481), pinned source audit [39551772538](https://github.com/glebKovshov/Veyra/actions/runs/39551772538), and Graphics smoke [39551772493](https://github.com/glebKovshov/Veyra/actions/runs/39551772493) passed; all **34/34** Lavapipe fixtures passed, including Vulkan validation for the sky-textured stage variants. Local JDK 21 checks passed **330 tests**, 85 example shader preprocessing cases, and 98 direct Vulkan SPIR-V stages. On an NVIDIA RTX 3070 the synthetic sky-stage fixture measured **14,249 active SUN pixels / 10,517 active MOON pixels / 0 disabled**. These synthetic fixtures validate named pipeline paths; they do not certify full-pack visuals. The beta.25 CloudRenderer Mixin crash fix remains present from beta.26 onward.
 
-The stable Iris-compatibility goal remains incomplete. See [WORK_SUMMARY.md](WORK_SUMMARY.md) for the release record and current progress.
+The beta.29 prerelease is [published on GitHub](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.29%2Bmc1.21.11); its verified install JAR is available [here](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.29%2Bmc1.21.11/veyra-0.2.0-beta.29%2Bmc1.21.11.jar). The stable Iris-compatibility goal remains incomplete. See [WORK_SUMMARY.md](WORK_SUMMARY.md) for the release record and current progress.
 
 ## Beta.28 per-program uniform and render-stage batch
 
