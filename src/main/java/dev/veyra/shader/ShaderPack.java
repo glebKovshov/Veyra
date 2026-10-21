@@ -989,6 +989,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         validateLightningVertexCapabilities();
         validateSkyTexturedVertexCapabilities();
         validateTexturedVertexCapabilities();
+        validateWeatherVertexCapabilities();
         if (hasGlintFragment() && readStage(GLINT_PROGRAM + ".vsh").isEmpty()) {
             String fragment = readGlintFragment().orElseThrow(
                     () -> new IOException("The pack no longer contains an armor-glint fragment shader."));
@@ -1008,7 +1009,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (extension.equals("vsh") && program.startsWith("gbuffers_")
                     && !program.equals("gbuffers_clouds")
                     && (readRawShader(programPath(program + ".fsh")).isPresent()
-                            || program.equals(SKY_BASIC_PROGRAM) && hasBasicFragment)) {
+                            || program.equals(SKY_BASIC_PROGRAM) && hasBasicFragment
+                            || program.equals(WEATHER_PROGRAMS.getFirst()) && hasWeatherFragment())) {
                 if (TERRAIN_PROGRAMS.contains(program)) {
                     // Terrain VSH signatures, capacity, and fragment links were checked above with
                     // locations freed by unused VulkanMod outputs.
@@ -1036,6 +1038,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     // Both Position/Tex and Position/Tex/Color sky formats were checked above.
                 } else if (program.equals(TEXTURED_PROGRAM)) {
                     // The world-border Position/Tex format and linked fragment inputs were checked above.
+                } else if (program.equals(WEATHER_PROGRAMS.getFirst())) {
+                    // The particle format and the weather/fallback fragment interface were checked above.
                 } else if (isEntityVertexProgram(program)) {
                     String vertexSource = readStage(file).orElseThrow(
                             () -> new IOException("The pack no longer contains " + file + "."));
@@ -1090,6 +1094,20 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 () -> new IOException("The pack no longer contains gbuffers_textured.fsh."));
         validateTextureVertexProgram(TEXTURED_PROGRAM, TEXTURED_PROGRAM, fragment, vertex.get(),
                 BasicVertexShaderAdapter.Format.TEXTURED, null);
+    }
+
+    private void validateWeatherVertexCapabilities() throws IOException {
+        String program = WEATHER_PROGRAMS.getFirst();
+        if (!isProgramEnabled(program)) return;
+        Optional<String> vertex = readStage(program + ".vsh");
+        if (vertex.isEmpty()) return;
+        String fragmentProgram = weatherPrograms.contains(program) ? program
+                : hasTexturedLitFragment ? TEXTURED_LIT_PROGRAM : TEXTURED_PROGRAM;
+        String fragment = readWeatherFragment(fragmentProgram).orElseThrow(
+                () -> new IOException("The pack no longer contains a weather or textured fallback fragment shader."));
+        validateTextureVertexProgram(program, fragmentProgram, fragment, vertex.get(),
+                BasicVertexShaderAdapter.Format.WEATHER, null);
+        readGeometryBlendSettings(fragmentProgram);
     }
 
     private void validateTextureVertexProgram(String vertexProgram, String fragmentProgram, String fragment,

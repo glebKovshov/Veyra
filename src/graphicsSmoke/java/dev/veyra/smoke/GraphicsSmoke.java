@@ -32,7 +32,7 @@ public final class GraphicsSmoke {
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
             glintMrtFixture, basicVertexFixture, skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, blockVertexFixture,
-            damagedBlockVertexFixture, handVertexFixture;
+            damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
@@ -73,6 +73,7 @@ public final class GraphicsSmoke {
             skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
             skyTexturedStageFixture = fixture.equals("skytextured-stage-variants");
             beaconBeamFixture = fixture.equals("beaconbeam-vertex-execution");
+            weatherVertexFixture = fixture.equals("weather-vertex-execution");
             blockVertexFixture = fixture.equals("block-vertex-execution");
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
             handVertexFixture = fixture.equals("hand-vertex-execution");
@@ -197,6 +198,7 @@ public final class GraphicsSmoke {
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
                     && !glintMrtFixture && !basicVertexFixture && !skyBasicVertexFixture && !beaconBeamFixture
                     && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
+                    && !weatherVertexFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -437,7 +439,7 @@ public final class GraphicsSmoke {
                         disabledBeaconBeamMrtPixels = basicMrtPixelCount;
                     }
                     int minPixels = currentRenderedItemFixture || blockVertexFixture
-                            || damagedBlockVertexFixture || handVertexFixture ? 100 : 2000;
+                            || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture ? 100 : 2000;
                     Throwable failure;
                     if (skyTexturedStageFixture) {
                         disabledSkySunPixels = count;

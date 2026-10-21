@@ -95,6 +95,32 @@ class BasicVertexShaderAdapterTest {
             }
             """;
 
+    private static final String NATIVE_WEATHER_VERTEX = """
+            #version 460
+            layout(location = 0) in vec3 Position;
+            layout(location = 1) in vec2 UV0;
+            layout(location = 2) in vec4 Color;
+            layout(location = 3) in ivec2 UV2;
+            layout(location = 0) out float sphericalVertexDistance;
+            layout(location = 1) out float cylindricalVertexDistance;
+            layout(location = 2) out vec2 texCoord0;
+            layout(location = 3) out vec4 vertexColor;
+            layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                mat4 ModelViewMat;
+                mat4 ProjMat;
+                mat4 TextureMat;
+                vec4 ColorModulator;
+            };
+            uniform sampler2D Sampler2;
+            void main() {
+                gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                sphericalVertexDistance = length(Position);
+                cylindricalVertexDistance = length(Position.xz);
+                texCoord0 = UV0;
+                vertexColor = Color * texelFetch(Sampler2, UV2 / 16, 0);
+            }
+            """;
+
     @Test
     void adaptsLeashInputsAndLinksFlatColorAndLightmapOutputs() throws IOException {
         BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(
@@ -330,6 +356,63 @@ class BasicVertexShaderAdapterTest {
         assertTrue(adapted.source().contains("#define gl_Vertex vec4(Position + ModelOffset, 1.0)"));
         assertFalse(adapted.source().contains("attribute vec4 mc_Entity"));
         assertFalse(adapted.source().contains("attribute vec4 mc_midTexCoord"));
+    }
+
+    @Test
+    void adaptsWeatherParticleInputsAndPreservesNativeLightmapAndFogOutputs() throws IOException {
+        BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.validate(
+                "gbuffers_weather", """
+                        #version 130
+                        flat varying vec2 lmCoord;
+                        varying vec2 texCoord;
+                        flat varying vec3 upVec, sunVec;
+                        flat varying vec4 glColor;
+                        varying float lPos;
+                        void main() {
+                            gl_Position = ftransform();
+                            texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                            lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                            upVec = vec3(0.0, 1.0, 0.0);
+                            sunVec = vec3(0.0, 0.0, 1.0);
+                            glColor = gl_Color;
+                            lPos = length(gl_Vertex.xyz);
+                        }
+                        """, BasicVertexShaderAdapter.Format.WEATHER);
+
+        assertTrue(adapted.source().contains("#define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define vaUV2 UV2"));
+        assertTrue(adapted.source().contains("uniform sampler2D Sampler2;"));
+        assertTrue(adapted.source().contains("vertexColor=Color*texelFetch(Sampler2,UV2/16,0);"));
+        assertTrue(adapted.source().contains("#define glColor vertexColor"));
+        assertFalse(adapted.source().contains("sphericalVertexDistance = 0.0;"));
+        assertEquals(0, adapted.varyings().get("glColor").location());
+        assertEquals(3, adapted.varyings().get("lmCoord").location());
+        assertEquals(7, adapted.varyings().get("texCoord").location());
+
+        String fragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                #version 130
+                flat varying vec2 lmCoord;
+                varying vec2 texCoord;
+                flat varying vec3 upVec, sunVec;
+                flat varying vec4 glColor;
+                varying float lPos;
+                void main() {
+                    gl_FragColor = glColor + vec4(texCoord + lmCoord, upVec.x + sunVec.x + lPos, 0.0);
+                }
+                """, "gbuffers_weather", adapted.varyings(), false, true);
+        assertTrue(fragment.contains("layout(location = 0) flat in vec4 vertexColor;"));
+        assertTrue(fragment.contains("layout(location = 3) flat in vec2 lmCoord;"), fragment);
+        assertTrue(fragment.contains("layout(location = 7) in vec2 texCoord0;"), fragment);
+
+        IOException missingNormal = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
+                "gbuffers_weather", """
+                        #version 130
+                        void main() {
+                            gl_Position = ftransform() + vec4(gl_Normal, 0.0);
+                        }
+                        """, BasicVertexShaderAdapter.Format.WEATHER));
+        assertTrue(missingNormal.getMessage().contains("gl_Normal"));
     }
 
     @Test

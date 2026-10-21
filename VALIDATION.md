@@ -1,5 +1,17 @@
 # Veyra 0.2 validation status
 
+## Weather vertex execution candidate — source validation passed
+
+On `feature/weather-vertex-execution`, the pinned source/profile/dimension audit passed for 4 SHA-512-pinned packs, 12 defaults, 63 declared-profile cases, and 5,178 stages: **864 geometry fragments accepted / 0 rejected / 0 adapter errors**. No audited pack reports a `gbuffers_weather.vsh` capability error. The 21 remaining whole-pack capability errors are 18 selected Complementary `shadowcomp.csh` stages and 3 Sildur `mc_Entity` inputs. All 75 audit rows retain `visualValidation=false`.
+
+Local JDK 21 `test build validateShaders compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon` passed **336 tests** with 0 failures/errors/skips, processed 86 examples, compiled 100 stages directly to Vulkan SPIR-V, and completed `build`, graphics-smoke Java compilation, and example-pack packaging. `scripts/verify_jar.py` passed on the local beta.30-metadata feature artifact (755,156 bytes; SHA-256 `9ee88e134be7ef179f11c64e1a239e389118574f47833575f5a565267392373f`). The rainy-world runtime fixture is added to the 35-case Lavapipe matrix; its real graphics result, PR, merge, and next batched release are pending.
+
+## Beta.30 experimental prerelease — published and verified
+
+Release-prep PR [#81](https://github.com/glebKovshov/Veyra/pull/81) merged into `main` at `74b0a1940edc954ec0edbf4a00238bd80994e60f`. Tag `v0.2.0-beta.30+mc1.21.11` and the [GitHub prerelease](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.30%2Bmc1.21.11) were published successfully by Release workflow [39568060859](https://github.com/glebKovshov/Veyra/actions/runs/39568060859), which passed source audit, all 34 Lavapipe fixtures, build/tests, and distributable verification.
+
+The published install [JAR](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.30%2Bmc1.21.11/veyra-0.2.0-beta.30%2Bmc1.21.11.jar) is **753,755 bytes**, SHA-256 `96edff62b629e4882e3a635823d61e08e59184301646eb0339dc60e4bbaef1d0`. It includes the CloudRenderer selector remap that fixes the beta.25 crash. The published beta.25 and beta.29 assets remain unchanged.
+
 ## Beta.29 experimental prerelease — published and verified
 
 Feature PR [#77](https://github.com/glebKovshov/Veyra/pull/77) added the batch; release-prep PR [#78](https://github.com/glebKovshov/Veyra/pull/78) merged as `7a11ea2318019b0cff13a060fe5c163d8ea931d8`. Annotated tag `v0.2.0-beta.29+mc1.21.11` points to that commit. Tag Build [39553458503](https://github.com/glebKovshov/Veyra/actions/runs/39553458503) and Release workflow [39553458506](https://github.com/glebKovshov/Veyra/actions/runs/39553458506) passed. The release workflow passed the pinned source audit, **34/34** Lavapipe graphics fixtures, versioned build/tests, distributable verifier, and publication.

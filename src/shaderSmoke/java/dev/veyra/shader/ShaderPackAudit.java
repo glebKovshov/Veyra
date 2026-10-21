@@ -96,6 +96,18 @@ public final class ShaderPackAudit {
                                 FragmentOutputs.parse(GlslPreprocessor.process(program + ".fsh", source));
                                 pack.readGeometryBlendSettings(program);
                             }
+                            else if (program.equals("gbuffers_weather")) {
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
+                                        pack.readStage(program + ".vsh").isPresent()
+                                                ? BasicVertexShaderAdapter.describeVaryings(program,
+                                                        pack.readStage(program + ".vsh").orElseThrow(),
+                                                        BasicVertexShaderAdapter.Format.WEATHER)
+                                                : Map.of();
+                                FragmentOutputs.parse(GlslPreprocessor.process(program + ".fsh", source));
+                                pack.readGeometryBlendSettings(program);
+                                TextureColorDistanceShaderAdapter.adaptFragment(source, program, vertexVaryings,
+                                        pack.hasShadowFragment(), true);
+                            }
                             else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.
                             accepted++;

@@ -318,6 +318,21 @@ public class ShaderCompileSmoke {
             count++;
             compiled += 2;
 
+            Path weatherFixture = Path.of("examples/weather-vertex-execution/shaders");
+            String weatherPackVertex = GlslPreprocessor.process("gbuffers_weather.vsh",
+                    Files.readString(weatherFixture.resolve("gbuffers_weather.vsh")));
+            String weatherPackFragment = GlslPreprocessor.process("gbuffers_weather.fsh",
+                    Files.readString(weatherFixture.resolve("gbuffers_weather.fsh")));
+            BasicVertexShaderAdapter.AdaptedStage weatherVertex = BasicVertexShaderAdapter.adaptStage(
+                    weatherNativeVertexSource(), weatherPackVertex, "gbuffers_weather",
+                    BasicVertexShaderAdapter.Format.WEATHER);
+            String weatherFragment = TextureColorDistanceShaderAdapter.adaptFragment(weatherPackFragment,
+                    "gbuffers_weather", weatherVertex.varyings(), false, true);
+            compileVertex(compiler, options, weatherVertex.source(), "weather-pack-vertex", true);
+            compile(compiler, options, weatherFragment, "weather-pack-fragment", true);
+            count++;
+            compiled += 2;
+
             String skyTexturedPackVertexSource = """
                     #version 130
                     varying vec2 texCoord;
@@ -852,13 +867,42 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather-particle vertex/lightmap/varyings, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
             shaderc_compiler_release(compiler);
         }
     }
+
+    private static String weatherNativeVertexSource() {
+        return """
+                #version 460
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec2 UV0;
+                layout(location = 2) in vec4 Color;
+                layout(location = 3) in ivec2 UV2;
+                out float sphericalVertexDistance;
+                out float cylindricalVertexDistance;
+                out vec2 texCoord0;
+                out vec4 vertexColor;
+                layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                    mat4 ModelViewMat;
+                    mat4 ProjMat;
+                    mat4 TextureMat;
+                    vec4 ColorModulator;
+                };
+                uniform sampler2D Sampler2;
+                void main() {
+                    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                    sphericalVertexDistance = length(Position);
+                    cylindricalVertexDistance = length(Position.xz);
+                    texCoord0 = UV0;
+                    vertexColor = Color * texelFetch(Sampler2, UV2 / 16, 0);
+                }
+                """;
+    }
+
     private static void compile(long compiler, long options, String source, String name, boolean expected) {
         long result = shaderc_compile_into_spv(compiler, source, shaderc_fragment_shader, name, "main", options);
         try {

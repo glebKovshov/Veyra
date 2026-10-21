@@ -16,7 +16,7 @@ final class BasicVertexShaderAdapter {
 
     enum Format {
         LEASH, LINE, SKY, STARS, SUNRISE_SUNSET,
-        LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR
+        LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER
     }
 
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
@@ -48,6 +48,8 @@ final class BasicVertexShaderAdapter {
             "\\b(gl_MultiTexCoord[3-7]|at_midBlock|mc_midBlock)\\b");
     private static final Pattern UNSUPPORTED_SKY_INPUT = Pattern.compile(
             "\\b(vaNormal|Normal|UV2|LineWidth)\\b");
+    private static final Pattern UNSUPPORTED_WEATHER_INPUT = Pattern.compile(
+            "\\b(vaNormal|Normal|LineWidth|gl_Normal)\\b");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern FOG_COORD = Pattern.compile("\\bgl_FogFragCoord\\b");
     private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile(
@@ -105,6 +107,7 @@ final class BasicVertexShaderAdapter {
             case LINE -> lineMain(widenFallbackLines);
             case LEASH -> leashMain();
             case LIGHTNING -> lightningMain();
+            case WEATHER -> weatherMain();
             default -> skyMain(format);
         };
 
@@ -129,6 +132,8 @@ final class BasicVertexShaderAdapter {
                     + "layout(location=1) in vec2 UV0;\n";
             case SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "layout(location=0) in vec3 Position;\n"
                     + "layout(location=1) in vec2 UV0;\nlayout(location=2) in vec4 Color;\n";
+            case WEATHER -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec2 UV0;\n"
+                    + "layout(location=2) in vec4 Color;\nlayout(location=3) in ivec2 UV2;\n";
         };
         String outputs = switch (format) {
             case LEASH, LINE, SUNRISE_SUNSET -> "layout(location=0) out vec4 vertexColor;\n"
@@ -141,20 +146,27 @@ final class BasicVertexShaderAdapter {
                     + "layout(location=2) out float cylindricalVertexDistance;\n";
             case SKY_TEXTURED, TEXTURED -> "out vec2 texCoord0;\n";
             case SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "out vec2 texCoord0;\nout vec4 vertexColor;\n";
+            case WEATHER -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\n"
+                    + "out vec2 texCoord0;\nout vec4 vertexColor;\n";
         };
         String textureOutput = switch (format) {
-            case SKY_TEXTURED, TEXTURED, SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "texCoord0 = UV0;";
+            case SKY_TEXTURED, TEXTURED, SKY_TEXTURED_COLOR, TEXTURED_COLOR, WEATHER -> "texCoord0 = UV0;";
             default -> "";
         };
         String colorOutput = switch (format) {
             case LIGHTNING, SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "vertexColor = Color;";
             default -> "";
         };
+        String weatherSampler = format == Format.WEATHER ? "uniform sampler2D Sampler2;\n" : "";
+        String weatherOutputs = format == Format.WEATHER
+                ? "sphericalVertexDistance=length(Position);cylindricalVertexDistance=length(Position.xz);"
+                        + "texCoord0=UV0;vertexColor=Color*texelFetch(Sampler2,UV2/16,0);"
+                : "";
         String base = "#version 460\n" + inputs + outputs
                 + "layout(set=0,binding=0,std140) uniform NativeTransforms { mat4 ModelViewMat; mat4 ProjMat; "
-                + "mat4 TextureMat; vec4 ColorModulator; vec2 ScreenSize; vec3 ModelOffset; };\n"
+                + "mat4 TextureMat; vec4 ColorModulator; vec2 ScreenSize; vec3 ModelOffset; };\n" + weatherSampler
                 + "void main(){gl_Position=ProjMat*ModelViewMat*vec4(Position,1.0);"
-                + textureOutput + colorOutput
+                + (format == Format.WEATHER ? weatherOutputs : textureOutput + colorOutput)
                 + (format == Format.SKY ? "sphericalVertexDistance=1.0;cylindricalVertexDistance=1.0;" : "")
                 + (format == Format.LIGHTNING ? "sphericalVertexDistance=0.0;cylindricalVertexDistance=0.0;" : "")
                 + "}\n";
@@ -203,6 +215,10 @@ final class BasicVertexShaderAdapter {
             if (unsupportedSkyInput.find()) throw new IOException(programName + ".vsh input '"
                     + unsupportedSkyInput.group(1) + "' is not present in Minecraft's "
                     + format.name().toLowerCase() + " vertex format.");
+        } else if (format == Format.WEATHER) {
+            Matcher unsupportedWeatherInput = UNSUPPORTED_WEATHER_INPUT.matcher(uncommented);
+            if (unsupportedWeatherInput.find()) throw new IOException(programName + ".vsh input '"
+                    + unsupportedWeatherInput.group(1) + "' is not present in Minecraft's particle vertex format.");
         }
 
         OutputBridge outputs = extractOutputs(source, programName, format);
@@ -363,6 +379,7 @@ final class BasicVertexShaderAdapter {
     private static String nativeInputBridge(Format format) {
         String lightmap = switch (format) {
             case LEASH -> "vec4(vec2(UV2), 0.0, 1.0)";
+            case WEATHER -> "vec4(vec2(UV2), 0.0, 1.0)";
             case LINE -> "vec4(240.0, 240.0, 0.0, 1.0)";
             default -> "vec4(0.0, 0.0, 0.0, 1.0)";
         };
@@ -374,6 +391,7 @@ final class BasicVertexShaderAdapter {
             case SKY_TEXTURED_COLOR -> "Color";
             case TEXTURED -> "vec4(1.0)";
             case TEXTURED_COLOR -> "Color";
+            case WEATHER -> "Color";
         };
         String vertex = format == Format.TEXTURED
                 ? "vec4(Position + ModelOffset, 1.0)" : "vec4(Position + veyraVertexOffset, 1.0)";
@@ -384,7 +402,7 @@ final class BasicVertexShaderAdapter {
                         : "vec4(0.5, 0.5, 0.0, 1.0)";
         String coreInputs = (hasTextureCoordinate(format) ? "#define vaUV0 UV0\n" : "")
                 + (hasNormalInput(format) ? "#define vaNormal Normal\n" : "")
-                + (format == Format.LEASH ? "#define vaUV2 UV2\n" : "");
+                + (format == Format.LEASH || format == Format.WEATHER ? "#define vaUV2 UV2\n" : "");
         return """
                 vec3 veyraVertexOffset = vec3(0.0);
                 #define gl_Vertex %s
@@ -412,6 +430,10 @@ final class BasicVertexShaderAdapter {
 
     private static String lightningMain() {
         return "void main() { veyraMinecraftLightningMain(); veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
+    }
+
+    private static String weatherMain() {
+        return "void main() { veyraMinecraftSkyMain(); veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
     }
 
     private static String lineMain(boolean widen) {
@@ -450,7 +472,7 @@ final class BasicVertexShaderAdapter {
             default -> "";
         };
         String initializeDistances = format == Format.STARS || format == Format.SUNRISE_SUNSET
-                || isTextureFormat(format)
+                || isTextureFormat(format) && format != Format.WEATHER
                 ? "sphericalVertexDistance = 0.0; cylindricalVertexDistance = 0.0; " : "";
         return "void main() { veyraMinecraftSkyMain(); " + initializeColor + initializeDistances
                 + "veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
@@ -462,12 +484,12 @@ final class BasicVertexShaderAdapter {
 
     private static boolean isTextureFormat(Format format) {
         return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
-                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR;
+                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR || format == Format.WEATHER;
     }
 
     private static boolean hasTextureCoordinate(Format format) {
         return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
-                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR;
+                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR || format == Format.WEATHER;
     }
 
     private static boolean hasNormalInput(Format format) {

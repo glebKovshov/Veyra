@@ -4597,35 +4597,69 @@ public final class VeyraRenderer {
                 .toList();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
-            String programName = pack.weatherPrograms().contains("gbuffers_weather")
+            String vertexProgram = "gbuffers_weather";
+            String fragmentProgram = pack.weatherPrograms().contains(vertexProgram)
                     ? "gbuffers_weather"
                     : pack.hasTexturedLitFragment() ? "gbuffers_textured_lit" : "gbuffers_textured";
-            boolean fallback = !pack.weatherPrograms().contains(programName);
+            boolean fallback = !pack.weatherPrograms().contains(fragmentProgram);
+            Optional<String> packVertex = pack.readStage(vertexProgram + ".vsh");
+            String vertexSource = null;
+            boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
+            FragmentOutputs outputLayout = null;
+            GeometryBlendSettings blendSettings = null;
             String fragmentSource;
             try {
-                fragmentSource = pack.readWeatherFragment(programName)
-                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
-                fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, programName, true);
+                String packFragment = pack.readWeatherFragment(fragmentProgram)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + fragmentProgram + ".fsh."));
+                if (packVertex.isPresent()) {
+                    ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
+                    String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                            minecraftVertex, packVertex.get(), vertexProgram, BasicVertexShaderAdapter.Format.WEATHER);
+                    vertexSource = adaptedVertex.source();
+                    outputLayout = FragmentOutputs.parse(
+                            GlslPreprocessor.process(fragmentProgram + ".fsh", packFragment));
+                    blendSettings = pack.readGeometryBlendSettings(fragmentProgram);
+                    samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(packFragment, fragmentProgram,
+                            pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"));
+                    usesNoiseSampler = adaptedVertex.usesNoiseSampler() || samplerInputs.usesNoiseSampler();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, fragmentProgram,
+                            adaptedVertex.varyings(), pack.hasShadowFragment(),
+                            original.getSamplers().contains("Sampler2"));
+                    validateColorDistanceSamplerBudget(fragmentProgram, original, usesNoiseSampler, samplerInputs);
+                } else {
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
+                            packFragment, fragmentProgram, true);
+                }
             } catch (IOException exception) {
-                if (!fallback) {
+                if (!fallback || packVertex.isPresent()) {
                     throw exception;
                 }
                 VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
-                        programName, original.getLocation(), exception.getMessage());
+                        fragmentProgram, original.getLocation(), exception.getMessage());
                 continue;
             }
-            String sourceHash = sha256(programName + '\n' + fragmentSource);
+            String sourceHash = sha256(fragmentProgram + '\n' + (vertexSource == null ? "" : vertexSource)
+                    + '\n' + fragmentSource + '\n' + (outputLayout == null ? "" : outputLayout)
+                    + '\n' + (blendSettings == null ? "" : blendSettings) + '\n' + samplerInputs);
             WeatherPipelineKey cacheKey = new WeatherPipelineKey(original, sourceHash);
             RenderPipeline weatherPipeline = WEATHER_PIPELINE_CACHE.get(cacheKey);
             if (weatherPipeline == null) {
                 try {
-                    weatherPipeline = compileWeatherPipeline(original, fragmentSource, sourceHash);
+                    weatherPipeline = vertexSource == null
+                            ? compileWeatherPipeline(original, fragmentSource, sourceHash)
+                            : compileColorDistancePipeline(original, fragmentProgram, fragmentSource, sourceHash,
+                                    vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 } catch (IOException exception) {
-                    if (!fallback) {
+                    if (!fallback || packVertex.isPresent()) {
                         throw exception;
                     }
                     VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
-                            programName, original.getLocation(), exception.getMessage());
+                            fragmentProgram, original.getLocation(), exception.getMessage());
                     continue;
                 }
                 WEATHER_PIPELINE_CACHE.put(cacheKey, weatherPipeline);
