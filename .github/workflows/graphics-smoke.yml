@@ -12,6 +12,7 @@ on:
       - 'examples/terrain-block-id/**'
       - 'examples/terrain-vertex-execution/**'
       - 'examples/terrain-vertex-varyings/**'
+      - 'examples/terrain-vertex-varyings/**'
       - 'examples/water-block-id/**'
       - 'examples/entity-mrt/**'
       - 'examples/entity-colortex-feedback/**'
@@ -107,7 +108,11 @@ jobs:
           export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
           test -n "$VK_ICD_FILENAMES"
           vulkaninfo --summary > vulkan-device.txt 2>&1
-          timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke 2>&1 | tee graphics-client.log
+          extra_args=()
+          if [[ '${{ matrix.fixture }}' == 'terrain-vertex-varyings' ]]; then
+            extra_args+=('-PgraphicsSmokeComputeProbe=true')
+          fi
+          timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke "${extra_args[@]}" 2>&1 | tee graphics-client.log
       - name: Verify real frame readback and validation output
         run: |
           python3 - <<'PY'
@@ -131,6 +136,10 @@ jobs:
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
           assert result['status']=='passed', result
+          if '${{ matrix.fixture }}' == 'terrain-vertex-varyings':
+              probe=json.loads(pathlib.Path('build/reports/graphics-smoke/compute-image-probe.json').read_text())
+              assert probe == {'status':'passed','format':'r16ui','texels':64,'expected':42}, probe
+              print('Custom-image compute readback:', probe)
           for phase in ['before-backend-cleanup','before-allocator-destruction']:
               snapshot=json.loads(pathlib.Path(f'build/reports/graphics-smoke/shutdown-{phase}.json').read_text())
               assert snapshot['phase']==phase

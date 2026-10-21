@@ -7,10 +7,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Iris 1.21.11 scalar and vec3 uniforms that the renderer evaluates once per frame and exposes through
- * every uniform path (terrain/entity uniform blocks, post blocks and custom-uniform inputs). Values are
- * published by the renderer; this class holds only names, types and the latest snapshot so adapters and
- * tests can use it without Minecraft.
+ * Iris 1.21.11 scalar and vec3 uniforms, plus Veyra compatibility helpers, that the renderer evaluates once
+ * per frame and exposes through uniform blocks and custom-uniform inputs. Values are published by the renderer;
+ * this class holds names, types and the latest snapshot so adapters and tests can use it without Minecraft.
  */
 public final class IrisExtraUniforms {
     public enum Kind {
@@ -27,7 +26,7 @@ public final class IrisExtraUniforms {
         }
     }
 
-    /** A uniform; {@code hardcodedCustom} marks Iris' HardcodedCustomUniforms that packs may redefine. */
+    /** A uniform; {@code hardcodedCustom} marks Iris custom uniforms or Veyra helpers packs may redefine. */
     public record Definition(String name, Kind kind, boolean hardcodedCustom) {
     }
 
@@ -65,6 +64,10 @@ public final class IrisExtraUniforms {
             new Definition("hideGUI", Kind.BOOL, false),
             new Definition("isRightHanded", Kind.BOOL, false),
             new Definition("anisotropicFiltering", Kind.INT, false),
+            new Definition("framemod2", Kind.FLOAT, true),
+            new Definition("framemod4", Kind.FLOAT, true),
+            new Definition("framemod8", Kind.FLOAT, true),
+            new Definition("framemod600", Kind.FLOAT, true),
             new Definition("pi", Kind.FLOAT, false),
             new Definition("dhFarPlane", Kind.FLOAT, false),
             new Definition("dhNearPlane", Kind.FLOAT, false),
@@ -104,6 +107,9 @@ public final class IrisExtraUniforms {
             new Definition("effectStrength", Kind.FLOAT, true));
     private static final Map<String, Definition> BY_NAME = DEFINITIONS.stream()
             .collect(Collectors.toUnmodifiableMap(Definition::name, definition -> definition));
+    /** Compatibility helpers computed by Veyra; they are not registered by Iris 1.21.11. */
+    public static final Set<String> VEYRA_COMPATIBILITY_UNIFORMS = Set.of(
+            "framemod2", "framemod4", "framemod8", "framemod600");
     /** Iris hardcoded custom uniforms; a shaders.properties definition with the same name wins. */
     public static final Set<String> HARDCODED_CUSTOM = DEFINITIONS.stream().filter(Definition::hardcodedCustom)
             .map(Definition::name).collect(Collectors.toUnmodifiableSet());

@@ -22,7 +22,12 @@ public abstract class DeviceManagerMixin {
             VK10.vkGetPhysicalDeviceProperties(DeviceManager.physicalDevice, properties);
             VeyraDeviceFeatures.maxColorAttachments = properties.limits().maxColorAttachments();
             VeyraDeviceFeatures.independentBlendEnabled = supported.independentBlend();
-            return requested.logicOp(logicOp).independentBlend(supported.independentBlend());
+            VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = supported.vertexPipelineStoresAndAtomics();
+            VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = supported.shaderStorageImageExtendedFormats();
+            return requested.logicOp(logicOp)
+                    .independentBlend(supported.independentBlend())
+                    .vertexPipelineStoresAndAtomics(supported.vertexPipelineStoresAndAtomics())
+                    .shaderStorageImageExtendedFormats(supported.shaderStorageImageExtendedFormats());
         }
     }
 }

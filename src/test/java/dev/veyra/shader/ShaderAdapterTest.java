@@ -244,8 +244,8 @@ class ShaderAdapterTest {
     @Test
     void rejectsTerrainVertexInterfacesThatHaveNoMatchingVulkanInputsOrFragmentBridge() throws IOException {
         IOException attribute = assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate(
-                "gbuffers_terrain", "#version 120\nattribute vec3 at_midBlock;\nvoid main(){}\n"));
-        assertTrue(attribute.getMessage().contains("at_midBlock"));
+                "gbuffers_terrain", "#version 120\nattribute vec3 mc_midBlock;\nvoid main(){}\n"));
+        assertTrue(attribute.getMessage().contains("mc_midBlock"));
 
         IOException output = assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate(
                 "gbuffers_terrain", "#version 120\nout dmat4 unsupportedTransform;\nvoid main(){}\n"));
@@ -580,18 +580,40 @@ class ShaderAdapterTest {
         assertEquals(0.5F, TerrainMidTexCoord.center(0.0F, 1.0F, 1.0F, 0.0F));
         assertEquals((short) 16384, TerrainMidTexCoord.pack(0.5F));
         assertEquals(Short.MIN_VALUE, TerrainMidTexCoord.pack(1.0F));
-        assertEquals(48, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
+        assertEquals(64, TerrainMidTexCoord.VERTEX_FORMAT.getVertexSize());
         assertEquals(20, TerrainMidTexCoord.MATERIAL_ID_OFFSET);
         assertEquals(24, TerrainMidTexCoord.RENDER_TYPE_OFFSET);
         assertEquals(28, TerrainMidTexCoord.PACKED_NORMAL_OFFSET);
         assertEquals(32, TerrainMidTexCoord.TANGENT_OFFSET);
-        assertEquals(11, TerrainMidTexCoord.VERTEX_FORMAT.getElements().size());
-        for (int location = 7; location <= 10; location++) {
+        assertEquals(48, TerrainMidTexCoord.MID_BLOCK_OFFSET);
+        assertEquals(60, TerrainMidTexCoord.EMISSION_OFFSET);
+        assertEquals(15, TerrainMidTexCoord.VERTEX_FORMAT.getElements().size());
+        for (int location = 7; location <= 14; location++) {
             var element = TerrainMidTexCoord.VERTEX_FORMAT.getElements().get(location);
             assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Usage.GENERIC, element.usage());
             assertEquals(com.mojang.blaze3d.vertex.VertexFormatElement.Type.FLOAT, element.type());
             assertEquals(1, element.count(), "VulkanMod only supports scalar generic FLOAT attributes");
         }
+    }
+
+    @Test
+    void midBlockUsesOriginalBlockCenterForBoundaryAndOffsetVertices() throws IOException {
+        assertEquals(32.0F, TerrainMidTexCoord.midBlockOffset(15.0F, 15.0F));
+        assertEquals(-32.0F, TerrainMidTexCoord.midBlockOffset(15.0F, 16.0F));
+        assertEquals(48.0F, TerrainMidTexCoord.midBlockOffset(0.0F, -0.25F));
+        assertEquals(-48.0F, TerrainMidTexCoord.midBlockOffset(0.0F, 1.25F));
+        TerrainVertexShaderAdapter.validate("gbuffers_terrain", "attribute vec3 at_midBlock;\nvoid main(){gl_Position=vec4(at_midBlock,1.0);}");
+        TerrainVertexShaderAdapter.validate("gbuffers_terrain", "attribute vec4 at_midBlock;\nvoid main(){gl_Position=at_midBlock;}");
+    }
+
+    @Test
+    void shadowVertexLegacyMatricesUseTheShadowView() throws IOException {
+        String source = TerrainVertexShaderAdapter.adapt("#version 450\nvoid main(){}\n",
+                "uniform int renderStage; // current draw phase\nvoid main(){gl_Position=ftransform();}", "shadow_solid");
+        assertTrue(source.contains("#define gl_ModelViewMatrix shadowModelView"));
+        assertTrue(source.contains("#define ftransform() ((shadowProjection * shadowModelView)"));
+        assertFalse(source.contains("#define gl_ModelViewMatrix gbufferModelView"));
+        assertTrue(source.contains("const int renderStage = 8;"));
     }
 
     @Test

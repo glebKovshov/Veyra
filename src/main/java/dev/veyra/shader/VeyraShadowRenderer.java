@@ -213,7 +213,7 @@ public final class VeyraShadowRenderer {
     }
 
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
-                              DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
+                              Matrix4f mainCullProjection, DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.hasShadowPass()) {
             shadowModelView.identity();
@@ -231,7 +231,9 @@ public final class VeyraShadowRenderer {
         boolean spectator = minecraft.player.isSpectator();
         WorldRenderer worldRenderer = WorldRenderer.getInstance();
         Renderer renderer = Renderer.getInstance();
-        Frustum mainFrustum = new Frustum(mainModelView, mainProjection);
+        // LevelRenderer uses its third matrix argument for culling. The render projection can
+        // have Vulkan's depth/Y convention and makes VFrustum's camera-cube expansion diverge.
+        Frustum mainFrustum = new Frustum(mainModelView, mainCullProjection);
         mainFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
         try {
             ensureResources();

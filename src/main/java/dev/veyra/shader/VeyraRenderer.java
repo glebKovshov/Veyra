@@ -1031,6 +1031,10 @@ public final class VeyraRenderer {
         Map<String, float[]> vectors = new HashMap<>();
 
         var dimension = level.dimensionType();
+        scalars.put("framemod2", (double) Math.floorMod(frame.frameCounter(), 2));
+        scalars.put("framemod4", (double) Math.floorMod(frame.frameCounter(), 4));
+        scalars.put("framemod8", (double) Math.floorMod(frame.frameCounter(), 8));
+        scalars.put("framemod600", (double) Math.floorMod(frame.frameCounter(), 600));
         scalars.put("heavyFog", minecraft.gui.getBossOverlay().shouldCreateWorldFog() ? 1.0 : 0.0);
         scalars.put("heightLimit", (double) dimension.height());
         scalars.put("logicalHeightLimit", (double) dimension.logicalHeight());
@@ -3546,20 +3550,48 @@ public final class VeyraRenderer {
                 }
             }
             if (shadowSamplerAvailable) {
-                for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
-                    String fragmentSource = pack.readShadowFragment(programName)
+                for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water", "shadow_tripwire")) {
+                    String sourceProgram = programName.equals("shadow_tripwire") ? "shadow_cutout" : programName;
+                    String fragmentSource = pack.readShadowFragment(sourceProgram)
                             .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+                    fragmentSource = IrisRenderStages.bindUniform(fragmentSource,
+                            IrisRenderStages.forShadowTerrainProgram(programName), programName);
+                    String originalFragmentSource = fragmentSource;
                     if (!FragmentOutputs.parse(fragmentSource).sceneOnly())
                         throw new IOException("Multiple shadow color attachments are not implemented yet.");
                     boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
+                    var shadowVertex = pack.readShadowVertex(sourceProgram);
+                    if (shadowVertex.isPresent()) {
+                        usesNoiseSampler |= TerrainVertexShaderAdapter.usesNoiseSampler(programName, shadowVertex.get());
+                    }
                     boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
                     if (usesSpecularSampler) VeyraSpecularTextures.prepareTerrain();
                     if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
-                    fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
+                    String shadowVertexSource = vertexSource;
+                    if (shadowVertex.isPresent()) {
+                        var descriptions = TerrainVertexShaderAdapter.describeVaryings(programName, shadowVertex.get());
+                        Set<Integer> unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, descriptions);
+                        var varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, shadowVertex.get(), unusedLocations);
+                        fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false, false, varyings);
+                        Set<Integer> finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource);
+                        if (!finalUnused.equals(unusedLocations)) {
+                            unusedLocations = finalUnused;
+                            varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, shadowVertex.get(), unusedLocations);
+                            // Re-adapt the original pack fragment, not the generated Vulkan source.
+                            fragmentSource = TerrainShaderAdapter.adaptFragment(originalFragmentSource, false, false, varyings);
+                            finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource);
+                        }
+                        if (!finalUnused.equals(unusedLocations)) throw new IOException(programName + " shadow varying interface did not converge.");
+                        shadowVertexSource = TerrainVertexShaderAdapter.adaptStage(
+                                TerrainShaderAdapter.pruneUnusedTerrainVertexOutputs(vertexSource, finalUnused),
+                                shadowVertex.get(), programName, 5, finalUnused).source();
+                    } else {
+                        fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false);
+                    }
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
                     builder.applyConfig(terrainPipelineConfig(false, usesNoiseSampler, false, usesSpecularSampler, false, false, Set.of()));
-                    builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+                    builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, shadowVertexSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                     GraphicsPipeline shadowPipeline = builder.createGraphicsPipeline();
                     setNoiseSamplerLayout(shadowPipeline);
@@ -6374,7 +6406,9 @@ public final class VeyraRenderer {
                 case "previousCameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPositionFract());
                 case "eyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().eyePosition());
                 case "relativeEyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().relativeEyePosition());
-                default -> IrisExtraUniforms.contains(uniform) ? irisExtraUniformValue(uniform)
+                default -> CustomUniforms.active().uniform(uniform) != null
+                        ? customUniformValue(uniform)
+                        : IrisExtraUniforms.contains(uniform) ? irisExtraUniformValue(uniform)
                         : customUniformValue(uniform);
             });
         }
@@ -7109,7 +7143,8 @@ public final class VeyraRenderer {
                 return null;
             }
             String programName = switch (terrainRenderType) {
-                case CUTOUT, TRIPWIRE -> "shadow_cutout";
+                case CUTOUT -> "shadow_cutout";
+                case TRIPWIRE -> "shadow_tripwire";
                 case TRANSLUCENT -> "shadow_water";
                 case SOLID -> "shadow_solid";
             };

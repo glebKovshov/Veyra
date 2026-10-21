@@ -70,8 +70,15 @@ class IrisUniformParityTest {
         Set<String> names = new HashSet<>();
         for (IrisExtraUniforms.Definition definition : IrisExtraUniforms.definitions()) {
             assertTrue(names.add(definition.name()), "duplicate " + definition.name());
-            assertTrue(IrisUnsetUniforms.IRIS_SET_UNIFORMS.contains(definition.name()),
-                    definition.name() + " must be a uniform Iris 1.21.11 registers");
+            if (IrisExtraUniforms.VEYRA_COMPATIBILITY_UNIFORMS.contains(definition.name())) {
+                assertFalse(IrisUnsetUniforms.IRIS_SET_UNIFORMS.contains(definition.name()),
+                        definition.name() + " is a Veyra compatibility helper, not an Iris uniform");
+                assertTrue(IrisExtraUniforms.HARDCODED_CUSTOM.contains(definition.name()),
+                        definition.name() + " can be overridden by shaders.properties");
+            } else {
+                assertTrue(IrisUnsetUniforms.IRIS_SET_UNIFORMS.contains(definition.name()),
+                        definition.name() + " must be a uniform Iris 1.21.11 registers");
+            }
         }
         // Uniforms that Complementary, BSL and Sildur declare and Veyra did not provide before.
         for (String required : new String[]{"heavyFog", "heightLimit", "isElytraFlying", "isRightHanded",
@@ -82,6 +89,16 @@ class IrisUniformParityTest {
         }
         assertTrue(IrisExtraUniforms.HARDCODED_CUSTOM.contains("timeAngle"));
         assertFalse(IrisExtraUniforms.HARDCODED_CUSTOM.contains("heavyFog"));
+    }
+
+    @Test
+    void veyraFrameModuloHelpersUseTheShaderPackDeclaredType() throws IOException {
+        CustomUniforms.activate(CustomUniforms.parse("uniform.int.framemod8=frameCounter % 8\n"));
+
+        ShaderPackUniformAdapter.AdaptedShader adapted = ShaderPackUniformAdapter.extract(
+                "uniform int framemod8;\nvoid main() {}\n", "gbuffers_terrain");
+
+        assertTrue(adapted.fields().contains(new ShaderPackUniformAdapter.UniformField("int", "framemod8")));
     }
 
     @Test

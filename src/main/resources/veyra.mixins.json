@@ -19,6 +19,7 @@
     "CustomVertexFormatMixin",
     "TerrainBufferBuilderMixin",
     "TerrainBuilderMixin",
+    "TerrainBlockRendererMixin",
     "FluidRendererMixin",
     "ThreadBuilderPackMixin",
     "LevelRendererMixin",

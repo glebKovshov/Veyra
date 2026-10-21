@@ -33,10 +33,7 @@ public final class CustomUniforms {
             "previousCameraPosition.x", "previousCameraPosition.y", "previousCameraPosition.z",
             "eyeBrightness.x", "eyeBrightness.y", "eyeBrightnessSmooth.x", "eyeBrightnessSmooth.y"),
             IrisExtraUniforms.expressionInputs());
-    /**
-     * Iris "hardcoded custom uniforms" that Veyra also provides as float built-ins. A shaders.properties
-     * definition with the same name (BSL defines shadowFade) takes precedence over the built-in value.
-     */
+    /** Iris hardcoded custom floats and Veyra frame helpers that pack properties may override. */
     public static final Set<String> PACK_OVERRIDABLE = withIrisExtras(Set.of("shadowFade", "velocity"),
             IrisExtraUniforms.HARDCODED_CUSTOM);
 
@@ -157,7 +154,9 @@ public final class CustomUniforms {
                 continue;
             }
             Type type = Type.valueOf(typeName.toUpperCase(java.util.Locale.ROOT));
-            if (PACK_OVERRIDABLE.contains(name) && type != Type.FLOAT) {
+            if (PACK_OVERRIDABLE.contains(name)
+                    && !IrisExtraUniforms.VEYRA_COMPATIBILITY_UNIFORMS.contains(name)
+                    && type != Type.FLOAT) {
                 unavailable.put(name, "the built-in " + name + " uniform must remain a float");
                 continue;
             }

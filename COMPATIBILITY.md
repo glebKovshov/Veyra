@@ -1,12 +1,20 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.30 published; next feature batch under validation
+# Shaderpack compatibility: beta.30 published; merged weather/textured batch and compute work tracked
+
+## Unpublished shadow terrain vertex and mid-block candidate
+
+The compute branch now executes pack vertex stages for terrain shadow variants, including matching fragment fallback and shadow matrix semantics. The extended terrain format supplies `at_midBlock` in 1/64-block units and the block's own emission. RTX 3070 fixtures verified terrain buffer inputs (223,167 active / 0 disabled control pixels) and custom shadow vertex output sampled by terrain (222,277 / 0). A culling-projection mixup discovered by the latter fixture was fixed; neither successful run logged Vulkan validation errors. These are synthetic checks, not complete third-party shaderpack validation.
+
+The full source audit accepts 864 geometry fragments and compiles all 18 active compute stages. New shadow preflight exposed BSL renderStage requirements; a focused rerun after native-shadow-layer specialization passed all 18 BSL cases without capability/adapter errors. Native stage values follow VulkanMod's actual compacted draw layers.
+
+A development GPU probe verified r16ui 3D-image clearing, nearest integer sampling, actual compute dispatch and readback of 64 texels. The combined shadow-stage fixture passed 222,796 active / 0 disabled control pixels. This probe is included in the terrain-varying CI fixture. Shared shadow/scene image descriptors and shaderpack-frame dispatch remain unfinished and gated. Shadow MRT and entity shadow vertex execution are not provided by this candidate. The interim extended vertex layout is 64 bytes and needs packing before release.
 
 ## Weather, textured-default, and translucent-particle vertex support
 
-Weather vertex execution merged into `main` in PR [#82](https://github.com/glebKovshov/Veyra/pull/82), commit `8872b50`. The current feature candidate adds the world-border `gbuffers_textured.vsh` generic defaults for `mc_Entity` and `mc_midTexCoord`, comment-safe uniform and sampler scans, and custom `gbuffers_particles_translucent.vsh` execution.
+Weather vertex execution merged into `main` in PR [#82](https://github.com/glebKovshov/Veyra/pull/82), commit `8872b50`. PR [#83](https://github.com/glebKovshov/Veyra/pull/83), now merged as `f57e125`, adds the world-border `gbuffers_textured.vsh` generic defaults for `mc_Entity` and `mc_midTexCoord`, comment-safe uniform and sampler scans, and custom `gbuffers_particles_translucent.vsh` execution. This merged batch is not yet included in a published release.
 
 The four-pack pinned source audit covers 75 default/profile/dimension rows and 5,178 stages. It accepts **864 geometry-fragment adapter results and rejects 0**; **57/75** rows have no capability error. The remaining 18 blockers are selected Complementary `shadowcomp.csh` compute stages, which are not implemented. All rows retain `visualValidation=false`.
 
-Synthetic GPU fixtures on an NVIDIA RTX 3070 produced **142,776 active / 0 disabled** magenta pixels for textured defaults and **9,583 / 0** for translucent particles. These exercise specific adapters and do not establish full third-party-pack visual compatibility. JDK 21 checks pass **338 tests**, 88 shader examples, and 104 direct Vulkan SPIR-V compilations. The candidate has not yet been merged or released.
+Synthetic GPU fixtures on an NVIDIA RTX 3070 produced **142,776 active / 0 disabled** magenta pixels for textured defaults and **9,583 / 0** for translucent particles. These exercise specific adapters and do not establish full third-party-pack visual compatibility. The merged work passed its JDK 21 build/test checks and graphics smoke CI. The current compute worktree statically compiles the 18 active Complementary compute stages, scopes the candidate dispatcher to the post-shadow `shadowcomp` family, preserves numeric/letter pass order, and parses fixed `const ivec3 workGroups`. Runtime dispatch, shadow voxel writes, and terrain 3D-image sampling are still not integrated, so the whole-pack gate remains closed. The remaining 18 whole-pack capability blockers are those compute profiles; all 75 audit rows retain `visualValidation=false`.
 
 ## Beta.30 CloudRenderer fix and textured lightmap support
 

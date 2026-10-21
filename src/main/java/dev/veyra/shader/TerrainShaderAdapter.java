@@ -681,7 +681,18 @@ public final class TerrainShaderAdapter {
         }
         List<ShaderUniform> uniforms = new ArrayList<>(SHADERPACK_UNIFORMS);
         for (CustomUniforms.Uniform uniform : custom) {
-            if (SHADERPACK_UNIFORMS.stream().anyMatch(builtIn -> builtIn.name().equals(uniform.name()))) {
+            int builtInIndex = -1;
+            for (int index = 0; index < uniforms.size(); index++) {
+                if (uniforms.get(index).name().equals(uniform.name())) {
+                    builtInIndex = index;
+                    break;
+                }
+            }
+            if (builtInIndex >= 0) {
+                if (IrisExtraUniforms.VEYRA_COMPATIBILITY_UNIFORMS.contains(uniform.name())) {
+                    uniforms.set(builtInIndex, new ShaderUniform(uniform.name(), uniform.type().glsl(),
+                            uniform.type() == CustomUniforms.Type.BOOL));
+                }
                 continue;
             }
             uniforms.add(new ShaderUniform(uniform.name(), uniform.type().glsl(),
@@ -764,6 +775,11 @@ public final class TerrainShaderAdapter {
                         + "\n    layout (location = 8) in float VeyraTerrainTangentY;"
                         + "\n    layout (location = 9) in float VeyraTerrainTangentZ;"
                         + "\n    layout (location = 10) in float VeyraTerrainTangentHandedness;"
+                        + "\n    layout (location = 11) in float VeyraTerrainMidBlockX;"
+                        + "\n    layout (location = 12) in float VeyraTerrainMidBlockY;"
+                        + "\n    layout (location = 13) in float VeyraTerrainMidBlockZ;"
+                        + "\n    layout (location = 14) in float VeyraTerrainEmission;"
+                        + "\n    #define VeyraTerrainMidBlock vec4(VeyraTerrainMidBlockX, VeyraTerrainMidBlockY, VeyraTerrainMidBlockZ, VeyraTerrainEmission)"
                         + "\n    #define VeyraTerrainTangent vec4(VeyraTerrainTangentX, VeyraTerrainTangentY,"
                         + " VeyraTerrainTangentZ, VeyraTerrainTangentHandedness)");
         adapted = adapted.replace(outputMarker,

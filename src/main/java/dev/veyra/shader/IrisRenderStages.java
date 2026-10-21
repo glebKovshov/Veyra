@@ -39,13 +39,23 @@ final class IrisRenderStages {
 
     private static final Pattern UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?"
-                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+renderStage\\s*;[\\t ]*(?:\\r?\\n|$)");
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+renderStage\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
 
     private IrisRenderStages() { }
 
     static int sunStage() { return Stage.SUN.ordinal(); }
     static int moonStage() { return Stage.MOON.ordinal(); }
     static int voidStage() { return Stage.VOID.ordinal(); }
+
+    static Integer forShadowTerrainProgram(String programName) {
+        return switch (programName) {
+            case "shadow_solid" -> Stage.TERRAIN_SOLID.ordinal();
+            case "shadow_cutout" -> Stage.TERRAIN_CUTOUT.ordinal();
+            case "shadow_water" -> Stage.TERRAIN_TRANSLUCENT.ordinal();
+            case "shadow_tripwire" -> Stage.TRIPWIRE.ordinal();
+            default -> null;
+        };
+    }
 
     static List<Integer> skyTexturedStages(String pipelinePath) {
         return switch (pipelinePath) {

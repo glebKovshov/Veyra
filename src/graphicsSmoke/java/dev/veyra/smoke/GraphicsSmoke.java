@@ -200,9 +200,13 @@ public final class GraphicsSmoke {
         Buffer readback = null;
         Buffer glintMrtReadback = null;
         Buffer basicMrtReadback = null;
+        ComputeImageProbe computeProbe = null;
         try {
             Renderer renderer = Renderer.getInstance();
             renderer.endRenderPass();
+            if (captureActive && Boolean.getBoolean("veyra.graphicsSmoke.computeProbe")) {
+                computeProbe = ComputeImageProbe.record();
+            }
             var source = renderer.getMainPass().getMainFramebuffer().getColorAttachment();
             if ((source.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
                 throw new IllegalStateException("Surface image does not support frame readback");
@@ -287,9 +291,11 @@ public final class GraphicsSmoke {
             Buffer completed = readback;
             Buffer completedGlintMrt = glintMrtReadback;
             Buffer completedBasicMrt = basicMrtReadback;
+            ComputeImageProbe completedComputeProbe = computeProbe;
             boolean active = captureActive;
             MemoryManager.getInstance().addFrameOp(() -> {
                 try {
+                    if (completedComputeProbe != null) completedComputeProbe.verify();
                     var bytes = MemoryUtil.memByteBuffer(completed.getDataPtr(), width * height * 4);
                     NativeImage image = new NativeImage(width, height, false);
                     boolean bgra = format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_B8G8R8A8_SRGB;
@@ -327,12 +333,14 @@ public final class GraphicsSmoke {
                     capture(client, image, active, mrtImage, basicMrtImage);
                 } catch (Throwable failure) { finish(client, failure, -1); }
                 finally {
+                    if (completedComputeProbe != null) completedComputeProbe.close();
                     completed.scheduleFree();
                     if (completedGlintMrt != null) completedGlintMrt.scheduleFree();
                     if (completedBasicMrt != null) completedBasicMrt.scheduleFree();
                 }
             });
         } catch (Throwable failure) {
+            if (computeProbe != null) computeProbe.close();
             if (readback != null) readback.scheduleFree();
             if (glintMrtReadback != null) glintMrtReadback.scheduleFree();
             if (basicMrtReadback != null) basicMrtReadback.scheduleFree();

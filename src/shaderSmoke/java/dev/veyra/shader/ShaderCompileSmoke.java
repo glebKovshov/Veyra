@@ -811,9 +811,11 @@ public class ShaderCompileSmoke {
                     attribute vec4 mc_Entity;
                     attribute vec4 mc_midTexCoord;
                     attribute vec4 at_tangent;
+                    attribute vec3 at_midBlock;
                     void main() {
                         vec4 position = gl_Vertex;
                         position.xyz += gl_Normal + at_tangent.xyz + mc_Entity.xyz * 0.0 + mc_midTexCoord.xyz * 0.0;
+                        position.xyz += at_midBlock / 64.0;
                         position.xy += (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy * 0.0;
                         position.xy += (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy * 0.0;
                         position += gl_Color * 0.0;
@@ -821,6 +823,15 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_terrain");
             compileVertex(compiler, options, terrainCustomVertex, "terrain-custom-vertex-main", true);
+            compileVertex(compiler, options, TerrainVertexShaderAdapter.adapt(terrainVertex, """
+                    #version 120
+                    attribute vec4 at_midBlock;
+                    varying vec4 color;
+                    void main() {
+                        gl_Position = ftransform();
+                        color = vec4(at_midBlock.xyz / 64.0, at_midBlock.w);
+                    }
+                    """, "shadow"), "shadow-custom-vertex-mid-block", true);
             TerrainVertexShaderAdapter.AdaptedStage terrainVaryings = TerrainVertexShaderAdapter.adaptStage(
                     terrainVertex, """
                             #version 130
@@ -957,6 +968,26 @@ public class ShaderCompileSmoke {
             if (success != expected) throw new AssertionError(name + ": " + shaderc_result_get_error_message(result));
             System.out.println("PASS " + name);
         } finally { shaderc_result_release(result); }
+    }
+
+    /** Compile an adapted compute stage against Vulkan's GLSL environment for the pinned-pack audit. */
+    public static void compileCompute(String source, String name) throws java.io.IOException {
+        long compiler = shaderc_compiler_initialize();
+        long options = shaderc_compile_options_initialize();
+        shaderc_compile_options_set_target_env(options, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
+        try {
+            long result = shaderc_compile_into_spv(compiler, source, shaderc_compute_shader, name, "main", options);
+            try {
+                if (shaderc_result_get_compilation_status(result) != shaderc_compilation_status_success) {
+                    throw new java.io.IOException(name + ": " + shaderc_result_get_error_message(result));
+                }
+            } finally {
+                shaderc_result_release(result);
+            }
+        } finally {
+            shaderc_compile_options_release(options);
+            shaderc_compiler_release(compiler);
+        }
     }
 
     private static String entityNativeVertexSource() {

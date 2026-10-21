@@ -2,6 +2,7 @@
 build/
 run/
 run-graphics-smoke/
+run-graphics-smoke-*/
 __pycache__/
 *.pyc
 *.iml

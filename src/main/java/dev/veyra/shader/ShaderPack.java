@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -206,6 +207,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public Optional<String> readShadowWaterFragment() throws IOException {
         return readShadowFragment("shadow_water");
+    }
+
+    /** Selects the vertex stage from the same fallback program as the shadow fragment. */
+    public Optional<String> readShadowVertex(String programName) throws IOException {
+        if (!supportsShaderPrograms()) return Optional.empty();
+        if (!SHADOW_PROGRAMS.contains(programName)) {
+            throw new IOException("Unsupported Iris shadow program '" + programName + "'.");
+        }
+        String selected = programName;
+        if (!programName.equals("shadow") && readShader(programName + ".fsh").isEmpty()) selected = "shadow";
+        return readStage(selected + ".vsh");
     }
 
     public boolean hasDamagedBlockPipeline() {
@@ -957,8 +969,83 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
+    public List<String> activeComputeStageFiles() throws IOException {
+        return activeComputeStageFiles(null);
+    }
+
+    /** Returns active compute files for one composite pass family, in Iris pass/component order. */
+    public List<String> activeComputeStageFiles(String programFamily) throws IOException {
+        if (programFamily != null && !programFamily.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+            throw new IllegalArgumentException("Invalid compute program family: " + programFamily);
+        }
+        List<String> active = new ArrayList<>();
+        Comparator<String> order = Comparator.comparing(ShaderPack::computeStageFamily)
+                .thenComparingInt(ShaderPack::computePassIndex)
+                .thenComparingInt(ShaderPack::computeComponentIndex)
+                .thenComparing(Comparator.naturalOrder());
+        for (String file : stageFiles().stream().filter(name -> name.endsWith(".csh")).sorted(order).toList()) {
+            if (programFamily != null && !computeStageFamily(file).equals(programFamily)) continue;
+            String program = file.substring(0, file.length() - 4);
+            String parent = program.replaceFirst("_[a-z]+$", "");
+            if (isProgramEnabled(parent)) active.add(file);
+        }
+        return List.copyOf(active);
+    }
+
+    private static String computeStageFamily(String file) {
+        String program = computeProgramName(file);
+        int suffix = trailingDigitsStart(program);
+        return program.substring(0, suffix);
+    }
+
+    private static int computePassIndex(String file) {
+        String program = computeProgramName(file);
+        int suffix = trailingDigitsStart(program);
+        if (suffix == program.length()) return 0;
+        try {
+            return Integer.parseInt(program.substring(suffix));
+        } catch (NumberFormatException ignored) {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    private static int computeComponentIndex(String file) {
+        String program = file.substring(0, file.length() - ".csh".length());
+        int separator = program.length() - 2;
+        if (separator < 0 || program.charAt(separator) != '_') return 0;
+        char component = program.charAt(separator + 1);
+        return component >= 'a' && component <= 'z' ? component - 'a' + 1 : 0;
+    }
+
+    private static String computeProgramName(String file) {
+        String program = file.substring(0, file.length() - ".csh".length());
+        if (program.length() >= 2) {
+            int separator = program.length() - 2;
+            char component = program.charAt(separator + 1);
+            if (program.charAt(separator) == '_' && component >= 'a' && component <= 'z') {
+                return program.substring(0, separator);
+            }
+        }
+        return program;
+    }
+
+    private static int trailingDigitsStart(String value) {
+        int suffix = value.length();
+        while (suffix > 0) {
+            char character = value.charAt(suffix - 1);
+            if (character < '0' || character > '9') break;
+            suffix--;
+        }
+        return suffix;
+    }
+
     public GeometryBlendSettings readGeometryBlendSettings(String program) throws IOException {
         return GeometryBlendSettings.read(ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse("")), program);
+    }
+
+    /** Reads active Iris image declarations after the selected profile and dimension options are applied. */
+    public ShaderPackImageProperties readImageProperties() throws IOException {
+        return ShaderPackImageProperties.parse(readShader("shaders.properties").orElse(""));
     }
 
     /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
@@ -983,6 +1070,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 TerrainShaderAdapter.validatePackVaryingLinks(program, fragment.get(), varyings);
             }
         }
+        validateShadowTerrainVertexCapabilities();
         validateBasicLineCapabilities();
         validateSkyBasicCapabilities();
         validateBeaconBeamCapabilities();
@@ -1063,6 +1151,19 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (program.matches("begin\\d*")) {
                 throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
             }
+        }
+    }
+
+    private void validateShadowTerrainVertexCapabilities() throws IOException {
+        if (!hasShadowFragment()) return;
+        for (String program : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
+            Optional<String> vertex = readShadowVertex(program);
+            if (vertex.isEmpty()) continue;
+            String fragment = readShadowFragment(program).orElseThrow();
+            var descriptions = TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+            Set<Integer> freeLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment, descriptions);
+            var varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), freeLocations);
+            TerrainShaderAdapter.validatePackVaryingLinks(program, fragment, varyings);
         }
     }
 
@@ -1242,6 +1343,23 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         Optional<String> source = readRawShader(programPath(fileName));
         return source.isEmpty() ? Optional.empty() : Optional.of(expandIncludes(fileName,
                 ShaderPackOptions.apply(source.get(), configuration.options())));
+    }
+
+    /** Reads a compute source with option values applied but leaves feature conditionals for its adapter. */
+    public Optional<String> readComputeStage(String fileName) throws IOException {
+        if (!fileName.matches("[A-Za-z0-9_]+\\.csh")) throw new IOException("Invalid compute stage name: " + fileName);
+        String actualFile = programPath(fileName);
+        Optional<String> source = readRawShader(actualFile);
+        if (source.isEmpty()) return Optional.empty();
+        String expanded = ShaderIncludes.expand(actualFile,
+                ShaderPackOptions.apply(source.get(), configuration.options()),
+                included -> readRawShader(included).map(text ->
+                        ShaderPackOptions.apply(text, configuration.options())));
+        String active = GlslPreprocessor.process(actualFile, expanded,
+                Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+        Set<String> customUniforms = readCustomUniforms().uniforms().stream()
+                .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return Optional.of(IrisUnsetUniforms.apply(active, customUniforms));
     }
 
     public ShaderPack configured(Map<String, String> options, int dimension) {

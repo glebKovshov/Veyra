@@ -12,7 +12,9 @@ public final class TerrainMidTexCoord {
     public static final int RENDER_TYPE_OFFSET = 24;
     public static final int PACKED_NORMAL_OFFSET = 28;
     public static final int TANGENT_OFFSET = 32;
-    public static final int VERTEX_SIZE = 48;
+    public static final int MID_BLOCK_OFFSET = 48;
+    public static final int EMISSION_OFFSET = 60;
+    public static final int VERTEX_SIZE = 64;
 
     public static final VertexFormat VERTEX_FORMAT = VertexFormat.builder()
             .add("Position", CustomVertexFormat.ELEMENT_POSITION_INT16)
@@ -36,6 +38,14 @@ public final class TerrainMidTexCoord {
                     VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
             .add("VeyraTerrainTangentHandedness", new VertexFormatElement(10, 0,
                     VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainMidBlockX", new VertexFormatElement(11, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainMidBlockY", new VertexFormatElement(12, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainMidBlockZ", new VertexFormatElement(13, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
+            .add("VeyraTerrainEmission", new VertexFormatElement(14, 0,
+                    VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.GENERIC, 1))
             .build();
 
     private TerrainMidTexCoord() {
@@ -43,6 +53,11 @@ public final class TerrainMidTexCoord {
 
     public static float center(float first, float second, float third, float fourth) {
         return (first + second + third + fourth) * 0.25F;
+    }
+
+    /** Iris expresses the offset to the original block center in 1/64 block units. */
+    public static float midBlockOffset(float blockOrigin, float vertexPosition) {
+        return (blockOrigin + 0.5F - vertexPosition) * 64.0F;
     }
 
     /** Matches VulkanMod's compressed UV encoding; the shader reads the bits as unsigned shorts. */

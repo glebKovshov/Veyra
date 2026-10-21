@@ -40,7 +40,7 @@ final class TerrainVertexShaderAdapter {
                     + "([\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$))");
     private static final Pattern MAIN_DECLARATION = Pattern.compile("(?m)\\bvoid\\s+main\\s*\\(\\s*\\)");
     private static final Pattern UNSUPPORTED_LEGACY_INPUT = Pattern.compile(
-            "\\b(gl_MultiTexCoord[2-7]|at_midBlock|mc_midBlock)\\b");
+            "\\b(gl_MultiTexCoord[2-7]|mc_midBlock)\\b");
     private static final String LIGHTMAP_TEXTURE_MATRIX = "mat4("
             + "0.00390625, 0.0, 0.0, 0.0, "
             + "0.0, 0.00390625, 0.0, 0.0, "
@@ -119,7 +119,7 @@ final class TerrainVertexShaderAdapter {
         baseMain = findMain(source, "VulkanMod terrain");
         source = source.substring(0, baseMain.closeBrace()) + "\n    veyraShaderPackMain();\n"
                 + source.substring(baseMain.closeBrace());
-        return new AdaptedStage(source + "\n" + pack.uniformMacros() + legacyInputBridge() + pack.outputBridge() + "\n"
+        return new AdaptedStage(source + "\n" + pack.uniformMacros() + legacyInputBridge(programName) + pack.outputBridge() + "\n"
                 + pack.source().replaceFirst("(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain("),
                 pack.varyings());
     }
@@ -134,6 +134,7 @@ final class TerrainVertexShaderAdapter {
         }
 
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forShadowTerrainProgram(programName), programName);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(source);
         while (extensionMatcher.find()) extensions.add(extensionMatcher.group().strip());
@@ -145,6 +146,7 @@ final class TerrainVertexShaderAdapter {
         source = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*1\\s*\\]")
                 .matcher(source).replaceAll(Matcher.quoteReplacement(LIGHTMAP_TEXTURE_MATRIX));
         source = expandCommaDeclarations(source);
+        source = source.replaceAll("\\bgl_VertexID\\b", "gl_VertexIndex");
         String uncommented = ShaderSource.maskBlockAndLineComments(source);
         if (noiseSamplerBinding != 5 && noiseSamplerBinding != 6) {
             throw new IOException("Veyra's terrain noisetex sampler must use binding 5 or 6.");
@@ -171,11 +173,13 @@ final class TerrainVertexShaderAdapter {
         Matcher attributes = ATTRIBUTE_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuffer withoutAttributes = new StringBuffer();
         List<String> declaredAttributes = new ArrayList<>();
+        String midBlockType = null;
         while (attributes.find()) {
             String type = attributes.group(1);
             String name = attributes.group(2);
             String expected = switch (name) {
                 case "mc_Entity", "mc_midTexCoord", "at_tangent" -> "vec4";
+                case "at_midBlock" -> type.equals("vec4") ? "vec4" : "vec3";
                 default -> null;
             };
             if (expected == null) {
@@ -189,10 +193,17 @@ final class TerrainVertexShaderAdapter {
                 throw new IOException(programName + ".vsh declares attribute '" + name + "' more than once.");
             }
             declaredAttributes.add(name);
+            if (name.equals("at_midBlock")) midBlockType = type;
             attributes.appendReplacement(withoutAttributes, "");
         }
         attributes.appendTail(withoutAttributes);
         source = withoutAttributes.toString();
+        if (midBlockType != null) {
+            source = source.replaceAll("\\bat_midBlock\\b",
+                    midBlockType.equals("vec4") ? "VeyraTerrainMidBlock" : "VeyraTerrainMidBlock.xyz");
+        } else if (Pattern.compile("\\bat_midBlock\\b").matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
+            throw new IOException(programName + ".vsh uses at_midBlock without a vec3 or vec4 attribute declaration.");
+        }
 
         MainFunction main = findMain(source, programName + ".vsh");
         if (MAIN_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(source)).find()
@@ -406,8 +417,8 @@ final class TerrainVertexShaderAdapter {
     private record SamplerBridge(String source, String declarationsAndMacros) {
     }
 
-    private static String legacyInputBridge() {
-        return """
+    private static String legacyInputBridge(String programName) {
+        String bridge = """
                 #define gl_Vertex vec4(getVertexPosition(), 1.0)
                 #define gl_Color unpackUnorm4x8(PackedColor)
                 #define gl_ModelViewProjectionMatrix (gbufferProjection * gbufferModelView)
@@ -423,6 +434,9 @@ final class TerrainVertexShaderAdapter {
                 #define mc_chunkFade fadeFactor
                 #define ftransform() ((gbufferProjection * gbufferModelView) * vec4(getVertexPosition(), 1.0))
                 """;
+        return programName.startsWith("shadow")
+                ? bridge.replace("gbufferProjection", "shadowProjection").replace("gbufferModelView", "shadowModelView")
+                : bridge;
     }
 
     private static String expandCommaDeclarations(String source) {

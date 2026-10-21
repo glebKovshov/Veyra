@@ -16,6 +16,7 @@ public abstract class FluidRendererMixin {
     private void veyra$beginFluidMaterial(BlockState state, FluidState fluidState, BlockPos pos,
                                          CallbackInfo ci) {
         TerrainMaterialContext.setFluid(state);
+        TerrainMaterialContext.setOrigin(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
     }
 
     @Inject(method = "renderLiquid", at = @At("RETURN"), remap = false)
