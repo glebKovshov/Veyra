@@ -104,7 +104,7 @@ class TextureColorDistanceShaderAdapterTest {
 
         assertTrue(adapted.contains("const int renderStage = 4;"), adapted);
         assertFalse(adapted.contains("uniform int renderStage"), adapted);
-        assertFalse(adapted.contains("layout(location = 31) in vec2 texCoord0;"), adapted);
+        assertFalse(adapted.contains("layout(location = 6) in vec2 texCoord0;"), adapted);
     }
 
     @Test

@@ -354,7 +354,7 @@ class BasicVertexShaderAdapterTest {
         BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
                 NATIVE_TEXTURED_VERTEX, packVertex, "gbuffers_textured",
                 BasicVertexShaderAdapter.Format.TEXTURED);
-        assertEquals(31, adaptedVertex.varyings().get("texCoord0").location());
+        assertEquals(6, adaptedVertex.varyings().get("texCoord0").location());
 
         String adaptedFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
                 #version 120
@@ -362,7 +362,7 @@ class BasicVertexShaderAdapterTest {
                 uniform sampler2D gtexture;
                 void main() { gl_FragColor = texture2D(gtexture, texCoord0); }
                 """, "gbuffers_textured", adaptedVertex.varyings(), false, false);
-        assertTrue(adaptedFragment.contains("layout(location = 31) in vec2 texCoord0;"));
+        assertTrue(adaptedFragment.contains("layout(location = 6) in vec2 texCoord0;"));
         assertTrue(adaptedVertex.source().contains("VEYRA_BASIC_NATIVE_TEXCOORD"));
     }
 }

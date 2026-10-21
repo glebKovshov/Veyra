@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 
 /** Adapts Iris basic/leash and line vertex stages to Minecraft's distinct native vertex formats. */
 final class BasicVertexShaderAdapter {
+    private static final int NATIVE_TEXTURE_COORD_LOCATION = 6;
+
     enum Format {
         LEASH, LINE, SKY, STARS, SUNRISE_SUNSET,
         LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR
@@ -263,9 +265,9 @@ final class BasicVertexShaderAdapter {
         StringBuilder declarations = new StringBuilder();
         Map<String, TerrainVertexShaderAdapter.PackVarying> varyings = new LinkedHashMap<>();
         Set<Integer> occupied = new HashSet<>(Set.of(0, 1, 2, 3, 4, 5));
-        if (isTextureFormat(format)) occupied.add(31);
+        if (isTextureFormat(format)) occupied.add(NATIVE_TEXTURE_COORD_LOCATION);
         Set<String> emittedVariables = new HashSet<>();
-        int nextLocation = 6;
+        int nextLocation = isTextureFormat(format) ? NATIVE_TEXTURE_COORD_LOCATION + 1 : 6;
         int cursor = 0;
         while (matcher.find()) {
             String interpolation = mergeInterpolation(matcher.group(2), matcher.group(3), programName, matcher.group(5));
@@ -330,7 +332,7 @@ final class BasicVertexShaderAdapter {
             if (output == null) {
                 if (isTextureFormat(format) && name.equals("texCoord0")) {
                     rewritten.append(source, copiedThrough, matcher.start()).append(matcher.group(1))
-                            .append(parserSafeOutput("VEYRA_BASIC_NATIVE_TEXCOORD", 31,
+                            .append(parserSafeOutput("VEYRA_BASIC_NATIVE_TEXCOORD", NATIVE_TEXTURE_COORD_LOCATION,
                                     "smooth", type, name));
                     copiedThrough = matcher.end();
                 }
@@ -515,7 +517,7 @@ final class BasicVertexShaderAdapter {
         if (isTextureFormat(format)) {
             TerrainVertexShaderAdapter.PackVarying texCoord = aliasedOutput(outputs,
                     Set.of("texcoord", "texCoord", "texCoord0"),
-                    defaultOutput("vec2", "smooth", 31, "texCoord0"));
+                    defaultOutput("vec2", "smooth", NATIVE_TEXTURE_COORD_LOCATION, "texCoord0"));
             effective.put("texcoord", texCoord);
             effective.put("texCoord", texCoord);
             effective.put("texCoord0", texCoord);
