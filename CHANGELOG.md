@@ -1,13 +1,12 @@
 # Changelog
 
-## 0.2.0-beta.26 - 2026-10-21 (experimental prerelease)
+## 0.2.0-beta.27 - 2026-10-21 (experimental prerelease)
 
-- Fix the beta.25 cloud-renderer Mixin target remapping failure. The published beta.25 release asset remains unchanged; this fix is included in beta.26.
-- Add supported custom vertex execution for basic/line and beacon beam programs, then block-entity/entity/first-person hand programs. These stages run after Minecraft's native setup and link checked pack varyings; missing native attributes fail with an explicit diagnostic.
-- Add separate entity, block-entity, and hand GPU fixtures. On NVIDIA RTX 3070 they read back 18,532/0, 2,428/0, and 47,282/0 active/disabled magenta pixels respectively; all three logs have no Vulkan validation errors.
-- The final pinned source audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: 709 geometry fragments accepted / 8 rejected. Every case has visualValidation=false; no full third-party pack visual result is claimed.
-- Remaining pack blockers include Complementary `gbuffers_damagedblock.vsh` and selected compute stages, BSL `mc_Entity` in `gbuffers_block.vsh`, and Sildur `shadowData` plus `gbuffers_skybasic.vsh`.
-
+- Add supported custom `gbuffers_damagedblock.vsh` execution with Minecraft's native `BLOCK` vertex format and integer `UV2` lightmap input.
+- Adapt VulkanMod's crumbling vertex shader before pipeline compilation to match the native signed integer `UV2` input.
+- Add custom `gbuffers_skybasic.vsh` execution for sky, stars, and sunrise/sunset pipelines with checked native formats and linked varyings.
+- Add shader compiler, source-audit, example-pack, and Lavapipe graphics coverage. All 30/30 CI graphics fixtures pass.
+- The pinned audit accepts 781 and rejects 8 geometry fragments across 4 archives, 75 profiles/dimensions, and 5,178 stages. All audit records have `visualValidation=false`; full third-party pack visuals remain unverified.
 ## 0.2.0-beta.25 - 2026-10-20 (experimental prerelease)
 
 - Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link checked color, UV, and fog-distance outputs to the adapted fragment stage. Bridge legacy position/UV inputs, texture matrices, Iris fog fields, and `noisetex`; map `gl_Color` to white where Minecraft's `POSITION_TEX` vertex format has no color input.

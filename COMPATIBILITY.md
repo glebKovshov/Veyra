@@ -1,11 +1,20 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.26 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.27 experimental prerelease
 
-## Unreleased compatibility candidate after beta.26
+## Beta.27 damaged-block and sky-basic vertex execution
 
-The current main-line candidate executes custom `gbuffers_damagedblock.vsh` stages after Minecraft's native crumbling setup using its actual `BLOCK` format: `Position` at location 0, `Color` at 1, `UV0` at 2, integer `UV2` at 3, and `Normal` at 4. Legacy `gl_MultiTexCoord1` reads lightmap UV2; unavailable entity overlay inputs are rejected during preflight. The updated pinned source audit covers 4 archives / 75 profile-dimension cases / 5,178 stages: **781 geometry fragments accepted / 8 rejected**, up from 709/8 in beta. The former Complementary Reimagined / Unbound damaged-block vertex-stage blocker is gone. Remaining whole-pack source blockers are Complementary `entityId` (54 cases), BSL `mc_Entity` (18), and Sildur `gbuffers_skybasic.vsh` (1); the eight fragment rejections are Sildur `shadowData` in Nether/End cases. Every audit row has `visualValidation=false`.
+Beta.27 executes supported `gbuffers_damagedblock.vsh` stages after Minecraft's native crumbling setup using its actual `BLOCK` format: `Position` location 0, `Color` 1, `UV0` 2, integer `UV2` 3, and `Normal` 4. Legacy `gl_MultiTexCoord1` reads lightmap UV2. VulkanMod's crumbling shader source is adapted before native Vulkan shader compilation. Missing inputs such as entity overlay values remain rejected during preflight.
 
-A synthetic damaged-block fixture passed on an NVIDIA GeForce RTX 3070: 552 active magenta pixels and 0 with Veyra disabled. This exercises the custom damaged-block pipeline and does not validate third-party pack visuals. Local smoke did not enable the Vulkan validation layer; Lavapipe CI on the corrected `BLOCK` adapter is pending. This candidate is not a released beta; beta.26 remains the latest public prerelease.
+The release also executes supported `gbuffers_skybasic.vsh` stages for the sky, stars, and sunrise/sunset pipelines. The adapter checks each native vertex format and varying link. This does not implement every sky-related program or all pack-specific inputs.
 
+PR #70 and PR #71 passed Build and source audit; all **30/30** Lavapipe graphics fixtures passed, including `damagedblock-vertex-execution` and `skybasic-vertex-execution`. On an NVIDIA GeForce RTX 3070, sky-basic readback measured **226,624 active magenta pixels / 0 disabled**. These synthetic fixtures test named pipeline paths, not full third-party pack visuals.
+
+The pinned source audit covers 4 archives / 75 profile-dimension cases / 5,178 stages: **781 geometry fragments accepted / 8 rejected**. The former Complementary damaged-block and Sildur sky-basic VSH blockers are reduced, while remaining first source blockers include Complementary/Unbound `entityId` (54 cases; selected profiles also declare unsupported `shadowcomp.csh` compute), BSL `renderStage` (12) and `mc_Entity` (6), and Sildur `shadowData` (2) plus unsupported `gbuffers_skytextured.vsh` (1). All audit rows have `visualValidation=false`; no complete third-party shaderpack has been visually validated.
+
+| Pack | Default geometry fragments accepted / attempted (OW, Nether, End) | Current source blockers | In-game pack result |
+| --- | --- | --- | --- |
+| Complementary Reimagined / Unbound r5.9.3 | 10/10, 10/10, 10/10 | `entityId`; selected profiles also declare unsupported `shadowcomp.csh` compute | Not tested |
+| BSL 10.1.8 | 9/9, 9/9, 9/9 | `renderStage`; `gbuffers_block.vsh` requires unavailable `mc_Entity` | Not tested |
+| Sildur's Vibrant 2.02 Extreme | 5/5, 1/5, 1/5 | `shadowData` in Nether/End; unsupported `gbuffers_skytextured.vsh` | Not tested |
 ## Beta.26 custom vertex execution
 
 Beta.26 adds supported subsets of custom gbuffers_basic, gbuffers_line, gbuffers_beaconbeam, gbuffers_block, gbuffers_entities, and gbuffers_hand vertex programs. The adapters execute after Minecraft's native vertex setup, expose only available attributes, and link pack varyings with checked type, interpolation, and location. Beacon fragment outputs can target multiple color attachments. The block/entity/hand bridge supports noisetex where declared and preserves Iris hand-depth scaling. Reads of unavailable attributes, including mc_Entity, mc_midTexCoord, at_tangent, and at_midBlock, fail with a named capability diagnostic. The beta.25 cloud-renderer Mixin selector now remaps the Minecraft Tesselator.begin call.

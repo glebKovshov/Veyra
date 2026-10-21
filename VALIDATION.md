@@ -1,4 +1,14 @@
 # Veyra 0.2 validation status
+
+## Beta.27 release candidate - validation passed, prerelease publication pending
+
+PR #70 merged as `17409ce`, and PR #71 merged as `044a953`. On PR #71 head, Build [39534071885](https://github.com/glebKovshov/Veyra/actions/runs/39534071885), pinned source audit [39534071977](https://github.com/glebKovshov/Veyra/actions/runs/39534071977), and Graphics smoke [39534071890](https://github.com/glebKovshov/Veyra/actions/runs/39534071890) passed. The graphics matrix passed **30/30** Lavapipe fixtures, including the sky-basic and damaged-block fixtures.
+
+The integrated local JDK 21 run passed **313 tests, 0 failures/errors/skips**, processed 82 example shader sources, and compiled 86 stages directly to Vulkan SPIR-V. The pinned audit covers 4 archives / 75 records / 5,178 stages and accepts **781 / rejects 8** geometry fragments; every row has `visualValidation=false`.
+
+An RTX 3070 sky-basic fixture loaded all three pipelines and measured **226,624 active magenta pixels, 0 when disabled**. This is synthetic pipeline validation; no complete third-party shaderpack has been visually validated. Remaining source capability errors include `entityId` (54), `renderStage` (12), `mc_Entity` (6), `shadowData` (2), and `gbuffers_skytextured.vsh` (1).
+
+The beta.27 release candidate is being prepared from `main` commit `044a953`. Versioned JDK 21 build and verification passed locally; the candidate install JAR is 737,199 bytes (SHA-256 `68A51812B270516BFDBF42B3998A56C0116A59110C4BDDC039380AD46F16B4BF`) and the example-packs ZIP is 87,325 bytes (SHA-256 `41C1A6E3A83E149808BC1EC7ED1AB90538E664F0ED092A3D19054F76F9731A91`). Release-tag workflow and publication remain pending; CI will rebuild the official assets.
 ## Beta.26 experimental prerelease - published (2026-10-21)
 
 Release-prep PR [#68](https://github.com/glebKovshov/Veyra/pull/68) merged as d9e58ea598555d24a02375f3e6fa2d56d1013bf3; tag v0.2.0-beta.26+mc1.21.11 points to that commit. Release workflow [39516955852](https://github.com/glebKovshov/Veyra/actions/runs/39516955852) passed the pinned source audit, **31/31** graphics smoke fixtures, release build/tests, distributable verification, and publication. Tag Build [39516955962](https://github.com/glebKovshov/Veyra/actions/runs/39516955962) also passed.
