@@ -633,7 +633,7 @@ public final class EntityShaderAdapter {
             usesLightmapSampler = Pattern.compile("\\blightmap\\b")
                     .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
         }
-        adapted = expandCommaSeparatedVaryings(adapted);
+        adapted = UnusedVaryingDeclarations.removeUnused(expandCommaSeparatedVaryings(adapted));
         boolean suppliesSunVectorInput = requiresVarying(adapted, "sunVec");
         boolean suppliesUpVectorInput = requiresVarying(adapted, "upVec");
         boolean suppliesEastVectorInput = requiresVarying(adapted, "eastVec");

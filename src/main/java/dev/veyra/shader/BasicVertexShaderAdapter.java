@@ -278,7 +278,8 @@ final class BasicVertexShaderAdapter {
             if (integerType(type) && !interpolation.equals("flat")) {
                 throw new IOException(programName + ".vsh integer output '" + name + "' must use flat interpolation.");
             }
-            FixedOutput fixed = FIXED_OUTPUTS.get(name);
+            FixedOutput fixed = name.equals("normal") && format == Format.TEXTURED && type.equals("vec4")
+                    ? null : FIXED_OUTPUTS.get(name);
             if (fixed != null && !fixed.type().equals(type)) {
                 throw new IOException(programName + ".vsh output '" + name + "' must use " + fixed.type() + ".");
             }

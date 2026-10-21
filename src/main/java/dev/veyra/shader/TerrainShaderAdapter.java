@@ -431,6 +431,7 @@ public final class TerrainShaderAdapter {
                     + "'; supported Iris scalar/matrix uniforms and the built-in samplers are available.");
         }
 
+        adapted = UnusedVaryingDeclarations.removeUnused(expandCommaSeparatedVaryings(adapted));
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         List<String> declaredVaryings = new ArrayList<>();
