@@ -146,9 +146,10 @@ jobs:
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
           assert result['status']=='passed', result
           if '${{ matrix.fixture }}' == 'shadow-color-mrt':
-              entity_route=re.search(r'Framebuffer evidence: pipeline=veyra:pipeline/shadow_entities.*bound=MRT\[[^\]]*shadowcolor1',text)
-              assert entity_route, 'The entity shadow pipeline did not route through both shadow color attachments'
-              print('Entity shadow MRT route:', entity_route.group(0))
+              entity_routes=re.findall(r'Framebuffer evidence: pipeline=veyra:pipeline/shadow_entities.*bound=MRT\[[^\]]*shadowcolor1',text)
+              assert len(entity_routes) >= 2, 'The entity shadow pipeline did not route through the MRT before and after shader-pack re-selection'
+              assert result['shadowMrtReenabledPixels'] >= 2000, result
+              print('Entity shadow MRT routes across re-selection:', len(entity_routes))
           if '${{ matrix.fixture }}' == 'terrain-vertex-varyings':
               probe=json.loads(pathlib.Path('build/reports/graphics-smoke/compute-image-probe.json').read_text())
               assert probe == {'status':'passed','format':'r16ui','texels':64,'expected':42}, probe

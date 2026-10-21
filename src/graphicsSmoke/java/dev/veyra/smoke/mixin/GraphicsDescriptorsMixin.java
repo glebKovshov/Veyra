@@ -28,7 +28,11 @@ public abstract class GraphicsDescriptorsMixin {
         var renderer = Renderer.getInstance();
         var boundFramebuffer = renderer.getBoundFramebuffer();
         var boundRenderPass = renderer.getBoundRenderPass();
-        if (veyra$seen.add("framebuffer:" + pipeline.getLocation())) {
+        boolean shadowMrt = pipeline.getLocation().toString().startsWith("veyra:pipeline/shadow_entities/")
+                && boundFramebuffer instanceof VeyraMrtFramebuffer;
+        String framebufferKey = "framebuffer:" + pipeline.getLocation()
+                + (shadowMrt ? ":" + System.identityHashCode(boundFramebuffer) : "");
+        if (veyra$seen.add(framebufferKey)) {
             LoggerFactory.getLogger("veyra-graphics-smoke").info(
                     "Framebuffer evidence: pipeline={} bound={} renderPassTarget={}",
                     pipeline.getLocation(), veyra$describe(boundFramebuffer),

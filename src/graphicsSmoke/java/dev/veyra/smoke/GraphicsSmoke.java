@@ -1,6 +1,7 @@
 package dev.veyra.smoke;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import dev.veyra.shader.ShaderPack;
 import dev.veyra.shader.VeyraRenderer;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.vulkan.Renderer;
@@ -21,7 +22,7 @@ import java.nio.file.Path;
 
 /** Exercise a real client/world and measure the fixture's shader output against a baseline. */
 public final class GraphicsSmoke {
-    private static int ticks, worldTicks, stage, activePixels, baselineAt;
+    private static int ticks, worldTicks, stage, activePixels, baselineAt, disabledPixels, reenabledShadowMrtPixels;
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
@@ -30,12 +31,13 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, basicVertexFixture, basicCustomImageFixture, entityCustomImageFixture,
+            glintMrtFixture, shadowColorMrtFixture, basicVertexFixture, basicCustomImageFixture, entityCustomImageFixture,
             compositeCustomImageFixture,
             skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
             damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
+    private static ShaderPack shadowMrtPack;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
@@ -76,6 +78,7 @@ public final class GraphicsSmoke {
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
+            shadowColorMrtFixture = fixture.equals("shadow-color-mrt");
             basicCustomImageFixture = fixture.equals("basic-custom-image");
             entityCustomImageFixture = fixture.equals("entity-custom-image");
             compositeCustomImageFixture = fixture.equals("composite-custom-image");
@@ -198,7 +201,7 @@ public final class GraphicsSmoke {
                 requested = true; captureActive = true;
             } else if (!vanillaBaseline && (stage == 1 || stage == 2) && worldTicks >= baselineAt) {
                 pending = true;
-                requested = true; captureActive = skyTexturedStageFixture && stage == 2;
+                requested = true; captureActive = (skyTexturedStageFixture || shadowColorMrtFixture) && stage == 2;
             }
         } catch (Throwable failure) { finish(client, failure, -1); }
     }
@@ -370,7 +373,8 @@ public final class GraphicsSmoke {
         int basicMrtPixels = 0;
         try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
-            String imageName = skyTexturedStageFixture
+            String imageName = shadowColorMrtFixture && stage == 2 ? "shadow-mrt-reenabled.png"
+                    : skyTexturedStageFixture
                     ? active && stage == 2 ? "skytextured-moon-active.png"
                             : active ? "skytextured-sun-active.png" : "skytextured-disabled.png"
                     : active ? "mrt-active.png" : "shaders-disabled.png";
@@ -412,6 +416,14 @@ public final class GraphicsSmoke {
                 if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
                 } else if (active) {
+                    if (shadowColorMrtFixture && stage == 2) {
+                        reenabledShadowMrtPixels = count;
+                        finish(client, count < 2000
+                                ? new IllegalStateException("Shadow MRT did not recover after shader-pack re-selection: "
+                                        + reenabledShadowMrtPixels + " active pixels") : null,
+                                disabledPixels);
+                        return;
+                    }
                     if (skyTexturedStageFixture && stage == 0) {
                         activeSkySunPixels = count;
                         activePixels = count;
@@ -462,6 +474,10 @@ public final class GraphicsSmoke {
                                 + activeGlintGreenPixels + ", colortex4 magenta=" + activeGlintMrtPixels) : null,
                                 activeGlintGreenPixels);
                         return;
+                    }
+                    if (shadowColorMrtFixture && stage == 0) {
+                        shadowMrtPack = VeyraRenderer.selectedPack().orElseThrow(
+                                () -> new IllegalStateException("The shadow MRT fixture lost its selected shader pack."));
                     }
                     VeyraRenderer.disable();
                     baselineAt = worldTicks + 80;
@@ -537,6 +553,25 @@ public final class GraphicsSmoke {
                                 + ", itemGreen=" + activeCurrentRenderedItemGreenPixels
                                 + ", disabledItemGreen=" + renderedItemGreenCount) : null;
                     }
+                    if (shadowColorMrtFixture && failure == null) {
+                        disabledPixels = count;
+                        if (shadowMrtPack == null) {
+                            finish(client, new IllegalStateException("The shadow MRT fixture has no shader pack to re-select."), count);
+                            return;
+                        }
+                        String selection = VeyraRenderer.select(shadowMrtPack);
+                        if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
+                            finish(client, new IllegalStateException("Could not re-select the shadow MRT fixture pack: "
+                                    + selection + " (" + VeyraRenderer.getLastError() + ")"), count);
+                            return;
+                        }
+                        LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                                "Re-selected shader pack after the disabled shadow MRT resource cycle.");
+                        stage = 2;
+                        baselineAt = worldTicks + 80;
+                        pending = false;
+                        return;
+                    }
                     finish(client, failure, count);
                 }
             };
@@ -552,6 +587,7 @@ public final class GraphicsSmoke {
             String renderer = physicalDeviceName().replace("\\", "\\\\").replace("\"", "\\\"");
             Files.writeString(output.resolve("result.json"), "{\"status\":\"" + (failure == null ? "passed" : "failed")
                     + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
+                    + ",\"shadowMrtReenabledPixels\":" + reenabledShadowMrtPixels
                     + ",\"activeOppositeMidTexCoordPixels\":" + activeOppositeMidTexCoordPixels
                     + ",\"activeCurrentRenderedItemGreenPixels\":" + activeCurrentRenderedItemGreenPixels
                     + ",\"disabledMagentaPixels\":" + baseline

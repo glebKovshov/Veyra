@@ -89,7 +89,10 @@ import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkClearColorValue;
+import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkFormatProperties;
+import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VK10;
 
 import java.io.IOException;
@@ -7209,7 +7212,8 @@ public final class VeyraRenderer {
             throw new IllegalStateException("VulkanMod did not create a Vulkan texture for colortex" + index + ".");
         }
         if (vulkanTexture.getVulkanImage().format != settings.format()
-                || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
+                || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0
+                || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             replaceColorTargetTexture(target, "Veyra shader pack colortex" + index + " " + side,
                     settings.format());
             changed = true;
@@ -7245,6 +7249,7 @@ public final class VeyraRenderer {
                     .setFormat(format)
                     .addUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
                     .addUsage(VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+                    .addUsage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                     .createVulkanImage();
             VkGlTexture.setVulkanImage(vulkanTexture.glId(), colorImage);
             installed = true;
@@ -7289,7 +7294,6 @@ public final class VeyraRenderer {
         if (renderer.getBoundRenderPass() != null) {
             renderer.endRenderPass();
         }
-        var commandEncoder = RenderSystem.getDevice().createCommandEncoder();
         for (int index : indices) {
             ColorTargetPair pair = colorTargets.get(index);
             ColorTargetSettings targetSettings = settings.getOrDefault(index,
@@ -7297,23 +7301,45 @@ public final class VeyraRenderer {
             if (initializedColorTargets.contains(index) && !targetSettings.clearEachFrame()) {
                 continue;
             }
-            clearColorTarget(commandEncoder, pair.targetA(), targetSettings.clearColor());
-            clearColorTarget(commandEncoder, pair.targetB(), targetSettings.clearColor());
+            clearColorTarget(pair.targetA(), targetSettings.clearColor());
+            clearColorTarget(pair.targetB(), targetSettings.clearColor());
             initializedColorTargets.add(index);
         }
     }
 
-    static void clearColorTarget(com.mojang.blaze3d.systems.CommandEncoder commandEncoder,
-                                 RenderTarget target, int clearColor) {
-        GpuTexture texture = target.getColorTexture();
-        commandEncoder.clearColorTexture(texture, clearColor);
-        if (!(texture instanceof VkGpuTexture vulkanTexture)) {
-            throw new IllegalStateException("VulkanMod did not allocate a Vulkan texture for shaderpack color targets.");
+    static void clearColorTarget(RenderTarget target, int clearColor) {
+        if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
+            throw new IllegalStateException("Veyra color targets must be cleared on a recording frame.");
         }
-        // VulkanMod clears immediately here but marks the texture for another deferred clear.
-        // PostPassM would then open it as an attachment and transition it on ImageUploadHelper's
-        // command buffer while the shader pass samples it. The clear already happened, so drop
-        // that stale deferred-clear request.
+        Renderer renderer = Renderer.getInstance();
+        if (renderer.getBoundRenderPass() != null) {
+            renderer.endRenderPass();
+        }
+        GpuTexture texture = target.getColorTexture();
+        if (!(texture instanceof VkGpuTexture vulkanTexture) || texture.isClosed()) {
+            throw new IllegalStateException("VulkanMod did not allocate a Vulkan texture for a Veyra color target.");
+        }
+        VulkanImage image = vulkanTexture.getVulkanImage();
+        if ((image.usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
+            throw new IllegalStateException("VulkanMod did not allocate a transfer-destination image for a Veyra color target.");
+        }
+        VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            image.transitionImageLayout(stack, commandBuffer, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            VkClearColorValue clearValue = VkClearColorValue.calloc(stack)
+                    .float32(stack.floats(
+                            ((clearColor >>> 16) & 0xFF) / 255.0F,
+                            ((clearColor >>> 8) & 0xFF) / 255.0F,
+                            (clearColor & 0xFF) / 255.0F,
+                            ((clearColor >>> 24) & 0xFF) / 255.0F));
+            VkImageSubresourceRange range = VkImageSubresourceRange.calloc(stack)
+                    .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
+                    .baseMipLevel(0).levelCount(1)
+                    .baseArrayLayer(0).layerCount(1);
+            VK10.vkCmdClearColorImage(commandBuffer, image.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    clearValue, range);
+        }
+        // The direct clear is already recorded on VulkanMod's graphics command buffer.
         ((VkGpuTextureAccessor) vulkanTexture).veyra$setNeedsClear(false);
     }
 

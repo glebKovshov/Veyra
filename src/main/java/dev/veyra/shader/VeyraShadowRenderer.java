@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
+import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD;
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_STORE_OP_STORE;
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -465,12 +466,14 @@ public final class VeyraShadowRenderer {
 
     private static void clearAdditionalShadowColors() {
         if (shadowColorTargetIndices.stream().noneMatch(index -> index > 0)) return;
-        var encoder = RenderSystem.getDevice().createCommandEncoder();
+        if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
+            throw new IllegalStateException("Shadow color attachments must be cleared on a recording frame.");
+        }
         for (int index : shadowColorTargetIndices) {
             if (index == 0) continue; // The base shadow render pass clears color0 and depth.
             TextureTarget colorTarget = additionalColorTargets.get(index);
             if (colorTarget == null) throw new IllegalStateException("shadowcolor" + index + " was not allocated.");
-            VeyraRenderer.clearColorTarget(encoder, colorTarget, 0x00000000);
+            VeyraRenderer.clearColorTarget(colorTarget, 0x00000000);
         }
     }
 
