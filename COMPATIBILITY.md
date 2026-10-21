@@ -1,14 +1,14 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.27 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.28 experimental prerelease
 
-## Unreleased compatibility batch based on beta.27
+## Beta.28 per-program uniform and render-stage batch
 
-The current feature branch adds Iris renderStage constants to the supported sky-basic vertex and fragment pipelines. It also binds entityId, blockEntityId, and currentRenderedItemId as per-render constants in supported custom entity, block, and hand vertex stages; selected identifier values are part of the compiled-pipeline cache key.
+Beta.28 adds Iris renderStage constants to the supported sky-basic vertex and fragment pipelines. It also binds entityId, blockEntityId, and currentRenderedItemId as per-render constants in supported custom entity, block, and hand vertex stages; selected identifier values are part of the compiled-pipeline cache key.
 
 Unused attribute vec4 mc_Entity declarations are removed from vertex stages only when no active code reads the attribute. Active reads remain rejected because Minecraft's NEW_ENTITY format does not supply mc_Entity. Veyra also skips the legacy gbuffers_entities_glowing program, which [Iris does not recognize as one of its programs](https://github.com/IrisShaders/docs/blob/main/src/content/docs/current/Reference/Programs/gbuffers.mdx).
 
 The refreshed pinned source audit covers 4 archives, 12 defaults, 63 declared-profile/dimension cases, and 5,178 stages. It accepts **781 geometry fragment programs and rejects 8**; the 8 fragment adapter errors are in Sildur shadowData inputs. The remaining first capability blockers are gbuffers_lightning.vsh (54 cases), gbuffers_skytextured.vsh (13), gbuffers_textured.vsh (6), and Sildur shadowData (2). gbuffers_lightning is an Iris-supported program, so it remains an explicit Veyra limitation. All 75 records retain visualValidation=false; no full third-party shaderpack visual validation is claimed.
 
-This batch is not part of the published beta.27 JAR. Local adapter tests, shader validation, build, and JAR metadata verification have passed. Synthetic `runGraphicsSmoke` fixtures on an NVIDIA RTX 3070 passed for entity vertex execution (18,532 active / 0 disabled magenta pixels), sky-basic vertex execution (226,295 / 0), and `currentRenderedItemId` (13,984 / 0 green pixels). These fixtures validate named rendering paths, not full third-party shaderpack visuals. CI and PR integration remain pending; see WORK_SUMMARY.md.
+PR #74 merged this batch into `main` as `9a8b0d8`. Build [39542873289](https://github.com/glebKovshov/Veyra/actions/runs/39542873289), source audit [39542873265](https://github.com/glebKovshov/Veyra/actions/runs/39542873265), and Graphics smoke [39542873210](https://github.com/glebKovshov/Veyra/actions/runs/39542873210) passed; all **30/30** Lavapipe fixtures passed. The local JDK 21 build passed 323 tests; 82 example shaders were processed and 86 stages compiled to Vulkan SPIR-V. Synthetic RTX 3070 fixtures passed for entity vertex execution (18,532 active / 0 disabled magenta pixels), sky-basic vertex execution (226,295 / 0), and `currentRenderedItemId` (13,984 / 0 green pixels). These fixtures validate named rendering paths, not full third-party shaderpack visuals. Beta.28 is an experimental prerelease; stable Iris compatibility remains incomplete. See WORK_SUMMARY.md for release details.
 
 ## Beta.27 damaged-block and sky-basic vertex execution
 
