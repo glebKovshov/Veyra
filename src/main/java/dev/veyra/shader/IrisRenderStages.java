@@ -72,7 +72,7 @@ final class IrisRenderStages {
             case SKY -> Stage.SKY.ordinal();
             case STARS -> Stage.STARS.ordinal();
             case SUNRISE_SUNSET -> Stage.SUNSET.ordinal();
-            case LEASH, LINE, LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR -> null;
+            case LEASH, LINE, LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER -> null;
         };
     }
 

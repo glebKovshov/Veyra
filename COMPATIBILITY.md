@@ -1,14 +1,20 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.30 candidate
+# Shaderpack compatibility: Veyra 0.2.0-beta.30 published; weather batch in progress
+
+## Weather vertex execution work in progress
+
+The active `feature/weather-vertex-execution` branch executes supported `gbuffers_weather.vsh` programs against Minecraft's particle vertex format, preserves native lightmap/fog outputs, and links the pack varyings to the weather fragment or textured fallback. The four-pack pinned audit now accepts **864 geometry fragment cases and rejects 0** across 75 default/profile/dimension rows and 5,178 stages. No row has an adapter error or weather capability error. The remaining whole-pack capability blockers are 18 Complementary `shadowcomp.csh` stages and 3 Sildur `mc_Entity` inputs. All 75 rows retain `visualValidation=false`; the new rainy-world Lavapipe fixture has not completed yet.
+
+Local JDK 21 checks passed **336 tests**, processed 86 example shaders, and compiled 100 stages directly to Vulkan SPIR-V. This branch is not merged or released.
 
 ## Beta.30 CloudRenderer fix and textured lightmap support
 
-Beta.30 corrects nested Mixin remapping for the Minecraft `Tesselator.begin` invocation. The published beta.25 and beta.29 JARs both lack the runtime mapping and can hit the logged `0/1` CloudRenderer injection failure. This candidate keeps VulkanMod's enclosing method selector unremapped and remaps the nested Minecraft invocation. It also adds live `Sampler2` lightmap binding for supported world-border and sky-textured pipelines, links `vec4 normal` from custom `gbuffers_textured.vsh`, and removes unused fragment varying declarations before linking.
+Beta.30 corrects nested Mixin remapping for the Minecraft `Tesselator.begin` invocation. The published beta.25 and beta.29 JARs both lack the runtime mapping and can hit the logged `0/1` CloudRenderer injection failure. The published beta.30 JAR keeps VulkanMod's enclosing method selector unremapped and remaps the nested Minecraft invocation. It also adds live `Sampler2` lightmap binding for supported world-border and sky-textured pipelines, links `vec4 normal` from custom `gbuffers_textured.vsh`, and removes unused fragment varying declarations before linking.
 
 The latest pinned audit covers 4 archives, 12 defaults, 63 declared-profile/dimension cases, and 5,178 stages. It accepts **789 geometry fragment programs and rejects 0**; there are no adapter errors. Explicit capability blockers remain custom `gbuffers_weather.vsh` execution (72 records) and Sildur's active `mc_Entity` input in `gbuffers_textured.vsh` (3 records). All 75 records retain `visualValidation=false`; no complete third-party shaderpack has been visually validated.
 
 Feature PR [#80](https://github.com/glebKovshov/Veyra/pull/80) merged into `main` at `a1ade554`. Build [39563491000](https://github.com/glebKovshov/Veyra/actions/runs/39563491000), pinned source audit [39563491016](https://github.com/glebKovshov/Veyra/actions/runs/39563491016), and Graphics smoke [39563491037](https://github.com/glebKovshov/Veyra/actions/runs/39563491037) passed. The local JDK 21 build passed **334 tests**, processed 85 example shaders, and compiled 98 direct Vulkan SPIR-V stages. The stable Iris-compatibility goal remains incomplete.
 
-The beta.30 release is being prepared. The latest published prerelease remains [beta.29](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.29%2Bmc1.21.11); its JAR does not contain the corrected runtime Mixin mapping. See [WORK_SUMMARY.md](WORK_SUMMARY.md) for the release record and current progress.
+Beta.30 was published as an experimental prerelease from tag `v0.2.0-beta.30+mc1.21.11` after release-prep PR [#81](https://github.com/glebKovshov/Veyra/pull/81) merged at `74b0a1940edc954ec0edbf4a00238bd80994e60f`. The [GitHub release](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.30%2Bmc1.21.11) includes the installable [JAR](https://github.com/glebKovshov/Veyra/releases/download/v0.2.0-beta.30%2Bmc1.21.11/veyra-0.2.0-beta.30%2Bmc1.21.11.jar), SHA-256 `96edff62b629e4882e3a635823d61e08e59184301646eb0339dc60e4bbaef1d0`. The beta.25 CloudRenderer crash fix is in that JAR; the historical beta.25 and beta.29 JARs are unchanged. See [WORK_SUMMARY.md](WORK_SUMMARY.md) for the release record and current progress.
 
 ## Beta.28 per-program uniform and render-stage batch
 

@@ -199,6 +199,33 @@ class ShaderPackOptionsTest {
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
     }
 
+    @Test void weatherVertexStagesLinkToWeatherAndTexturedFallbackFragments() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("weather-fallback/shaders"));
+        Files.writeString(shader.resolve("gbuffers_weather.vsh"), """
+                #version 130
+                varying vec2 texCoord;
+                void main() {
+                    gl_Position = ftransform();
+                    texCoord = gl_MultiTexCoord0.xy;
+                }
+                """);
+        Files.writeString(shader.resolve("gbuffers_textured_lit.fsh"), """
+                #version 130
+                varying vec2 texCoord;
+                void main() { gl_FragColor = vec4(texCoord, 0.0, 1.0); }
+                """);
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+
+        Files.writeString(shader.resolve("gbuffers_weather.fsh"), """
+                #version 130
+                varying vec2 missingWeatherVarying;
+                void main() { gl_FragColor = vec4(missingWeatherVarying, 0.0, 1.0); }
+                """);
+        IOException error = assertThrows(IOException.class,
+                () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
+        assertTrue(error.getMessage().contains("missingWeatherVarying"));
+    }
+
     @Test void glintFragmentMrtIsValidatedEvenWithoutACustomVertexStage() throws IOException {
         Path shader = Files.createDirectories(root.resolve("glint-mrt/shaders"));
         Path fragment = shader.resolve("gbuffers_armor_glint.fsh");
