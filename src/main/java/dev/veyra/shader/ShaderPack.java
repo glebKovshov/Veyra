@@ -179,6 +179,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public Optional<String> readShadowFragment(String programName) throws IOException {
+        return readShadowFragment(programName, false);
+    }
+
+    Optional<String> readShadowFragment(String programName, boolean customImages) throws IOException {
         if (!supportsShaderPrograms()) {
             return Optional.empty();
         }
@@ -194,7 +198,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (source.isEmpty()) {
             return hasShadowFragment() ? Optional.of(DEFAULT_SHADOW_FRAGMENT) : Optional.empty();
         }
-        return Optional.of(expandIncludes(fileName, source.get()));
+        return customImages ? readCustomImageStage(fileName) : Optional.of(expandIncludes(fileName, source.get()));
     }
 
     public boolean hasShadowWaterFragment() {
@@ -211,13 +215,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     /** Selects the vertex stage from the same fallback program as the shadow fragment. */
     public Optional<String> readShadowVertex(String programName) throws IOException {
+        return readShadowVertex(programName, false);
+    }
+
+    Optional<String> readShadowVertex(String programName, boolean customImages) throws IOException {
         if (!supportsShaderPrograms()) return Optional.empty();
         if (!SHADOW_PROGRAMS.contains(programName)) {
             throw new IOException("Unsupported Iris shadow program '" + programName + "'.");
         }
         String selected = programName;
         if (!programName.equals("shadow") && readShader(programName + ".fsh").isEmpty()) selected = "shadow";
-        return readStage(selected + ".vsh");
+        return customImages ? readCustomImageStage(selected + ".vsh") : readStage(selected + ".vsh");
     }
 
     public boolean hasDamagedBlockPipeline() {
@@ -959,7 +967,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String language = readRawShader("lang/en_US.lang").orElse("");
         ShaderPackOptions definitions = ShaderPackOptions.parse(sources, properties, language);
         ShaderPackOptions resolved = ShaderPackOptions.parse(sources, GlslPreprocessor.properties(properties,
-                definitions.effective(configuration.options())), language);
+                featureOptions(definitions.effective(configuration.options()))), language);
         configuration.cacheDefinitions(resolved);
         return resolved;
     }
@@ -1052,22 +1060,32 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public void validatePipelineCapabilities() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         String required = properties.getProperty("iris.features.required", "").strip();
-        if (!required.isEmpty()) {
-            throw new IOException("This pack requires Iris features not implemented by Veyra: " + required);
+        Set<String> supportedFeatures = configuration.customImages() ? Set.of("CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of();
+        List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())
+                .filter(name -> !supportedFeatures.contains(name)).toList();
+        if (!unsupportedFeatures.isEmpty()) {
+            throw new IOException("This pack requires Iris features not implemented by Veyra: " + String.join(" ", unsupportedFeatures));
         }
+        if (configuration.customImages()) validateShadowComputeCapabilities();
         for (String program : TERRAIN_PROGRAMS.stream().sorted().toList()) {
             if (!isProgramEnabled(program) || !terrainPrograms.contains(program)) continue;
             Optional<String> vertex = readStage(program + ".vsh");
             if (vertex.isEmpty()) continue;
             Optional<String> fragment = readTerrainFragment(program);
             if (fragment.isPresent()) {
+                String vertexSource = vertex.get(), fragmentSource = fragment.get();
+                if (configuration.customImages()) {
+                    var images = readImageProperties();
+                    vertexSource = ShaderPackImageBindings.prepare(program + ".vsh", vertexSource, images).source();
+                    fragmentSource = ShaderPackImageBindings.prepare(program + ".fsh", fragmentSource, images).source();
+                }
                 Map<String, TerrainVertexShaderAdapter.PackVarying> descriptions =
-                        TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+                        TerrainVertexShaderAdapter.describeVaryings(program, vertexSource);
                 Set<Integer> freeOutputLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
-                        fragment.get(), descriptions);
+                        fragmentSource, descriptions);
                 Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
-                        TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), freeOutputLocations);
-                TerrainShaderAdapter.validatePackVaryingLinks(program, fragment.get(), varyings);
+                        TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertexSource, freeOutputLocations);
+                TerrainShaderAdapter.validatePackVaryingLinks(program, fragmentSource, varyings);
             }
         }
         validateShadowTerrainVertexCapabilities();
@@ -1094,6 +1112,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String parent = extension.equals("csh") ? program.replaceFirst("_[a-z]+$", "") : program;
             if (IGNORED_IRIS_PROGRAMS.contains(parent)) continue;
             if (!isProgramEnabled(parent)) continue;
+            if (configuration.customImages() && Set.of("vsh", "fsh").contains(extension)
+                    && !TERRAIN_PROGRAMS.contains(program) && !SHADOW_PROGRAMS.contains(program)) {
+                var images = ShaderPackImageBindings.prepare(file, readStage(file).orElseThrow(), readImageProperties());
+                if (!images.resources().isEmpty()) throw new IOException("Custom images for " + file + " are not integrated yet.");
+            }
             if (extension.equals("vsh") && program.startsWith("gbuffers_")
                     && !program.equals("gbuffers_clouds")
                     && (readRawShader(programPath(program + ".fsh")).isPresent()
@@ -1146,6 +1169,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 }
             }
             if (Set.of("csh", "gsh", "tcs", "tes").contains(extension)) {
+                if (extension.equals("csh") && configuration.customImages()) continue; // Validated with the complete active sequence above.
                 throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
             }
             if (program.matches("begin\\d*")) {
@@ -1157,13 +1181,44 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private void validateShadowTerrainVertexCapabilities() throws IOException {
         if (!hasShadowFragment()) return;
         for (String program : List.of("shadow_solid", "shadow_cutout", "shadow_water")) {
+            String fragment = readShadowFragment(program).orElseThrow();
+            if (!FragmentOutputs.parse(fragment).sceneOnly()) {
+                throw new IOException("Multiple shadow color attachments are not implemented yet.");
+            }
             Optional<String> vertex = readShadowVertex(program);
             if (vertex.isEmpty()) continue;
-            String fragment = readShadowFragment(program).orElseThrow();
-            var descriptions = TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+            String vertexSource = vertex.get();
+            if (configuration.customImages()) {
+                var images = readImageProperties();
+                vertexSource = ShaderPackImageBindings.prepare(program + ".vsh", vertexSource, images).source();
+                fragment = ShaderPackImageBindings.prepare(program + ".fsh", fragment, images).source();
+            }
+            var descriptions = TerrainVertexShaderAdapter.describeVaryings(program, vertexSource);
             Set<Integer> freeLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment, descriptions);
-            var varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), freeLocations);
+            var varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertexSource, freeLocations);
             TerrainShaderAdapter.validatePackVaryingLinks(program, fragment, varyings);
+        }
+    }
+
+    private void validateShadowComputeCapabilities() throws IOException {
+        if (!hasShadowFragment()) throw new IOException("shadowcomp custom images require an active shadow pass.");
+        var properties = readImageProperties();
+        for (String file : activeComputeStageFiles()) {
+            if (!file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
+                throw new IOException("Compute dispatch timing for " + file + " is not implemented yet.");
+            }
+            String source = readComputeStage(file).orElseThrow();
+            ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
+            var shader = ComputeShaderAdapter.adapt(file, source, properties);
+            if (!shader.hasFixedWorkGroups()) throw new IOException(file + " requires fixed const ivec3 workGroups.");
+            if (shader.resources().stream().noneMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
+                throw new IOException(file + " has no supported storage-image output.");
+            }
+            for (var resource : shader.resources()) {
+                if (!properties.images().get(resource.imageName()).is3d()) {
+                    throw new IOException(file + " requires unsupported 2D custom image " + resource.imageName() + ".");
+                }
+            }
         }
     }
 
@@ -1348,6 +1403,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     /** Reads a compute source with option values applied but leaves feature conditionals for its adapter. */
     public Optional<String> readComputeStage(String fileName) throws IOException {
         if (!fileName.matches("[A-Za-z0-9_]+\\.csh")) throw new IOException("Invalid compute stage name: " + fileName);
+        return readCustomImageStage(fileName);
+    }
+
+    /** Explicit custom-image preprocessing; ordinary reads retain their existing capability environment. */
+    Optional<String> readCustomImageStage(String fileName) throws IOException {
+        if (!fileName.matches("[A-Za-z0-9_]+\\.(?:vsh|fsh|csh)")) throw new IOException("Invalid custom-image stage name: " + fileName);
         String actualFile = programPath(fileName);
         Optional<String> source = readRawShader(actualFile);
         if (source.isEmpty()) return Optional.empty();
@@ -1356,14 +1417,29 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 included -> readRawShader(included).map(text ->
                         ShaderPackOptions.apply(text, configuration.options())));
         String active = GlslPreprocessor.process(actualFile, expanded,
-                Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+                Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1", "IRIS_FEATURE_COMPUTE_SHADERS", "1"));
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return Optional.of(IrisUnsetUniforms.apply(active, customUniforms));
     }
 
     public ShaderPack configured(Map<String, String> options, int dimension) {
-        return inspect(path, new ShaderPackConfiguration(options, dimension));
+        return inspect(path, new ShaderPackConfiguration(options, dimension, configuration.customImages()));
+    }
+
+    /** A new source snapshot prevents feature-on sources from sharing feature-off cached preprocessing. */
+    public ShaderPack withRuntimeFeatures() throws IOException {
+        if (configuration.customImages()) return this;
+        ShaderPack candidate = inspect(path, new ShaderPackConfiguration(configuration.options(), configuration.dimension(), true));
+        return candidate.activeComputeStageFiles("shadowcomp").isEmpty() ? this : candidate;
+    }
+
+    private Map<String, String> featureOptions(Map<String, String> options) {
+        if (!configuration.customImages()) return options;
+        Map<String, String> effective = new java.util.LinkedHashMap<>(options);
+        effective.put("IRIS_FEATURE_CUSTOM_IMAGES", "1");
+        effective.put("IRIS_FEATURE_COMPUTE_SHADERS", "1");
+        return effective;
     }
 
     private String programPath(String fileName) throws IOException {
@@ -1392,7 +1468,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         String expression = properties.getProperty("program." + resolved + ".enabled");
-        boolean enabled = expression == null || GlslPreprocessor.condition(expression, readOptions().effective(configuration.options()));
+        boolean enabled = expression == null || GlslPreprocessor.condition(expression, featureOptions(readOptions().effective(configuration.options())));
         configuration.cacheEnabled(program, enabled);
         return enabled;
     }
@@ -1405,7 +1481,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         Optional<String> source = readRawShader(programPath(fileName));
         if (source.isEmpty()) return source;
         if (fileName.equals("shaders.properties")) {
-            String processed = GlslPreprocessor.properties(source.get(), readOptions().effective(configuration.options()));
+            String processed = GlslPreprocessor.properties(source.get(), featureOptions(readOptions().effective(configuration.options())));
             configuration.cacheProcessed(fileName, processed);
             return Optional.of(processed);
         }
@@ -1476,7 +1552,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String cached = configuration.processed(actualFile);
         if (cached != null) return cached;
         String processed = GlslPreprocessor.process(actualFile, ShaderIncludes.expand(actualFile, source,
-                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))));
+                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))), featureOptions(Map.of()));
         // Uniforms Iris never sets read their initializer or 0 there; mirror that with constants.
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());

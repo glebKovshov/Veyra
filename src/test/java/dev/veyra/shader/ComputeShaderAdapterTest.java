@@ -10,6 +10,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ComputeShaderAdapterTest {
+    @Test
+    void supportsImageOnlyComputeWithoutAnEmptyUniformBlockOrBindingGap() throws Exception {
+        var stage = ComputeShaderAdapter.adapt("shadowcomp.csh", """
+                layout(local_size_x=1,local_size_y=1,local_size_z=1) in;
+                const ivec3 workGroups=ivec3(1,1,1);
+                writeonly uniform image3D floodfill_img;
+                void main(){imageStore(floodfill_img,ivec3(0),vec4(1));}
+                """, ShaderPackImageProperties.parse(IMAGE_PROPERTIES));
+        assertTrue(stage.uniforms().isEmpty());
+        assertEquals(0, stage.resources().getFirst().binding());
+        assertFalse(stage.source().contains("VeyraComputeUniforms"));
+        assertTrue(stage.source().contains("binding = 0, rgba16f"));
+    }
     private static final String IMAGE_PROPERTIES = """
             image.floodfill_img = floodfill_sampler rgba rgba16f half_float false false 32 32 32
             """;

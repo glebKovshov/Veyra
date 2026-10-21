@@ -49,6 +49,7 @@ public final class ShaderPackAudit {
                 if (values == null) throw new IllegalArgumentException("Unknown profile '" + profile + "' in " + argument);
                 pack = pack.configured(pack.readOptions().validate(values), dimension);
             }
+            pack = pack.withRuntimeFeatures();
             // Match runtime selection: adapters see the pack's shaders.properties custom uniforms.
             CustomUniforms.activate(pack.readCustomUniforms());
             List<String> errors = new ArrayList<>();
@@ -93,6 +94,7 @@ public final class ShaderPackAudit {
                         String program = file.substring(0, file.length() - 4);
                         try {
                             if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs =
                                         terrainVertexOutputs(pack, program, source);
                                 TerrainShaderAdapter.adaptFragment(source, pack.hasShadowFragment(),
@@ -172,10 +174,12 @@ public final class ShaderPackAudit {
             ShaderPack pack, String program, String fragmentSource) throws IOException {
         var vertex = pack.readStage(program + ".vsh");
         if (vertex.isEmpty()) return Map.of();
+        String vertexSource = ShaderPackImageBindings.prepare(program + ".vsh", vertex.get(),
+                pack.readImageProperties()).source();
         Map<String, TerrainVertexShaderAdapter.PackVarying> descriptions =
-                TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+                TerrainVertexShaderAdapter.describeVaryings(program, vertexSource);
         var unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, descriptions);
-        return TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), unusedLocations);
+        return TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertexSource, unusedLocations);
     }
 
     private static Map<String, TerrainVertexShaderAdapter.PackVarying> entityVertexOutputs(

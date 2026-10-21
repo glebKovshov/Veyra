@@ -50,6 +50,10 @@ public final class GraphicsSmoke {
                 Runnable ready = completion; completion = null; ready.run();
                 if (finished) return;
             }
+            if (client.level != null && client.screen instanceof net.minecraft.client.gui.screens.PauseScreen) {
+                LoggerFactory.getLogger("veyra-graphics-smoke").info("Resuming the unattended validation world from PauseScreen");
+                client.setScreen(null);
+            }
             if (++ticks > 2400) throw new IllegalStateException("Timed out waiting for the validation world/readback; screen=" + client.screen);
             if (client.level == null || client.player == null || client.screen != null || pending) return;
             worldTicks++;
@@ -62,7 +66,7 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             terrainMaterialFixture = fixture.equals("terrain-block-id");
             terrainVertexExecutionFixture = fixture.equals("terrain-vertex-execution");
-            terrainVertexVaryingsFixture = fixture.equals("terrain-vertex-varyings");
+            terrainVertexVaryingsFixture = fixture.equals("terrain-vertex-varyings") || fixture.equals("custom-image-compute");
             waterMaterialFixture = fixture.equals("water-block-id");
             entityMrtFixture = fixture.equals("entity-mrt");
             entityColorFeedbackFixture = fixture.equals("entity-colortex-feedback");

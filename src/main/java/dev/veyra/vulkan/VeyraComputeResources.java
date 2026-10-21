@@ -104,6 +104,19 @@ public final class VeyraComputeResources implements AutoCloseable {
         return descriptorsByStage.get(stageIndex);
     }
 
+    /** Creates graphics bindings borrowing the very same images owned by this resource set. */
+    public List<VeyraImageDescriptor> graphicsDescriptors(List<ComputeShaderAdapter.OpaqueResource> bindings) throws IOException {
+        if (closed) throw new IllegalStateException("Custom image resources have already been released.");
+        List<VeyraImageDescriptor> descriptors = new ArrayList<>();
+        for (var binding : bindings) {
+            VeyraImage3D image = images.get(binding.imageName());
+            if (image == null) throw new IOException("Graphics uniform '" + binding.name()
+                    + "' references image." + binding.imageName() + " absent from the shared compute resource set.");
+            descriptors.add(new VeyraImageDescriptor(binding.binding(), binding.glslType(), binding.name(), image, binding.storageImage()));
+        }
+        return List.copyOf(descriptors);
+    }
+
     public Map<String, VeyraImage3D> images() {
         return images;
     }

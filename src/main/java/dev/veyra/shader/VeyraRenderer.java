@@ -2546,6 +2546,7 @@ public final class VeyraRenderer {
         EntityIdMap previousEntityIds = EntityIdMap.active();
         BlockIdMap previousBlockIds = BlockIdMap.active();
         try {
+            pack = pack.withRuntimeFeatures();
             pack.validatePipelineCapabilities();
             // Adapters size uniform blocks from the active definitions, so install them before compiling.
             CustomUniforms.activate(pack.readCustomUniforms());
@@ -3461,13 +3462,24 @@ public final class VeyraRenderer {
         Map<String, GraphicsPipeline> pipelines = new HashMap<>();
         Map<String, GraphicsPipeline> shadowPipelines = new HashMap<>();
         boolean shadowSamplerAvailable = pack.hasShadowFragment();
+        VeyraComputePipelineSet compute = null;
         try {
+            compute = VeyraComputePipelineSet.compile(pack);
+            if (compute != null && !shadowSamplerAvailable) throw new IOException("shadowcomp requires an active shadow pass.");
+            ShaderPackImageProperties customImages = compute == null ? null : pack.readImageProperties();
+            var noCustomImages = new ShaderPackImageBindings.PreparedStage("", List.of());
             for (String programName : List.of(
                     "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water")) {
                 if (!pack.terrainPrograms().contains(programName)) {
                     continue;
                 }
-                var shaderPackVertex = pack.readStage(programName + ".vsh");
+                var shaderPackVertex = compute == null ? pack.readStage(programName + ".vsh")
+                        : pack.readCustomImageStage(programName + ".vsh");
+                var vertexImages = noCustomImages;
+                if (compute != null && shaderPackVertex.isPresent()) {
+                    vertexImages = ShaderPackImageBindings.prepare(programName + ".vsh", shaderPackVertex.get(), customImages);
+                    shaderPackVertex = java.util.Optional.of(vertexImages.source());
+                }
                 boolean vertexUsesNoiseSampler = false;
                 Map<String, TerrainVertexShaderAdapter.PackVarying> outputDescriptions = Map.of();
                 if (shaderPackVertex.isPresent()) {
@@ -3478,6 +3490,12 @@ public final class VeyraRenderer {
                 }
                 String fragmentSource = pack.readTerrainFragment(programName)
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                var fragmentImages = noCustomImages;
+                if (compute != null) {
+                    fragmentImages = ShaderPackImageBindings.prepare(programName + ".fsh",
+                            pack.readCustomImageStage(programName + ".fsh").orElseThrow(), customImages);
+                    fragmentSource = fragmentImages.source();
+                }
                 boolean usesNoiseSampler = vertexUsesNoiseSampler
                         || TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
                 boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
@@ -3527,6 +3545,11 @@ public final class VeyraRenderer {
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
                 builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler, usesOpaqueDepthSampler, usesSpecularSampler, usesShadowColor, usesOpaqueShadow, colorInputs));
+                if (compute != null) {
+                    var images = compute.bindGraphicsImages(builder, vertexImages, fragmentImages);
+                    programVertexSource = images.decorate(programVertexSource, vertexImages);
+                    adaptedFragmentSource = images.decorate(adaptedFragmentSource, fragmentImages);
+                }
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, programVertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, adaptedFragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
@@ -3552,15 +3575,25 @@ public final class VeyraRenderer {
             if (shadowSamplerAvailable) {
                 for (String programName : List.of("shadow_solid", "shadow_cutout", "shadow_water", "shadow_tripwire")) {
                     String sourceProgram = programName.equals("shadow_tripwire") ? "shadow_cutout" : programName;
-                    String fragmentSource = pack.readShadowFragment(sourceProgram)
+                    String fragmentSource = pack.readShadowFragment(sourceProgram, compute != null)
                             .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
+                    var fragmentImages = noCustomImages;
+                    if (compute != null) {
+                        fragmentImages = ShaderPackImageBindings.prepare(sourceProgram + ".fsh", fragmentSource, customImages);
+                        fragmentSource = fragmentImages.source();
+                    }
                     fragmentSource = IrisRenderStages.bindUniform(fragmentSource,
                             IrisRenderStages.forShadowTerrainProgram(programName), programName);
                     String originalFragmentSource = fragmentSource;
                     if (!FragmentOutputs.parse(fragmentSource).sceneOnly())
                         throw new IOException("Multiple shadow color attachments are not implemented yet.");
                     boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
-                    var shadowVertex = pack.readShadowVertex(sourceProgram);
+                    var shadowVertex = pack.readShadowVertex(sourceProgram, compute != null);
+                    var vertexImages = noCustomImages;
+                    if (compute != null && shadowVertex.isPresent()) {
+                        vertexImages = ShaderPackImageBindings.prepare(sourceProgram + ".vsh", shadowVertex.get(), customImages);
+                        shadowVertex = java.util.Optional.of(vertexImages.source());
+                    }
                     if (shadowVertex.isPresent()) {
                         usesNoiseSampler |= TerrainVertexShaderAdapter.usesNoiseSampler(programName, shadowVertex.get());
                     }
@@ -3591,6 +3624,11 @@ public final class VeyraRenderer {
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
                     builder.applyConfig(terrainPipelineConfig(false, usesNoiseSampler, false, usesSpecularSampler, false, false, Set.of()));
+                    if (compute != null) {
+                        var images = compute.bindGraphicsImages(builder, vertexImages, fragmentImages);
+                        shadowVertexSource = images.decorate(shadowVertexSource, vertexImages);
+                        fragmentSource = images.decorate(fragmentSource, fragmentImages);
+                    }
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, shadowVertexSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                     GraphicsPipeline shadowPipeline = builder.createGraphicsPipeline();
@@ -3602,11 +3640,12 @@ public final class VeyraRenderer {
                     shadowPipelines.put(programName, shadowPipeline);
                 }
             }
-            return new TerrainPipelineSet(Map.copyOf(pipelines), Map.copyOf(shadowPipelines));
+            return new TerrainPipelineSet(Map.copyOf(pipelines), Map.copyOf(shadowPipelines), compute);
         } catch (IOException | RuntimeException exception) {
             pipelines.values().forEach(VeyraGeometryTargets::unregister);
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
+            if (compute != null) compute.close();
             throw exception;
         }
     }
@@ -3687,6 +3726,28 @@ public final class VeyraRenderer {
     public static void shadowInputFailed(Exception failure) {
         renderingEnabled = false;
         lastError = shortError(failure);
+    }
+
+    static void clearShadowCustomImages() {
+        if (terrainPipelineSet != null && terrainPipelineSet.compute() != null) {
+            Renderer.getInstance().endRenderPass();
+            terrainPipelineSet.compute().clearForShadowPass();
+        }
+    }
+
+    static void prepareShadowTerrainPipelines() throws IOException {
+        if (!terrainPipelineDirty) return;
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null) return;
+        TerrainPipelineSet prepared = compileTerrainPipelines(pack);
+        replaceTerrainPipelines(prepared);
+        terrainPipelineDirty = false;
+    }
+
+    static void dispatchShadowCompute() {
+        if (terrainPipelineSet != null && terrainPipelineSet.compute() != null) {
+            terrainPipelineSet.compute().dispatchAfterShadowPass();
+        }
     }
 
     public static void materialInputFailed(Exception failure) {
@@ -7133,7 +7194,8 @@ public final class VeyraRenderer {
     }
 
     private record TerrainPipelineSet(Map<String, GraphicsPipeline> pipelines,
-                                      Map<String, GraphicsPipeline> shadowPipelines) implements AutoCloseable {
+                                      Map<String, GraphicsPipeline> shadowPipelines,
+                                      VeyraComputePipelineSet compute) implements AutoCloseable {
         private boolean hasShadowPipelines() {
             return !shadowPipelines.isEmpty();
         }
@@ -7156,6 +7218,7 @@ public final class VeyraRenderer {
             pipelines.values().forEach(VeyraGeometryTargets::unregister);
             pipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
             shadowPipelines.values().forEach(GraphicsPipeline::scheduleCleanUp);
+            if (compute != null) compute.close();
         }
     }
 

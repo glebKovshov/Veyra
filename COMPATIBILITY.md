@@ -2,11 +2,19 @@
 
 ## Unpublished shadow terrain vertex and mid-block candidate
 
+### Current production integration
+
+Shared 3D-image descriptors now connect shadow terrain vertex/fragment writes, fixed-size post-shadow `shadowcomp` dispatch, and terrain sampling through ordinary shaderpack loading. The new `custom-image-compute` RTX 3070 fixture passed **222,642 active / 0 disabled** control pixels: a shadow atomic writes 5, compute adds 37, and terrain tests for 42. This run does not invoke the standalone development compute probe. No Vulkan validation/device-lost messages appeared in its log; validation layers were not independently established for that Windows run.
+
+The current local build passes **364 tests**, 89 example preprocessing checks, 105 direct SPIR-V compilations, and JAR verification. Supported compute is limited to fixed workgroups and 3D images in the shadowcomp family. Custom images outside terrain/shadow, shadow MRT, broader compute timing and full-pack GPU/lifecycle validation remain open. A new source audit is running; counts below describe earlier revisions and must not be treated as proof of current whole-pack support.
+
+### Earlier checkpoints
+
 The compute branch now executes pack vertex stages for terrain shadow variants, including matching fragment fallback and shadow matrix semantics. The extended terrain format supplies `at_midBlock` in 1/64-block units and the block's own emission. RTX 3070 fixtures verified terrain buffer inputs (223,167 active / 0 disabled control pixels) and custom shadow vertex output sampled by terrain (222,277 / 0). A culling-projection mixup discovered by the latter fixture was fixed; neither successful run logged Vulkan validation errors. These are synthetic checks, not complete third-party shaderpack validation.
 
 The full source audit accepts 864 geometry fragments and compiles all 18 active compute stages. New shadow preflight exposed BSL renderStage requirements; a focused rerun after native-shadow-layer specialization passed all 18 BSL cases without capability/adapter errors. Native stage values follow VulkanMod's actual compacted draw layers.
 
-A development GPU probe verified r16ui 3D-image clearing, nearest integer sampling, actual compute dispatch and readback of 64 texels. After packing the mid-block/emission input into one integer attribute, the combined shadow-stage fixture passed 223,237 active / 0 disabled control pixels. The vertex layout is 52 bytes with 12 attributes. This probe is included in the terrain-varying CI fixture. Shared shadow/scene image descriptors and shaderpack-frame dispatch remain unfinished and gated. Shadow MRT and entity shadow vertex execution are not provided by this candidate.
+A development GPU probe verified r16ui 3D-image clearing, nearest integer sampling, actual compute dispatch and readback of 64 texels. After packing the mid-block/emission input into one integer attribute, the combined shadow-stage fixture passed 223,237 active / 0 disabled control pixels. The vertex layout is 52 bytes with 12 attributes. This probe is included in the terrain-varying CI fixture. Shared shadow/scene image integration was completed in the subsequent checkpoint above. Shadow MRT and entity shadow vertex execution are not provided by this candidate.
 
 ## Weather, textured-default, and translucent-particle vertex support
 

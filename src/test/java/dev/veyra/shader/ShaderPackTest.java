@@ -16,6 +16,17 @@ class ShaderPackTest {
     @TempDir Path directory;
 
     @Test
+    void rejectsShadowMrtBeforeAllocationEvenWithoutVertexStage() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("shadow-mrt/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
+        Files.writeString(shaders.resolve("shadow.fsh"),
+                "/* DRAWBUFFERS:01 */\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.0); }\n");
+        ShaderPack pack = ShaderPack.inspect(shaders.getParent());
+        IOException error = assertThrows(IOException.class, pack::validatePipelineCapabilities);
+        assertTrue(error.getMessage().contains("Multiple shadow color attachments"), error.getMessage());
+    }
+
+    @Test
     void readsDirectoryProgramsInNumericOrder() throws IOException {
         Path shaders = Files.createDirectories(directory.resolve("pack/shaders"));
         for (String file : new String[]{"composite10.fsh", "composite2.fsh", "prepare.fsh", "deferred.fsh", "final.fsh"}) {

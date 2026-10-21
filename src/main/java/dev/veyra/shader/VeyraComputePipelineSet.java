@@ -3,6 +3,7 @@ package dev.veyra.shader;
 import dev.veyra.vulkan.VeyraComputeResources;
 import dev.veyra.vulkan.VeyraDeviceFeatures;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.shader.Pipeline;
 import org.lwjgl.vulkan.VkCommandBuffer;
 
 import java.io.IOException;
@@ -70,6 +71,17 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
     public void clearForShadowPass() {
         ensureOpen();
         resources.clearForShadowPass();
+    }
+
+    ShaderPackImageBindings.Plan bindGraphicsImages(Pipeline.Builder builder,
+                                                   ShaderPackImageBindings.PreparedStage... stages) throws IOException {
+        ensureOpen();
+        int firstBinding = builder.getUBOs().size() + builder.getImageDescriptors().size();
+        var plan = ShaderPackImageBindings.plan(firstBinding, stages);
+        for (var descriptor : resources.graphicsDescriptors(List.copyOf(plan.resources().values()))) {
+            builder.addImageDescriptor(descriptor);
+        }
+        return plan;
     }
 
     /** Dispatches after all shadow stages, matching Iris shadowcomp ordering, then exposes writes to graphics. */

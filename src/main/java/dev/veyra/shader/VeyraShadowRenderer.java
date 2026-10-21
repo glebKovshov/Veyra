@@ -246,6 +246,8 @@ public final class VeyraShadowRenderer {
             VeyraShadowRenderer.shadowModelView.set(shadowModelView);
             VeyraShadowRenderer.shadowProjection.set(shadowProjection);
             updateShadowMatrixUniformBuffers();
+            // Resources must exist and be cleared before the first shadow draw, including a lazy pack load.
+            VeyraRenderer.prepareShadowTerrainPipelines();
 
             Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
                     ? new DistanceLimitedFrustum(shadowModelView, shadowProjection, cameraPosition,
@@ -258,6 +260,7 @@ public final class VeyraShadowRenderer {
             ((CameraAccessor) (Object) camera).veyra$setRotation(shadowView.yaw(), shadowView.pitch());
             cameraRotationChanged = true;
             worldRenderer.setupRenderer(camera, shadowFrustum, false, spectator);
+            VeyraRenderer.clearShadowCustomImages();
             renderer.beginRenderPass(renderPass, framebuffer);
             shadowRenderPassStarted = true;
             VRenderSystem.setShaderTexture(3, null);
@@ -294,6 +297,7 @@ public final class VeyraShadowRenderer {
                 ((net.vulkanmod.render.engine.VkGpuTexture) target.getColorTexture()).getVulkanImage()
                         .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
+            VeyraRenderer.dispatchShadowCompute();
         } catch (Exception exception) {
             VeyraClient.LOGGER.error("Could not render the shader pack shadow map.", exception);
             VeyraRenderer.shadowInputFailed(exception);

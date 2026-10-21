@@ -14,6 +14,13 @@ public final class VeyraImageDescriptor extends ImageDescriptor {
                         : org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
         this.image = image;
         this.useSampler = !storageImage;
+        setLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_GENERAL);
+        isReadOnlyLayout = false;
+        if (useSampler) {
+            boolean integer = glslType.startsWith("usampler") || glslType.startsWith("isampler");
+            boolean linear = !integer && (!(image instanceof VeyraImage3D volume) || volume.supportsLinearFiltering());
+            image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, linear, 0));
+        }
     }
 
     @Override

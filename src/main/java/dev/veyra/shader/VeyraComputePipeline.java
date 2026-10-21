@@ -48,9 +48,13 @@ public final class VeyraComputePipeline extends Pipeline {
         for (ShaderPackUniformAdapter.UniformField field : shader.uniforms()) {
             uniformBuilder.addUniform(field.type(), field.name());
         }
-        UBO uniforms = uniformBuilder.buildUBO("VeyraComputeUniforms", 0, VK_SHADER_STAGE_COMPUTE_BIT);
-        uniforms.setUseGlobalBuffer(true);
-        this.buffers = List.of(uniforms);
+        if (shader.uniforms().isEmpty()) {
+            this.buffers = List.of();
+        } else {
+            UBO uniforms = uniformBuilder.buildUBO("VeyraComputeUniforms", 0, VK_SHADER_STAGE_COMPUTE_BIT);
+            uniforms.setUseGlobalBuffer(true);
+            this.buffers = List.of(uniforms);
+        }
         this.imageDescriptors = new ArrayList<>(descriptors);
         this.pushConstants = null;
 
@@ -96,9 +100,6 @@ public final class VeyraComputePipeline extends Pipeline {
 
     public static VeyraComputePipeline create(String name, ComputeShaderAdapter.AdaptedStage shader,
                                               List<? extends ImageDescriptor> descriptors) throws IOException {
-        if (shader.uniforms().isEmpty()) {
-            throw new IOException("Compute program " + name + " has no supported uniforms.");
-        }
         for (ImageDescriptor descriptor : descriptors) {
             descriptor.setLayout(VK_IMAGE_LAYOUT_GENERAL);
             // Shader-pack images remain in GENERAL so the same image can be read and written

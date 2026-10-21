@@ -23,10 +23,16 @@ public class ShaderCompileSmoke {
                         Path file = path.getParent().resolve(included);
                         return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                     });
-                    source = GlslPreprocessor.process(name, source);
                     String programName = name.substring(0, name.length() - 4);
                     Path vertexPath = path.getParent().resolve(programName + ".vsh");
                     Path properties = path.getParent().resolve("shaders.properties");
+                    var imageProperties = ShaderPackImageProperties.parse(Files.exists(properties) ? Files.readString(properties) : "");
+                    source = GlslPreprocessor.process(name, source, imageProperties.images().isEmpty()
+                            ? Map.of() : Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+                    var customImages = imageProperties.images().isEmpty()
+                            ? new ShaderPackImageBindings.PreparedStage(source, List.of())
+                            : ShaderPackImageBindings.prepare(name, source, imageProperties);
+                    source = customImages.source();
                     CustomUniforms.activate(Files.exists(properties)
                             ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                     Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings = Map.of();
@@ -68,6 +74,7 @@ public class ShaderCompileSmoke {
                                     name.substring(0, name.length()-4)), false, packVaryings)
                             : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
                                     packVaryings);
+                    adapted = ShaderPackImageBindings.plan(20, customImages).decorate(adapted, customImages);
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);
                     try {
@@ -823,6 +830,15 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_terrain");
             compileVertex(compiler, options, terrainCustomVertex, "terrain-custom-vertex-main", true);
+            Path imageFixture = Path.of("examples/custom-image-compute/shaders");
+            var imageFixtureProperties = ShaderPackImageProperties.parse(Files.readString(imageFixture.resolve("shaders.properties")));
+            var imageShadowVertex = ShaderPackImageBindings.prepare("shadow.vsh",
+                    Files.readString(imageFixture.resolve("shadow.vsh")), imageFixtureProperties);
+            String adaptedImageShadow = TerrainVertexShaderAdapter.adapt(terrainVertex, imageShadowVertex.source(), "shadow_solid");
+            compileVertex(compiler, options, ShaderPackImageBindings.plan(20, imageShadowVertex).decorate(adaptedImageShadow, imageShadowVertex),
+                    "shadow-custom-image-write", true);
+            compileCompute(ComputeShaderAdapter.adapt("shadowcomp.csh", Files.readString(imageFixture.resolve("shadowcomp.csh")),
+                    imageFixtureProperties).source(), "shadow-custom-image-compute");
             compileVertex(compiler, options, TerrainVertexShaderAdapter.adapt(terrainVertex, """
                     #version 120
                     attribute vec4 at_midBlock;

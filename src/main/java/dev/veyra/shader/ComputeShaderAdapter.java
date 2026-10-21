@@ -140,9 +140,6 @@ public final class ComputeShaderAdapter {
         addLegacyFogField(uniformFields, fogSource, "FogColor", "vec4", fileName);
         addLegacyFogField(uniformFields, fogSource, "FogEnvironmentalStart", "float", fileName);
         addLegacyFogField(uniformFields, fogSource, "FogEnvironmentalEnd", "float", fileName);
-        if (uniformFields.isEmpty()) {
-            throw new IOException(fileName + " declares no supported Iris compute uniforms.");
-        }
         Matcher localSizeMatcher = LOCAL_SIZE.matcher(ShaderSource.maskBlockAndLineComments(uniformStage.source()));
         if (!localSizeMatcher.find()) {
             throw new IOException(fileName + " must declare fixed local_size_x, local_size_y, and local_size_z values.");
@@ -168,14 +165,24 @@ public final class ComputeShaderAdapter {
             };
         }
 
-        StringBuilder block = new StringBuilder("layout(std140, set = 0, binding = 0) uniform VeyraComputeUniforms {\n");
-        for (ShaderPackUniformAdapter.UniformField field : uniformFields.values()) {
-            block.append("    ").append(field.type()).append(' ').append(field.name()).append(";\n");
+        StringBuilder block = new StringBuilder();
+        if (!uniformFields.isEmpty()) {
+            block.append("layout(std140, set = 0, binding = 0) uniform VeyraComputeUniforms {\n");
+            for (ShaderPackUniformAdapter.UniformField field : uniformFields.values()) {
+                block.append("    ").append(field.type()).append(' ').append(field.name()).append(";\n");
+            }
+            block.append("};\n");
         }
-        block.append("};\n");
         String body = VERSION.matcher(uniformStage.source()).replaceAll("");
         body = EXTENSION.matcher(body).replaceAll("");
         body = PRECISION.matcher(body).replaceAll("");
+        if (uniformFields.isEmpty()) {
+            // VulkanMod indexes layout bindings into a buffer sized by descriptor count: no unused UBO slot.
+            body = Pattern.compile("layout\\(set = 0, binding = (\\d+)").matcher(body)
+                    .replaceAll(match -> "layout(set = 0, binding = " + (Integer.parseInt(match.group(1)) - 1));
+            resources.replaceAll(resource -> new OpaqueResource(resource.name(), resource.glslType(), resource.qualifier(),
+                    resource.imageName(), resource.storageImage(), resource.format(), resource.binding() - 1));
+        }
         String adapted = "#version 450\n" + block + fogStage.bridge() + uniformStage.macros() + body;
         return new AdaptedStage(adapted, List.copyOf(uniformFields.values()), List.copyOf(resources),
                 localSize[0], localSize[1], localSize[2], workGroups[0], workGroups[1], workGroups[2]);

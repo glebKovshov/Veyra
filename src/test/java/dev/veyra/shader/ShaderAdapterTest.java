@@ -29,8 +29,14 @@ class ShaderAdapterTest {
                     Path file = path.getParent().resolve(included);
                     return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                 });
-                source = GlslPreprocessor.process(name, source);
                 Path properties = path.getParent().resolve("shaders.properties");
+                var imageProperties = ShaderPackImageProperties.parse(Files.exists(properties) ? Files.readString(properties) : "");
+                source = GlslPreprocessor.process(name, source, imageProperties.images().isEmpty()
+                        ? Map.of() : Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+                var customImages = imageProperties.images().isEmpty()
+                        ? new ShaderPackImageBindings.PreparedStage(source, List.of())
+                        : ShaderPackImageBindings.prepare(name, source, imageProperties);
+                source = customImages.source();
                 CustomUniforms.activate(Files.exists(properties)
                         ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                 String adapted;
@@ -70,6 +76,7 @@ class ShaderAdapterTest {
                 } finally {
                     CustomUniforms.activate(CustomUniforms.EMPTY);
                 }
+                adapted = ShaderPackImageBindings.plan(20, customImages).decorate(adapted, customImages);
                 assertTrue(adapted.startsWith("#version 460\n"));
                 assertTrue(adapted.contains("void main("));
                 assertFalse(adapted.contains("#version 120"));
