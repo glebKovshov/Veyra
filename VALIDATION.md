@@ -1,5 +1,15 @@
 # Veyra 0.2 validation status
 
+## Beta.29 candidate — feature CI passed; release pending
+
+Feature PR [#77](https://github.com/glebKovshov/Veyra/pull/77) merged into `main` at `e4f96f8`. Build [39551772481](https://github.com/glebKovshov/Veyra/actions/runs/39551772481), pinned source audit [39551772538](https://github.com/glebKovshov/Veyra/actions/runs/39551772538), and Graphics smoke [39551772493](https://github.com/glebKovshov/Veyra/actions/runs/39551772493) passed; Graphics smoke passed **34/34** Lavapipe fixtures.
+
+Local JDK 21 `test build validateShaders compileGraphicsSmokeJava packageExamplePacks --no-daemon` passed **330 tests**, preprocessed 85 shader examples, and compiled 98 stages directly to Vulkan SPIR-V. On an NVIDIA RTX 3070, the sky-stage fixture measured **14,249 active SUN pixels / 10,517 active MOON pixels / 0 after disabling Veyra**. These are synthetic path checks, not third-party shaderpack visual validation.
+
+The pinned source audit covers 4 SHA-512-pinned archives / 12 defaults / 63 declared-profile-dimension cases / 5,178 stages; it accepts **781 geometry fragment programs and rejects 8**. All 75 audit rows retain `visualValidation=false`. First remaining blockers include the unavailable Minecraft lightmap sampler for `gbuffers_textured` (72 records), Sildur's unsupported `normal` output type (3), and Sildur `shadowData` in Nether/End (8 fragment rejections). No complete third-party shaderpack has been visually validated. The beta.25 CloudRenderer Mixin crash was fixed in beta.26 and is present in beta.28 and this candidate.
+
+On release-prep branch `release-prep/beta29`, the versioned JDK 21 command `test build validateShaders compileGraphicsSmokeJava packageExamplePacks --no-daemon` passed. The 749,499-byte Windows beta.29 install JAR has SHA-256 `9c7132519c99ec96225cebee16f4d5f63b55ebf789c79d94ccd45f7234b15c11` and passes `scripts/verify_jar.py` for Minecraft 1.21.11 / VulkanMod 0.6.8 / beta.29. PR checks, release tag, and official release assets are still pending; this local candidate is not a published release asset.
+
 ## Beta.28 experimental prerelease - published and verified
 
 Release-prep PR [#75](https://github.com/glebKovshov/Veyra/pull/75) merged at `57f36f0868e4fd76332be6b3be53950f3cde3544`; tag `v0.2.0-beta.28+mc1.21.11` points to that commit. Release workflow [39543950206](https://github.com/glebKovshov/Veyra/actions/runs/39543950206) passed the pinned source audit, **30/30** Lavapipe graphics fixtures, versioned build and tests, distributable verifier, and publication.

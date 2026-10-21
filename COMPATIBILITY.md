@@ -1,4 +1,14 @@
-# Shaderpack compatibility: Veyra 0.2.0-beta.28 experimental prerelease
+# Shaderpack compatibility: Veyra 0.2.0-beta.29 experimental prerelease
+
+## Beta.29 lightning, textured sky, and world-border vertex stages
+
+Beta.29 executes supported custom vertex stages for Iris `gbuffers_lightning`, both native `gbuffers_skytextured` formats, and the `gbuffers_textured` world-border path. Vertex and fragment varyings are type-checked before pipeline creation. Core `textureSize()` is retained for supported 2D samplers. When a sky-textured fragment uses Iris `renderStage`, the celestial pipeline gets separate SUN, MOON, and VOID variants and the End sky/flash draws get VOID.
+
+The pinned audit now covers 4 archives, 12 defaults, 63 declared-profile/dimension cases, and 5,178 stages. It accepts **781 geometry fragment programs and rejects 8**. The first remaining capability errors are `gbuffers_textured` requesting Minecraft's unavailable lightmap sampler (72 records) and Sildur's `gbuffers_textured.vsh` declaring `normal` with an unsupported type (3 records). The 8 fragment adapter rejections are four Sildur `shadowData` programs in each of Nether and End. All 75 records retain `visualValidation=false`; no complete third-party shaderpack has been visually validated.
+
+Feature PR [#77](https://github.com/glebKovshov/Veyra/pull/77) merged into `main` at `e4f96f8`. Build [39551772481](https://github.com/glebKovshov/Veyra/actions/runs/39551772481), pinned source audit [39551772538](https://github.com/glebKovshov/Veyra/actions/runs/39551772538), and Graphics smoke [39551772493](https://github.com/glebKovshov/Veyra/actions/runs/39551772493) passed; all **34/34** Lavapipe fixtures passed, including Vulkan validation for the sky-textured stage variants. Local JDK 21 checks passed **330 tests**, 85 example shader preprocessing cases, and 98 direct Vulkan SPIR-V stages. On an NVIDIA RTX 3070 the synthetic sky-stage fixture measured **14,249 active SUN pixels / 10,517 active MOON pixels / 0 disabled**. These synthetic fixtures validate named pipeline paths; they do not certify full-pack visuals. The beta.25 CloudRenderer Mixin crash fix remains present from beta.26 onward.
+
+The stable Iris-compatibility goal remains incomplete. See [WORK_SUMMARY.md](WORK_SUMMARY.md) for the release record and current progress.
 
 ## Beta.28 per-program uniform and render-stage batch
 
