@@ -261,4 +261,16 @@ class CustomUniformsTest {
                 "uniform float shadowFade;\nvoid main(){}\n", "gbuffers_entities");
         assertTrue(irisDefault.fields().contains(new ShaderPackUniformAdapter.UniformField("float", "shadowFade")));
     }
+
+    @Test
+    void shaderPackUniformAdapterIgnoresUniformDeclarationsInsideComments() throws IOException {
+        String source = "/*\nuniform sampler2D shadowtex0;\n*/\nvoid main() {}\n";
+
+        ShaderPackUniformAdapter.AdaptedShader adapted =
+                ShaderPackUniformAdapter.extract(source, "gbuffers_textured");
+
+        assertEquals(source, adapted.source());
+        assertTrue(adapted.declarations().isEmpty());
+        assertTrue(adapted.fields().isEmpty());
+    }
 }

@@ -405,30 +405,52 @@ class BasicVertexShaderAdapterTest {
         assertTrue(fragment.contains("layout(location = 3) flat in vec2 lmCoord;"), fragment);
         assertTrue(fragment.contains("layout(location = 7) in vec2 texCoord0;"), fragment);
 
-        IOException missingNormal = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
+        BasicVertexShaderAdapter.AdaptedStage defaultNormal = BasicVertexShaderAdapter.validate(
                 "gbuffers_weather", """
                         #version 130
                         void main() {
                             gl_Position = ftransform() + vec4(gl_Normal, 0.0);
                         }
+                        """, BasicVertexShaderAdapter.Format.WEATHER);
+        assertTrue(defaultNormal.source().contains("#define gl_Normal vec3(0.0, 0.0, 1.0)"));
+
+        IOException missingNormal = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
+                "gbuffers_weather", """
+                        attribute vec3 Normal;
+                        void main() { gl_Position = ftransform() + vec4(Normal, 0.0); }
                         """, BasicVertexShaderAdapter.Format.WEATHER));
-        assertTrue(missingNormal.getMessage().contains("gl_Normal"));
+        assertTrue(missingNormal.getMessage().contains("Normal"));
     }
 
     @Test
-    void rejectsActiveMissingTexturedAttributesButAllowsUnusedDeclarations() throws IOException {
+    void usesOpenGlGenericDefaultsForIrisAttributesAbsentFromWorldBorderFormat() throws IOException {
         String source = """
                 #version 120
                 attribute vec4 mc_Entity;
-                void main() { gl_Position = ftransform(); }
+                attribute vec4 mc_midTexCoord;
+                varying vec4 attributeDefaults;
+                void main() {
+                    gl_Position = ftransform();
+                    attributeDefaults = mc_Entity + mc_midTexCoord;
+                }
                 """;
-        BasicVertexShaderAdapter.adaptStage(NATIVE_TEXTURED_VERTEX, source,
+        BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(NATIVE_TEXTURED_VERTEX, source,
                 "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED);
+
+        assertTrue(adapted.source().contains("#define mc_Entity vec4(0.0, 0.0, 0.0, 1.0)"));
+        assertTrue(adapted.source().contains("#define mc_midTexCoord vec4(0.0, 0.0, 0.0, 1.0)"));
+        assertFalse(adapted.source().contains("attribute vec4 mc_Entity"));
+        assertFalse(adapted.source().contains("attribute vec4 mc_midTexCoord"));
+        assertTrue(adapted.varyings().containsKey("attributeDefaults"));
+
         IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
-                NATIVE_TEXTURED_VERTEX, source.replace("gl_Position = ftransform();",
-                        "gl_Position = ftransform() + vec4(mc_Entity.xyz, 0.0);"),
+                NATIVE_TEXTURED_VERTEX, source.replace("attribute vec4 mc_Entity;", "attribute vec3 mc_Entity;"),
                 "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED));
-        assertTrue(error.getMessage().contains("mc_Entity"));
+        assertTrue(error.getMessage().contains("must be declared as vec4"));
+
+        IOException unavailableOnColorFormat = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
+                "gbuffers_textured", source, BasicVertexShaderAdapter.Format.TEXTURED_COLOR));
+        assertTrue(unavailableOnColorFormat.getMessage().contains("mc_Entity"));
     }
 
     @Test

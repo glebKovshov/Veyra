@@ -39,6 +39,22 @@ class TextureColorDistanceShaderAdapterTest {
     }
 
     @Test
+    void ignoresSamplerDeclarationsInsideComments() throws IOException {
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
+                /*
+                #if defined Shadows && defined PCSS
+                uniform sampler2D shadowtex0;
+                #endif
+                */
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(texture, texcoord); }
+                """, "gbuffers_armor_glint", false);
+
+        assertFalse(adapted.contains("shadowtex0"), adapted);
+    }
+
+    @Test
     void mapsIrisTextureAtlasAliasToMinecraftGlintSampler() throws IOException {
         String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
                 uniform sampler2D tex;

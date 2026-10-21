@@ -160,8 +160,9 @@ public final class TextureColorDistanceShaderAdapter {
         }
         adapted = PRECISION_DECLARATION.matcher(extensionMatcher.replaceAll("")).replaceAll("");
 
-        Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
-        StringBuffer withoutSamplers = new StringBuffer();
+        Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted));
+        StringBuilder withoutSamplers = new StringBuilder(adapted.length());
+        int samplerCursor = 0;
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("gtexture")
@@ -171,14 +172,15 @@ public final class TextureColorDistanceShaderAdapter {
             if (!samplerMatcher.group(1).equals("sampler2D")) {
                 throw new IOException(programName + " sampler '" + sampler + "' must use sampler2D.");
             }
-            samplerMatcher.appendReplacement(withoutSamplers, "");
+            withoutSamplers.append(adapted, samplerCursor, samplerMatcher.start());
+            samplerCursor = samplerMatcher.end();
         }
-        samplerMatcher.appendTail(withoutSamplers);
+        withoutSamplers.append(adapted, samplerCursor, adapted.length());
         adapted = withoutSamplers.toString();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, programName);
         adapted = shaderPackUniforms.source();
-        if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
+        if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted)).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");
         }
 

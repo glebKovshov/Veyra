@@ -1040,6 +1040,14 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     // The world-border Position/Tex format and linked fragment inputs were checked above.
                 } else if (program.equals(WEATHER_PROGRAMS.getFirst())) {
                     // The particle format and the weather/fallback fragment interface were checked above.
+                } else if (particlePrograms.contains(program)) {
+                    String vertexSource = readStage(file).orElseThrow(
+                            () -> new IOException("The pack no longer contains " + file + "."));
+                    String fragment = readParticleFragment(program).orElseThrow(
+                            () -> new IOException("The pack no longer contains " + program + ".fsh."));
+                    validateTextureVertexProgram(program, program, fragment, vertexSource,
+                            BasicVertexShaderAdapter.Format.WEATHER, null);
+                    readGeometryBlendSettings(program);
                 } else if (isEntityVertexProgram(program)) {
                     String vertexSource = readStage(file).orElseThrow(
                             () -> new IOException("The pack no longer contains " + file + "."));
