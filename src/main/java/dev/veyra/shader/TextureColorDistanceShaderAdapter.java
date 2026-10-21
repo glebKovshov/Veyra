@@ -75,7 +75,8 @@ public final class TextureColorDistanceShaderAdapter {
                                 String vertexColorInterpolation, String texCoordInterpolation,
                                 boolean explicitVertexLocations) throws IOException {
         return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
-                vertexColorInterpolation, texCoordInterpolation, explicitVertexLocations, null, false, false);
+                vertexColorInterpolation, texCoordInterpolation, explicitVertexLocations, null,
+                false, false, null);
     }
 
     static String adaptFragment(String source, String programName,
@@ -87,7 +88,15 @@ public final class TextureColorDistanceShaderAdapter {
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
                                 boolean shadowPassAvailable, boolean lightmapSamplerAvailable) throws IOException {
         return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
-                Map.copyOf(vertexOutputs), shadowPassAvailable, lightmapSamplerAvailable);
+                Map.copyOf(vertexOutputs), shadowPassAvailable, lightmapSamplerAvailable, null);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
+                                int renderStage) throws IOException {
+        return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
+                Map.copyOf(vertexOutputs), shadowPassAvailable, lightmapSamplerAvailable, renderStage);
     }
 
     private static String adaptFragment(String source, String programName,
@@ -95,7 +104,8 @@ public final class TextureColorDistanceShaderAdapter {
                                         String vertexColorInterpolation, String texCoordInterpolation,
                                         boolean explicitVertexLocations,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
-                                        boolean shadowPassAvailable, boolean lightmapSamplerAvailable)
+                                        boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
+                                        Integer renderStage)
             throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
@@ -111,6 +121,7 @@ public final class TextureColorDistanceShaderAdapter {
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(adapted, programName);
         adapted = fog.source();
         adapted = UnusedUniformDeclarations.removeUnused(adapted);
+        adapted = IrisRenderStages.bindUniform(adapted, renderStage, programName);
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         SamplerBridge samplers = adaptSamplers(adapted, programName, vertexOutputs != null,
                 shadowPassAvailable, lightmapSamplerAvailable);

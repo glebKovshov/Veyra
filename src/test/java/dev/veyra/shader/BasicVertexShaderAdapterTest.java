@@ -169,6 +169,27 @@ class BasicVertexShaderAdapterTest {
     }
 
     @Test
+    void bindsRenderStageSeparatelyForEachSkyVertexPipeline() throws IOException {
+        String vertex = """
+                #version 120
+                uniform int renderStage;
+                void main() {
+                    gl_Position = ftransform() + vec4(float(renderStage));
+                }
+                """;
+
+        for (var format : new BasicVertexShaderAdapter.Format[] {
+                BasicVertexShaderAdapter.Format.SKY,
+                BasicVertexShaderAdapter.Format.STARS,
+                BasicVertexShaderAdapter.Format.SUNRISE_SUNSET }) {
+            int expected = IrisRenderStages.forSkyFormat(format);
+            String adapted = BasicVertexShaderAdapter.validate("gbuffers_skybasic", vertex, format).source();
+            assertTrue(adapted.contains("const int renderStage = " + expected + ";"), adapted);
+            assertFalse(adapted.contains("uniform int renderStage"), adapted);
+        }
+    }
+
+    @Test
     void rejectsSkyVertexInputsMissingFromTheNativeFormats() {
         IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
                 "gbuffers_skybasic", """

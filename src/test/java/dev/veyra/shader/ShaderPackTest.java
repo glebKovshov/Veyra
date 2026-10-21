@@ -55,6 +55,19 @@ class ShaderPackTest {
     }
 
     @Test
+    void ignoresOptifineOnlyEntitiesGlowingProgramLikeIris() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("glowing/shaders"));
+        Files.writeString(shaders.resolve("gbuffers_entities.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
+        Files.writeString(shaders.resolve("gbuffers_entities_glowing.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
+        Files.writeString(shaders.resolve("gbuffers_entities_glowing.vsh"), ""
+                + "uniform int entityId;\nvoid main() { gl_Position = vec4(float(entityId)); }\n");
+
+        ShaderPack pack = ShaderPack.inspect(shaders.getParent());
+        assertTrue(pack.supportsShaderPrograms());
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+    }
+
+    @Test
     void readsEyeBrightnessHalfLifeFromAnyGlslFileAndUsesIrisDefault() throws IOException {
         Path shaderRoot = Files.createDirectories(directory.resolve("smooth/shaders"));
         Path shaders = Files.createDirectories(shaderRoot.resolve("lib"));

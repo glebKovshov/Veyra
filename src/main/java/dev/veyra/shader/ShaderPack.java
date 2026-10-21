@@ -41,6 +41,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water");
     private static final List<String> ENTITY_PROGRAMS = List.of(
             "gbuffers_entities", "gbuffers_entities_translucent", "gbuffers_spidereyes");
+    // Iris intentionally ignores this legacy OptiFine program and its stages.
+    private static final Set<String> IGNORED_IRIS_PROGRAMS = Set.of("gbuffers_entities_glowing");
     private static final List<String> PARTICLE_PROGRAMS = List.of(
             "gbuffers_particles", "gbuffers_particles_translucent");
     private static final List<String> WEATHER_PROGRAMS = List.of("gbuffers_weather");
@@ -998,6 +1000,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String extension = file.substring(dot + 1);
             // Iris allows suffixed compute stages belonging to one parent program.
             String parent = extension.equals("csh") ? program.replaceFirst("_[a-z]+$", "") : program;
+            if (IGNORED_IRIS_PROGRAMS.contains(parent)) continue;
             if (!isProgramEnabled(parent)) continue;
             if (extension.equals("vsh") && program.startsWith("gbuffers_")
                     && !program.equals("gbuffers_clouds")
@@ -1125,7 +1128,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = BasicVertexShaderAdapter
                     .validate(SKY_BASIC_PROGRAM, vertex.get(), format).varyings();
             TextureColorDistanceShaderAdapter.adaptFragment(fragment, fragmentProgram, outputs,
-                    hasShadowFragment(), false);
+                    hasShadowFragment(), false, IrisRenderStages.forSkyFormat(format));
         }
     }
 

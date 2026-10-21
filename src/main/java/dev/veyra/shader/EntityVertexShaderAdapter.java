@@ -45,6 +45,10 @@ final class EntityVertexShaderAdapter {
     private static final Pattern LEGACY_INPUT = Pattern.compile(
             "\\b(gl_MultiTexCoord[3-7]|gl_VertexID|gl_InstanceID|gl_ClipVertex|gl_FrontColor|gl_BackColor|"
                     + "mc_Entity|at_tangent|mc_midTexCoord|at_midBlock|mc_midBlock)\\b");
+    private static final Pattern MC_ENTITY_ATTRIBUTE_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
+                    + "(?:attribute|in)\\s+vec4\\s+mc_Entity\\s*;"
+                    + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern SAMPLER = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(sampler\\w+)\\s+"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
@@ -78,7 +82,15 @@ final class EntityVertexShaderAdapter {
 
     static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
                                    boolean handPass) throws IOException {
-        PreparedStage pack = prepare(shaderPackSource, programName);
+        return adaptStage(minecraftSource, shaderPackSource, programName, handPass,
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED);
+    }
+
+    static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
+                                   boolean handPass, int entityId, int blockEntityId,
+                                   int currentRenderedItemId) throws IOException {
+        PreparedStage pack = prepare(shaderPackSource, programName,
+                entityId, blockEntityId, currentRenderedItemId);
         if (minecraftSource == null || minecraftSource.isBlank()) {
             throw new IOException("Minecraft's " + programName + " vertex shader is empty.");
         }
@@ -103,7 +115,8 @@ final class EntityVertexShaderAdapter {
 
     static AdaptedStage validate(String programName, String shaderPackSource, boolean handPass) throws IOException {
         String base = validationNativeSource(programName);
-        PreparedStage prepared = prepare(shaderPackSource, programName);
+        PreparedStage prepared = prepare(shaderPackSource, programName,
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED);
         String adapted = base + "\n" + prepared.outputDeclarations()
                 + nativeBridge(programName)
                 + prepared.uniformBridge() + prepared.source().replaceFirst(
@@ -114,10 +127,13 @@ final class EntityVertexShaderAdapter {
 
     static Map<String, TerrainVertexShaderAdapter.PackVarying> describeVaryings(
             String programName, String shaderPackSource) throws IOException {
-        return prepare(shaderPackSource, programName).varyings();
+        return prepare(shaderPackSource, programName,
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED).varyings();
     }
 
-    private static PreparedStage prepare(String shaderPackSource, String programName) throws IOException {
+    private static PreparedStage prepare(String shaderPackSource, String programName,
+                                         int entityId, int blockEntityId,
+                                         int currentRenderedItemId) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
@@ -140,6 +156,7 @@ final class EntityVertexShaderAdapter {
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "textureGrad(")
                 .replaceAll("\\btexture2DProj\\s*\\(", "textureProj(")
                 .replaceAll("\\btexture2D\\s*\\(", "texture(");
+        source = removeUnusedMcEntityDeclaration(source, programName);
         Matcher textureMatrix = TEXTURE_MATRIX.matcher(ShaderSource.maskBlockAndLineComments(source));
         while (textureMatrix.find()) {
             if (!Set.of("0", "1").contains(textureMatrix.group(1))) {
@@ -168,6 +185,8 @@ final class EntityVertexShaderAdapter {
         source = UnusedSamplerDeclarations.removeUnused(source);
         SamplerBridge samplers = adaptSamplers(source, programName);
         source = samplers.source();
+        source = EntityShaderAdapter.bindEntityIdentifiers(source, programName,
+                entityId, blockEntityId, currentRenderedItemId);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(source, programName, true);
         ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(fog.source(), programName);
         source = uniforms.source();
@@ -180,6 +199,34 @@ final class EntityVertexShaderAdapter {
         String uniformBridge = fog.bridge() + uniforms.declarations() + uniforms.macros() + samplers.bridge();
         return new PreparedStage(source, List.copyOf(extensions), uniformBridge,
                 outputs.declarationsAndMacros(), outputs.varyings(), samplers.usesNoiseSampler());
+    }
+
+    private static String removeUnusedMcEntityDeclaration(String source, String programName) throws IOException {
+        String uncommented = ShaderSource.maskBlockAndLineComments(source);
+        Matcher declaration = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(uncommented);
+        List<int[]> declarations = new ArrayList<>();
+        StringBuilder withoutDeclarations = new StringBuilder(uncommented);
+        while (declaration.find()) {
+            declarations.add(new int[] {declaration.start(), declaration.end()});
+            for (int i = declaration.start(); i < declaration.end(); i++) {
+                if (withoutDeclarations.charAt(i) != '\n' && withoutDeclarations.charAt(i) != '\r') {
+                    withoutDeclarations.setCharAt(i, ' ');
+                }
+            }
+        }
+        if (declarations.isEmpty()) return source;
+        if (Pattern.compile("\\bmc_Entity\\b").matcher(withoutDeclarations).find()) {
+            throw new IOException(programName + ".vsh uses legacy interface 'mc_Entity', which is not provided by Minecraft's "
+                    + vertexFormatName(programName) + " vertex format.");
+        }
+        StringBuilder clean = new StringBuilder(source.length());
+        int cursor = 0;
+        for (int[] span : declarations) {
+            clean.append(source, cursor, span[0]);
+            cursor = span[1];
+        }
+        clean.append(source, cursor, source.length());
+        return clean.toString();
     }
 
     private static SamplerBridge adaptSamplers(String source, String programName) throws IOException {

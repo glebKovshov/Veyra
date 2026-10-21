@@ -1,0 +1,60 @@
+package dev.veyra.shader;
+
+import java.io.IOException;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class IrisRenderStagesTest {
+    @Test
+    void exposesIrisRenderStageMacrosWithIrisOrdinals() throws IOException {
+        var macros = IrisRenderStages.macros();
+        assertEquals(24, macros.size());
+        assertEquals("0", macros.get("MC_RENDER_STAGE_NONE"));
+        assertEquals("1", macros.get("MC_RENDER_STAGE_SKY"));
+        assertEquals("2", macros.get("MC_RENDER_STAGE_SUNSET"));
+        assertEquals("5", macros.get("MC_RENDER_STAGE_MOON"));
+        assertEquals("6", macros.get("MC_RENDER_STAGE_STARS"));
+        assertEquals("23", macros.get("MC_RENDER_STAGE_HAND_TRANSLUCENT"));
+
+        String processed = GlslPreprocessor.process("render-stage.glsl", """
+                #if MC_RENDER_STAGE_MOON == 5 && MC_RENDER_STAGE_STARS == 6
+                const int irisStagesAvailable = 1;
+                #else
+                #error Iris render-stage macros have incorrect values
+                #endif
+                """);
+        assertTrue(processed.contains("irisStagesAvailable"));
+    }
+
+    @Test
+    void mapsTheThreeSkyFormatsAndPipelinesToIrisStages() {
+        assertEquals(1, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.SKY));
+        assertEquals(6, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.STARS));
+        assertEquals(2, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.SUNRISE_SUNSET));
+        assertEquals(1, IrisRenderStages.forSkyPipeline("pipeline/sky"));
+        assertEquals(6, IrisRenderStages.forSkyPipeline("pipeline/stars"));
+        assertEquals(2, IrisRenderStages.forSkyPipeline("pipeline/sunrise_sunset"));
+        assertNull(IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.LINE));
+        assertNull(IrisRenderStages.forSkyPipeline("pipeline/other"));
+    }
+
+    @Test
+    void bindsOnlyAnIntegerRenderStageUniform() throws IOException {
+        String source = "uniform int renderStage;\nvoid main() { int stage = renderStage; }\n";
+        String bound = IrisRenderStages.bindUniform(source, 6, "gbuffers_skybasic");
+        assertTrue(bound.contains("const int renderStage = 6;"));
+        assertFalse(bound.contains("uniform int renderStage"));
+        assertEquals(source, IrisRenderStages.bindUniform(source, null, "gbuffers_line"));
+
+        IOException wrongType = assertThrows(IOException.class, () -> IrisRenderStages.bindUniform(
+                "uniform float renderStage;\nvoid main() { float stage = renderStage; }\n",
+                1, "gbuffers_skybasic"));
+        assertTrue(wrongType.getMessage().contains("must have type int"));
+    }
+}
