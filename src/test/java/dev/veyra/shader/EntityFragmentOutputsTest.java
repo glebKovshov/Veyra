@@ -7,6 +7,52 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class EntityFragmentOutputsTest {
     @Test
+    void masksBackslashAsciiArtCommentsBeforeVulkanModParsing() {
+        String source = "/* shader banner \\\\ / \\\\ */\nvoid main() { gl_FragColor = vec4(1.0); }\n";
+
+        String masked = ShaderSource.maskBlockAndLineComments(source);
+
+        assertEquals(source.length(), masked.length());
+        assertFalse(masked.contains("\\"), masked);
+        assertTrue(masked.contains("void main() { gl_FragColor = vec4(1.0); }"), masked);
+    }
+
+    @Test
+    void bindsShadowEntityPositionToTheFragmentBridge() throws IOException {
+        String source = "in vec4 position;\n"
+                + "void main() { gl_FragColor = vec4(position.xyz, 1.0); }\n";
+
+        String adapted = EntityShaderAdapter.adaptFragment(source, "shadow_entities");
+
+        assertTrue(EntityShaderAdapter.requiresPositionInput(source, "shadow_entities"));
+        assertTrue(adapted.contains("in vec4 position;"), adapted);
+        assertEquals(1, occurrences(adapted, "in vec4 position;"));
+    }
+
+    @Test
+    void bindsIrisRenderStageInEntityFragmentPrograms() throws IOException {
+        String source = "uniform int renderStage;\n"
+                + "void main() { gl_FragColor = vec4(float(renderStage)); }\n";
+
+        String adapted = EntityShaderAdapter.adaptFragment(source, "gbuffers_block_translucent");
+
+        assertTrue(adapted.contains("const int renderStage = 12;"), adapted);
+        assertFalse(adapted.contains("uniform int renderStage"), adapted);
+    }
+
+    @Test
+    void removesUnusedShadowMatricesFromTheEntityFragmentBridge() throws IOException {
+        String source = "uniform mat4 shadowModelViewInverse;\n"
+                + "uniform mat4 shadowProjectionInverse;\n"
+                + "void main() { gl_FragColor = vec4(1.0); }\n";
+
+        String adapted = EntityShaderAdapter.adaptFragment(source, "shadow_entities");
+
+        assertFalse(adapted.contains("uniform mat4 shadowModelViewInverse"), adapted);
+        assertFalse(adapted.contains("uniform mat4 shadowProjectionInverse"), adapted);
+    }
+
+    @Test
     void preservesExplicitEntityOutputsAcrossMultipleColorTargets() throws IOException {
         String source = """
                 #version 120

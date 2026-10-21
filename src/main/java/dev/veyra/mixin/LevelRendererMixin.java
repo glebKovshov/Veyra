@@ -26,6 +26,7 @@ public abstract class LevelRendererMixin {
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
         VeyraRenderer.captureFrameMatrices(modelView, projection, camera.position());
+        VeyraRenderer.captureFogColor(fogColor);
     }
 
     @Inject(method = "renderLevel", at = @At(value = "INVOKE", target =

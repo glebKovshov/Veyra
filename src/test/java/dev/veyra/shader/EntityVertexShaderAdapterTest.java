@@ -79,6 +79,40 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void bindsIrisRenderStageInCustomEntityVertexStages() throws Exception {
+        String pack = "uniform int renderStage;\n"
+                + "void main() { gl_Position = vec4(float(renderStage)); }\n";
+
+        EntityVertexShaderAdapter.AdaptedStage adapted = EntityVertexShaderAdapter.adaptStage(
+                NATIVE, pack, "gbuffers_block_translucent", false);
+
+        assertTrue(adapted.source().contains("const int renderStage = 12;"), adapted.source());
+        assertFalse(adapted.source().contains("uniform int renderStage"), adapted.source());
+    }
+
+    @Test
+    void reconstructsShadowEntityWorldPositionAfterTheNativeClipTransform() throws Exception {
+        String adapted = EntityShaderAdapter.adaptVertexShader(
+                NATIVE, true, "shadow_entities", false, false, false, false, false, true);
+
+        assertTrue(adapted.contains("out vec4 position;"), adapted);
+        assertTrue(adapted.contains("uniform mat4 shadowModelViewInverse;"), adapted);
+        assertTrue(adapted.contains("uniform mat4 shadowProjectionInverse;"), adapted);
+        int clipAssignment = adapted.indexOf("gl_Position = ProjMat * ModelViewMat");
+        int worldPositionAssignment = adapted.indexOf(
+                "position = shadowModelViewInverse * shadowProjectionInverse * gl_Position;");
+        assertTrue(clipAssignment >= 0, adapted);
+        assertTrue(worldPositionAssignment > clipAssignment, adapted);
+    }
+
+    @Test
+    void rejectsShadowPositionGenerationOutsideShadowPasses() {
+        IOException error = assertThrows(IOException.class, () -> EntityShaderAdapter.adaptVertexShader(
+                NATIVE, false, "gbuffers_entities", false, false, false, false, false, true));
+        assertTrue(error.getMessage().contains("outside a shadow pass"), error.getMessage());
+    }
+
+    @Test
     void linksDamagedBlockFragmentToCustomVertexVaryings() throws Exception {
         String vertex = """
                 #version 120

@@ -3,6 +3,7 @@ package dev.veyra.vulkan;
 import dev.veyra.shader.ComputeShaderAdapter;
 import dev.veyra.shader.ShaderPackImageProperties;
 import net.vulkanmod.vulkan.device.DeviceManager;
+import net.vulkanmod.vulkan.texture.VulkanImage;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,14 +20,14 @@ public final class VeyraComputeResources implements AutoCloseable {
     private static final long MEBIBYTE = 1024L * 1024L;
     private static final int DEVICE_LOCAL_BUDGET_PERCENT = 60;
 
-    private final Map<String, VeyraImage3D> images;
+    private final Map<String, VulkanImage> images;
     private final Map<String, Boolean> clearEveryPass;
     private final Set<String> initialized = new LinkedHashSet<>();
     private final List<List<VeyraImageDescriptor>> descriptorsByStage;
     private final long estimatedBytes;
     private boolean closed;
 
-    private VeyraComputeResources(Map<String, VeyraImage3D> images, Map<String, Boolean> clearEveryPass,
+    private VeyraComputeResources(Map<String, VulkanImage> images, Map<String, Boolean> clearEveryPass,
                                   List<List<VeyraImageDescriptor>> descriptorsByStage, long estimatedBytes) {
         this.images = Map.copyOf(images);
         this.clearEveryPass = Map.copyOf(clearEveryPass);
@@ -41,7 +42,13 @@ public final class VeyraComputeResources implements AutoCloseable {
 
     public static VeyraComputeResources create(ShaderPackImageProperties properties,
                                                List<ComputeShaderAdapter.AdaptedStage> shaders) throws IOException {
-        Map<String, VeyraImage3D> images = new LinkedHashMap<>();
+        return create(properties, shaders, Set.of());
+    }
+
+    public static VeyraComputeResources create(ShaderPackImageProperties properties,
+                                               List<ComputeShaderAdapter.AdaptedStage> shaders,
+                                               Set<String> graphicsImageNames) throws IOException {
+        Map<String, VulkanImage> images = new LinkedHashMap<>();
         Map<String, Boolean> clearEveryPass = new LinkedHashMap<>();
         List<List<VeyraImageDescriptor>> descriptorsByStage = new ArrayList<>();
         try {
@@ -59,13 +66,13 @@ public final class VeyraComputeResources implements AutoCloseable {
                         throw new IOException("Compute resource '" + resource.name()
                                 + "' uses 2D image." + image.name() + "; only 3D compute images are supported.");
                     }
-                    VeyraImage3D volume = images.get(image.name());
+                    VeyraImage3D volume = (VeyraImage3D) images.get(image.name());
                     if (volume == null) {
                         int[] dimensions = properties.resolveDimensions(image);
                         long imageBytes = estimateBytes(image, dimensions);
                         estimatedBytes = Math.addExact(estimatedBytes, imageBytes);
                         if (estimatedBytes > budget) {
-                            throw new IOException("Shader-pack 3D images require " + mebibytes(estimatedBytes)
+                            throw new IOException("Shader-pack custom images require " + mebibytes(estimatedBytes)
                                     + " MiB, above Veyra's conservative " + mebibytes(budget)
                                     + " MiB device-local image budget.");
                         }
@@ -79,12 +86,33 @@ public final class VeyraComputeResources implements AutoCloseable {
                 }
                 descriptorsByStage.add(List.copyOf(descriptors));
             }
+            for (String imageName : graphicsImageNames) {
+                ShaderPackImageProperties.Image image = properties.images().get(imageName);
+                if (image == null) {
+                    throw new IOException("Graphics stage references missing image." + imageName + ".");
+                }
+                if (images.containsKey(imageName)) continue;
+                int[] dimensions = properties.resolveDimensions(image);
+                long imageBytes = estimateBytes(image, dimensions);
+                estimatedBytes = Math.addExact(estimatedBytes, imageBytes);
+                if (estimatedBytes > budget) {
+                    throw new IOException("Shader-pack custom images require " + mebibytes(estimatedBytes)
+                            + " MiB, above Veyra's conservative " + mebibytes(budget)
+                            + " MiB device-local image budget.");
+                }
+                VulkanImage resource = image.is3d()
+                        ? VeyraImage3D.create(image.name(), image.vulkanFormat(),
+                                dimensions[0], dimensions[1], dimensions[2])
+                        : VeyraImage2D.create(image.name(), image.vulkanFormat(), dimensions[0], dimensions[1]);
+                images.put(imageName, resource);
+                clearEveryPass.put(imageName, image.clear());
+            }
             return new VeyraComputeResources(images, clearEveryPass, descriptorsByStage, estimatedBytes);
         } catch (ArithmeticException exception) {
-            images.values().forEach(VeyraImage3D::free);
-            throw new IOException("Shader-pack 3D image memory estimate overflowed.", exception);
+            images.values().forEach(VulkanImage::free);
+            throw new IOException("Shader-pack custom image memory estimate overflowed.", exception);
         } catch (IOException | RuntimeException exception) {
-            images.values().forEach(VeyraImage3D::free);
+            images.values().forEach(VulkanImage::free);
             throw exception;
         }
     }
@@ -95,7 +123,7 @@ public final class VeyraComputeResources implements AutoCloseable {
         for (var entry : images.entrySet()) {
             String name = entry.getKey();
             if (!clearEveryPass.getOrDefault(name, false) && initialized.contains(name)) continue;
-            entry.getValue().clearZero();
+            ((VeyraCustomImage) entry.getValue()).clearZero();
             initialized.add(name);
         }
     }
@@ -109,7 +137,7 @@ public final class VeyraComputeResources implements AutoCloseable {
         if (closed) throw new IllegalStateException("Custom image resources have already been released.");
         List<VeyraImageDescriptor> descriptors = new ArrayList<>();
         for (var binding : bindings) {
-            VeyraImage3D image = images.get(binding.imageName());
+            VulkanImage image = images.get(binding.imageName());
             if (image == null) throw new IOException("Graphics uniform '" + binding.name()
                     + "' references image." + binding.imageName() + " absent from the shared compute resource set.");
             descriptors.add(new VeyraImageDescriptor(binding.binding(), binding.glslType(), binding.name(), image, binding.storageImage()));
@@ -117,7 +145,7 @@ public final class VeyraComputeResources implements AutoCloseable {
         return List.copyOf(descriptors);
     }
 
-    public Map<String, VeyraImage3D> images() {
+    public Map<String, VulkanImage> images() {
         return images;
     }
 
@@ -129,15 +157,16 @@ public final class VeyraComputeResources implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
-        images.values().forEach(VeyraImage3D::free);
+        images.values().forEach(VulkanImage::free);
     }
 
     private static long estimateBytes(ShaderPackImageProperties.Image image, int[] dimensions) throws IOException {
         try {
-            return Math.multiplyExact(Math.multiplyExact(Math.multiplyExact((long) dimensions[0], dimensions[1]),
-                    dimensions[2]), image.bytesPerTexel());
+            long texels = Math.multiplyExact((long) dimensions[0], dimensions[1]);
+            if (dimensions.length == 3) texels = Math.multiplyExact(texels, dimensions[2]);
+            return Math.multiplyExact(texels, image.bytesPerTexel());
         } catch (ArithmeticException exception) {
-            throw new IOException("3D image." + image.name() + " is too large to estimate safely.", exception);
+            throw new IOException("Custom image." + image.name() + " is too large to estimate safely.", exception);
         }
     }
 

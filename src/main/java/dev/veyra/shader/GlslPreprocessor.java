@@ -33,6 +33,8 @@ final class GlslPreprocessor {
         macros.put("MC_RENDER_QUALITY", "1.0");
         macros.put("MC_SHADOW_QUALITY", "1.0");
         macros.put("MC_HAND_DEPTH", "0.125");
+        // Veyra implements Iris shader-pack compatibility, including Iris-only uniforms/stages.
+        macros.put("IS_IRIS", "1");
         macros.put("VEYRA", "200");
         macros.put("IRIS_TAG_SUPPORT", "2");
         macros.putAll(IrisRenderStages.macros());

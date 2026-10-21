@@ -60,6 +60,9 @@ public final class TerrainShaderAdapter {
             "veyraAbsMidCoordPos", "veyraMidCoord", "veyraTerrainDistance", "veyraBslTexCoord",
             "veyraBslTexCoordAM", "veyraSpriteBounds");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
+    private static final Pattern TOP_LEVEL_VALUE_DECLARATION = Pattern.compile(
+            "^[\\t ]*(?:(?:const|invariant|precise|lowp|mediump|highp)\\s+)*(?:double|float|int|uint|bool|[biu]?vec[234]|mat[234](?:x[234])?)\\s+"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\[[^]]*])?\\s*(?:=[^;]*)?;[\\t ]*$");
     private static final Map<String, Varying> SUPPORTED_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2", 1)),
             Map.entry("texCoord", new Varying("vec2", 1)),
@@ -203,11 +206,38 @@ public final class TerrainShaderAdapter {
             vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv) {
                 return texture(sourceSampler, sourceUv);
             }
+            vec4 veyraSample(sampler3D sourceSampler, vec3 sourceCoord) {
+                return texture(sourceSampler, sourceCoord);
+            }
+            uvec4 veyraSample(usampler2D sourceSampler, vec2 sourceUv) {
+                return texture(sourceSampler, sourceUv);
+            }
+            uvec4 veyraSample(usampler3D sourceSampler, vec3 sourceCoord) {
+                return texture(sourceSampler, sourceCoord);
+            }
             vec4 veyraSampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
                 return textureLod(sourceSampler, sourceUv, lod);
             }
+            vec4 veyraSampleLod(sampler3D sourceSampler, vec3 sourceCoord, float lod) {
+                return textureLod(sourceSampler, sourceCoord, lod);
+            }
+            uvec4 veyraSampleLod(usampler2D sourceSampler, vec2 sourceUv, float lod) {
+                return textureLod(sourceSampler, sourceUv, lod);
+            }
+            uvec4 veyraSampleLod(usampler3D sourceSampler, vec3 sourceCoord, float lod) {
+                return textureLod(sourceSampler, sourceCoord, lod);
+            }
             vec4 veyraSampleGrad(sampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
                 return textureGrad(sourceSampler, sourceUv, dx, dy);
+            }
+            vec4 veyraSampleGrad(sampler3D sourceSampler, vec3 sourceCoord, vec3 dx, vec3 dy) {
+                return textureGrad(sourceSampler, sourceCoord, dx, dy);
+            }
+            uvec4 veyraSampleGrad(usampler2D sourceSampler, vec2 sourceUv, vec2 dx, vec2 dy) {
+                return textureGrad(sourceSampler, sourceUv, dx, dy);
+            }
+            uvec4 veyraSampleGrad(usampler3D sourceSampler, vec3 sourceCoord, vec3 dx, vec3 dy) {
+                return textureGrad(sourceSampler, sourceCoord, dx, dy);
             }
             vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
                 float visibility = step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
@@ -219,33 +249,8 @@ public final class TerrainShaderAdapter {
             #define lightmap LightTexture
             #define shadowtex0 VeyraShadowSampler
             #define noisetex VeyraNoiseSampler
-            #define shadowPos veyraShadowPos
-            #define shadowCoord veyraShadowPos
-            #define viewPos veyraViewPosition
-            #define dist veyraTerrainDistance
-            #define vTexCoord veyraBslTexCoord
-            #define vTexCoordAM veyraBslTexCoordAM
-            #define spriteBounds veyraSpriteBounds
-            #define vertexPos veyraTerrainPosition
-            #define playerPos veyraTerrainPosition
-            #define signMidCoordPos veyraSignMidCoordPos
-            #define absMidCoordPos veyraAbsMidCoordPos
-            #define midCoord veyraMidCoord
             #define shadow2D(sampler, coord) veyraSample(sampler, coord)
-            #define sphericalVertexDistance veyraSphericalVertexDistance
-            #define cylindricalVertexDistance veyraCylindricalVertexDistance
             #define alphaTestRef AlphaCutout
-            #define texcoord veyraTexCoord
-            #define texCoord veyraTexCoord
-            #define texCoord0 veyraTexCoord
-            #define lmcoord veyraLightmapCoord
-            #define lmCoord veyraLightmapCoord
-            #define lightMapCoord veyraLightmapCoord
-            #define color veyraVertexColor
-            #define glColorRaw veyraVertexColor
-            #define glcolor veyraVertexColor
-            #define glColor veyraVertexColor
-            #define gl_Color veyraVertexColor
             #define gl_FragColor veyraFragColor
             """;
 
@@ -360,6 +365,15 @@ public final class TerrainShaderAdapter {
     static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings,
                                 boolean pipelineNoiseSamplerAvailable) throws IOException {
+        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, packVaryings,
+                pipelineNoiseSamplerAvailable, "gbuffers_terrain");
+    }
+
+    static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings,
+                                boolean pipelineNoiseSamplerAvailable, String programName) throws IOException {
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
+        Set<String> conflictingShaderPackUniforms = conflictingShaderPackUniforms(source);
         Map<String, Integer> colorInputs = waterInputsAvailable ? GeometryColorSamplers.read(source) : Map.of();
         FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
         source = fragmentOutputs.rewriteLegacy(source);
@@ -448,10 +462,11 @@ public final class TerrainShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         List<String> declaredVaryings = new ArrayList<>();
-        Map<String, String> declaredVaryingTypes = new java.util.HashMap<>();
         Map<String, String> linkedPackVaryings = new java.util.LinkedHashMap<>();
+        Map<Integer, String> fixedInputAliases = new java.util.LinkedHashMap<>();
+        Map<String, String> computedVaryingTypes = new java.util.LinkedHashMap<>();
+        Map<String, String> computedVaryingExpressions = new java.util.LinkedHashMap<>();
         StringBuilder packVaryingDeclarations = new StringBuilder();
-        StringBuilder packVaryingMacros = new StringBuilder();
         Set<Integer> requiredTerrainInputLocations = new HashSet<>();
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
@@ -469,21 +484,22 @@ public final class TerrainShaderAdapter {
                 }
                 String fragmentVariable = packVarying.fixedBridge()
                         ? fixedFragmentVariable(packVarying.location()) : null;
-                if (packVarying.fixedBridge()) requiredTerrainInputLocations.add(packVarying.location());
+                if (packVarying.fixedBridge()) {
+                    requiredTerrainInputLocations.add(packVarying.location());
+                }
                 if (fragmentVariable == null) {
-                    fragmentVariable = "veyraPackVarying_" + name;
                     packVaryingDeclarations.append("layout(location = ").append(packVarying.location()).append(") ");
                     if (!packVarying.interpolation().equals("smooth")) {
                         packVaryingDeclarations.append(packVarying.interpolation()).append(' ');
                     }
-                    packVaryingDeclarations.append("in ").append(type).append(' ').append(fragmentVariable).append(";\n");
+                    packVaryingDeclarations.append("in ").append(type).append(' ').append(name).append(";\n");
+                    fragmentVariable = name;
+                } else {
+                    addFixedTerrainInputAlias(packVarying.location(), name, type, fixedInputAliases,
+                            computedVaryingTypes, computedVaryingExpressions);
                 }
-                linkedPackVaryings.put(name, fragmentVariable);
-                if (!name.equals(fragmentVariable)) {
-                    packVaryingMacros.append("#define ").append(name).append(' ').append(fragmentVariable).append('\n');
-                }
+                linkedPackVaryings.put(name, name);
                 declaredVaryings.add(name);
-                declaredVaryingTypes.put(name, type);
                 varyingMatcher.appendReplacement(withoutVaryings, "");
                 continue;
             }
@@ -501,11 +517,18 @@ public final class TerrainShaderAdapter {
                 throw new IOException("gbuffers_terrain input '" + name + "' uses an unsupported location.");
             }
             declaredVaryings.add(name);
-            declaredVaryingTypes.put(name, type);
             if (name.equals("recolor")) {
                 requiredTerrainInputLocations.add(11);
             } else if (varying.location() >= 0 && !name.equals("normal")) {
                 requiredTerrainInputLocations.add(varying.location());
+            }
+            String computedExpression = computedTerrainVaryingExpression(name, type);
+            if (computedExpression != null) {
+                computedVaryingTypes.put(name, type);
+                computedVaryingExpressions.put(name, computedExpression);
+            } else if (varying.location() >= 0) {
+                addFixedTerrainInputAlias(varying.location(), name, type, fixedInputAliases,
+                        computedVaryingTypes, computedVaryingExpressions);
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
@@ -550,28 +573,6 @@ public final class TerrainShaderAdapter {
         for (String extension : extensions) {
             result.append(extension).append('\n');
         }
-        StringBuilder terrainMaterialMacros = new StringBuilder();
-        if (declaredVaryings.contains("mat") && !linkedPackVaryings.containsKey("mat")) {
-            terrainMaterialMacros.append("#define mat ");
-            terrainMaterialMacros.append(declaredVaryingTypes.get("mat").equals("float")
-                    ? "float(veyraTerrainMaterialId)\n" : "veyraTerrainMaterialId\n");
-        }
-        if (declaredVaryings.contains("mc_Entity") && !linkedPackVaryings.containsKey("mc_Entity")) {
-            terrainMaterialMacros.append("#define mc_Entity veyraMcEntity\n");
-        }
-        if (declaredVaryings.contains("recolor") && !linkedPackVaryings.containsKey("recolor")) {
-            terrainMaterialMacros.append("#define recolor ((veyraTerrainMaterialId / 100 == 151 || "
-                    + "veyraTerrainMaterialId / 100 == 155 || veyraTerrainMaterialId / 100 == 156) ? 1.0 : 0.0)\n");
-        }
-        if (declaredVaryings.contains("sunVec") && !linkedPackVaryings.containsKey("sunVec")) {
-            terrainMaterialMacros.append("#define sunVec normalize(sunPosition)\n");
-        }
-        if (declaredVaryings.contains("upVec") && !linkedPackVaryings.containsKey("upVec")) {
-            terrainMaterialMacros.append("#define upVec normalize(gbufferModelView[1].xyz)\n");
-        }
-        if (declaredVaryings.contains("eastVec") && !linkedPackVaryings.containsKey("eastVec")) {
-            terrainMaterialMacros.append("#define eastVec normalize(gbufferModelView[0].xyz)\n");
-        }
         boolean hasTangentSpaceInputs = (declaredVaryings.contains("tangent") && !linkedPackVaryings.containsKey("tangent"))
                 || (declaredVaryings.contains("binormal") && !linkedPackVaryings.containsKey("binormal"))
                 || (declaredVaryings.contains("viewVector") && !linkedPackVaryings.containsKey("viewVector"));
@@ -584,9 +585,10 @@ public final class TerrainShaderAdapter {
             requiredTerrainInputLocations.add(7);
         }
         String bridge = pruneUnusedTerrainFragmentInputs(FRAGMENT_BRIDGE, requiredTerrainInputLocations)
-                .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields())
-                .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms)
-                        + fogUniforms.bridge() + terrainMaterialMacros + "#define texture Sampler0");
+                .replace("__VEYRA_SHADERPACK_UNIFORMS__", shaderPackUniformFields(conflictingShaderPackUniforms))
+                .replace("#define texture Sampler0", shaderPackUniformMacros(declaredUniforms, conflictingShaderPackUniforms)
+                        + fogUniforms.bridge()
+                        + "#define texture Sampler0");
         boolean usesDepth = waterInputsAvailable && usesOpaqueDepthSampler(source);
         if (usesDepth) {
             int depthBinding = 5 + (shadowSamplerAvailable ? 1 : 0) + (noiseSamplerAvailable ? 1 : 0);
@@ -617,28 +619,13 @@ public final class TerrainShaderAdapter {
                 .append("#define ").append(input.getKey()).append(' ').append(GeometryColorSamplers.samplerName(input.getValue())).append('\n'));
         bridge = colorBridge + bridge;
         if (hasTangentSpaceInputs) {
-            StringBuilder tangentSpaceMacros = new StringBuilder(TANGENT_SPACE_BRIDGE);
-            if (hasDerivedNormal) {
-                tangentSpaceMacros.append("#define normal veyraTerrainNormal()\n");
-            }
-            if (declaredVaryings.contains("tangent") && !linkedPackVaryings.containsKey("tangent")) {
-                tangentSpaceMacros.append("#define tangent veyraTerrainTangent()\n");
-            }
-            if (declaredVaryings.contains("binormal") && !linkedPackVaryings.containsKey("binormal")) {
-                tangentSpaceMacros.append("#define binormal veyraTerrainBinormal()\n");
-            }
-            if (declaredVaryings.contains("viewVector") && !linkedPackVaryings.containsKey("viewVector")) {
-                tangentSpaceMacros.append("#define viewVector veyraTerrainViewVector()\n");
-            }
-            tangentSpaceMacros.append("#define texture Sampler0");
-            bridge = bridge.replace("#define texture Sampler0", tangentSpaceMacros.toString());
+            bridge = bridge.replace("#define texture Sampler0", TANGENT_SPACE_BRIDGE + "\n#define texture Sampler0");
         } else if (hasDerivedNormal) {
             bridge = bridge.replace("#define texture Sampler0", """
                     vec3 veyraTerrainNormal() {
                         vec3 faceNormal = cross(dFdx(veyraTerrainPosition), dFdy(veyraTerrainPosition));
                         return normalize(gl_FrontFacing ? faceNormal : -faceNormal);
                     }
-                    #define normal veyraTerrainNormal()
                     #define texture Sampler0
                     """);
         }
@@ -661,17 +648,27 @@ public final class TerrainShaderAdapter {
         bridge = bridge
                 .replace("layout(location = 0) out vec4 veyraFragColor;", fragmentOutputs.declarations())
                 .replace("#define gl_FragColor veyraFragColor", "#define gl_FragColor " + outputName);
-        for (String name : linkedPackVaryings.keySet()) {
-            bridge = bridge.replaceAll("(?m)^[\\t ]*#define\\s+" + Pattern.quote(name)
-                    + "(?=[\\t (])[^\\r\\n]*(?:\\r?\\n|$)", "");
+        for (Map.Entry<Integer, String> alias : fixedInputAliases.entrySet()) {
+            String bridgeVariable = fixedFragmentVariable(alias.getKey());
+            if (bridgeVariable != null) {
+                bridge = replaceIdentifier(bridge, bridgeVariable, alias.getValue());
+            }
         }
-        bridge += packVaryingDeclarations.toString() + packVaryingMacros;
-        if (hasTangentSpaceInputs) {
-            adapted = renameMainForTangentSpace(adapted);
+        StringBuilder computedVaryingDeclarations = new StringBuilder();
+        computedVaryingTypes.forEach((name, type) -> computedVaryingDeclarations
+                .append(type).append(' ').append(name).append(";\n"));
+        bridge += packVaryingDeclarations.toString() + computedVaryingDeclarations;
+        boolean initializePackVaryings = !computedVaryingExpressions.isEmpty();
+        if (hasTangentSpaceInputs || initializePackVaryings) {
+            adapted = renameMainForTerrainInitialization(adapted);
         }
         result.append(bridge).append(adapted);
-        if (hasTangentSpaceInputs) {
-            result.append("\nvoid main() {\n    veyraInitializeTerrainTangentFrame();\n    veyraShaderPackMain();\n}\n");
+        if (hasTangentSpaceInputs || initializePackVaryings) {
+            result.append("\nvoid main() {\n");
+            if (hasTangentSpaceInputs) result.append("    veyraInitializeTerrainTangentFrame();\n");
+            computedVaryingExpressions.forEach((name, expression) -> result.append("    ")
+                    .append(name).append(" = ").append(expression).append(";\n"));
+            result.append("    veyraShaderPackMain();\n}\n");
         }
         return result.toString();
     }
@@ -748,23 +745,107 @@ public final class TerrainShaderAdapter {
     }
 
     private static String shaderPackUniformFields() {
+        return shaderPackUniformFields(Set.of());
+    }
+
+    private static String shaderPackUniformFields(Set<String> conflicts) {
         StringBuilder fields = new StringBuilder();
         for (ShaderUniform uniform : shaderPackUniforms()) {
+            String memberName = conflicts.contains(uniform.name())
+                    ? reservedShaderPackUniformName(uniform.name()) : uniform.blockMemberName();
             fields.append("    ").append(uniform.bufferType()).append(' ')
-                    .append(uniform.blockMemberName()).append(";\n");
+                    .append(memberName).append(";\n");
         }
         return fields.toString().stripTrailing();
     }
 
-    private static String shaderPackUniformMacros(Map<String, String> declaredUniforms) {
+    /** Finds pack globals that would collide with same-named Iris fields in Veyra's terrain UBO. */
+    static Set<String> conflictingShaderPackUniforms(String source) {
+        Set<String> supported = shaderPackUniforms().stream().map(ShaderUniform::name)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> conflicts = new java.util.LinkedHashSet<>();
+        int braceDepth = 0;
+        for (String line : ShaderSource.maskBlockAndLineComments(source).split("\\R", -1)) {
+            if (braceDepth == 0) {
+                Matcher declaration = TOP_LEVEL_VALUE_DECLARATION.matcher(line);
+                if (declaration.matches() && supported.contains(declaration.group(1))) {
+                    conflicts.add(declaration.group(1));
+                }
+            }
+            for (int index = 0; index < line.length(); index++) {
+                if (line.charAt(index) == '{') braceDepth++;
+                else if (line.charAt(index) == '}') braceDepth = Math.max(0, braceDepth - 1);
+            }
+        }
+        return Set.copyOf(conflicts);
+    }
+
+    /** Renames only colliding UBO members; field types and order keep the Vulkan block layout intact. */
+    static String renameConflictingShaderPackUniformFields(String source, String packSource) {
+        for (String name : conflictingShaderPackUniforms(packSource)) {
+            ShaderUniform uniform = shaderPackUniform(name);
+            if (uniform == null) continue;
+            Pattern field = Pattern.compile("(?m)^([\\t ]*)" + Pattern.quote(uniform.bufferType()) + "[\\t ]+"
+                    + Pattern.quote(uniform.blockMemberName()) + "([\\t ]*;[\\t ]*)$");
+            Matcher matcher = field.matcher(source);
+            if (matcher.find()) {
+                source = matcher.replaceAll(Matcher.quoteReplacement(matcher.group(1)
+                        + uniform.bufferType() + " " + reservedShaderPackUniformName(name) + matcher.group(2)));
+                source = Pattern.compile("\\b" + Pattern.quote(name) + "\\b")
+                        .matcher(source).replaceAll(Matcher.quoteReplacement(reservedShaderPackUniformName(name)));
+            }
+        }
+        return source;
+    }
+
+    private static String reservedShaderPackUniformName(String name) {
+        return "veyraReservedShaderPack_" + name;
+    }
+
+    private static void addFixedTerrainInputAlias(int location, String name, String type,
+                                                 Map<Integer, String> fixedInputAliases,
+                                                 Map<String, String> computedVaryingTypes,
+                                                 Map<String, String> computedVaryingExpressions) {
+        String existing = fixedInputAliases.putIfAbsent(location, name);
+        if (existing != null && !existing.equals(name)) {
+            computedVaryingTypes.put(name, type);
+            computedVaryingExpressions.put(name, existing);
+        }
+    }
+
+    private static String computedTerrainVaryingExpression(String name, String type) {
+        return switch (name) {
+            case "mat" -> type.equals("float") ? "float(veyraTerrainMaterialId)"
+                    : type.equals("int") ? "veyraTerrainMaterialId" : null;
+            case "recolor" -> "((veyraTerrainMaterialId / 100 == 151 || veyraTerrainMaterialId / 100 == 155 || "
+                    + "veyraTerrainMaterialId / 100 == 156) ? 1.0 : 0.0)";
+            case "sunVec" -> "normalize(sunPosition)";
+            case "upVec" -> "normalize(gbufferModelView[1].xyz)";
+            case "eastVec" -> "normalize(gbufferModelView[0].xyz)";
+            case "normal" -> "veyraTerrainNormal()";
+            case "tangent" -> "veyraTerrainTangent()";
+            case "binormal" -> "veyraTerrainBinormal()";
+            case "viewVector" -> "veyraTerrainViewVector()";
+            default -> null;
+        };
+    }
+
+    private static String replaceIdentifier(String source, String original, String replacement) {
+        return Pattern.compile("\\b" + Pattern.quote(original) + "\\b")
+                .matcher(source).replaceAll(Matcher.quoteReplacement(replacement));
+    }
+
+    private static String shaderPackUniformMacros(Map<String, String> declaredUniforms, Set<String> conflicts) {
         StringBuilder macros = new StringBuilder();
         for (ShaderUniform uniform : shaderPackUniforms()) {
+            String memberName = conflicts.contains(uniform.name())
+                    ? reservedShaderPackUniformName(uniform.name()) : uniform.blockMemberName();
             if (uniform.booleanField()) {
                 macros.append("#define ").append(uniform.name()).append(' ');
                 if ("int".equals(declaredUniforms.get(uniform.name()))) {
-                    macros.append(uniform.blockMemberName());
+                    macros.append(memberName);
                 } else {
-                    macros.append('(').append(uniform.blockMemberName()).append(" != 0)");
+                    macros.append('(').append(memberName).append(" != 0)");
                 }
                 macros.append('\n');
             }
@@ -969,7 +1050,7 @@ public final class TerrainShaderAdapter {
         return expanded.toString();
     }
 
-    private static String renameMainForTangentSpace(String source) throws IOException {
+    private static String renameMainForTerrainInitialization(String source) throws IOException {
         Matcher matcher = MAIN_FUNCTION_DECLARATION.matcher(maskComments(source));
         StringBuilder renamed = new StringBuilder(source.length() + 32);
         int copiedThrough = 0;
@@ -982,7 +1063,7 @@ public final class TerrainShaderAdapter {
             copiedThrough = nameEnd;
         }
         if (declarations != 1) {
-            throw new IOException("gbuffers_terrain tangent-space inputs require exactly one top-level void main() entrypoint.");
+            throw new IOException("gbuffers_terrain compatibility varyings require exactly one top-level void main() entrypoint.");
         }
         return renamed.append(source, copiedThrough, source.length()).toString();
     }

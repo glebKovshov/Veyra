@@ -35,6 +35,7 @@ public final class ComputeShaderAdapter {
         // Iris defines this feature macro when the pack uses image.* resources. Veyra's compute
         // path provides the custom-image interface even though the offline preprocessor has no Iris runtime.
         String active = GlslPreprocessor.process(fileName, source, Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+        active = IrisRenderStages.bindUniform(active, IrisRenderStages.computeStage(), fileName);
         active = UnreachableGlslFunctions.removeUnreachable(active, "main");
         String masked = ShaderSource.maskBlockAndLineComments(active);
         Matcher matcher = OPAQUE_UNIFORM.matcher(masked);

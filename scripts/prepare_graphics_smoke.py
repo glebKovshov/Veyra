@@ -7,6 +7,8 @@ import struct
 import argparse
 import json
 import zlib
+import zipfile
+from pathlib import PurePosixPath
 
 
 def material_png(path):
@@ -46,10 +48,21 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'composite-custom-image', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'composite-custom-image', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
+    parser.add_argument('--shaderpack-archive', type=pathlib.Path)
+    parser.add_argument('--shaderpack-name', default='')
+    parser.add_argument('--profile', default='')
     arguments = parser.parse_args()
     fixture = arguments.fixture
+    third_party = fixture == 'third-party-shaderpack'
+    if third_party:
+        if arguments.shaderpack_archive is None or not arguments.shaderpack_archive.is_file():
+            parser.error('--shaderpack-archive must identify an existing ZIP for third-party-shaderpack')
+        if not arguments.shaderpack_name or not all(char.isalnum() or char in '._-' for char in arguments.shaderpack_name):
+            parser.error('--shaderpack-name must be a simple folder name')
+        if arguments.shaderpack_name in {'.', '..'} or not arguments.profile:
+            parser.error('third-party-shaderpack requires a valid --shaderpack-name and --profile')
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
     if fixture.startswith('water-'):
         layers.append((1, 'minecraft:water'))
@@ -93,8 +106,30 @@ def main():
     with gzip.open(world / "level.dat", "wb") as output:
         output.write(bytes([10]) + string("") + payload(10, {"Data": (10, data)}))
     pack = root / 'shaderpacks' / fixture
-    if fixture != 'vanilla-baseline':
+    if third_party:
+        pack = root / 'shaderpacks' / arguments.shaderpack_name
+        if pack.exists() and any(pack.iterdir()):
+            parser.error(f'refusing to overwrite existing shaderpack data in {pack}')
+        pack.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(arguments.shaderpack_archive) as archive:
+            for entry in archive.infolist():
+                relative = PurePosixPath(entry.filename)
+                if relative.is_absolute() or any(part in {'', '.', '..'} for part in relative.parts):
+                    parser.error(f'unsafe ZIP path: {entry.filename!r}')
+                if (entry.external_attr >> 16) & 0o170000 == 0o120000:
+                    parser.error(f'symlink in shaderpack archive is not supported: {entry.filename!r}')
+                destination = pack.joinpath(*relative.parts)
+                if not destination.resolve().is_relative_to(pack.resolve()):
+                    parser.error(f'ZIP path escapes shaderpack directory: {entry.filename!r}')
+                if entry.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                else:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with archive.open(entry) as source, destination.open('xb') as target:
+                        shutil.copyfileobj(source, target)
+    elif fixture != 'vanilla-baseline':
         example_name = ('gbuffers-skybasic-vertex-execution' if fixture == 'skybasic-vertex-execution'
+                        else 'shadow-color-mrt' if fixture == 'shadow-color-mrt-lifecycle'
                         else fixture)
         shutil.copytree(pathlib.Path('examples') / example_name, pack, dirs_exist_ok=True)
     if fixture == 'water-post-shadow-inputs':
@@ -104,8 +139,11 @@ def main():
             source_file.write_text(source_file.read_text(encoding='utf-8').replace('#version 120\n', '#version 120\n' + '\n' * 60000, 1), encoding='utf-8')
     config = root / "veyra"
     config.mkdir(parents=True, exist_ok=True)
-    (config / "selected-pack.txt").write_text("" if fixture == "vanilla-baseline" else fixture, encoding="utf-8")
+    selected_pack = arguments.shaderpack_name if third_party else ("" if fixture == "vanilla-baseline" else fixture)
+    (config / "selected-pack.txt").write_text(selected_pack, encoding="utf-8")
     (config / 'graphics-fixture.txt').write_text(fixture, encoding='utf-8')
+    if third_party:
+        (config / 'shaderpack-profile.txt').write_text(arguments.profile, encoding='utf-8')
     extra_options = ''
     if fixture.startswith('specular-'):
         resource_pack = root / 'resourcepacks/veyra-material-fixture'

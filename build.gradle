@@ -30,6 +30,7 @@ dependencies {
     runtimeOnly 'org.lwjgl:lwjgl-shaderc:3.3.3'
     compileOnly 'org.lwjgl:lwjgl-vulkan:3.3.3'
     compileOnly 'org.lwjgl:lwjgl-vma:3.3.3'
+    compileOnly 'org.lwjgl:lwjgl-shaderc:3.3.3'
     annotationProcessor 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
     implementation('org.anarres:jcpp:1.4.14') { transitive = false }
     include('org.anarres:jcpp:1.4.14') { transitive = false }
@@ -234,8 +235,13 @@ loom {
             client()
             source = sourceSets.graphicsSmoke
             runDir = project.findProperty('graphicsSmokeRunDir')?.toString() ?: 'run-graphics-smoke'
+            def graphicsSmokeOutput = project.findProperty('graphicsSmokeOutputDir')?.toString()
+                    ?: layout.buildDirectory.dir('reports/graphics-smoke').get().asFile.absolutePath
             vmArgs '-Xmx3G', '-Dveyra.graphicsSmoke=true',
-                    "-Dveyra.graphicsSmoke.output=${layout.buildDirectory.dir('reports/graphics-smoke').get().asFile.absolutePath}"
+                    "-Dveyra.graphicsSmoke.output=${file(graphicsSmokeOutput).absolutePath}"
+            if (project.hasProperty('graphicsSmokeDumpShaderSources')) {
+                vmArgs '-Dveyra.debug.dumpShaderSources=true'
+            }
             programArgs '--quickPlaySingleplayer', 'VeyraValidation', '--width', '640', '--height', '360'
             if (project.hasProperty('graphicsSmokeComputeProbe')) {
                 vmArgs '-Dveyra.graphicsSmoke.computeProbe=true'

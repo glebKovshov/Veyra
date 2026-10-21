@@ -22,7 +22,7 @@ import java.nio.LongBuffer;
 import static org.lwjgl.vulkan.VK10.*;
 
 /** A VMA-owned 3D image exposed through VulkanMod's image descriptor interface. */
-public final class VeyraImage3D extends VulkanImage {
+public final class VeyraImage3D extends VulkanImage implements VeyraCustomImage {
     private final long allocation;
     private final long volumeView;
     private final boolean linearFiltering;

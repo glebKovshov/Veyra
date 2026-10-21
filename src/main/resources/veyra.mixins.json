@@ -28,6 +28,7 @@
     "VkRenderPassMixin",
     "VulkanCloudRendererMixin",
     "VkCommandEncoderMixin",
+    "SPIRVUtilsMixin",
     "VeyraUniformsMixin",
     "accessor.MinecraftAccessor",
     "accessor.BufferBuilderAccessor",

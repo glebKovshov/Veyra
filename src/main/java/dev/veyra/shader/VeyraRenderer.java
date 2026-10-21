@@ -96,6 +96,8 @@ import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VK10;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -214,7 +216,7 @@ public final class VeyraRenderer {
     private static final String NOISE_INPUT_NAME = "VeyraNoise";
     private static final List<String> SUPPORTED_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.values()), List.of(
             "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
-            "darknessLightFactor", "shadowFade", "velocity", "playerMood", "biome_precipitation", "atlasSize",
+            "darknessLightFactor", "shadowFade", "velocity", "playerMood", "biome_precipitation", "atlasSize", "fogColor",
             "lightningBoltPosition", "viewWidth", "viewHeight", "aspectRatio", "frameTimeCounter", "frameTime", "frameCounter",
             "sunAngle", "rainStrength", "wetness", "thunderStrength", "worldTime", "worldDay",
             "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity",
@@ -231,7 +233,7 @@ public final class VeyraRenderer {
             "shadowProjection", "shadowProjectionInverse");
     private static final List<String> VECTOR3_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.VEC3), List.of(
             "cameraPosition", "cameraPositionFract", "previousCameraPosition", "previousCameraPositionFract",
-            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor"));
+            "eyePosition", "relativeEyePosition", "playerLookVector", "skyColor", "fogColor"));
     private static final List<String> VECTOR4_UNIFORMS = List.of("lightningBoltPosition");
     private static final List<String> IVECTOR2_UNIFORMS = List.of("eyeBrightness", "eyeBrightnessSmooth", "atlasSize");
     private static final List<String> IVECTOR3_UNIFORMS = List.of("cameraPositionInt", "previousCameraPositionInt");
@@ -245,6 +247,7 @@ public final class VeyraRenderer {
     private static final List<String> DYNAMIC_UNIFORMS = withIrisExtras(Set.of(IrisExtraUniforms.Kind.values()), List.of(
             "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2", "darknessLightFactor",
             "playerMood", "biome_precipitation", "playerLookVector", "skyColor", "atlasSize", "lightningBoltPosition",
+            "fogColor",
             "frameTimeCounter", "frameTime", "frameCounter", "sunAngle", "shadowFade", "velocity", "rainStrength", "wetness", "thunderStrength",
             "worldTime", "worldDay", "moonPhase", "bedrockLevel", "cloudHeight", "endFlashIntensity", "eyeAltitude", "eyeBrightness", "eyeBrightnessSmooth", "screenBrightness", "blindness", "nightVision", "darknessFactor",
             "isEyeInWater", "isSpectator",
@@ -333,6 +336,7 @@ public final class VeyraRenderer {
     private static CameraUniforms cameraUniforms = CameraUniforms.ZERO;
     private static boolean cameraUniformsInitialized;
     private static volatile FrameUniforms shaderPackFrameUniforms = FrameUniforms.ZERO;
+    private static final Vector3f irisFogColor = new Vector3f();
     private static boolean shaderPackUniformsRegistered;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
@@ -1370,6 +1374,10 @@ public final class VeyraRenderer {
         }
     }
 
+    public static void captureFogColor(Vector4f fogColor) {
+        irisFogColor.set(fogColor.x, fogColor.y, fogColor.z);
+    }
+
     public static void captureDepthTex1() {
         if (repository == null || repository.getSelected().isEmpty() || !selectedPackUsesDepth1Sampler()) {
             return;
@@ -2040,7 +2048,8 @@ public final class VeyraRenderer {
                 pipeline = spec.shadowPass()
                         ? compileShadowEntityPipeline(original, spec.programName(), fragmentSource, sourceHash,
                                 spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
-                                spec.requiresViewNormal())
+                                spec.requiresViewNormal(), EntityShaderAdapter.requiresPositionInput(
+                                        spec.fragmentSource(), spec.programName()))
                         : compileEntityPipeline(original, fragmentSource, sourceHash,
                                 spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
                                 spec.requiresViewNormal(), false, spec.handPass(), spec.programName(),
@@ -2933,6 +2942,12 @@ public final class VeyraRenderer {
         if (!isRenderingEnabled() || minecraft.level == null || minecraft.player == null) {
             return;
         }
+        // World/swapchain replacement can invoke LevelRenderer before Vulkan has started
+        // recording its next command buffer. Leave this frame untouched; the phase counter
+        // is reset by captureFrameMatrices on the next renderLevel invocation.
+        if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
+            return;
+        }
 
         boolean depthSampling = false;
         try {
@@ -3320,6 +3335,7 @@ public final class VeyraRenderer {
             throw new IllegalArgumentException(programName + ".vsh exceeds the 1 MiB size limit.");
         }
 
+        source = UnusedUniformDeclarations.removeUnused(source);
         String uncommented = COMMENTS.matcher(source.replace("\uFEFF", "")).replaceAll("");
         Matcher matcher = POST_VERTEX_UNIFORM_DECLARATION.matcher(uncommented);
         Set<String> declaredUniforms = new HashSet<>();
@@ -3567,7 +3583,7 @@ public final class VeyraRenderer {
                             programName, shaderPackVertex.get(), unusedOutputLocations);
                 }
                 String adaptedFragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
-                        programName.equals("gbuffers_water"), packVaryings, usesNoiseSampler);
+                        programName.equals("gbuffers_water"), packVaryings, usesNoiseSampler, programName);
                 String programVertexSource = vertexSource;
                 if (shaderPackVertex.isPresent()) {
                     Set<Integer> reconciledUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
@@ -3578,7 +3594,7 @@ public final class VeyraRenderer {
                                 programName, shaderPackVertex.get(), unusedOutputLocations);
                         adaptedFragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource,
                                 shadowSamplerAvailable, programName.equals("gbuffers_water"), packVaryings,
-                                usesNoiseSampler);
+                                usesNoiseSampler, programName);
                         reconciledUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
                                 adaptedFragmentSource);
                     }
@@ -3601,6 +3617,8 @@ public final class VeyraRenderer {
                     programVertexSource = images.decorate(programVertexSource, vertexImages);
                     adaptedFragmentSource = images.decorate(adaptedFragmentSource, fragmentImages);
                 }
+                dumpShaderSource("terrain-" + programName + ".vsh", programVertexSource);
+                dumpShaderSource("terrain-" + programName + ".fsh", adaptedFragmentSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, programVertexSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, adaptedFragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
@@ -3657,14 +3675,14 @@ public final class VeyraRenderer {
                         Set<Integer> unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, descriptions);
                         var varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, shadowVertex.get(), unusedLocations);
                         fragmentSource = TerrainShaderAdapter.adaptFragment(
-                                fragmentSource, false, false, varyings, usesNoiseSampler);
+                                fragmentSource, false, false, varyings, usesNoiseSampler, programName);
                         Set<Integer> finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource);
                         if (!finalUnused.equals(unusedLocations)) {
                             unusedLocations = finalUnused;
                             varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, shadowVertex.get(), unusedLocations);
                             // Re-adapt the original pack fragment, not the generated Vulkan source.
                             fragmentSource = TerrainShaderAdapter.adaptFragment(
-                                    originalFragmentSource, false, false, varyings, usesNoiseSampler);
+                                    originalFragmentSource, false, false, varyings, usesNoiseSampler, programName);
                             finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource);
                         }
                         if (!finalUnused.equals(unusedLocations)) throw new IOException(programName + " shadow varying interface did not converge.");
@@ -3673,7 +3691,7 @@ public final class VeyraRenderer {
                                 shadowVertex.get(), programName, 5, finalUnused).source();
                     } else {
                         fragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, false, false,
-                                usesNoiseSampler);
+                                Map.of(), usesNoiseSampler, programName);
                     }
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
@@ -3683,6 +3701,8 @@ public final class VeyraRenderer {
                         shadowVertexSource = images.decorate(shadowVertexSource, vertexImages);
                         fragmentSource = images.decorate(fragmentSource, fragmentImages);
                     }
+                    dumpShaderSource("shadow-" + programName + ".vsh", shadowVertexSource);
+                    dumpShaderSource("shadow-" + programName + ".fsh", fragmentSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, shadowVertexSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
                     GraphicsPipeline shadowPipeline = builder.createGraphicsPipeline();
@@ -3840,6 +3860,18 @@ public final class VeyraRenderer {
             if (descriptor == null) continue;
             descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             descriptor.isReadOnlyLayout = false;
+        }
+    }
+
+    private static void dumpShaderSource(String name, String source) {
+        if (!Boolean.getBoolean("veyra.debug.dumpShaderSources")) return;
+        try {
+            Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"))
+                    .resolve("shader-dumps");
+            Files.createDirectories(output);
+            Files.writeString(output.resolve(name), source, StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            VeyraClient.LOGGER.warn("Could not write shader debug source {}.", name, exception);
         }
     }
 
@@ -4150,6 +4182,7 @@ public final class VeyraRenderer {
         boolean requiresLightmap = EntityShaderAdapter.requiresLightmapInput(rawFragmentSource);
         boolean requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(rawFragmentSource);
         boolean requiresViewNormal = EntityShaderAdapter.requiresViewNormalInput(rawFragmentSource);
+        boolean requiresShadowPosition = EntityShaderAdapter.requiresPositionInput(rawFragmentSource, programName);
         String fragmentSource = EntityShaderAdapter.adaptFragment(rawFragmentSource, programName);
         String sourceHash = sha256(programName + '\n' + fragmentSource);
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
@@ -4163,7 +4196,8 @@ public final class VeyraRenderer {
             RenderPipeline shadowPipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
             if (shadowPipeline == null) {
                 shadowPipeline = compileShadowEntityPipeline(original, programName, fragmentSource, sourceHash,
-                        requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
+                        requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
+                        requiresShadowPosition);
                 ENTITY_PIPELINE_CACHE.put(cacheKey, shadowPipeline);
             }
             GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(shadowPipeline).getPipeline();
@@ -4184,7 +4218,8 @@ public final class VeyraRenderer {
     private static RenderPipeline compileShadowEntityPipeline(
             RenderPipeline original, String programName, String fragmentSource, String sourceHash,
             boolean requiresNormal, boolean requiresLightmap,
-            boolean requiresViewPosition, boolean requiresViewNormal) throws IOException {
+            boolean requiresViewPosition, boolean requiresViewNormal,
+            boolean requiresShadowPosition) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/" + programName + "/" + sourceHash);
         Identifier location = Identifier.fromNamespaceAndPath("veyra",
@@ -4193,17 +4228,23 @@ public final class VeyraRenderer {
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
-        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal) {
+        if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || requiresShadowPosition) {
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
                     shaderManager.getShader(vertexShader, ShaderType.VERTEX), true, programName,
-                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal);
+                    requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
+                    false, requiresShadowPosition);
             vertexShader = entityNormalVertexShader(original, sourceHash, true);
         }
         Identifier selectedVertexShader = vertexShader;
         String selectedVertexSource = adaptedVertex;
+        String parserSafeFragmentSource = dev.veyra.shader.ShaderSource.maskBlockAndLineComments(fragmentSource);
+        if (selectedVertexSource != null) {
+            dumpShaderSource("shadow-entity-" + programName + ".vsh", selectedVertexSource);
+        }
+        dumpShaderSource("shadow-entity-" + programName + ".fsh", parserSafeFragmentSource);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
-                return fragmentSource;
+                return parserSafeFragmentSource;
             }
             if (selectedVertexSource != null && identifier.equals(selectedVertexShader)
                     && type == ShaderType.VERTEX) {
@@ -6781,6 +6822,7 @@ public final class VeyraRenderer {
                 case "biome_precipitation" -> new UniformValue.IntUniform(biomePrecipitation());
                 case "playerLookVector" -> new UniformValue.Vec3Uniform(frameUniforms.camera().playerLookVector());
                 case "skyColor" -> new UniformValue.Vec3Uniform(frameUniforms.camera().skyColor());
+                case "fogColor" -> new UniformValue.Vec3Uniform(new Vector3f(irisFogColor));
                 case "lightningBoltPosition" -> new UniformValue.Vec4Uniform(frameUniforms.camera().lightningBoltPosition());
                 case "heldBlockLightValue" -> new UniformValue.IntUniform(
                         heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND));

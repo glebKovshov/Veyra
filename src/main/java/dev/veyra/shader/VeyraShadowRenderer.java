@@ -78,6 +78,7 @@ public final class VeyraShadowRenderer {
     private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
     private static boolean rendering;
     private static boolean renderingFeatures;
+    private static boolean warnedAboutNonRecordingFrame;
     private static ShadowSettings shadowSettings = ShadowSettings.DEFAULT;
     private static Vec3 shadowCameraPosition = Vec3.ZERO;
 
@@ -264,6 +265,17 @@ public final class VeyraShadowRenderer {
             updateShadowMatrixUniformBuffers();
             return;
         }
+        if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
+            if (!warnedAboutNonRecordingFrame) {
+                VeyraClient.LOGGER.warn("Skipping one shadow pass because Vulkan is not recording this world-transition frame.");
+                warnedAboutNonRecordingFrame = true;
+            }
+            shadowModelView.identity();
+            shadowProjection.identity();
+            updateShadowMatrixUniformBuffers();
+            return;
+        }
+        warnedAboutNonRecordingFrame = false;
 
         Vec3 cameraPosition = camera.position();
         shadowCameraPosition = cameraPosition;

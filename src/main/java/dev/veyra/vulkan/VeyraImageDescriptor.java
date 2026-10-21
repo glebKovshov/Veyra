@@ -18,7 +18,8 @@ public final class VeyraImageDescriptor extends ImageDescriptor {
         isReadOnlyLayout = false;
         if (useSampler) {
             boolean integer = glslType.startsWith("usampler") || glslType.startsWith("isampler");
-            boolean linear = !integer && (!(image instanceof VeyraImage3D volume) || volume.supportsLinearFiltering());
+            boolean linear = !integer && (!(image instanceof VeyraCustomImage customImage)
+                    || customImage.supportsLinearFiltering());
             image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, linear, 0));
         }
     }

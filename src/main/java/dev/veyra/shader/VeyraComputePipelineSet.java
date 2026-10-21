@@ -10,7 +10,9 @@ import org.lwjgl.vulkan.VkCommandBuffer;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -42,7 +44,19 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             adapted.add(ComputeShaderAdapter.adapt(file, source, properties));
         }
 
-        VeyraComputeResources resources = VeyraComputeResources.create(properties, adapted);
+        Set<String> graphicsImageNames = new LinkedHashSet<>();
+        for (String file : pack.stageFiles().stream().sorted().toList()) {
+            if (!file.endsWith(".vsh") && !file.endsWith(".fsh")) continue;
+            String program = file.substring(0, file.lastIndexOf('.'));
+            if (!pack.isProgramEnabled(program)) continue;
+            var source = pack.readStage(file);
+            if (source.isEmpty()) continue;
+            var stage = ShaderPackImageBindings.prepare(file, source.get(), properties);
+            stage.resources().stream().map(ComputeShaderAdapter.OpaqueResource::imageName)
+                    .forEach(graphicsImageNames::add);
+        }
+
+        VeyraComputeResources resources = VeyraComputeResources.create(properties, adapted, graphicsImageNames);
         List<Dispatch> compiled = new ArrayList<>(adapted.size());
         try {
             for (int index = 0; index < adapted.size(); index++) {
@@ -133,7 +147,7 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         }
         VeyraComputePipeline.memoryBarrier(commandBuffer,
                 VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                 VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
                 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
         for (int index = 0; index < stages.size(); index++) {

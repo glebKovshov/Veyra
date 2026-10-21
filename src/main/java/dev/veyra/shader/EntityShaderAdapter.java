@@ -66,6 +66,8 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Position\\s*;");
     private static final Pattern VIEW_POSITION_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+viewPos\\s*;");
+    private static final Pattern SHADOW_POSITION_VERTEX_OUTPUT = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec4\\s+position\\s*;");
     private static final Pattern VIEW_NORMAL_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+viewNormal\\s*;");
     private static final Pattern MAIN_FUNCTION = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
@@ -262,6 +264,10 @@ public final class EntityShaderAdapter {
         return requiresVarying(source, "viewNormal");
     }
 
+    public static boolean requiresPositionInput(String source, String programName) {
+        return programName.startsWith("shadow_") && requiresVarying(source, "position");
+    }
+
     public static boolean requiresMainHandInput(String source) {
         return requiresVarying(source, "isMainHand");
     }
@@ -385,18 +391,31 @@ public final class EntityShaderAdapter {
                                           boolean requiresNormal, boolean requiresLightmapCoord,
                                           boolean requiresViewPosition, boolean requiresViewNormal,
                                           boolean handPass) throws IOException {
+        return adaptVertexShader(source, shadowPass, programName, requiresNormal, requiresLightmapCoord,
+                requiresViewPosition, requiresViewNormal, handPass, false);
+    }
+
+    public static String adaptVertexShader(String source, boolean shadowPass, String programName,
+                                          boolean requiresNormal, boolean requiresLightmapCoord,
+                                          boolean requiresViewPosition, boolean requiresViewNormal,
+                                          boolean handPass, boolean requiresShadowPosition) throws IOException {
         if (source == null || source.isBlank()) {
             List<String> required = new ArrayList<>();
             if (requiresNormal) required.add("normals");
             if (requiresLightmapCoord) required.add("lightmap coordinates");
             if (requiresViewPosition) required.add("view-space positions");
             if (requiresViewNormal) required.add("view-space normals");
+            if (requiresShadowPosition) required.add("shadow-space world positions");
             if (handPass) required.add("the first-person hand depth transform");
             String requiredInputs = String.join(", ", required);
             throw new IOException(programName + " requires " + requiredInputs
                     + ", but its VulkanMod vertex shader is empty.");
         }
-        if (!requiresNormal && !requiresLightmapCoord && !requiresViewPosition && !requiresViewNormal && !handPass) {
+        if (requiresShadowPosition && !shadowPass) {
+            throw new IOException(programName + " requires shadow-space world positions outside a shadow pass.");
+        }
+        if (!requiresNormal && !requiresLightmapCoord && !requiresViewPosition && !requiresViewNormal
+                && !requiresShadowPosition && !handPass) {
             return source;
         }
         String uncommented = COMMENTS.matcher(source).replaceAll("");
@@ -428,9 +447,14 @@ public final class EntityShaderAdapter {
         if (addViewNormalAssignment && !NORMAL_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
             throw new IOException(programName + " requires viewNormal, but VulkanMod's vertex format does not provide normals.");
         }
+        boolean hasShadowPositionOutput = SHADOW_POSITION_VERTEX_OUTPUT.matcher(uncommented).find();
+        boolean hasShadowPositionAssignment = Pattern.compile("\\bposition\\s*=").matcher(uncommented).find();
+        boolean addShadowPositionOutput = requiresShadowPosition && !hasShadowPositionOutput;
+        boolean addShadowPositionAssignment = requiresShadowPosition && !hasShadowPositionAssignment;
         if (!addNormalOutput && !addNormalAssignment && !addLightmapOutput && !addLightmapAssignment
                 && !addViewPositionOutput && !addViewPositionAssignment
-                && !addViewNormalOutput && !addViewNormalAssignment) {
+                && !addViewNormalOutput && !addViewNormalAssignment
+                && !addShadowPositionOutput && !addShadowPositionAssignment) {
             if (!handPass) {
                 return source;
             }
@@ -445,11 +469,11 @@ public final class EntityShaderAdapter {
         StringBuilder declarations = new StringBuilder();
         String inverseMatrix = shadowPass ? "shadowModelViewInverse" : "gbufferModelViewInverse";
         if (addNormalAssignment) {
-            Pattern inverseMatrixUniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
-                    + Pattern.quote(inverseMatrix) + "\\s*;");
-            if (!inverseMatrixUniform.matcher(uncommented).find()) {
-                declarations.append("uniform mat4 ").append(inverseMatrix).append(";\n");
-            }
+            appendMatrixUniformIfMissing(declarations, uncommented, inverseMatrix);
+        }
+        if (addShadowPositionAssignment) {
+            appendMatrixUniformIfMissing(declarations, uncommented, "shadowModelViewInverse");
+            appendMatrixUniformIfMissing(declarations, uncommented, "shadowProjectionInverse");
         }
         if (addNormalOutput) {
             declarations.append("out vec3 normal;\n");
@@ -462,6 +486,9 @@ public final class EntityShaderAdapter {
         }
         if (addViewNormalOutput) {
             declarations.append("out vec3 viewNormal;\n");
+        }
+        if (addShadowPositionOutput) {
+            declarations.append("out vec4 position;\n");
         }
         String withDeclarations = source.substring(0, main.start()) + declarations + source.substring(main.start());
         Matcher adaptedMain = MAIN_FUNCTION.matcher(withDeclarations);
@@ -484,7 +511,38 @@ public final class EntityShaderAdapter {
         }
         String adapted = withDeclarations.substring(0, adaptedMain.end()) + vertexAssignments
                 + withDeclarations.substring(adaptedMain.end());
+        if (addShadowPositionAssignment) {
+            String adaptedUncommented = maskComments(adapted);
+            Matcher positionMain = MAIN_FUNCTION.matcher(adaptedUncommented);
+            if (!positionMain.find()) {
+                throw new IOException(programName + " requires shadow-space world positions, but its vertex shader has no main function.");
+            }
+            int mainStart = positionMain.end() - 1;
+            int mainEnd = findMainEnd(adaptedUncommented, mainStart, programName);
+            Matcher clipPosition = GL_POSITION_ASSIGNMENT.matcher(adaptedUncommented);
+            boolean assignsClipPosition = false;
+            while (clipPosition.find()) {
+                if (clipPosition.start() > mainStart && clipPosition.start() < mainEnd) {
+                    assignsClipPosition = true;
+                    break;
+                }
+            }
+            if (!assignsClipPosition) {
+                throw new IOException(programName + " requires shadow-space world positions, but VulkanMod's vertex shader does not assign gl_Position.");
+            }
+            adapted = adapted.substring(0, mainEnd)
+                    + "\nposition = shadowModelViewInverse * shadowProjectionInverse * gl_Position;\n"
+                    + adapted.substring(mainEnd);
+        }
         return handPass ? applyHandDepth(adapted, programName) : adapted;
+    }
+
+    private static void appendMatrixUniformIfMissing(StringBuilder declarations, String uncommented, String name) {
+        Pattern uniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
+                + Pattern.quote(name) + "\\s*;");
+        if (!uniform.matcher(uncommented).find()) {
+            declarations.append("uniform mat4 ").append(name).append(";\n");
+        }
     }
 
     private static String applyHandDepth(String source, String programName) throws IOException {
@@ -520,7 +578,7 @@ public final class EntityShaderAdapter {
                 return index;
             }
         }
-        throw new IOException(programName + " cannot apply MC_HAND_DEPTH because VulkanMod's vertex main function has unmatched braces.");
+        throw new IOException(programName + " has unmatched braces in its vertex main function.");
     }
 
     private static String maskComments(String source) {
@@ -578,6 +636,7 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
         FragmentOutputs outputLayout = FragmentOutputs.parse(source);
 
         String adapted = bindEntityIdentifiers(source.replace("\uFEFF", ""), programName,
@@ -593,6 +652,7 @@ public final class EntityShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        adapted = UnusedUniformDeclarations.removeUnused(adapted);
         Map<String, Integer> geometryColorInputs = geometryColorInputsAvailable
                 ? GeometryColorSamplers.read(source) : Map.of();
         boolean usesShadowSampler = usesShadowSampler(adapted);
@@ -656,6 +716,7 @@ public final class EntityShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
         boolean suppliesNormal = false;
+        boolean suppliesShadowPosition = false;
         boolean suppliesLegacyColor = false;
         boolean suppliesViewPosition = false;
         boolean suppliesViewNormal = false;
@@ -671,7 +732,9 @@ public final class EntityShaderAdapter {
             String interpolation = varyingMatcher.group(2) == null ? "smooth" : varyingMatcher.group(2);
             String type = varyingMatcher.group(3);
             String name = varyingMatcher.group(4);
-            Varying varying = (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
+            Varying varying = programName.startsWith("shadow_") && name.equals("position")
+                    ? new Varying("vec4")
+                    : (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
             TerrainVertexShaderAdapter.PackVarying packVarying = vertexVaryings.get(name);
             if (varying == null && packVarying == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's "
@@ -705,6 +768,9 @@ public final class EntityShaderAdapter {
             if (name.equals("eastVec")) suppliesEastVector = true;
             if (name.equals("normal")) {
                 suppliesNormal = true;
+            }
+            if (name.equals("position") && programName.startsWith("shadow_")) {
+                suppliesShadowPosition = true;
             }
             if (name.equals("color")) {
                 suppliesLegacyColor = true;
@@ -793,6 +859,7 @@ public final class EntityShaderAdapter {
                 in vec2 texCoord0;
                 __VEYRA_COLOR_ALIAS__
                 __VEYRA_VIEW_POSITION_INPUT__
+                __VEYRA_SHADOW_POSITION_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_IS_MAIN_HAND_VALUE__
                 __VEYRA_DIRECTIONAL_INPUTS__
@@ -826,6 +893,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
                 __VEYRA_VIEW_POSITION_INPUT__
+                __VEYRA_SHADOW_POSITION_INPUT__
                 #ifdef PER_FACE_LIGHTING
                 in vec4 vertexPerFaceColorBack;
                 in vec4 vertexPerFaceColorFront;
@@ -879,6 +947,7 @@ public final class EntityShaderAdapter {
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
                 .replace("__VEYRA_COLOR_ALIAS__", suppliesLegacyColor ? "#define color veyraEntityColor\n" : "")
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
+                .replace("__VEYRA_SHADOW_POSITION_INPUT__", suppliesShadowPosition ? "in vec4 position;\n" : "")
                 .replace("__VEYRA_VIEW_NORMAL_INPUT__", suppliesViewNormal ? "in vec3 viewNormal;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
                 .replace("__VEYRA_IS_MAIN_HAND_VALUE__", suppliesMainHand

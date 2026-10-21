@@ -104,7 +104,8 @@ final class TerrainVertexShaderAdapter {
     static AdaptedStage adaptStage(String vulkanModSource, String shaderPackSource, String programName,
                                    int noiseSamplerBinding, Set<Integer> freeOutputLocations) throws IOException {
         PreparedStage pack = prepare(programName, shaderPackSource, noiseSamplerBinding, freeOutputLocations);
-        String source = vulkanModSource;
+        String source = TerrainShaderAdapter.renameConflictingShaderPackUniformFields(
+                vulkanModSource, pack.source());
         Matcher version = VERSION_DIRECTIVE.matcher(source);
         if (!version.find()) {
             throw new IOException("VulkanMod's terrain vertex shader has no #version directive.");
@@ -134,7 +135,7 @@ final class TerrainVertexShaderAdapter {
         }
 
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
-        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forShadowTerrainProgram(programName), programName);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION_DIRECTIVE.matcher(source);
         while (extensionMatcher.find()) extensions.add(extensionMatcher.group().strip());

@@ -1546,7 +1546,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return fileName;
     }
 
-    private boolean isProgramEnabled(String program) throws IOException {
+    boolean isProgramEnabled(String program) throws IOException {
         Boolean cached = configuration.enabled(program);
         if (cached != null) return cached;
         String resolved = program;

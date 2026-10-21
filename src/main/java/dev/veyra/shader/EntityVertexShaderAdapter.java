@@ -137,6 +137,7 @@ final class EntityVertexShaderAdapter {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
         source = UnreachableGlslFunctions.removeUnreachable(source, "main");
         source = UnusedUniformDeclarations.removeUnused(source);
         List<String> extensions = new ArrayList<>();

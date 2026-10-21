@@ -45,6 +45,22 @@ class IrisRenderStagesTest {
     }
 
     @Test
+    void mapsEntityHandBlockAndDamageProgramsToTheirIrisStages() {
+        assertEquals(8, IrisRenderStages.forProgram("gbuffers_terrain"));
+        assertEquals(11, IrisRenderStages.forProgram("gbuffers_entities_translucent"));
+        assertEquals(11, IrisRenderStages.forProgram("shadow_entities"));
+        assertEquals(11, IrisRenderStages.forProgram("gbuffers_spidereyes"));
+        assertEquals(12, IrisRenderStages.forProgram("gbuffers_block"));
+        assertEquals(12, IrisRenderStages.forProgram("gbuffers_block_translucent"));
+        assertEquals(12, IrisRenderStages.forProgram("shadow_block"));
+        assertEquals(12, IrisRenderStages.forProgram("gbuffers_text"));
+        assertEquals(13, IrisRenderStages.forProgram("gbuffers_damagedblock"));
+        assertEquals(16, IrisRenderStages.forProgram("gbuffers_hand"));
+        assertEquals(23, IrisRenderStages.forProgram("gbuffers_hand_water"));
+        assertNull(IrisRenderStages.forProgram("gbuffers_weather"));
+    }
+
+    @Test
     void specializesCelestialAndEndSkyPipelinesForTheirDrawStages() {
         assertEquals(4, IrisRenderStages.sunStage());
         assertEquals(5, IrisRenderStages.moonStage());

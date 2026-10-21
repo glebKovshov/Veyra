@@ -95,6 +95,80 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void preservesPackGlobalsThatShareNamesWithTerrainUniformFields() throws IOException {
+        String fragment = """
+                #version 120
+                const float pi = 3.14159265;
+                float timeAngle = 0.25;
+                void main() { gl_FragColor = vec4(sin(timeAngle * pi)); }
+                """;
+
+        assertEquals(Set.of("pi", "timeAngle"), TerrainShaderAdapter.conflictingShaderPackUniforms(fragment));
+        String adapted = TerrainShaderAdapter.adaptFragment(fragment);
+
+        assertTrue(adapted.contains("float veyraReservedShaderPack_pi;"), adapted);
+        assertTrue(adapted.contains("float veyraReservedShaderPack_timeAngle;"), adapted);
+        assertTrue(adapted.contains("const float pi = 3.14159265;"), adapted);
+        assertTrue(adapted.contains("float timeAngle = 0.25;"), adapted);
+        assertTrue(adapted.contains("sin(timeAngle * pi)"), adapted);
+    }
+
+    @Test
+    void preservesNativeTerrainUniformReferencesWhenRenamingConflictingFields() throws IOException {
+        String vulkanModVertex = """
+                #version 460
+                layout(binding = 1) uniform UBO {
+                    float pi;
+                    float timeAngle;
+                    float aspectRatio;
+                };
+                void main() { gl_Position = vec4(pi, timeAngle, aspectRatio, 1.0); }
+                """;
+        String shaderPackVertex = """
+                const float pi = 3.14159265;
+                float timeAngle = 0.25;
+                void main() { gl_Position = vec4(sin(timeAngle * pi)); }
+                """;
+
+        String adapted = TerrainVertexShaderAdapter.adapt(vulkanModVertex, shaderPackVertex, "gbuffers_terrain");
+
+        assertTrue(adapted.contains("float veyraReservedShaderPack_pi;"), adapted);
+        assertTrue(adapted.contains("float veyraReservedShaderPack_timeAngle;"), adapted);
+        assertTrue(adapted.contains("vec4(veyraReservedShaderPack_pi, veyraReservedShaderPack_timeAngle, aspectRatio, 1.0)"), adapted);
+        assertTrue(adapted.contains("const float pi = 3.14159265;"), adapted);
+        assertTrue(adapted.contains("float timeAngle = 0.25;"), adapted);
+        assertTrue(adapted.contains("sin(timeAngle * pi)"), adapted);
+    }
+
+    @Test
+    void dropsUnusedUnknownUniformsButKeepsDeclarationsUsedByPostStages() {
+        String source = """
+                uniform int blockEntityId;
+                uniform float customStageValue;
+                void main() { gl_Position = vec4(customStageValue); }
+                """;
+
+        String adapted = UnusedUniformDeclarations.removeUnused(source);
+
+        assertFalse(adapted.contains("uniform int blockEntityId;"), adapted);
+        assertTrue(adapted.contains("uniform float customStageValue;"), adapted);
+    }
+
+    @Test
+    void doesNotAliasLocalColorParametersAsVertexVaryings() throws IOException {
+        String adapted = TerrainShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec4 color;
+                vec4 adjustColor(vec4 color) { return color * 0.5; }
+                void main() { gl_FragColor = adjustColor(color); }
+                """);
+
+        assertFalse(adapted.contains("#define color veyraVertexColor"), adapted);
+        assertTrue(adapted.contains("layout(location = 0) in vec4 color;"), adapted);
+        assertTrue(adapted.contains("vec4 adjustColor(vec4 color)"), adapted);
+    }
+
+    @Test
     void adaptsCamelCaseLightmapCoordToTerrainLightmapInput() throws IOException {
         String adapted = TerrainShaderAdapter.adaptFragment("""
                 #version 120
@@ -102,8 +176,8 @@ class ShaderAdapterTest {
                 void main() { gl_FragColor = vec4(lmCoord, 0.0, 1.0); }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 5) in vec2 veyraLightmapCoord;"));
-        assertTrue(adapted.contains("#define lmCoord veyraLightmapCoord"));
+        assertTrue(adapted.contains("layout(location = 5) in vec2 lmCoord;"));
+        assertFalse(adapted.contains("#define lmCoord"));
         assertFalse(adapted.contains("varying vec2 lmCoord;"));
     }
 
@@ -134,8 +208,8 @@ class ShaderAdapterTest {
                 void main() { gl_FragColor = color; }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 0) in vec4 veyraVertexColor;"));
-        assertTrue(adapted.contains("#define color veyraVertexColor"));
+        assertTrue(adapted.contains("layout(location = 0) in vec4 color;"));
+        assertFalse(adapted.contains("#define color"));
         assertFalse(adapted.contains("varying vec4 color;"));
     }
 
@@ -165,12 +239,10 @@ class ShaderAdapterTest {
                 }
                 """);
 
-        assertTrue(fragment.contains("layout(location = 10) in vec3 veyraViewPosition;"));
-        assertTrue(fragment.contains("#define viewPos veyraViewPosition"));
-        assertTrue(fragment.contains("layout(location = 16) in float veyraTerrainDistance;"));
-        assertTrue(fragment.contains("layout(location = 19) in vec4 veyraSpriteBounds;"));
-        assertTrue(fragment.contains("#define dist veyraTerrainDistance"));
-        assertTrue(fragment.contains("#define spriteBounds veyraSpriteBounds"));
+        assertTrue(fragment.contains("layout(location = 10) in vec3 viewPos;"));
+        assertTrue(fragment.contains("layout(location = 16) in float dist;"));
+        assertTrue(fragment.contains("layout(location = 19) in vec4 spriteBounds;"));
+        assertFalse(fragment.contains("#define viewPos"));
         assertFalse(fragment.contains("varying vec3 viewPos;"));
         assertFalse(fragment.contains("varying float dist;"));
         assertTrue(vertex.contains("layout (location = 10) out vec3 veyraViewPosition;"));
@@ -345,10 +417,9 @@ class ShaderAdapterTest {
         assertTrue(vertex.source().contains("#define texCoord texCoord0"));
         assertTrue(vertex.source().contains("layout(location = 20) out vec3 veyraPackVarying_normal;"));
         assertEquals(20, vertex.varyings().get("normal").location());
-        assertTrue(fragment.contains("layout(location = 20) in vec3 veyraPackVarying_normal;"));
-        assertTrue(fragment.contains("layout(location = 4) flat in float veyraPackVarying_chunkFade;"));
-        assertTrue(fragment.contains("#define mat veyraTerrainMaterialId"));
-        assertTrue(fragment.contains("#define chunkFade veyraPackVarying_chunkFade"));
+        assertTrue(fragment.contains("layout(location = 20) in vec3 normal;"));
+        assertTrue(fragment.contains("layout(location = 4) flat in float chunkFade;"));
+        assertTrue(fragment.contains("layout(location = 11) flat in int mat;"));
         assertFalse(fragment.contains("veyraInitializeTerrainTangentFrame"));
     }
 
@@ -405,9 +476,9 @@ class ShaderAdapterTest {
                     gl_FragColor = vec4(tbnMatrix[0] + matrixFollowing.rgb, 1.0);
                 }
                 """, false, false, vertex.varyings());
-        assertTrue(fragment.contains("layout(location = 20) in mat3 veyraPackVarying_tbnMatrix;"));
-        assertTrue(fragment.contains("layout(location = 23) in vec4 veyraPackVarying_matrixFollowing;"));
-        assertTrue(fragment.contains("#define tbnMatrix veyraPackVarying_tbnMatrix"));
+        assertTrue(fragment.contains("layout(location = 20) in mat3 tbnMatrix;"));
+        assertTrue(fragment.contains("layout(location = 23) in vec4 matrixFollowing;"));
+        assertFalse(fragment.contains("#define tbnMatrix"));
     }
 
     @Test
@@ -472,13 +543,10 @@ class ShaderAdapterTest {
                     }
                     """.formatted(materialType));
 
-            assertTrue(adapted.contains("layout(location = 11) flat in int veyraTerrainMaterialId;"));
-            assertTrue(adapted.contains("layout(location = 13) flat in vec2 veyraMcEntity;"));
-            assertTrue(adapted.contains(materialType.equals("float")
-                    ? "#define mat float(veyraTerrainMaterialId)" : "#define mat veyraTerrainMaterialId"));
-            assertTrue(adapted.contains("#define mc_Entity veyraMcEntity"));
-            assertFalse(adapted.contains("flat in " + materialType + " mat;"));
-            assertFalse(adapted.contains("flat in vec2 mc_Entity;"));
+            assertTrue(adapted.contains("layout(location = 13) flat in vec2 mc_Entity;"));
+            assertTrue(materialType.equals("float")
+                    ? adapted.contains("float mat;") && adapted.contains("mat = float(veyraTerrainMaterialId);")
+                    : adapted.contains("int mat;") && adapted.contains("mat = veyraTerrainMaterialId;"));
         }
     }
 
@@ -491,8 +559,9 @@ class ShaderAdapterTest {
                 """);
 
         assertTrue(adapted.contains("layout(location = 11) flat in int veyraTerrainMaterialId;"));
-        assertTrue(adapted.contains("#define recolor ((veyraTerrainMaterialId / 100 == 151 || "
-                + "veyraTerrainMaterialId / 100 == 155 || veyraTerrainMaterialId / 100 == 156) ? 1.0 : 0.0)"));
+        assertTrue(adapted.contains("float recolor;"));
+        assertTrue(adapted.contains("recolor = ((veyraTerrainMaterialId / 100 == 151 || "
+                + "veyraTerrainMaterialId / 100 == 155 || veyraTerrainMaterialId / 100 == 156) ? 1.0 : 0.0);"));
         assertFalse(adapted.contains("varying float recolor;"));
     }
 
@@ -506,9 +575,10 @@ class ShaderAdapterTest {
 
         assertTrue(adapted.contains("vec3 sunPosition;"));
         assertTrue(adapted.contains("mat4 gbufferModelView;"));
-        assertTrue(adapted.contains("#define sunVec normalize(sunPosition)"));
-        assertTrue(adapted.contains("#define upVec normalize(gbufferModelView[1].xyz)"));
-        assertTrue(adapted.contains("#define eastVec normalize(gbufferModelView[0].xyz)"));
+        assertTrue(adapted.contains("vec3 sunVec;"));
+        assertTrue(adapted.contains("sunVec = normalize(sunPosition);"));
+        assertTrue(adapted.contains("upVec = normalize(gbufferModelView[1].xyz);"));
+        assertTrue(adapted.contains("eastVec = normalize(gbufferModelView[0].xyz);"));
         assertFalse(adapted.contains("varying vec3 sunVec"));
     }
 
@@ -520,10 +590,8 @@ class ShaderAdapterTest {
                 void main() { gl_FragColor = vec4(vTexCoord.st * vTexCoordAM.pq + vTexCoordAM.st, 0.0, 1.0); }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 17) in vec4 veyraBslTexCoord;"));
-        assertTrue(adapted.contains("layout(location = 18) in vec4 veyraBslTexCoordAM;"));
-        assertTrue(adapted.contains("#define vTexCoord veyraBslTexCoord"));
-        assertTrue(adapted.contains("#define vTexCoordAM veyraBslTexCoordAM"));
+        assertTrue(adapted.contains("layout(location = 17) in vec4 vTexCoord;"));
+        assertTrue(adapted.contains("layout(location = 18) in vec4 vTexCoordAM;"));
         assertFalse(adapted.contains("varying vec4 vTexCoord"));
     }
 
@@ -538,8 +606,7 @@ class ShaderAdapterTest {
                 }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 12) in vec2 veyraSignMidCoordPos;"));
-        assertTrue(adapted.contains("#define signMidCoordPos veyraSignMidCoordPos"));
+        assertTrue(adapted.contains("layout(location = 12) in vec2 signMidCoordPos;"));
         assertFalse(adapted.contains("varying vec2 signMidCoordPos;"));
     }
 
@@ -551,8 +618,7 @@ class ShaderAdapterTest {
                 void main() { gl_FragColor = vec4(absMidCoordPos, 0.0, 1.0); }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 14) flat in vec2 veyraAbsMidCoordPos;"));
-        assertTrue(adapted.contains("#define absMidCoordPos veyraAbsMidCoordPos"));
+        assertTrue(adapted.contains("layout(location = 14) flat in vec2 absMidCoordPos;"));
         assertFalse(adapted.contains("varying vec2 absMidCoordPos;"));
     }
 
@@ -564,9 +630,8 @@ class ShaderAdapterTest {
                 void main() { gl_FragColor = vec4(midCoord, 0.0, 1.0); }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 15) flat in vec2 veyraMidCoord;"));
-        assertTrue(adapted.contains("#define midCoord veyraMidCoord"));
-        assertFalse(adapted.contains("flat in vec2 midCoord;"));
+        assertTrue(adapted.contains("layout(location = 15) flat in vec2 midCoord;"));
+        assertFalse(adapted.contains("flat in vec2 veyraMidCoord;"));
     }
 
     @Test
@@ -577,8 +642,8 @@ class ShaderAdapterTest {
                     varying vec3 %s;
                     void main() { gl_FragColor = vec4(abs(%s) / 64.0, 1.0); }
                     """.formatted(input, input));
-            assertTrue(adapted.contains("layout(location = 7) in vec3 veyraTerrainPosition;"));
-            assertTrue(adapted.contains("#define " + input + " veyraTerrainPosition"));
+            assertTrue(adapted.contains("layout(location = 7) in vec3 " + input + ";"));
+            assertFalse(adapted.contains("#define " + input));
             assertFalse(adapted.contains("varying vec3 " + input + ";"));
         }
     }
@@ -598,12 +663,17 @@ class ShaderAdapterTest {
         assertTrue(adapted.contains("dFdy(veyraViewPosition)"));
         assertTrue(adapted.contains("dFdx(veyraTexCoord)"));
         assertTrue(adapted.contains("dFdy(veyraTexCoord)"));
-        assertTrue(adapted.contains("#define normal veyraTerrainNormal()"));
-        assertTrue(adapted.contains("#define binormal veyraTerrainBinormal()"));
-        assertTrue(adapted.contains("#define tangent veyraTerrainTangent()"));
-        assertTrue(adapted.contains("#define viewVector veyraTerrainViewVector()"));
+        assertTrue(adapted.contains("vec3 normal;"));
+        assertTrue(adapted.contains("vec3 binormal;"));
+        assertTrue(adapted.contains("vec3 tangent;"));
+        assertTrue(adapted.contains("vec3 viewVector;"));
+        assertTrue(adapted.contains("normal = veyraTerrainNormal();"));
+        assertTrue(adapted.contains("binormal = veyraTerrainBinormal();"));
+        assertTrue(adapted.contains("tangent = veyraTerrainTangent();"));
+        assertTrue(adapted.contains("viewVector = veyraTerrainViewVector();"));
         assertTrue(adapted.contains("void veyraShaderPackMain()"));
-        assertTrue(adapted.contains("veyraInitializeTerrainTangentFrame();\n    veyraShaderPackMain();"));
+        assertTrue(adapted.contains("veyraInitializeTerrainTangentFrame();"));
+        assertTrue(adapted.contains("veyraShaderPackMain();"));
         assertFalse(adapted.contains("flat in vec3 normal, binormal, tangent;"));
         assertFalse(adapted.contains("in vec3 viewVector;"));
     }
@@ -616,8 +686,8 @@ class ShaderAdapterTest {
                 void main() { gl_FragColor = glColorRaw; }
                 """);
 
-        assertTrue(adapted.contains("layout(location = 0) in vec4 veyraVertexColor;"));
-        assertTrue(adapted.contains("#define glColorRaw veyraVertexColor"));
+        assertTrue(adapted.contains("layout(location = 0) in vec4 glColorRaw;"));
+        assertFalse(adapted.contains("#define glColorRaw"));
         assertFalse(adapted.contains("varying vec4 glColorRaw;"));
     }
 
