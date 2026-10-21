@@ -57,7 +57,10 @@ class ShaderAdapterTest {
                                         }))
                         : java.util.Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                 if (name.equals("gbuffers_clouds.fsh")) {
-                    adapted = CloudShaderAdapter.adaptFragment(source);
+                    Set<String> cloudCustomSamplers = customImages.resources().stream()
+                            .filter(resource -> !resource.storageImage())
+                            .map(ComputeShaderAdapter.OpaqueResource::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
+                    adapted = CloudShaderAdapter.adaptFragment(source, List.of(), cloudCustomSamplers).source();
                 } else if (programName.equals("gbuffers_damagedblock")) {
                     adapted = Files.exists(vertexPath)
                             ? DamagedBlockShaderAdapter.adaptFragment(source, programName, packVaryings,
@@ -265,6 +268,23 @@ class ShaderAdapterTest {
         assertFalse(source.contains("uniform sampler2D tex;"));
         assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate("shadow_solid",
                 "uniform samplerCube tex;\nvoid main(){gl_Position=texture(tex,vec3(0));}"));
+    }
+
+    @Test
+    void cloudAdapterAcceptsARegisteredCustomImageSampler() throws IOException {
+        var adapted = CloudShaderAdapter.adapt("""
+                #version 430
+                varying vec4 color;
+                void main() {
+                    vec4 voxels = texture(voxel_sampler, vec3(0.5));
+                    gl_FragColor = color + voxels;
+                }
+                """, java.util.List.of(), 2, java.util.Set.of("voxel_sampler"));
+        assertTrue(adapted.source().contains("texture(voxel_sampler, vec3(0.5))"));
+        assertThrows(IOException.class, () -> CloudShaderAdapter.adapt("""
+                #version 430
+                void main() { gl_FragColor=texture(voxel_sampler,vec3(0)); }
+                """));
     }
 
     @Test

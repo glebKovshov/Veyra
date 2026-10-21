@@ -61,7 +61,7 @@ public final class GraphicsSmoke {
             vanillaBaseline = fixture.equals("vanilla-baseline");
             cloudSceneColorFixture = fixture.equals("cloud-colortex0");
             cloudFixture = cloudSceneColorFixture || fixture.equals("cloud-texture-inputs")
-                    || fixture.equals("cloud-model-view");
+                    || fixture.equals("cloud-model-view") || fixture.equals("cloud-custom-image");
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             terrainMaterialFixture = fixture.equals("terrain-block-id");

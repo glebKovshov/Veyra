@@ -1115,7 +1115,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (configuration.customImages() && Set.of("vsh", "fsh").contains(extension)
                     && !TERRAIN_PROGRAMS.contains(program) && !SHADOW_PROGRAMS.contains(program)) {
                 var images = ShaderPackImageBindings.prepare(file, readStage(file).orElseThrow(), readImageProperties());
-                if (!images.resources().isEmpty()) throw new IOException("Custom images for " + file + " are not integrated yet.");
+                if (!images.resources().isEmpty()) {
+                    if (!program.equals("gbuffers_clouds")) {
+                        throw new IOException("Custom images for " + file + " are not integrated yet.");
+                    }
+                    if (extension.equals("fsh")) {
+                        Set<String> customSamplers = images.resources().stream()
+                                .filter(resource -> !resource.storageImage()).map(ComputeShaderAdapter.OpaqueResource::name)
+                                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                        CloudShaderAdapter.adapt(images.source(), List.of(), 2,
+                                customSamplers);
+                    }
+                }
             }
             if (extension.equals("vsh") && program.startsWith("gbuffers_")
                     && !program.equals("gbuffers_clouds")

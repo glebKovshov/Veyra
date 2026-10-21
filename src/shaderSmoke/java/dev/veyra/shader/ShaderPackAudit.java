@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -133,20 +134,31 @@ public final class ShaderPackAudit {
                                 TextureColorDistanceShaderAdapter.adaptFragment(source, program, vertexVaryings,
                                         pack.hasShadowFragment(), true);
                             }
-                            else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
+                            else if (program.equals("gbuffers_clouds")) {
+                                var prepared = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties());
+                                source = prepared.source();
+                                Set<String> customSamplers = prepared.resources().stream()
+                                        .filter(resource -> !resource.storageImage())
+                                        .map(ComputeShaderAdapter.OpaqueResource::name)
+                                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                                CloudShaderAdapter.adaptFragment(source, List.of(), customSamplers);
+                            }
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.
                             accepted++;
                         } catch (Exception exception) { rejected++; errors.add(file + " adapter: " + exception.getMessage()); }
                     } catch (Exception exception) { errors.add(file + " preprocess: " + exception.getMessage()); }
                 }
                 try {
-                    pack.readCloudVertex().ifPresent(source -> {
+                    var cloudVertex = pack.readCloudVertex();
+                    if (cloudVertex.isPresent()) {
                         try {
-                            CloudShaderAdapter.adaptVertexWithMetadata(vulkanModCloudVertex, source);
+                            var prepared = ShaderPackImageBindings.prepare("gbuffers_clouds.vsh", cloudVertex.get(),
+                                    pack.readImageProperties());
+                            CloudShaderAdapter.adaptVertexWithMetadata(vulkanModCloudVertex, prepared.source());
                         } catch (IOException exception) {
                             errors.add("gbuffers_clouds.vsh adapter: " + exception.getMessage());
                         }
-                    });
+                    }
                 } catch (Exception exception) {
                     errors.add("gbuffers_clouds.vsh preprocess: " + exception.getMessage());
                 }

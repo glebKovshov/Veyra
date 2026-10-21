@@ -2604,7 +2604,7 @@ public final class VeyraRenderer {
                 preparedBeaconBeams = compileBeaconBeamPipelines(pack);
             }
             if (pack.hasCloudFragment()) {
-                preparedClouds = compileCloudPipeline(pack);
+                preparedClouds = compileCloudPipeline(pack, preparedTerrain == null ? null : preparedTerrain.compute());
             }
             repository.select(pack);
             BlockIdMap.activate(nextBlockIds);
@@ -3778,22 +3778,43 @@ public final class VeyraRenderer {
     }
 
     private static GraphicsPipeline compileCloudPipeline(ShaderPack pack) throws IOException {
+        return compileCloudPipeline(pack, terrainPipelineSet == null ? null : terrainPipelineSet.compute());
+    }
+
+    private static GraphicsPipeline compileCloudPipeline(ShaderPack pack, VeyraComputePipelineSet compute) throws IOException {
         String shaderPath = ShaderLoadUtil.resolveShaderPath("basic/clouds");
         String vertexSource = ShaderLoadUtil.loadShader(shaderPath, "clouds.vsh");
         CloudShaderAdapter.AdaptedVertex adaptedVertex = null;
         Optional<String> shaderPackVertex = pack.readCloudVertex();
+        var customImageProperties = pack.readImageProperties();
+        var emptyCloudImages = new ShaderPackImageBindings.PreparedStage("", List.of());
+        var cloudVertexImages = emptyCloudImages;
+        var cloudFragmentImages = emptyCloudImages;
+        if (compute != null) {
+            if (shaderPackVertex.isPresent()) {
+                cloudVertexImages = ShaderPackImageBindings.prepare("gbuffers_clouds.vsh", shaderPackVertex.get(), customImageProperties);
+                shaderPackVertex = Optional.of(cloudVertexImages.source());
+            }
+        }
         if (shaderPackVertex.isPresent()) {
             adaptedVertex = CloudShaderAdapter.adaptVertexWithMetadata(vertexSource, shaderPackVertex.get());
             vertexSource = adaptedVertex.source();
         }
         String source = pack.readCloudFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_clouds.fsh."));
+        if (compute != null) {
+            cloudFragmentImages = ShaderPackImageBindings.prepare("gbuffers_clouds.fsh", source, customImageProperties);
+            source = cloudFragmentImages.source();
+        }
         PipelineConfig config = PipelineConfig.fromJson("clouds", ShaderLoadUtil.getJsonConfig(shaderPath, "clouds"));
         int firstImageBinding = firstCloudImageBinding(config);
         List<ShaderPackUniformAdapter.UniformField> vertexUniformFields = adaptedVertex == null
                 ? List.of() : adaptedVertex.uniformFields();
+        Set<String> cloudCustomSamplers = cloudFragmentImages.resources().stream()
+                .filter(resource -> !resource.storageImage()).map(ComputeShaderAdapter.OpaqueResource::name)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         CloudShaderAdapter.AdaptedFragment adaptedFragment = CloudShaderAdapter.adapt(
-                source, vertexUniformFields, firstImageBinding);
+                source, vertexUniformFields, firstImageBinding, cloudCustomSamplers);
         for (String varyingName : adaptedFragment.varyings()) {
             if (CloudShaderAdapter.isExtendedVarying(varyingName)
                     && (adaptedVertex == null || !adaptedVertex.varyings().contains(varyingName))) {
@@ -3808,7 +3829,6 @@ public final class VeyraRenderer {
                 || (adaptedVertex != null && adaptedVertex.requiresExtendedVertexFormat())) {
             VeyraCloudTexture.ensure();
         }
-        String fragmentSource = adaptedFragment.source();
         if (!adaptedFragment.uniformFields().isEmpty()) {
             vertexSource = addCloudUniformFields(vertexSource, adaptedFragment.uniformFields());
             config = addCloudUniformBufferFields(config, adaptedFragment.uniformFields());
@@ -3851,7 +3871,14 @@ public final class VeyraRenderer {
                         ? VeyraCloudVertexFormat.VERTEX_FORMAT : DefaultVertexFormat.POSITION_COLOR,
                 "veyra_clouds");
         builder.applyConfig(config);
-        builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, vertexSource);
+        String finalVertexSource = vertexSource;
+        String fragmentSource = adaptedFragment.source();
+        if (compute != null) {
+            var imagePlan = compute.bindGraphicsImages(builder, cloudVertexImages, cloudFragmentImages);
+            finalVertexSource = imagePlan.decorate(finalVertexSource, cloudVertexImages);
+            fragmentSource = imagePlan.decorate(fragmentSource, cloudFragmentImages);
+        }
+        builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, finalVertexSource);
         builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
         GraphicsPipeline pipeline = builder.createGraphicsPipeline();
         cloudPipelineUsesExtendedVertexFormat = adaptedVertex != null

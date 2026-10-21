@@ -61,7 +61,10 @@ public class ShaderCompileSmoke {
                             packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, packVertex);
                         }
                     }
-                    String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
+                    String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source,
+                            List.of(), customImages.resources().stream().filter(resource -> !resource.storageImage())
+                                    .map(ComputeShaderAdapter.OpaqueResource::name)
+                                    .collect(java.util.stream.Collectors.toUnmodifiableSet())).source()
                             : programName.equals("gbuffers_damagedblock")
                             ? Files.exists(vertexPath)
                                     ? DamagedBlockShaderAdapter.adaptFragment(source, programName, packVaryings,
