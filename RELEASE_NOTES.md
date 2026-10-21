@@ -1,24 +1,25 @@
-# Veyra 0.2.0-beta.27+mc1.21.11 — experimental prerelease
+﻿# Veyra 0.2.0-beta.28+mc1.21.11 — experimental prerelease
 
-Beta.27 batches supported custom vertex execution for damaged-block and sky-basic pipelines. It remains an experimental subset and does not provide full Iris compatibility or establish that a complete third-party shaderpack is playable.
+Beta.28 batches Iris render-stage constants and per-program entity identifiers for supported custom vertex shaders. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
 
 ## Installation
 
-- Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, Java 21 or newer.
-- Install `veyra-0.2.0-beta.27+mc1.21.11.jar` in the instance mods folder alongside VulkanMod. Keep only one Veyra JAR installed; do not install the sources JAR.
-- Optional example packs can be extracted into shaderpacks. Press F6, select a pack, then use Configure / Apply for options and profiles. Overrides persist under `veyra/options/`; shader pack archives are not modified.
+- Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
+- Install `veyra-0.2.0-beta.28+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
-## Changes since beta.26
+## Changes since beta.27
 
-- Add a supported custom `gbuffers_damagedblock.vsh` path after Minecraft's native crumbling setup. Match the `BLOCK` vertex format, including integer `UV2`; map legacy lightmap input correctly and adapt VulkanMod's crumbling shader input before Vulkan pipeline compilation.
-- Add supported custom `gbuffers_skybasic.vsh` execution for sky, stars, and sunrise/sunset native pipelines. Validate actual native vertex formats and linked varyings.
-- Add damaged-block and sky-basic example packs, compiler and adapter regression coverage, source-audit support, and real-client graphics fixtures.
-- Update the smoke harness to use the correct sky fixture directory, framebuffer readback, and upward-facing camera.
+- Add Iris `MC_RENDER_STAGE_*` macros and bind `renderStage` to the available sky, stars, and sunrise/sunset pipeline values.
+- Bind `entityId`, `blockEntityId`, and `currentRenderedItemId` in supported custom entity, block, and hand vertex stages. Include selected identifier values in the pipeline cache identity.
+- Remove unused `mc_Entity` declarations when shader code does not read the attribute. Active reads still produce a capability error because Minecraft's `NEW_ENTITY` vertex format does not provide it.
+- Skip the legacy OptiFine-only `gbuffers_entities_glowing` program, which Iris does not discover.
+- The beta.25 `CloudRenderer` Mixin crash was fixed in beta.26 and remains fixed in this release.
 
 ## Validation and known limits
 
-PR [#70](https://github.com/glebKovshov/Veyra/pull/70) merged as `17409ce`; PR [#71](https://github.com/glebKovshov/Veyra/pull/71) merged as `044a953`. Build [39534071885](https://github.com/glebKovshov/Veyra/actions/runs/39534071885), pinned source audit [39534071977](https://github.com/glebKovshov/Veyra/actions/runs/39534071977), and graphics smoke [39534071890](https://github.com/glebKovshov/Veyra/actions/runs/39534071890) passed; graphics smoke passed all **30/30** Lavapipe fixtures, including sky-basic and damaged-block validation.
+PR [#74](https://github.com/glebKovshov/Veyra/pull/74) merged as `9a8b0d8`. Build [39542873289](https://github.com/glebKovshov/Veyra/actions/runs/39542873289), pinned source audit [39542873265](https://github.com/glebKovshov/Veyra/actions/runs/39542873265), and Graphics smoke [39542873210](https://github.com/glebKovshov/Veyra/actions/runs/39542873210) passed. CI Graphics smoke passed **30/30** Lavapipe fixtures.
 
-The local JDK 21 build passed 313 tests; 82 example shaders were processed and 86 stages compiled to Vulkan SPIR-V. On NVIDIA GeForce RTX 3070, the sky-basic fixture produced 226,624 active magenta pixels and 0 with shaders disabled. These synthetic fixtures verify specific paths, not full shaderpack visuals.
+The local JDK 21 build passed 323 tests; 82 example shaders were processed and 86 stages compiled to Vulkan SPIR-V. On an NVIDIA GeForce RTX 3070, synthetic entity, sky-basic, and currentRenderedItemId fixtures read back respectively **18,532**, **226,295**, and **13,984** active pixels, with **0** for each after disabling the pack. These fixtures test named paths, not full third-party shaderpack visuals.
 
-The pinned source audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: **781 geometry fragments accepted / 8 rejected**. Remaining first source blockers include `entityId` (54 cases), `renderStage` (12), `mc_Entity` (6), `shadowData` (2), and unsupported `gbuffers_skytextured.vsh` (1); selected Complementary profiles also declare unsupported `shadowcomp.csh`. Every audit record has `visualValidation=false`. No complete third-party pack has been visually validated; the stable-release goal remains incomplete.
+The pinned audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: **781 geometry fragments accepted / 8 rejected**. Remaining first source blockers include `gbuffers_lightning.vsh` (54 cases), `gbuffers_skytextured.vsh` (13), `gbuffers_textured.vsh` (6), and Sildur `shadowData` (2). Selected Complementary profiles also declare unsupported `shadowcomp.csh` compute. Every audit record has `visualValidation=false`; no complete third-party shaderpack has been visually validated. See [COMPATIBILITY.md](COMPATIBILITY.md) for the measured matrix.

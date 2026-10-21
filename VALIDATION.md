@@ -1,5 +1,15 @@
 # Veyra 0.2 validation status
 
+## Beta.28 release candidate - versioned checks passed; publication pending
+
+Feature PR [#74](https://github.com/glebKovshov/Veyra/pull/74) merged as `9a8b0d8`. Build [39542873289](https://github.com/glebKovshov/Veyra/actions/runs/39542873289), source audit [39542873265](https://github.com/glebKovshov/Veyra/actions/runs/39542873265), and Graphics smoke [39542873210](https://github.com/glebKovshov/Veyra/actions/runs/39542873210) passed; CI Graphics smoke passed **30/30** Lavapipe fixtures.
+
+The versioned local JDK 21 command `test validateShaders build compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon` passed **323 tests**, processed 82 shader examples, and compiled 86 stages directly to Vulkan SPIR-V. The beta.28 install candidate is 743,444 bytes, SHA-256 `2832278d544107e41c212df56870d45eeef8140cda2b855a17109ab6b6fde9f3`; it passes `scripts/verify_jar.py` for Minecraft 1.21.11 / VulkanMod 0.6.8 / Veyra 0.2.0-beta.28.
+
+The pinned source audit covers 4 archives / 75 profile-dimension cases / 5,178 stages and accepts **781 / rejects 8** geometry fragments. Remaining first source blockers include `gbuffers_lightning.vsh` (54 cases), `gbuffers_skytextured.vsh` (13), `gbuffers_textured.vsh` (6), and Sildur `shadowData` (2); all rows retain `visualValidation=false`.
+
+Synthetic RTX 3070 graphics fixtures measured entity vertex **18,532 / 0**, sky-basic **226,295 / 0**, and `currentRenderedItemId` **13,984 / 0** active/disabled pixels. No complete third-party shaderpack has been visually validated. Beta.28 release-prep PR, tag workflow, and official asset download/hash verification remain pending.
+
 ## Beta.27 experimental prerelease - published (2026-10-21)
 
 Feature PRs [#70](https://github.com/glebKovshov/Veyra/pull/70) and [#71](https://github.com/glebKovshov/Veyra/pull/71) merged damaged-block and sky-basic vertex execution. Release-prep PR [#72](https://github.com/glebKovshov/Veyra/pull/72) merged as `ce30d37cc8003b121d71bbbf1a09db458ab57573`; annotated tag `v0.2.0-beta.27+mc1.21.11` points to that commit. Release workflow [39535427317](https://github.com/glebKovshov/Veyra/actions/runs/39535427317) passed source audit, **33/33** Lavapipe graphics fixtures, versioned build/tests, distributable verification, and publication. PR #71 checks were Build [39534071885](https://github.com/glebKovshov/Veyra/actions/runs/39534071885), source audit [39534071977](https://github.com/glebKovshov/Veyra/actions/runs/39534071977), and Graphics smoke [39534071890](https://github.com/glebKovshov/Veyra/actions/runs/39534071890).

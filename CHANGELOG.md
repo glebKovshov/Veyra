@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-beta.28 - 2026-10-21 (experimental prerelease)
+
+- Add Iris `MC_RENDER_STAGE_*` macros and bind `renderStage` to the values available in the sky, stars, and sunrise/sunset pipelines.
+- Bind `entityId`, `blockEntityId`, and `currentRenderedItemId` in supported custom entity, block, and hand vertex stages; selected identifier values are included in pipeline cache identity.
+- Remove unused `mc_Entity` declarations when shaders do not read them, while keeping explicit capability errors for active reads unavailable in Minecraft's `NEW_ENTITY` format.
+- Skip the legacy OptiFine-only `gbuffers_entities_glowing` program, consistent with Iris program discovery.
+- Pass 323 local tests, source validation, the pinned 75-case audit, and all 30/30 CI graphics fixtures. Full third-party shaderpack visuals remain unverified.
+
 ## 0.2.0-beta.27 - 2026-10-21 (experimental prerelease)
 
 - Add supported custom `gbuffers_damagedblock.vsh` execution with Minecraft's native `BLOCK` vertex format and integer `UV2` lightmap input.
@@ -7,6 +15,7 @@
 - Add custom `gbuffers_skybasic.vsh` execution for sky, stars, and sunrise/sunset pipelines with checked native formats and linked varyings.
 - Add shader compiler, source-audit, example-pack, and Lavapipe graphics coverage. All 30/30 CI graphics fixtures pass.
 - The pinned audit accepts 781 and rejects 8 geometry fragments across 4 archives, 75 profiles/dimensions, and 5,178 stages. All audit records have `visualValidation=false`; full third-party pack visuals remain unverified.
+
 ## 0.2.0-beta.25 - 2026-10-20 (experimental prerelease)
 
 - Execute a supported subset of `gbuffers_armor_glint.vsh` after Minecraft's glint vertex setup and link checked color, UV, and fog-distance outputs to the adapted fragment stage. Bridge legacy position/UV inputs, texture matrices, Iris fog fields, and `noisetex`; map `gl_Color` to white where Minecraft's `POSITION_TEX` vertex format has no color input.
