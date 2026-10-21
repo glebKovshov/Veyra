@@ -54,6 +54,56 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void linksDamagedBlockFragmentToCustomVertexVaryings() throws Exception {
+        String vertex = """
+                #version 120
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                void main() {
+                    gl_Position = ftransform();
+                    texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    glcolor = gl_Color;
+                }
+                """;
+        String fragment = """
+                #version 120
+                uniform sampler2D texture;
+                uniform float alphaTestRef;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                void main() {
+                    vec4 color = texture2D(texture, texcoord) * glcolor;
+                    if (color.a < alphaTestRef) discard;
+                    gl_FragColor = color;
+                }
+                """;
+        var outputs = EntityVertexShaderAdapter.describeVaryings("gbuffers_damagedblock", vertex);
+
+        String adapted = DamagedBlockShaderAdapter.adaptFragment(fragment, "gbuffers_damagedblock",
+                outputs, false, false);
+
+        assertEquals(16, outputs.get("texcoord").location());
+        assertEquals(17, outputs.get("glcolor").location());
+        assertTrue(adapted.contains("layout(location = 16) in vec2 texCoord0;"));
+        assertTrue(adapted.contains("layout(location = 17) in vec4 vertexColor;"));
+        assertFalse(adapted.contains("uniform float alphaTestRef"));
+    }
+
+    @Test
+    void rejectsUnavailableLightmapSamplerInDamagedBlockPipeline() throws Exception {
+        String vertex = "#version 120\nvarying vec2 lmcoord;\n"
+                + "void main(){gl_Position=ftransform();lmcoord=vec2(0.0);}\n";
+        String fragment = "#version 120\nuniform sampler2D lightmap;\nvarying vec2 lmcoord;\n"
+                + "void main(){gl_FragColor=texture2D(lightmap,lmcoord);}\n";
+        var outputs = EntityVertexShaderAdapter.describeVaryings("gbuffers_damagedblock", vertex);
+
+        IOException error = assertThrows(IOException.class, () -> DamagedBlockShaderAdapter.adaptFragment(
+                fragment, "gbuffers_damagedblock", outputs, false, false));
+
+        assertTrue(error.getMessage().contains("lightmap sampler"));
+    }
+
+    @Test
     void appliesHandDepthAfterTheShaderPackEntryPoint() throws Exception {
         String pack = "#version 120\nvoid main(){gl_Position=ftransform();}\n";
         String adapted = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "gbuffers_hand", true).source();

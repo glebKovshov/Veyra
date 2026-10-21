@@ -83,6 +83,19 @@ public final class ShaderPackAudit {
                                         program.startsWith("gbuffers_hand"), pack.hasShadowFragment(),
                                         -1, -1, ItemIdMap.UNMAPPED, true, false, vertexVaryings);
                             }
+                            else if (program.equals("gbuffers_damagedblock")) {
+                                var vertex = pack.readDamagedBlockVertex();
+                                if (vertex.isPresent()) {
+                                    Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
+                                            EntityVertexShaderAdapter.describeVaryings(program, vertex.get());
+                                    DamagedBlockShaderAdapter.adaptFragment(source, program, vertexVaryings,
+                                            pack.hasShadowFragment(), false);
+                                } else {
+                                    DamagedBlockShaderAdapter.adaptFragment(source, program);
+                                }
+                                FragmentOutputs.parse(GlslPreprocessor.process(program + ".fsh", source));
+                                pack.readGeometryBlendSettings(program);
+                            }
                             else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.
                             accepted++;

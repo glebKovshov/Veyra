@@ -1,6 +1,7 @@
 package dev.veyra.shader;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /** Adapts Iris damaged-block fragments to Minecraft's crumbling render pipeline. */
@@ -14,11 +15,20 @@ public final class DamagedBlockShaderAdapter {
     }
 
     public static String adaptFragment(String source, String programName) throws IOException {
+        return adaptFragment(source, programName, null, true, true);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                boolean shadowPassAvailable, boolean lightmapSamplerAvailable) throws IOException {
         String adapted = VERSION_DIRECTIVE.matcher(source.replace("\uFEFF", "")).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         if (!ALPHA_TEST_DEFINE.matcher(adapted).find()) {
             adapted = "#define alphaTestRef 0.1\n" + adapted;
         }
-        return TextureColorDistanceShaderAdapter.adaptFragment(adapted, programName, true, true);
+        return vertexOutputs == null
+                ? TextureColorDistanceShaderAdapter.adaptFragment(adapted, programName, true, true)
+                : TextureColorDistanceShaderAdapter.adaptFragment(adapted, programName, vertexOutputs,
+                        shadowPassAvailable, lightmapSamplerAvailable);
     }
 }

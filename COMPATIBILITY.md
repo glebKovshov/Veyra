@@ -1,5 +1,11 @@
 # Shaderpack compatibility: Veyra 0.2.0-beta.26 experimental prerelease
 
+## Unreleased compatibility candidate after beta.26
+
+The current main-line candidate executes custom `gbuffers_damagedblock.vsh` stages after Minecraft's native crumbling vertex setup and links their declared varyings with `gbuffers_damagedblock.fsh`. The updated pinned source audit covers 4 archives / 75 profile-dimension cases / 5,178 stages: **781 geometry fragments accepted / 8 rejected**, up from 709/8 in beta.26. The former Complementary Reimagined / Unbound damaged-block vertex-stage blocker is gone. Remaining whole-pack source blockers are Complementary `entityId` (54 cases), BSL `mc_Entity` (18), and Sildur `gbuffers_skybasic.vsh` (1); the eight fragment rejections are Sildur `shadowData` in Nether/End cases. Every audit row has `visualValidation=false`.
+
+A synthetic damaged-block fixture passed on an NVIDIA GeForce RTX 3070: 551 active magenta pixels and 0 with Veyra disabled. This exercises the custom damaged-block pipeline and does not validate third-party pack visuals. This candidate is not a released beta; beta.26 remains the latest public prerelease.
+
 ## Beta.26 custom vertex execution
 
 Beta.26 adds supported subsets of custom gbuffers_basic, gbuffers_line, gbuffers_beaconbeam, gbuffers_block, gbuffers_entities, and gbuffers_hand vertex programs. The adapters execute after Minecraft's native vertex setup, expose only available attributes, and link pack varyings with checked type, interpolation, and location. Beacon fragment outputs can target multiple color attachments. The block/entity/hand bridge supports noisetex where declared and preserves Iris hand-depth scaling. Reads of unavailable attributes, including mc_Entity, mc_midTexCoord, at_tangent, and at_midBlock, fail with a named capability diagnostic. The beta.25 cloud-renderer Mixin selector now remaps the Minecraft Tesselator.begin call.

@@ -5122,11 +5122,44 @@ public final class VeyraRenderer {
         String programName = fallback ? "gbuffers_terrain" : "gbuffers_damagedblock";
         String source = pack.readDamagedBlockFragment()
                 .orElseThrow(() -> new IOException("The pack no longer contains a damaged-block shader or terrain fallback."));
+        Optional<String> packVertexSource = fallback ? Optional.empty() : pack.readDamagedBlockVertex();
+        ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
             String fragmentSource;
+            String vertexSource = null;
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs = null;
+            boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty();
+            FragmentOutputs outputLayout = null;
+            GeometryBlendSettings blendSettings = null;
             try {
-                fragmentSource = DamagedBlockShaderAdapter.adaptFragment(source, programName);
+                if (packVertexSource.isPresent()) {
+                    String nativeVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
+                            nativeVertex, false, programName, false, false, false, false, false);
+                    EntityVertexShaderAdapter.AdaptedStage adaptedVertex = EntityVertexShaderAdapter.adaptStage(
+                            minecraftVertex, packVertexSource.get(), programName, false);
+                    vertexSource = adaptedVertex.source();
+                    vertexOutputs = adaptedVertex.varyings();
+                    usesNoiseSampler = adaptedVertex.usesNoiseSampler();
+                }
+                if (fallback) {
+                    fragmentSource = DamagedBlockShaderAdapter.adaptFragment(source, programName);
+                } else {
+                    samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
+                            source, programName, pack.hasShadowFragment(),
+                            original.getSamplers().contains("Sampler2"));
+                    usesNoiseSampler |= samplerInputs.usesNoiseSampler();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                    fragmentSource = DamagedBlockShaderAdapter.adaptFragment(source, programName,
+                            vertexOutputs, pack.hasShadowFragment(),
+                            original.getSamplers().contains("Sampler2"));
+                    outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
+                    blendSettings = pack.readGeometryBlendSettings(programName);
+                }
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -5135,12 +5168,13 @@ public final class VeyraRenderer {
                         exception.getMessage());
                 return new DamagedBlockPipelineSet(Map.of());
             }
-            String sourceHash = sha256("gbuffers_damagedblock\n" + fragmentSource);
+            String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
+                    + '\n' + fragmentSource + '\n' + outputLayout + '\n' + blendSettings + '\n' + samplerInputs);
             ColorDistancePipelineKey cacheKey = new ColorDistancePipelineKey(original, sourceHash);
             RenderPipeline replacement = COLOR_DISTANCE_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
-                replacement = compileColorDistancePipeline(
-                        original, "gbuffers_damagedblock", fragmentSource, sourceHash);
+                replacement = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                        vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs);
                 COLOR_DISTANCE_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);

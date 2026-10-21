@@ -17,7 +17,7 @@ public class ShaderCompileSmoke {
             try (var files = Files.walk(Path.of("examples"))) {
                 for (Path path : files.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().matches(
                         "gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|block(?:_translucent)?|"
-                                + "hand(?:_water)?|spidereyes|clouds)\\.fsh")).sorted().toList()) {
+                                + "hand(?:_water)?|spidereyes|clouds|damagedblock)\\.fsh")).sorted().toList()) {
                     String name = path.getFileName().toString();
                     String source = ShaderIncludes.expand(name, Files.readString(path), included -> {
                         Path file = path.getParent().resolve(included);
@@ -53,6 +53,11 @@ public class ShaderCompileSmoke {
                         }
                     }
                     String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
+                            : programName.equals("gbuffers_damagedblock")
+                            ? Files.exists(vertexPath)
+                                    ? DamagedBlockShaderAdapter.adaptFragment(source, programName, packVaryings,
+                                            false, false)
+                                    : DamagedBlockShaderAdapter.adaptFragment(source, programName)
                             : EntityVertexShaderAdapter.supportsProgram(programName)
                             ? EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
                             programName.startsWith("gbuffers_hand"), Files.exists(path.getParent().resolve("shadow.fsh")),

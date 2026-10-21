@@ -22,7 +22,7 @@ class ShaderAdapterTest {
             return files.filter(Files::isRegularFile).filter(path -> {
                 String name = path.getFileName().toString();
                 return name.matches("gbuffers_(terrain(?:_solid|_cutout)?|water|entities(?:_translucent)?|"
-                        + "block(?:_translucent)?|hand(?:_water)?|spidereyes|clouds)\\.fsh");
+                        + "block(?:_translucent)?|hand(?:_water)?|spidereyes|clouds|damagedblock)\\.fsh");
             }).sorted().map(path -> DynamicTest.dynamicTest(path.toString(), () -> {
                 String name = path.getFileName().toString();
                 String source = ShaderIncludes.expand(name, Files.readString(path), included -> {
@@ -52,6 +52,11 @@ class ShaderAdapterTest {
                         : java.util.Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                 if (name.equals("gbuffers_clouds.fsh")) {
                     adapted = CloudShaderAdapter.adaptFragment(source);
+                } else if (programName.equals("gbuffers_damagedblock")) {
+                    adapted = Files.exists(vertexPath)
+                            ? DamagedBlockShaderAdapter.adaptFragment(source, programName, packVaryings,
+                                    false, false)
+                            : DamagedBlockShaderAdapter.adaptFragment(source, programName);
                 } else if (EntityVertexShaderAdapter.supportsProgram(programName)) {
                     adapted = EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
                             programName.startsWith("gbuffers_hand"),

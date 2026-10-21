@@ -65,7 +65,8 @@ final class EntityVertexShaderAdapter {
 
     static boolean supportsProgram(String programName) {
         return programName.startsWith("gbuffers_entities") || programName.startsWith("gbuffers_block")
-                || programName.startsWith("gbuffers_hand") || programName.equals("gbuffers_spidereyes");
+                || programName.startsWith("gbuffers_hand") || programName.equals("gbuffers_spidereyes")
+                || programName.equals("gbuffers_damagedblock");
     }
 
     static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
