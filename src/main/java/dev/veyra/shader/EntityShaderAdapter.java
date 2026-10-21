@@ -301,20 +301,17 @@ public final class EntityShaderAdapter {
         return adaptVertexShader(source, shadowPass, programName, true, false);
     }
 
-    /**
-     * Minecraft 1.21.11's item-entity vertex shader declares UV1 as a float despite NEW_ENTITY supplying
-     * an integer pair.
-     */
-    static String adaptItemEntityVertexFormat(String source, String programName) throws IOException {
+    /** Minecraft 1.21.11 has native pipelines that declare integer NEW_ENTITY UV1 as a float pair. */
+    static String adaptOverlayVertexFormat(String source, String programName) throws IOException {
         if (source == null || source.isBlank()) {
-            throw new IOException(programName + " cannot adapt the item-entity vertex format because its VulkanMod vertex shader is empty.");
+            throw new IOException(programName + " cannot adapt the overlay vertex format because its VulkanMod vertex shader is empty.");
         }
         Matcher floatOverlay = ITEM_ENTITY_FLOAT_OVERLAY_ATTRIBUTE.matcher(source);
         if (!floatOverlay.find()) {
             if (ITEM_ENTITY_INTEGER_OVERLAY_ATTRIBUTE.matcher(source).find()) {
                 return source;
             }
-            throw new IOException(programName + " cannot adapt the item-entity vertex format because UV1's shader input changed.");
+            throw new IOException(programName + " cannot adapt the overlay vertex format because UV1's shader input changed.");
         }
         StringBuffer adapted = new StringBuffer();
         floatOverlay.appendReplacement(adapted,
@@ -326,6 +323,10 @@ public final class EntityShaderAdapter {
         }
         return overlayAssignment.replaceAll(Matcher.quoteReplacement(overlayAssignment.group(1)
                 + "vec2(UV1)" + overlayAssignment.group(2)));
+    }
+
+    static String adaptItemEntityVertexFormat(String source, String programName) throws IOException {
+        return adaptOverlayVertexFormat(source, programName);
     }
 
     public static String adaptVertexShader(String source, boolean shadowPass, String programName,

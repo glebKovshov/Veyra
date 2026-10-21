@@ -4300,7 +4300,7 @@ public final class VeyraRenderer {
         if (shaderPackVertexSource != null) {
             String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
             if (itemEntityPipeline) {
-                vertexSource = EntityShaderAdapter.adaptItemEntityVertexFormat(vertexSource, programName);
+                vertexSource = EntityShaderAdapter.adaptOverlayVertexFormat(vertexSource, programName);
             }
             String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
                     vertexSource, shadowPass, programName,
@@ -4312,7 +4312,7 @@ public final class VeyraRenderer {
                 || itemEntityPipeline) {
             String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
             if (itemEntityPipeline) {
-                vertexSource = EntityShaderAdapter.adaptItemEntityVertexFormat(vertexSource, programName);
+                vertexSource = EntityShaderAdapter.adaptOverlayVertexFormat(vertexSource, programName);
             }
             adaptedVertex = EntityShaderAdapter.adaptVertexShader(
                     vertexSource, shadowPass, programName,
@@ -5136,7 +5136,8 @@ public final class VeyraRenderer {
             GeometryBlendSettings blendSettings = null;
             try {
                 if (packVertexSource.isPresent()) {
-                    String nativeVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
+                    String nativeVertex = EntityShaderAdapter.adaptOverlayVertexFormat(
+                            shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX), programName);
                     String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
                             nativeVertex, false, programName, false, false, false, false, false);
                     EntityVertexShaderAdapter.AdaptedStage adaptedVertex = EntityVertexShaderAdapter.adaptStage(
