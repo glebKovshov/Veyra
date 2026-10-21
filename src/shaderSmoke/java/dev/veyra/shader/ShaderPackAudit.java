@@ -145,12 +145,6 @@ public final class ShaderPackAudit {
             ShaderPack pack, String program) throws IOException {
         var vertex = pack.readStage(program + ".vsh");
         if (vertex.isEmpty()) return Map.of();
-        try {
-            return EntityVertexShaderAdapter.describeVaryings(program, vertex.get());
-        } catch (IOException unsupportedVertex) {
-            // Keep fragment-adapter statistics independent when the pack-level preflight has
-            // already reported that this custom vertex stage cannot execute.
-            return Map.of();
-        }
+        return EntityVertexShaderAdapter.describeVaryings(program, vertex.get());
     }
 }

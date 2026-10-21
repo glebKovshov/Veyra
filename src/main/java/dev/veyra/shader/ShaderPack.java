@@ -1106,10 +1106,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         readGeometryBlendSettings(program);
         if (renderStage == null) {
             TextureColorDistanceShaderAdapter.adaptFragment(fragment, program, vertexOutputs,
-                    hasShadowFragment(), false);
+                    hasShadowFragment(), true);
         } else {
             TextureColorDistanceShaderAdapter.adaptFragment(fragment, program, vertexOutputs,
-                    hasShadowFragment(), false, renderStage);
+                    hasShadowFragment(), true, renderStage);
         }
     }
 

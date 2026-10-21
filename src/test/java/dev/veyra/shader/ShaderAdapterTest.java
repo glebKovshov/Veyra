@@ -98,6 +98,25 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void ignoresUnusedFragmentVaryingsWithoutMatchingVertexOutputs() throws IOException {
+        String fragment = """
+                #version 120
+                varying vec3 shadowData;
+                /* shadowData is only referenced by this disabled block. */
+                void main() { gl_FragColor = vec4(1.0); }
+                """;
+
+        String entity = EntityShaderAdapter.adaptGeometryFragment(fragment, "gbuffers_entities_translucent",
+                false, false, -1, -1, ItemIdMap.UNMAPPED, true, false, Map.of());
+        String terrain = TerrainShaderAdapter.adaptFragment(fragment, false, false);
+
+        assertFalse(entity.contains("varying vec3 shadowData"), entity);
+        assertFalse(entity.contains("in vec3 shadowData"), entity);
+        assertFalse(terrain.contains("varying vec3 shadowData"), terrain);
+        assertFalse(terrain.contains("in vec3 shadowData"), terrain);
+    }
+
+    @Test
     void adaptsPackColorToTerrainVertexColorInput() throws IOException {
         String adapted = TerrainShaderAdapter.adaptFragment("""
                 #version 120
@@ -117,7 +136,7 @@ class ShaderAdapterTest {
                 varying vec3 viewPos;
                 varying float dist;
                 varying vec4 spriteBounds;
-                void main() { gl_FragColor = vec4(abs(viewPos) / 64.0, 1.0) + spriteBounds * 0.0; }
+                void main() { gl_FragColor = vec4(abs(viewPos) / 64.0, 1.0) + spriteBounds * 0.0 + vec4(dist * 0.0); }
                 """);
         String vertex = TerrainShaderAdapter.adaptVertex("""
                 #version 460

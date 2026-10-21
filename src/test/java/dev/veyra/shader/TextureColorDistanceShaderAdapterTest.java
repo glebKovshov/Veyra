@@ -236,6 +236,26 @@ class TextureColorDistanceShaderAdapterTest {
     }
 
     @Test
+    void bridgesLightmapSamplerWithTheNativeTexturedVertexInterface() throws IOException {
+        String source = """
+                #version 120
+                uniform sampler2D lightmap;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(lightmap, texcoord); }
+                """;
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment(
+                source, "gbuffers_textured", false, false, true, false, true);
+        var samplers = TextureColorDistanceShaderAdapter.inspectSamplers(
+                source, "gbuffers_textured", false, true);
+
+        assertTrue(adapted.contains("uniform sampler2D Sampler2;"), adapted);
+        assertTrue(adapted.contains("#define lightmap Sampler2"), adapted);
+        assertTrue(adapted.contains("veyraTextureSample(lightmap, texCoord0)"), adapted);
+        assertFalse(adapted.contains("uniform sampler2D lightmap;"), adapted);
+        assertTrue(samplers.usesLightmapSampler());
+    }
+
+    @Test
     void rejectsBasicAndLineFragmentSamplersMissingFromTheNativePipeline() {
         Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = Map.of(
                 "lmCoord", new TerrainVertexShaderAdapter.PackVarying(

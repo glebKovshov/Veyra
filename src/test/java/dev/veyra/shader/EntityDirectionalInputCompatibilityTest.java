@@ -33,7 +33,8 @@ class EntityDirectionalInputCompatibilityTest {
 
     @Test
     void reportsUnsupportedMembersOfCommaSeparatedInputDeclarationsPrecisely() {
-        String source = "varying vec3 sunVec, unsupportedDirection;\nvoid main() {}";
+        String source = "varying vec3 sunVec, unsupportedDirection;\n"
+                + "void main() { gl_FragColor = vec4(normalize(sunVec) + normalize(unsupportedDirection), 1.0); }";
         IOException error = assertThrows(IOException.class,
                 () -> EntityShaderAdapter.adaptFragment(source, "gbuffers_entities"));
         assertTrue(error.getMessage().contains("unsupportedDirection"), error.getMessage());

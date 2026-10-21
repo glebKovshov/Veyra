@@ -7,6 +7,7 @@ import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
 import dev.veyra.vulkan.VeyraSpecularTextures;
+import net.minecraft.client.Minecraft;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
 import net.vulkanmod.render.engine.VkRenderPass;
 import net.vulkanmod.render.engine.VkTextureView;
@@ -25,6 +26,23 @@ public abstract class VkRenderPassMixin {
         RenderPipeline active = pass.getPipeline();
         if (active == null) return;
         var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
+        String pipelinePath = active.getLocation().getPath();
+        boolean lightmapPipeline = pipelinePath.equals("pipeline/world_border")
+                || pipelinePath.equals("pipeline/celestial") || pipelinePath.equals("pipeline/end_sky");
+        if (pipeline != null && lightmapPipeline
+                && active.getFragmentShader().getNamespace().equals("veyra")
+                && active.getSamplers().contains("Sampler2")) {
+            GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
+            var descriptor = pipeline.getImageDescriptor("Sampler2");
+            if (descriptor != null && lightmap instanceof VkTextureView vulkanView) {
+                var texture = vulkanView.texture();
+                if (!texture.isClosed() && texture.getVulkanImage() != null) {
+                    descriptor.setLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    descriptor.isReadOnlyLayout = false;
+                    VTextureSelector.bindTexture(descriptor.imageIdx, texture.getVulkanImage());
+                }
+            }
+        }
         if (pipeline != null) VeyraRenderer.bindCloudSceneColor(pass, pipeline);
         if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra"))
             { VeyraShadowRenderer.bindEntityShadowColor(pass, pipeline); VeyraShadowRenderer.bindEntityOpaqueDepth(pass, pipeline); }

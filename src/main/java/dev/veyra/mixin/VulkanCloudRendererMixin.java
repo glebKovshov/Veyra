@@ -60,9 +60,10 @@ public abstract class VulkanCloudRendererMixin {
         VeyraCloudVertexFormat.endBuild();
     }
 
+    // The VulkanMod method selector stays literal; this nested Minecraft invocation must be remapped.
     @ModifyArg(method = "buildClouds", at = @At(value = "INVOKE", target =
             "Lcom/mojang/blaze3d/vertex/Tesselator;begin(Lcom/mojang/blaze3d/vertex/VertexFormat$Mode;"
-                    + "Lcom/mojang/blaze3d/vertex/VertexFormat;)Lcom/mojang/blaze3d/vertex/BufferBuilder;"),
+                    + "Lcom/mojang/blaze3d/vertex/VertexFormat;)Lcom/mojang/blaze3d/vertex/BufferBuilder;", remap = true),
             index = 1, remap = false)
     private VertexFormat veyra$selectCloudVertexFormat(VertexFormat original) {
         return VeyraRenderer.requiresExtendedCloudVertexFormat()

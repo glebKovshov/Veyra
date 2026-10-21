@@ -349,6 +349,34 @@ class BasicVertexShaderAdapterTest {
     }
 
     @Test
+    void linksVec4NormalAsAUserVaryingForTexturedPrograms() throws IOException {
+        String packVertex = """
+                #version 120
+                varying vec4 normal;
+                void main() {
+                    gl_Position = ftransform();
+                    normal = vec4(0.0, 0.0, 1.0, 0.0);
+                }
+                """;
+        BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                NATIVE_TEXTURED_VERTEX, packVertex, "gbuffers_textured",
+                BasicVertexShaderAdapter.Format.TEXTURED);
+        var normal = adaptedVertex.varyings().get("normal");
+
+        assertNotNull(normal);
+        assertEquals("vec4", normal.type());
+        assertFalse(normal.fixedBridge());
+
+        String adaptedFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                #version 120
+                varying vec4 normal;
+                void main() { gl_FragColor = normal; }
+                """, "gbuffers_textured", adaptedVertex.varyings(), false, false);
+        assertTrue(adaptedFragment.contains("layout(location = " + normal.location() + ") in vec4 normal;"),
+                adaptedFragment);
+    }
+
+    @Test
     void linksTextureFragmentToNativeTexCoordWhenPackVertexDoesNotReplaceIt() throws IOException {
         String packVertex = "#version 120\nvoid main() { gl_Position = ftransform(); }\n";
         BasicVertexShaderAdapter.AdaptedStage adaptedVertex = BasicVertexShaderAdapter.adaptStage(

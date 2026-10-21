@@ -76,14 +76,32 @@ public final class TextureColorDistanceShaderAdapter {
                                 boolean explicitVertexLocations) throws IOException {
         return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
                 vertexColorInterpolation, texCoordInterpolation, explicitVertexLocations, null,
-                false, false, null);
+                false, false, false, null);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                boolean hasVertexColor, boolean hasVertexDistances,
+                                boolean allowIrisSamplers, boolean shadowPassAvailable,
+                                boolean lightmapSamplerAvailable) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                "smooth", "smooth", false, null, allowIrisSamplers,
+                shadowPassAvailable, lightmapSamplerAvailable, null);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                boolean hasVertexColor, boolean hasVertexDistances,
+                                boolean allowIrisSamplers, boolean shadowPassAvailable,
+                                boolean lightmapSamplerAvailable, int renderStage) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                "smooth", "smooth", false, null, allowIrisSamplers,
+                shadowPassAvailable, lightmapSamplerAvailable, renderStage);
     }
 
     static String adaptFragment(String source, String programName,
                                 boolean hasVertexColor, boolean hasVertexDistances,
                                 int renderStage) throws IOException {
         return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
-                "smooth", "smooth", false, null, false, false, renderStage);
+                "smooth", "smooth", false, null, false, false, false, renderStage);
     }
 
     static String adaptFragment(String source, String programName,
@@ -95,7 +113,7 @@ public final class TextureColorDistanceShaderAdapter {
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
                                 boolean shadowPassAvailable, boolean lightmapSamplerAvailable) throws IOException {
         return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
-                Map.copyOf(vertexOutputs), shadowPassAvailable, lightmapSamplerAvailable, null);
+                Map.copyOf(vertexOutputs), true, shadowPassAvailable, lightmapSamplerAvailable, null);
     }
 
     static String adaptFragment(String source, String programName,
@@ -103,7 +121,7 @@ public final class TextureColorDistanceShaderAdapter {
                                 boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
                                 int renderStage) throws IOException {
         return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
-                Map.copyOf(vertexOutputs), shadowPassAvailable, lightmapSamplerAvailable, renderStage);
+                Map.copyOf(vertexOutputs), true, shadowPassAvailable, lightmapSamplerAvailable, renderStage);
     }
 
     private static String adaptFragment(String source, String programName,
@@ -111,6 +129,7 @@ public final class TextureColorDistanceShaderAdapter {
                                         String vertexColorInterpolation, String texCoordInterpolation,
                                         boolean explicitVertexLocations,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                        boolean allowIrisSamplers,
                                         boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
                                         Integer renderStage)
             throws IOException {
@@ -130,7 +149,7 @@ public final class TextureColorDistanceShaderAdapter {
         adapted = UnusedUniformDeclarations.removeUnused(adapted);
         adapted = IrisRenderStages.bindUniform(adapted, renderStage, programName);
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
-        SamplerBridge samplers = adaptSamplers(adapted, programName, vertexOutputs != null,
+        SamplerBridge samplers = adaptSamplers(adapted, programName, allowIrisSamplers,
                 shadowPassAvailable, lightmapSamplerAvailable);
         adapted = samplers.source();
         adapted = VERSION_DIRECTIVE.matcher(adapted).replaceAll("");
@@ -163,7 +182,7 @@ public final class TextureColorDistanceShaderAdapter {
             throw new IOException(programName + " has an unsupported uniform declaration.");
         }
 
-        adapted = expandCommaVaryings(adapted);
+        adapted = UnusedVaryingDeclarations.removeUnused(expandCommaVaryings(adapted));
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         StringBuilder linkedVertexInputs = new StringBuilder();
