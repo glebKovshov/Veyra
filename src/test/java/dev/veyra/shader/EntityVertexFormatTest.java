@@ -55,9 +55,23 @@ class EntityVertexFormatTest {
 
         String adapted = EntityShaderAdapter.adaptBlockVertexFormat(source, "gbuffers_damagedblock");
 
-        assertTrue(adapted.contains("layout(location = 3) in ivec2 UV2;"), adapted);
+        assertTrue(adapted.contains("in ivec2 UV2;"), adapted);
         assertTrue(adapted.contains("texCoord2 = vec2(UV2);"), adapted);
         assertEquals(0, adapted.split("in vec2 UV2;", -1).length - 1);
+    }
+
+    @Test
+    void convertsMinecraftImplicitBlockLightmapInputToIntegerVector() throws IOException {
+        String source = """
+                #version 330
+                in vec2 UV2;
+                void main() { }
+                """;
+
+        String adapted = EntityShaderAdapter.adaptBlockVertexFormat(source, "gbuffers_damagedblock");
+
+        assertTrue(adapted.contains("in ivec2 UV2;"), adapted);
+        assertTrue(!adapted.contains("layout(location="), adapted);
     }
 
     @Test

@@ -119,8 +119,10 @@ class EntityVertexShaderAdapterTest {
                 }
                 """;
 
+        String blockFormat = EntityShaderAdapter.adaptBlockVertexFormat(
+                nativeBlock, "gbuffers_damagedblock");
         String adapted = EntityVertexShaderAdapter.adaptStage(
-                nativeBlock, pack, "gbuffers_damagedblock", false).source();
+                blockFormat, pack, "gbuffers_damagedblock", false).source();
 
         assertTrue(adapted.contains("layout(location=3) in ivec2 UV2;"), adapted);
         assertTrue(adapted.contains("texCoord2 = vec2(UV2);"), adapted);
