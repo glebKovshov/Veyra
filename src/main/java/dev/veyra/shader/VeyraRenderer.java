@@ -5136,7 +5136,7 @@ public final class VeyraRenderer {
             GeometryBlendSettings blendSettings = null;
             try {
                 if (packVertexSource.isPresent()) {
-                    String nativeVertex = EntityShaderAdapter.adaptOverlayVertexFormat(
+                    String nativeVertex = EntityShaderAdapter.adaptBlockVertexFormat(
                             shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX), programName);
                     String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
                             nativeVertex, false, programName, false, false, false, false, false);

@@ -37,7 +37,10 @@ public class ShaderCompileSmoke {
                         });
                         if (EntityVertexShaderAdapter.supportsProgram(programName)) {
                             boolean hand = programName.startsWith("gbuffers_hand");
-                            String nativeVertex = EntityShaderAdapter.adaptVertexShader(entityNativeVertexSource(),
+                            String nativeInput = programName.equals("gbuffers_damagedblock")
+                                    ? EntityShaderAdapter.adaptBlockVertexFormat(damagedBlockNativeVertexSource(), programName)
+                                    : entityNativeVertexSource();
+                            String nativeVertex = EntityShaderAdapter.adaptVertexShader(nativeInput,
                                     false, programName,
                                     EntityShaderAdapter.requiresNormalInput(source),
                                     EntityShaderAdapter.requiresLightmapInput(source),
@@ -421,6 +424,19 @@ public class ShaderCompileSmoke {
                             }
                             """, "gbuffers_entities", false);
             compileVertex(compiler, options, entityNoiseVertex.source(), "entity-noisetex-vertex", true);
+            String blockLightmapNative = EntityShaderAdapter.adaptBlockVertexFormat(
+                    damagedBlockNativeVertexSource(), "gbuffers_damagedblock");
+            EntityVertexShaderAdapter.AdaptedStage blockLightmapVertex = EntityVertexShaderAdapter.adaptStage(
+                    blockLightmapNative, """
+                            #version 120
+                            varying vec2 lmCoord;
+                            void main() {
+                                gl_Position = ftransform();
+                                lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
+                            }
+                            """, "gbuffers_damagedblock", false);
+            compileVertex(compiler, options, blockLightmapVertex.source(),
+                    "damaged-block-block-format-lightmap-alias", true);
             Path mainHandFixture = Path.of("examples/current-rendered-item-id/shaders/gbuffers_hand.fsh");
             String mainHandPackSource = GlslPreprocessor.process(
                     mainHandFixture.getFileName().toString(), Files.readString(mainHandFixture));
@@ -688,7 +704,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, beacon-beam flat varyings/MRT, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
@@ -737,6 +753,31 @@ public class ShaderCompileSmoke {
                     texCoord0 = (TextureMat * vec4(UV0, 0.0, 1.0)).xy;
                     lightMapColor = vec4(vec2(UV2), 0.0, 1.0);
                     overlayColor = vec4(vec2(UV1), 0.0, 1.0);
+                }
+                """;
+    }
+
+    private static String damagedBlockNativeVertexSource() {
+        return """
+                #version 460
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 2) in vec2 UV0;
+                layout(location = 3) in vec2 UV2;
+                layout(location = 4) in vec3 Normal;
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out vec2 texCoord0;
+                layout(location = 2) out vec2 texCoord2;
+                layout(set = 0, binding = 0, std140) uniform DynamicTransforms {
+                    mat4 ModelViewMat;
+                    mat4 ProjMat;
+                    mat4 TextureMat;
+                };
+                void main() {
+                    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                    vertexColor = Color;
+                    texCoord0 = UV0;
+                    texCoord2 = UV2;
                 }
                 """;
     }

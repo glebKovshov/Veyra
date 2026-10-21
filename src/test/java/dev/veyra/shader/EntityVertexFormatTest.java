@@ -43,19 +43,31 @@ class EntityVertexFormatTest {
     }
 
     @Test
-    void adaptsCrumblingOverlayInputToItsIntegerVertexFormat() throws IOException {
+    void adaptsCrumblingBlockLightmapInputToItsIntegerVertexFormat() throws IOException {
         String source = """
-                #version 330
-                in vec2 UV1;
-                out vec2 texCoord1;
+                #version 460
+                layout(location = 3) in vec2 UV2;
+                layout(location = 2) out vec2 texCoord2;
                 void main() {
-                    texCoord1 = UV1;
+                    texCoord2 = UV2;
                 }
                 """;
 
-        String adapted = EntityShaderAdapter.adaptOverlayVertexFormat(source, "gbuffers_damagedblock");
+        String adapted = EntityShaderAdapter.adaptBlockVertexFormat(source, "gbuffers_damagedblock");
 
-        assertTrue(adapted.contains("in ivec2 UV1;"), adapted);
-        assertTrue(adapted.contains("texCoord1 = vec2(UV1);"), adapted);
+        assertTrue(adapted.contains("layout(location = 3) in ivec2 UV2;"), adapted);
+        assertTrue(adapted.contains("texCoord2 = vec2(UV2);"), adapted);
+        assertEquals(0, adapted.split("in vec2 UV2;", -1).length - 1);
+    }
+
+    @Test
+    void rejectsCrumblingShaderWhoseBlockLightmapInputChanged() {
+        IOException error = assertThrows(IOException.class, () ->
+                EntityShaderAdapter.adaptBlockVertexFormat("""
+                        #version 460
+                        void main() {}
+                        """, "gbuffers_damagedblock"));
+
+        assertTrue(error.getMessage().contains("UV2's shader input changed."));
     }
 }

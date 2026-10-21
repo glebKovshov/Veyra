@@ -1,4 +1,14 @@
-## Крупный пакет после beta.26: custom damaged-block vertex shader — CI fix на перепроверке (2026-10-21)
+## Последняя проверка beta.27 candidate: BLOCK vertex format исправлен (2026-10-21)
+
+- Разбор Lavapipe CI показал, что `gbuffers_damagedblock` использует Minecraft `BLOCK` format, а не `NEW_ENTITY`: в `rendertype_crumbling.vsh` нет `UV1`; `UV2` — целочисленная пара на location 3. Предыдущая попытка переиспользовала overlay adapter и не устраняла `VUID-VkGraphicsPipelineCreateInfo-Input-08733`.
+- Добавлен отдельный `BLOCK` adapter: `UV2` нормализуется в `ivec2`, `texCoord2` явно получает `vec2(UV2)`, legacy `gl_MultiTexCoord1` отображается на lightmap UV2. Отсутствующие overlay `UV1` и `gl_MultiTexCoord2` получают раннюю ошибку; entity/block-entity/hand сохраняют `NEW_ENTITY`.
+- Полный JDK 21 прогон `test validateShaders build compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon` прошёл: **308 тестов, 0 failures/errors/skips; 81 shader examples обработан, 80 напрямую скомпилировано в Vulkan SPIR-V**. Build, smoke harness compilation и example pack packaging успешны.
+- RTX 3070 graphics smoke загрузил исправленный `pipeline/crumbling` и прочитал **552 активных magenta pixels / 0 при выключенном Veyra**, `status=passed`. Локально Vulkan validation layer не включалась; Lavapipe CI должна подтвердить отсутствие VUID.
+- Повторный pinned audit завершился: 4 SHA-512-pinned архива, 12 defaults + 63 профиля / **75 записей и 5,178 stages; 781 geometry fragments accepted / 8 rejected**. Ошибок capability для damagedblock нет; `visualValidation=true` записей — 0. Оставшиеся whole-pack blockers: Complementary `entityId` (54), BSL `mc_Entity` (18), Sildur `gbuffers_skybasic.vsh` (1); восемь fragment rejections — Sildur `shadowData` для Nether/End.
+- Local candidate прошёл `scripts/verify_jar.py`: **734,131 bytes**, SHA-256 `04a559f5c77d64532974b3bdb58e77ff21fdcd4613d8a9e21dc066aec5ccca9c`; это beta.26 metadata candidate, не Release asset. PR [#70](https://github.com/glebKovshov/Veyra/pull/70) открыт и связан с текущим T3 thread; CI на исправленном head ожидается.
+- Приложенный crash относится к старому beta.25 JAR. CloudRenderer remap fix уже находится в опубликованном [beta.26](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.26%2Bmc1.21.11); отдельный hotfix релиз не нужен, следующий выпуск остаётся пакетным.
+
+## Историческая первая диагностика PR #70 — гипотеза UV1 заменена BLOCK mapping (2026-10-21)
 
 - В отдельном worktree `feature/beta27-compatibility-batch` добавлен runtime-путь для `gbuffers_damagedblock.vsh`: Veyra сохраняет нативную подготовку crumbling pipeline, запускает pack `main`, связывает varyings с `gbuffers_damagedblock.fsh` и учитывает sampler inputs, fragment outputs, blend settings и данные vertex stage в cache key. Поддержка покрывает только атрибуты и ресурсы, реально предоставленные pipeline.
 - Pinned source audit и capability preflight теперь валидируют damaged-block VSH/FSH вместе. Example pack получил custom VSH; unit test проверяет cross-stage varyings; `ShaderAdapterTest` и shaderc smoke включают этот program.
