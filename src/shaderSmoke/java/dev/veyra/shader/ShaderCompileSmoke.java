@@ -294,6 +294,90 @@ public class ShaderCompileSmoke {
             }
             count++;
             compiled += nativeSkyVertices.size() * 2;
+            String lightningPackVertexSource = """
+                    #version 130
+                    varying vec4 color;
+                    void main() {
+                        gl_Position = ftransform();
+                        color = gl_Color;
+                    }
+                    """;
+            BasicVertexShaderAdapter.AdaptedStage lightningVertex = BasicVertexShaderAdapter.validate(
+                    "gbuffers_lightning", lightningPackVertexSource, BasicVertexShaderAdapter.Format.LIGHTNING);
+            String lightningFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 130
+                    varying vec4 color;
+                    varying float sphericalVertexDistance;
+                    varying float cylindricalVertexDistance;
+                    void main() {
+                        gl_FragColor = color + vec4(sphericalVertexDistance + cylindricalVertexDistance);
+                    }
+                    """, "gbuffers_lightning", lightningVertex.varyings(), false, false);
+            compileVertex(compiler, options, lightningVertex.source(), "lightning-pack-vertex", true);
+            compile(compiler, options, lightningFragment, "lightning-pack-fragment", true);
+            count++;
+            compiled += 2;
+
+            String skyTexturedPackVertexSource = """
+                    #version 130
+                    varying vec2 texCoord;
+                    varying vec4 color;
+                    void main() {
+                        gl_Position = ftransform();
+                        texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                        color = gl_Color;
+                    }
+                    """;
+            String skyTexturedPackFragmentSource = """
+                    #version 130
+                    uniform int renderStage;
+                    varying vec2 texCoord;
+                    varying vec4 color;
+                    void main() {
+                        gl_FragColor = vec4(texCoord, float(renderStage) / 23.0, 1.0) * color;
+                    }
+                    """;
+            for (BasicVertexShaderAdapter.Format format : List.of(
+                    BasicVertexShaderAdapter.Format.SKY_TEXTURED,
+                    BasicVertexShaderAdapter.Format.SKY_TEXTURED_COLOR)) {
+                BasicVertexShaderAdapter.AdaptedStage skyTexturedVertex = BasicVertexShaderAdapter.validate(
+                        "gbuffers_skytextured", skyTexturedPackVertexSource, format);
+                compileVertex(compiler, options, skyTexturedVertex.source(),
+                        "skytextured-" + format.name().toLowerCase() + "-vertex", true);
+                for (int renderStage : IrisRenderStages.skyTexturedStages("pipeline/celestial")) {
+                    String skyTexturedFragment = TextureColorDistanceShaderAdapter.adaptFragment(
+                            skyTexturedPackFragmentSource, "gbuffers_skytextured",
+                            skyTexturedVertex.varyings(), false, false, renderStage);
+                    compile(compiler, options, skyTexturedFragment,
+                            "skytextured-" + format.name().toLowerCase() + "-stage-" + renderStage, true);
+                }
+            }
+            count++;
+            compiled += 8;
+
+            String texturedPackVertexSource = """
+                    #version 130
+                    varying vec2 texcoord;
+                    void main() {
+                        gl_Position = ftransform();
+                        texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                    }
+                    """;
+            BasicVertexShaderAdapter.AdaptedStage texturedVertex = BasicVertexShaderAdapter.validate(
+                    "gbuffers_textured", texturedPackVertexSource, BasicVertexShaderAdapter.Format.TEXTURED);
+            String texturedFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 130
+                    varying vec2 texcoord;
+                    uniform sampler2D tex;
+                    void main() {
+                        vec2 texel = 1.0 / vec2(textureSize(tex, 0));
+                        gl_FragColor = texture2D(tex, texcoord + texel);
+                    }
+                    """, "gbuffers_textured", texturedVertex.varyings(), false, false);
+            compileVertex(compiler, options, texturedVertex.source(), "textured-pack-vertex", true);
+            compile(compiler, options, texturedFragment, "textured-pack-fragment", true);
+            count++;
+            compiled += 2;
             Path beaconFixture = Path.of("examples/beaconbeam-vertex-execution/shaders");
             String beaconPackVertexSource = GlslPreprocessor.process("gbuffers_beaconbeam.vsh",
                     Files.readString(beaconFixture.resolve("gbuffers_beaconbeam.vsh")));

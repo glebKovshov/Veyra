@@ -45,6 +45,17 @@ class IrisRenderStagesTest {
     }
 
     @Test
+    void specializesCelestialAndEndSkyPipelinesForTheirDrawStages() {
+        assertEquals(4, IrisRenderStages.sunStage());
+        assertEquals(5, IrisRenderStages.moonStage());
+        assertEquals(7, IrisRenderStages.voidStage());
+        assertEquals(java.util.List.of(4, 5, 7), IrisRenderStages.skyTexturedStages("pipeline/celestial"));
+        assertEquals(java.util.List.of(7), IrisRenderStages.skyTexturedStages("pipeline/end_sky"));
+        assertTrue(IrisRenderStages.hasRenderStageUniform("uniform int renderStage;"));
+        assertFalse(IrisRenderStages.hasRenderStageUniform("// uniform int renderStage;\n"));
+    }
+
+    @Test
     void bindsOnlyAnIntegerRenderStageUniform() throws IOException {
         String source = "uniform int renderStage;\nvoid main() { int stage = renderStage; }\n";
         String bound = IrisRenderStages.bindUniform(source, 6, "gbuffers_skybasic");

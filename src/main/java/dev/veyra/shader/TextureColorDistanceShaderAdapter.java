@@ -35,7 +35,7 @@ public final class TextureColorDistanceShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;?");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
-            "\\btexture(?:Gather|Offset|Proj|Size|QueryLod)\\w*\\s*\\(");
+            "\\btexture(?:(?:2D)?(?:Gather|Offset|Proj)|QueryLod)\\w*\\s*\\(");
     private static final Map<String, String> INPUT_TYPES = Map.ofEntries(
             Map.entry("texcoord", "vec2"),
             Map.entry("texCoord", "vec2"),
@@ -77,6 +77,13 @@ public final class TextureColorDistanceShaderAdapter {
         return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
                 vertexColorInterpolation, texCoordInterpolation, explicitVertexLocations, null,
                 false, false, null);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                boolean hasVertexColor, boolean hasVertexDistances,
+                                int renderStage) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                "smooth", "smooth", false, null, false, false, renderStage);
     }
 
     static String adaptFragment(String source, String programName,

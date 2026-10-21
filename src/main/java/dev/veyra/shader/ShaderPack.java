@@ -986,6 +986,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         validateBasicLineCapabilities();
         validateSkyBasicCapabilities();
         validateBeaconBeamCapabilities();
+        validateLightningVertexCapabilities();
+        validateSkyTexturedVertexCapabilities();
+        validateTexturedVertexCapabilities();
         if (hasGlintFragment() && readStage(GLINT_PROGRAM + ".vsh").isEmpty()) {
             String fragment = readGlintFragment().orElseThrow(
                     () -> new IOException("The pack no longer contains an armor-glint fragment shader."));
@@ -1027,6 +1030,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     // The three native sky pipeline formats and their cross-stage links were checked above.
                 } else if (program.equals(BEACON_BEAM_PROGRAM)) {
                     // The beacon vertex/fragment interface was linked and its outputs validated above.
+                } else if (program.equals(LIGHTNING_PROGRAM)) {
+                    // The Position/Color lightning format and linked fragment inputs were checked above.
+                } else if (program.equals(SKY_TEXTURED_PROGRAM)) {
+                    // Both Position/Tex and Position/Tex/Color sky formats were checked above.
+                } else if (program.equals(TEXTURED_PROGRAM)) {
+                    // The world-border Position/Tex format and linked fragment inputs were checked above.
                 } else if (isEntityVertexProgram(program)) {
                     String vertexSource = readStage(file).orElseThrow(
                             () -> new IOException("The pack no longer contains " + file + "."));
@@ -1042,6 +1051,65 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (program.matches("begin\\d*")) {
                 throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
             }
+        }
+    }
+
+    private void validateLightningVertexCapabilities() throws IOException {
+        if (!hasLightningFragment || !isProgramEnabled(LIGHTNING_PROGRAM)) return;
+        Optional<String> vertex = readStage(LIGHTNING_PROGRAM + ".vsh");
+        if (vertex.isEmpty()) return;
+        String fragment = readLightningFragment().orElseThrow(
+                () -> new IOException("The pack no longer contains gbuffers_lightning.fsh."));
+        validateTextureVertexProgram(LIGHTNING_PROGRAM, LIGHTNING_PROGRAM, fragment, vertex.get(),
+                BasicVertexShaderAdapter.Format.LIGHTNING, null);
+    }
+
+    private void validateSkyTexturedVertexCapabilities() throws IOException {
+        if ((!hasSkyTexturedFragment && !hasTexturedFragment)
+                || !isProgramEnabled(SKY_TEXTURED_PROGRAM)) return;
+        Optional<String> vertex = readStage(SKY_TEXTURED_PROGRAM + ".vsh");
+        if (vertex.isEmpty()) return;
+        String fragmentProgram = hasSkyTexturedFragment ? SKY_TEXTURED_PROGRAM : TEXTURED_PROGRAM;
+        String fragment = readSkyTexturedFragment().orElseThrow(
+                () -> new IOException("The pack no longer contains a sky-textured or textured fragment shader."));
+        List<Integer> renderStages = IrisRenderStages.hasRenderStageUniform(fragment)
+                ? IrisRenderStages.skyTexturedStages("pipeline/celestial") : java.util.Collections.singletonList(null);
+        for (Integer renderStage : renderStages) {
+            validateTextureVertexProgram(SKY_TEXTURED_PROGRAM, fragmentProgram, fragment, vertex.get(),
+                    BasicVertexShaderAdapter.Format.SKY_TEXTURED, renderStage);
+            validateTextureVertexProgram(SKY_TEXTURED_PROGRAM, fragmentProgram, fragment, vertex.get(),
+                    BasicVertexShaderAdapter.Format.SKY_TEXTURED_COLOR, renderStage);
+        }
+    }
+
+    private void validateTexturedVertexCapabilities() throws IOException {
+        if (!hasTexturedFragment || !isProgramEnabled(TEXTURED_PROGRAM)) return;
+        Optional<String> vertex = readStage(TEXTURED_PROGRAM + ".vsh");
+        if (vertex.isEmpty()) return;
+        String fragment = readTexturedFragment().orElseThrow(
+                () -> new IOException("The pack no longer contains gbuffers_textured.fsh."));
+        validateTextureVertexProgram(TEXTURED_PROGRAM, TEXTURED_PROGRAM, fragment, vertex.get(),
+                BasicVertexShaderAdapter.Format.TEXTURED, null);
+    }
+
+    private void validateTextureVertexProgram(String vertexProgram, String fragmentProgram, String fragment,
+            String vertex, BasicVertexShaderAdapter.Format format, Integer renderStage) throws IOException {
+        BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.validate(
+                vertexProgram, vertex, format);
+        validateTextureFragmentLink(fragmentProgram, fragment, adapted.varyings(), renderStage);
+    }
+
+    private void validateTextureFragmentLink(String program, String fragment,
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs, Integer renderStage) throws IOException {
+        String activeFragment = GlslPreprocessor.process(program + ".fsh", fragment);
+        FragmentOutputs.parse(activeFragment);
+        readGeometryBlendSettings(program);
+        if (renderStage == null) {
+            TextureColorDistanceShaderAdapter.adaptFragment(fragment, program, vertexOutputs,
+                    hasShadowFragment(), false);
+        } else {
+            TextureColorDistanceShaderAdapter.adaptFragment(fragment, program, vertexOutputs,
+                    hasShadowFragment(), false, renderStage);
         }
     }
 

@@ -52,6 +52,21 @@ class TextureColorDistanceShaderAdapterTest {
     }
 
     @Test
+    void retainsCoreTextureSizeQueriesForSupportedTwoDimensionalSamplers() throws IOException {
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
+                uniform sampler2D tex;
+                varying vec2 texcoord;
+                void main() {
+                    vec2 texel = 1.0 / vec2(textureSize(tex, 0));
+                    gl_FragColor = texture2D(tex, texcoord + texel);
+                }
+                """, "gbuffers_armor_glint", false);
+
+        assertTrue(adapted.contains("textureSize(tex, 0)"), adapted);
+        assertTrue(adapted.contains("#define tex Sampler0"), adapted);
+    }
+
+    @Test
     void mapsIrisFogColorThroughTheMinecraftFogUniformBlock() throws IOException {
         String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
                 uniform vec3 fogColor;
@@ -77,6 +92,19 @@ class TextureColorDistanceShaderAdapterTest {
             assertTrue(adapted.contains("const int renderStage = " + stage + ";"), adapted);
             assertFalse(adapted.contains("uniform int renderStage"), adapted);
         }
+    }
+
+    @Test
+    void bindsRenderStageForNativeTextureFormatsWithoutPackVertexOutputs() throws IOException {
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
+                #version 120
+                uniform int renderStage;
+                void main() { gl_FragColor = vec4(float(renderStage)); }
+                """, "gbuffers_skytextured", false, false, IrisRenderStages.sunStage());
+
+        assertTrue(adapted.contains("const int renderStage = 4;"), adapted);
+        assertFalse(adapted.contains("uniform int renderStage"), adapted);
+        assertFalse(adapted.contains("layout(location = 6) in vec2 texCoord0;"), adapted);
     }
 
     @Test
