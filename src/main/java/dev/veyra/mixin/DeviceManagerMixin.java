@@ -1,5 +1,6 @@
 package dev.veyra.mixin;
 
+import dev.veyra.VeyraClient;
 import dev.veyra.vulkan.VeyraDeviceFeatures;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import org.lwjgl.PointerBuffer;
@@ -33,6 +34,10 @@ public abstract class DeviceManagerMixin {
             VeyraDeviceFeatures.independentBlendEnabled = enabled.independentBlend();
             VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = enabled.vertexPipelineStoresAndAtomics();
             VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = enabled.shaderStorageImageExtendedFormats();
+            VeyraClient.LOGGER.info("Vulkan core feature request for {} (API {}): independentBlend={}, vertexPipelineStoresAndAtomics={}, shaderStorageImageExtendedFormats={}, pEnabledFeaturesNull={}, features2SType={}.",
+                    properties.deviceNameString(), properties.apiVersion(), enabled.independentBlend(),
+                    enabled.vertexPipelineStoresAndAtomics(), enabled.shaderStorageImageExtendedFormats(),
+                    createInfo.pEnabledFeatures() == null, enabledFeatures.sType());
             return VK10.vkCreateDevice(physicalDevice, createInfo, allocator, device);
         }
     }

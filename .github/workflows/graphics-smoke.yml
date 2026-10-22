@@ -171,8 +171,8 @@ jobs:
               assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
               assert result['activeMagentaPixels'] >= 2000
               assert result['disabledMagentaPixels'] * 4 < result['activeMagentaPixels']
-              assert re.search(r'Storage buffer evidence: pipeline=veyra:pipeline/shadow_entities/.*binding=16 type=9 stages=.*global=false',text), 'Shadow entity SSBO descriptor was not bound'
-              assert re.search(r'Storage buffer evidence: pipeline=veyra:pipeline/shaderpack/composite_.*binding=16 type=9 stages=.*global=false',text), 'Post-pass SSBO descriptor was not bound'
+              assert re.search(r'Storage buffer evidence: pipeline=veyra:pipeline/shadow_entities/.*binding=1024 type=9 stages=.*global=false',text), 'Shadow entity SSBO descriptor was not bound'
+              assert re.search(r'Storage buffer evidence: pipeline=veyra:pipeline/shaderpack/composite_.*binding=1024 type=9 stages=.*global=false',text), 'Post-pass SSBO descriptor was not bound'
           if '${{ matrix.fixture }}' == 'shadow-color-mrt':
               entity_routes=re.findall(r'Framebuffer evidence: pipeline=veyra:pipeline/shadow_entities.*bound=MRT\[[^\]]*shadowcolor1',text)
               assert len(entity_routes) >= 2, 'The entity shadow pipeline did not route through the MRT before and after shader-pack re-selection'
