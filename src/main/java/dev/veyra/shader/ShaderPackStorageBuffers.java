@@ -146,7 +146,7 @@ public final class ShaderPackStorageBuffers {
             String instanceName = instance.group(1);
             String references = analysis.substring(0, blocks.start()) + analysis.substring(instance.end());
             if (!Pattern.compile("\\b" + Pattern.quote(instanceName) + "\\b").matcher(references).find()) {
-                replacements.add(new Replacement(blocks.start(), instance.end(), ""));
+                replacements.add(new Replacement(blocks.start(), instance.end(), "", ""));
                 blocks.region(instance.end(), analysis.length());
                 continue;
             }
@@ -173,16 +173,19 @@ public final class ShaderPackStorageBuffers {
             }
             String parserBlock = "layout(binding = " + descriptorBinding + ") uniform " + placeholder
                     + " { vec4 veyraStorageBufferPlaceholder; }" + storageBlock.instanceSuffix();
-            replacements.add(new Replacement(blocks.start(), instance.end(), parserBlock));
+            replacements.add(new Replacement(blocks.start(), instance.end(), parserBlock,
+                    storageBlock.declaration(descriptorBinding)));
             blocks.region(instance.end(), analysis.length());
         }
 
-        StringBuilder adapted = new StringBuilder(source);
+        StringBuilder parserSource = new StringBuilder(source);
+        StringBuilder directSource = new StringBuilder(source);
         for (int index = replacements.size() - 1; index >= 0; index--) {
             Replacement replacement = replacements.get(index);
-            adapted.replace(replacement.start(), replacement.end(), replacement.value());
+            parserSource.replace(replacement.start(), replacement.end(), replacement.parserValue());
+            directSource.replace(replacement.start(), replacement.end(), replacement.directValue());
         }
-        return new PreparedSource(adapted.toString(), Map.copyOf(storageBlocks));
+        return new PreparedSource(parserSource.toString(), Map.copyOf(storageBlocks), directSource.toString());
     }
 
     private static String maskSpans(String source, List<Span> spans) {
@@ -244,7 +247,7 @@ public final class ShaderPackStorageBuffers {
         return -1;
     }
 
-    public record PreparedSource(String source, Map<String, StorageBlock> storageBlocks) { }
+    public record PreparedSource(String source, Map<String, StorageBlock> storageBlocks, String directSource) { }
 
     public record StorageBlock(String placeholder, int bufferObjectBinding, long allocationBytes,
                                String blockName, String layout, String access, String body, String instanceSuffix) {
@@ -268,6 +271,6 @@ public final class ShaderPackStorageBuffers {
         }
     }
 
-    private record Replacement(int start, int end, String value) { }
+    private record Replacement(int start, int end, String parserValue, String directValue) { }
     private record Span(int start, int end) { }
 }

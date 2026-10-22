@@ -3792,6 +3792,10 @@ public final class VeyraRenderer {
                     programVertexSource = images.decorate(programVertexSource, vertexImages);
                     adaptedFragmentSource = images.decorate(adaptedFragmentSource, fragmentImages);
                 }
+                VeyraStorageBufferResources.DirectCompilation storageCompilation =
+                        prepareDirectStorageBufferCompilation(builder, programVertexSource, adaptedFragmentSource);
+                programVertexSource = storageCompilation.vertexSource();
+                adaptedFragmentSource = storageCompilation.fragmentSource();
                 dumpShaderSource("terrain-" + programName + ".vsh", programVertexSource);
                 dumpShaderSource("terrain-" + programName + ".fsh", adaptedFragmentSource);
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, programVertexSource);
@@ -3876,6 +3880,10 @@ public final class VeyraRenderer {
                         shadowVertexSource = images.decorate(shadowVertexSource, vertexImages);
                         fragmentSource = images.decorate(fragmentSource, fragmentImages);
                     }
+                    VeyraStorageBufferResources.DirectCompilation storageCompilation =
+                            prepareDirectStorageBufferCompilation(builder, shadowVertexSource, fragmentSource);
+                    shadowVertexSource = storageCompilation.vertexSource();
+                    fragmentSource = storageCompilation.fragmentSource();
                     dumpShaderSource("shadow-" + programName + ".vsh", shadowVertexSource);
                     dumpShaderSource("shadow-" + programName + ".fsh", fragmentSource);
                     builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, shadowVertexSource);
@@ -4160,6 +4168,10 @@ public final class VeyraRenderer {
             finalVertexSource = imagePlan.decorate(finalVertexSource, cloudVertexImages);
             fragmentSource = imagePlan.decorate(fragmentSource, cloudFragmentImages);
         }
+        VeyraStorageBufferResources.DirectCompilation storageCompilation =
+                prepareDirectStorageBufferCompilation(builder, finalVertexSource, fragmentSource);
+        finalVertexSource = storageCompilation.vertexSource();
+        fragmentSource = storageCompilation.fragmentSource();
         builder.setShaderSrc(SPIRVUtils.ShaderKind.VERTEX_SHADER, finalVertexSource);
         builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, fragmentSource);
         GraphicsPipeline pipeline = builder.createGraphicsPipeline();
@@ -4170,6 +4182,18 @@ public final class VeyraRenderer {
             ubo.setUseGlobalBuffer(true);
         }
         return pipeline;
+    }
+
+    private static VeyraStorageBufferResources.DirectCompilation prepareDirectStorageBufferCompilation(
+            Pipeline.Builder builder, String vertexSource, String fragmentSource) throws IOException {
+        VeyraStorageBufferResources storageBuffers = VeyraStorageBufferResources.active();
+        if (storageBuffers == null) {
+            return new VeyraStorageBufferResources.DirectCompilation(vertexSource, fragmentSource, null, List.of());
+        }
+        VeyraStorageBufferResources.DirectCompilation prepared = storageBuffers.prepareDirectCompilation(
+                vertexSource, fragmentSource, null);
+        prepared.storageDescriptors().forEach(builder::addUBO);
+        return prepared;
     }
 
     /** VulkanMod allocates descriptor-layout slots by descriptor count, then indexes them by binding. */

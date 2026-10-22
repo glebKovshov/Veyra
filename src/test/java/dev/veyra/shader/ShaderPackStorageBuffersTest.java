@@ -149,6 +149,30 @@ class ShaderPackStorageBuffersTest {
     }
 
     @Test
+    void rewritesAnActiveStorageBlockForDirectShadercCompilation() throws Exception {
+        String source = """
+                #version 450
+                layout(std430, binding = 0) buffer blockDataBuffer {
+                    uint value;
+                } blockDataSSBO;
+                void main() {
+                    atomicAdd(blockDataSSBO.value, 1u);
+                    gl_Position = vec4(0.0);
+                }
+                """;
+        var properties = ShaderPackStorageBufferProperties.parse("bufferObject.0 = 128\n");
+
+        var prepared = ShaderPackStorageBuffers.prepareForVulkanParser(source, properties, 800, 450);
+
+        assertTrue(prepared.source().contains("uniform VeyraStorageBuffer_0_"), prepared.source());
+        assertTrue(prepared.directSource().contains("layout(std430, binding = 1024) buffer blockDataBuffer"),
+                prepared.directSource());
+        assertTrue(prepared.directSource().contains("atomicAdd(blockDataSSBO.value, 1u)"), prepared.directSource());
+        assertFalse(prepared.directSource().contains("VeyraStorageBuffer_0_"), prepared.directSource());
+        assertEquals(1, prepared.storageBlocks().size());
+    }
+
+    @Test
     void vulkanModParserKeepsTheStoragePlaceholderAsAContiguousDescriptor() throws Exception {
         String source = """
                 #version 450

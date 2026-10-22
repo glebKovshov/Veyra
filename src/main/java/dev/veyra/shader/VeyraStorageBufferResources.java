@@ -4,10 +4,13 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
+import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import org.lwjgl.vulkan.VkCommandBuffer;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -125,6 +128,39 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
         allocatedBytes += allocationBytes;
         return created;
     }
+
+    /** Prepares sources compiled directly by shaderc and returns their Vulkan storage descriptors. */
+    public DirectCompilation prepareDirectCompilation(String vertexSource, String fragmentSource,
+                                                      String computeSource) throws IOException {
+        Map<Integer, Integer> descriptorStages = new TreeMap<>();
+        String preparedVertex = prepareDirectStage(vertexSource, VK_SHADER_STAGE_VERTEX_BIT, descriptorStages);
+        String preparedFragment = prepareDirectStage(fragmentSource, VK_SHADER_STAGE_FRAGMENT_BIT, descriptorStages);
+        String preparedCompute = prepareDirectStage(computeSource, VK_SHADER_STAGE_COMPUTE_BIT, descriptorStages);
+        List<UBO> descriptors = new java.util.ArrayList<>(descriptorStages.size());
+        for (var entry : descriptorStages.entrySet()) {
+            StorageBuffer storageBuffer = storageBuffer(entry.getKey());
+            UBO logicalBlock = new UBO("VeyraDirectStorageBuffer_" + entry.getKey(), entry.getKey(),
+                    entry.getValue(), 16, List.of());
+            descriptors.add(new VeyraStorageBufferUBO(logicalBlock, storageBuffer));
+        }
+        return new DirectCompilation(preparedVertex, preparedFragment, preparedCompute, List.copyOf(descriptors));
+    }
+
+    private String prepareDirectStage(String source, int stage, Map<Integer, Integer> descriptorStages)
+            throws IOException {
+        if (source == null) return null;
+        ShaderPackStorageBuffers.PreparedSource prepared = ShaderPackStorageBuffers.prepareForVulkanParser(
+                source, properties, viewWidth, viewHeight);
+        for (ShaderPackStorageBuffers.StorageBlock block : prepared.storageBlocks().values()) {
+            registerBlock(block);
+            storageBuffer(block.bufferObjectBinding());
+            descriptorStages.merge(block.bufferObjectBinding(), stage, (previous, next) -> previous | next);
+        }
+        return prepared.directSource();
+    }
+
+    public record DirectCompilation(String vertexSource, String fragmentSource, String computeSource,
+                                    List<UBO> storageDescriptors) { }
 
     /** Clears pack SSBOs before shadow writers run and makes the transfer writes visible to shader stages. */
     public void clearForShadowPass() {

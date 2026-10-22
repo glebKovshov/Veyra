@@ -38,6 +38,15 @@ public final class VeyraComputePipeline extends Pipeline {
     private VeyraComputePipeline(String name, ComputeShaderAdapter.AdaptedStage shader,
                                  List<? extends ImageDescriptor> descriptors) throws IOException {
         super(name);
+        String shaderSource = shader.source();
+        List<UBO> storageBufferDescriptors = List.of();
+        VeyraStorageBufferResources storageBuffers = VeyraStorageBufferResources.active();
+        if (storageBuffers != null) {
+            VeyraStorageBufferResources.DirectCompilation direct = storageBuffers.prepareDirectCompilation(
+                    null, null, shaderSource);
+            shaderSource = direct.computeSource();
+            storageBufferDescriptors = direct.storageDescriptors();
+        }
         requireGraphicsQueueComputeSupport();
         validateLocalSize(name, shader.localSizeX(), shader.localSizeY(), shader.localSizeZ());
         this.localSizeX = shader.localSizeX();
@@ -48,13 +57,14 @@ public final class VeyraComputePipeline extends Pipeline {
         for (ShaderPackUniformAdapter.UniformField field : shader.uniforms()) {
             uniformBuilder.addUniform(field.type(), field.name());
         }
-        if (shader.uniforms().isEmpty()) {
-            this.buffers = List.of();
-        } else {
+        List<UBO> pipelineBuffers = new ArrayList<>();
+        if (!shader.uniforms().isEmpty()) {
             UBO uniforms = uniformBuilder.buildUBO("VeyraComputeUniforms", 0, VK_SHADER_STAGE_COMPUTE_BIT);
             uniforms.setUseGlobalBuffer(true);
-            this.buffers = List.of(uniforms);
+            pipelineBuffers.add(uniforms);
         }
+        pipelineBuffers.addAll(storageBufferDescriptors);
+        this.buffers = pipelineBuffers;
         this.imageDescriptors = new ArrayList<>(descriptors);
         this.pushConstants = null;
 
@@ -63,7 +73,7 @@ public final class VeyraComputePipeline extends Pipeline {
             createPipelineLayout();
             createDescriptorSets(Renderer.getFramesNum());
             try (SPIRVUtils.SPIRV spirv = SPIRVUtils.compileShader(
-                    name, shader.source(), SPIRVUtils.ShaderKind.COMPUTE_SHADER)) {
+                    name, shaderSource, SPIRVUtils.ShaderKind.COMPUTE_SHADER)) {
                 long module = createShaderModule(spirv.bytecode());
                 try (MemoryStack stack = MemoryStack.stackPush()) {
                     VkPipelineShaderStageCreateInfo stage = VkPipelineShaderStageCreateInfo.calloc(stack)

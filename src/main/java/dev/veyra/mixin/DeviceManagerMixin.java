@@ -9,6 +9,7 @@ import org.lwjgl.vulkan.VkAllocationCallbacks;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
+import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,12 +26,9 @@ public abstract class DeviceManagerMixin {
             VK10.vkGetPhysicalDeviceFeatures(physicalDevice, supported);
             VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
             VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
-            VkPhysicalDeviceFeatures enabled = createInfo.pEnabledFeatures();
-            if (enabled == null) {
-                enabled = VkPhysicalDeviceFeatures.calloc(stack);
-                createInfo.pEnabledFeatures(enabled);
-            }
-            VeyraDeviceFeatures.mergeSupportedFeatures(enabled, supported);
+            VkPhysicalDeviceFeatures2 enabledFeatures = VeyraDeviceFeatures.enableSupportedFeatures(
+                    createInfo, supported, stack);
+            VkPhysicalDeviceFeatures enabled = enabledFeatures.features();
             VeyraDeviceFeatures.maxColorAttachments = properties.limits().maxColorAttachments();
             VeyraDeviceFeatures.independentBlendEnabled = enabled.independentBlend();
             VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = enabled.vertexPipelineStoresAndAtomics();
