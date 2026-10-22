@@ -8,7 +8,7 @@ RTX 3070 runtime smokes passed for entity custom-image (**18,410 active / 0 disa
 
 The refreshed pinned audit covers 4 packs / 75 cases (12 defaults + 63 profile/dimension cases), 5,178 declared stages / 5,124 preprocessed stages, 864 geometry fragments accepted / 0 rejected, and 18/18 active compute stages compiled. It reports 0 capability/adapter-error rows. Every row still has `visualValidation=false`; this is source validation, not whole-pack visual proof.
 
-The real Complementary Reimagined `COMPLEMENTARY` GPU smoke is still blocked before visual validation: `composite_colortex7` declares and uses active SSBO `blockDataBuffer`, which VulkanMod 0.6.8's native `RenderPipeline` cannot bind. Veyra now reports this as an explicit unsupported-capability error rather than letting the native parser crash. PR #84 remains draft; the latest CI results are for the previous remote head and must be rerun after the verified local fixes are pushed.
+The real Complementary Reimagined `COMPLEMENTARY` GPU smoke is still blocked before visual validation: `composite_colortex7` declares and uses active SSBO `blockDataBuffer`, which VulkanMod 0.6.8's native `RenderPipeline` cannot bind. Veyra now reports this as an explicit unsupported-capability error rather than letting the native parser crash. Commit `21522d93` is pushed to draft PR #84; its Build and source-audit workflows are in progress, and Graphics smoke is queued. The previous head's failures are not results for this candidate.
 
 ## Cloud render-stage input and entity midpoint investigation — 2026-10-22
 
