@@ -1317,7 +1317,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String source = readComputeStage(file).orElseThrow();
             ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
             var shader = ComputeShaderAdapter.adapt(file, source, properties);
-            if (!shader.hasFixedWorkGroups()) throw new IOException(file + " requires fixed const ivec3 workGroups.");
             if (shader.resources().stream().noneMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
                 throw new IOException(file + " has no supported storage-image output.");
             }

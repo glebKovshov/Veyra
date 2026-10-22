@@ -69,13 +69,11 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                 if (!hasStorageImage) {
                     throw new IOException(file + " does not declare an active storage image; Veyra shadow compute currently requires image resources.");
                 }
-                if (!shader.hasFixedWorkGroups()) {
-                    throw new IOException(file + " has no fixed const ivec3 workGroups; render-relative or indirect compute sizing is not implemented.");
-                }
                 VeyraComputePipeline pipeline = VeyraComputePipeline.create(
                         file.substring(0, file.length() - 4),
                         shader, resources.descriptors(index));
-                compiled.add(new Dispatch(pipeline, shader.workGroupsX(), shader.workGroupsY(), shader.workGroupsZ()));
+                compiled.add(new Dispatch(pipeline, shader.workGroupDispatch(),
+                        shader.localSizeX(), shader.localSizeY()));
             }
             return new VeyraComputePipelineSet(resources, compiled);
         } catch (IOException | RuntimeException exception) {
@@ -153,9 +151,17 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
     }
 
     /** Dispatches after all shadow stages, matching Iris shadowcomp ordering, then exposes writes to graphics. */
-    public void dispatchAfterShadowPass() {
+    public void dispatchAfterShadowPass(int renderWidth, int renderHeight) {
         ensureOpen();
         if (stages.isEmpty()) return;
+        List<ResolvedDispatch> resolvedStages = new ArrayList<>(stages.size());
+        for (Dispatch dispatch : stages) {
+            int[] groups = dispatch.workGroups().resolve(renderWidth, renderHeight,
+                    dispatch.localSizeX(), dispatch.localSizeY());
+            if (groups[0] == 0 || groups[1] == 0 || groups[2] == 0) continue;
+            resolvedStages.add(new ResolvedDispatch(dispatch.pipeline(), groups[0], groups[1], groups[2]));
+        }
+        if (resolvedStages.isEmpty()) return;
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
         if (!Renderer.isRecording() || commandBuffer == null) {
             throw new IllegalStateException("Shader-pack compute stages can only dispatch while VulkanMod records a frame.");
@@ -168,10 +174,10 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                 VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
                 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-        for (int index = 0; index < stages.size(); index++) {
-            Dispatch dispatch = stages.get(index);
+        for (int index = 0; index < resolvedStages.size(); index++) {
+            ResolvedDispatch dispatch = resolvedStages.get(index);
             dispatch.pipeline().dispatchWorkGroups(dispatch.x(), dispatch.y(), dispatch.z());
-            if (index + 1 < stages.size()) {
+            if (index + 1 < resolvedStages.size()) {
                 VeyraComputePipeline.memoryBarrier(commandBuffer,
                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                         VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -203,6 +209,10 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         if (closed) throw new IllegalStateException("Compute pipeline set has already been released.");
     }
 
-    private record Dispatch(VeyraComputePipeline pipeline, int x, int y, int z) {
+    private record Dispatch(VeyraComputePipeline pipeline, ComputeWorkGroupDispatch workGroups,
+                            int localSizeX, int localSizeY) {
+    }
+
+    private record ResolvedDispatch(VeyraComputePipeline pipeline, int x, int y, int z) {
     }
 }

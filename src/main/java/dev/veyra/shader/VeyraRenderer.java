@@ -4032,7 +4032,8 @@ public final class VeyraRenderer {
     static void dispatchShadowCompute() {
         if (storageBufferResources != null) storageBufferResources.barrierAfterShadowPass();
         if (terrainPipelineSet != null && terrainPipelineSet.compute() != null) {
-            terrainPipelineSet.compute().dispatchAfterShadowPass();
+            RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+            terrainPipelineSet.compute().dispatchAfterShadowPass(mainTarget.width, mainTarget.height);
         }
     }
 
