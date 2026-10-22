@@ -43,10 +43,6 @@ public final class TerrainShaderAdapter {
     private static final Pattern TERRAIN_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^([\\t ]*)layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*out\\s+"
                     + "(?:flat\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;");
-    private static final Pattern FRAGMENT_INPUT_LOCATION = Pattern.compile(
-            "(?m)^\\s*layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*"
-                    + "(?:(?:flat|smooth|noperspective)\\s+)?in\\s+[A-Za-z_][A-Za-z0-9_]*\\s+"
-                    + "([A-Za-z_][A-Za-z0-9_]*)\\s*;");
     private static final Pattern TERRAIN_FRAGMENT_BRIDGE_INPUT = Pattern.compile(
             "(?m)^([\\t ]*)layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*"
                     + "(?:(?:flat|smooth|noperspective)\\s+)?in\\s+[A-Za-z_][A-Za-z0-9_]*\\s+"
@@ -960,10 +956,17 @@ public final class TerrainShaderAdapter {
 
     static Set<Integer> unusedTerrainVertexOutputs(String adaptedFragmentSource) {
         Set<Integer> consumed = new HashSet<>();
-        Matcher inputs = FRAGMENT_INPUT_LOCATION.matcher(ShaderSource.maskBlockAndLineComments(adaptedFragmentSource));
-        while (inputs.find()) {
-            int location = Integer.parseInt(inputs.group(1));
-            String name = inputs.group(2);
+        String uncommented = ShaderSource.maskBlockAndLineComments(adaptedFragmentSource);
+        int lineStart = 0;
+        while (lineStart < uncommented.length()) {
+            ParsedFragmentInput input = parseFragmentInput(uncommented, lineStart);
+            if (input == null) {
+                lineStart = nextLineStart(uncommented, lineStart);
+                continue;
+            }
+            int location = input.location();
+            String name = input.name();
+            lineStart = nextLineStart(uncommented, input.semicolon() + 1);
             if (name.startsWith("veyraPackVarying_")
                     && !(location == 4 && name.equals("veyraPackVarying_chunkFade"))) continue;
             consumed.add(location);
@@ -971,6 +974,72 @@ public final class TerrainShaderAdapter {
         Set<Integer> unused = new HashSet<>(TERRAIN_VERTEX_OUTPUT_LOCATIONS);
         unused.removeAll(consumed);
         return Set.copyOf(unused);
+    }
+
+    private static ParsedFragmentInput parseFragmentInput(String source, int lineStart) {
+        int cursor = skipWhitespace(source, lineStart);
+        if (!matchesToken(source, cursor, "layout")) return null;
+        cursor = skipWhitespace(source, cursor + "layout".length());
+        if (cursor >= source.length() || source.charAt(cursor) != '(') return null;
+        cursor = skipWhitespace(source, cursor + 1);
+        if (!matchesToken(source, cursor, "location")) return null;
+        cursor = skipWhitespace(source, cursor + "location".length());
+        if (cursor >= source.length() || source.charAt(cursor) != '=') return null;
+        cursor = skipWhitespace(source, cursor + 1);
+        int numberStart = cursor;
+        while (cursor < source.length() && source.charAt(cursor) >= '0' && source.charAt(cursor) <= '9') cursor++;
+        if (cursor == numberStart) return null;
+        int location = Integer.parseInt(source.substring(numberStart, cursor));
+        cursor = skipWhitespace(source, cursor);
+        if (cursor >= source.length() || source.charAt(cursor) != ')') return null;
+        cursor = skipWhitespace(source, cursor + 1);
+        if (matchesToken(source, cursor, "flat")) cursor = skipWhitespace(source, cursor + "flat".length());
+        else if (matchesToken(source, cursor, "smooth")) cursor = skipWhitespace(source, cursor + "smooth".length());
+        else if (matchesToken(source, cursor, "noperspective")) cursor = skipWhitespace(source, cursor + "noperspective".length());
+        if (!matchesToken(source, cursor, "in")) return null;
+        cursor = skipWhitespace(source, cursor + "in".length());
+        int typeEnd = identifierEnd(source, cursor);
+        if (typeEnd == cursor) return null;
+        int nameStart = skipWhitespace(source, typeEnd);
+        if (nameStart == typeEnd) return null;
+        int nameEnd = identifierEnd(source, nameStart);
+        if (nameEnd == nameStart) return null;
+        cursor = skipWhitespace(source, nameEnd);
+        return cursor < source.length() && source.charAt(cursor) == ';'
+                ? new ParsedFragmentInput(location, source.substring(nameStart, nameEnd), cursor) : null;
+    }
+
+    private static int skipWhitespace(String source, int cursor) {
+        while (cursor < source.length() && Character.isWhitespace(source.charAt(cursor))) cursor++;
+        return cursor;
+    }
+
+    private static int identifierEnd(String source, int cursor) {
+        if (cursor >= source.length() || !isIdentifierStart(source.charAt(cursor))) return cursor;
+        cursor++;
+        while (cursor < source.length() && isIdentifierPart(source.charAt(cursor))) cursor++;
+        return cursor;
+    }
+
+    private static boolean matchesToken(String source, int cursor, String token) {
+        if (cursor < 0 || !source.startsWith(token, cursor)) return false;
+        int end = cursor + token.length();
+        return end == source.length() || !isIdentifierPart(source.charAt(end));
+    }
+
+    private static boolean isIdentifierStart(char character) {
+        return character == '_' || character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z';
+    }
+
+    private static boolean isIdentifierPart(char character) {
+        return isIdentifierStart(character) || character >= '0' && character <= '9';
+    }
+
+    private static int nextLineStart(String source, int cursor) {
+        while (cursor < source.length() && source.charAt(cursor) != '\r' && source.charAt(cursor) != '\n') cursor++;
+        if (cursor < source.length() && source.charAt(cursor) == '\r') cursor++;
+        if (cursor < source.length() && source.charAt(cursor) == '\n') cursor++;
+        return cursor;
     }
 
     static Set<Integer> unusedTerrainVertexOutputs(String fragmentSource,
@@ -1114,6 +1183,8 @@ public final class TerrainShaderAdapter {
 
     private record Varying(String type, int location) {
     }
+
+    private record ParsedFragmentInput(int location, String name, int semicolon) { }
 
     public record ShaderUniform(String name, String sourceType, boolean booleanField) {
         public String bufferType() {

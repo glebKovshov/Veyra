@@ -113,7 +113,7 @@ class ShaderPackImageBindingsTest {
         assertTrue(decorated.indexOf("layout(set") < decorated.indexOf("void main"));
     }
 
-    @Test void emitsUnlocatedSamplerDeclarationsForNativeRenderPipelineAndRejectsStorageImages() throws Exception {
+    @Test void emitsNativeSamplerPlaceholdersAndRestoresStorageImageDeclarations() throws Exception {
         var properties = ShaderPackImageProperties.parse(PROPERTIES);
         var sampler = ShaderPackImageBindings.prepare("gbuffers_basic.fsh", """
                 #version 120
@@ -127,12 +127,19 @@ class ShaderPackImageBindingsTest {
         assertFalse(nativeSource.contains("layout(set"));
 
         var storage = ShaderPackImageBindings.prepare("gbuffers_basic.fsh", """
-                writeonly uniform uimage3D voxel_img;
+                coherent uniform uimage3D voxel_img;
                 void main(){imageStore(voxel_img,ivec3(0),uvec4(1));}
                 """, properties);
-        IOException error = assertThrows(IOException.class, () ->
-                ShaderPackImageBindings.decorateNativeSamplers("#version 460\nvoid main(){}", storage));
-        assertTrue(error.getMessage().contains("graphics storage image"));
+        String storagePlaceholder = ShaderPackImageBindings.decorateNativeSamplers(
+                "#version 460\nvoid main(){}", storage);
+        assertTrue(storagePlaceholder.contains("uniform sampler2D voxel_img;"));
+        var restored = VeyraNativeImageBindings.restoreStorageImageDeclarations(
+                "layout(binding = 4) uniform sampler2D voxel_img;\n",
+                java.util.Map.of("voxel_img", storage.resources().getFirst()),
+                java.util.Map.of("voxel_img", 4));
+        assertEquals("layout(set = 0, binding = 4, r16ui) coherent uniform uimage3D voxel_img;\n",
+                restored.source());
+        assertEquals(java.util.Set.of("voxel_img"), restored.names());
     }
 
     @Test void keepsSharedImagesLinkedThroughEntityAndTexturedFragmentAdapters() throws Exception {

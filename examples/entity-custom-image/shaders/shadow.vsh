@@ -7,5 +7,5 @@ void main() {
     gl_Position = ftransform();
     vec4 albedo = texture2DLod(tex, gl_MultiTexCoord0.xy, 0.0);
     vec4 light = texture2DLod(lightmap, vec2(0.5), 0.0);
-    if (albedo.a > 0.0 && light.r > 0.0) imageAtomicMax(voxel_img, ivec3(0), 5u);
+    if (albedo.a > 0.0 && light.r > 0.0) imageAtomicMax(voxel_img, ivec3(0), 2u);
 }

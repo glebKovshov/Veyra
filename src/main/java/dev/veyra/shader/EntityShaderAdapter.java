@@ -26,10 +26,6 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern LEADING_VARYING_INTERPOLATION = Pattern.compile(
             "(?m)^([\\t ]*)(flat|smooth|noperspective)([\\t ]+)(varying|in)([\\t ]+)");
-    private static final Pattern COMMA_SEPARATED_VARYING_DECLARATION = Pattern.compile(
-            "(?m)^([\\t ]*(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s+)"
-                    + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)\\s*;"
-                    + "([\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$))");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|in)\\b[^\\r\\n]*;?");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
@@ -45,6 +41,7 @@ public final class EntityShaderAdapter {
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern SHADOWTEX_REFERENCE = Pattern.compile("\\bshadowtex0\\b");
+    private static final Pattern GLSL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
     private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
@@ -286,23 +283,112 @@ public final class EntityShaderAdapter {
     }
 
     private static String expandCommaSeparatedVaryings(String source) {
-        Matcher matcher = COMMA_SEPARATED_VARYING_DECLARATION.matcher(source);
-        StringBuffer expanded = new StringBuffer();
-        while (matcher.find()) {
-            String prefix = matcher.group(1);
-            String[] names = matcher.group(2).split("\\s*,\\s*");
-            String suffix = matcher.group(3);
-            StringBuilder declarations = new StringBuilder();
-            for (int index = 0; index < names.length; index++) {
-                if (index > 0) declarations.append('\n');
-                declarations.append(prefix).append(names[index]).append(';');
-                if (index == names.length - 1) declarations.append(suffix);
+        StringBuilder expanded = new StringBuilder(source.length());
+        int copiedThrough = 0;
+        int lineStart = 0;
+        while (lineStart < source.length()) {
+            CommaSeparatedVarying declaration = parseCommaSeparatedVarying(source, lineStart);
+            if (declaration != null) {
+                expanded.append(source, copiedThrough, declaration.start());
+                String separator = declaration.lineEnding().isEmpty() ? "\n" : declaration.lineEnding();
+                for (int index = 0; index < declaration.names().size(); index++) {
+                    if (index > 0) expanded.append(separator);
+                    expanded.append(declaration.prefix()).append(declaration.names().get(index)).append(';');
+                }
+                expanded.append(declaration.suffix()).append(declaration.lineEnding());
+                copiedThrough = declaration.end();
+                lineStart = copiedThrough;
+            } else {
+                int newline = source.indexOf('\n', lineStart);
+                if (newline < 0) break;
+                lineStart = newline + 1;
             }
-            matcher.appendReplacement(expanded, Matcher.quoteReplacement(declarations.toString()));
         }
-        matcher.appendTail(expanded);
-        return expanded.toString();
+        return expanded.append(source, copiedThrough, source.length()).toString();
     }
+
+    private static CommaSeparatedVarying parseCommaSeparatedVarying(String source, int lineStart) {
+        int cursor = skipHorizontalWhitespace(source, lineStart);
+        int storageEnd = tokenEnd(source, cursor, "varying");
+        if (storageEnd < 0) storageEnd = tokenEnd(source, cursor, "in");
+        if (storageEnd < 0) return null;
+
+        cursor = skipWhitespace(source, storageEnd);
+        int interpolationEnd = tokenEnd(source, cursor, "flat");
+        if (interpolationEnd < 0) interpolationEnd = tokenEnd(source, cursor, "smooth");
+        if (interpolationEnd < 0) interpolationEnd = tokenEnd(source, cursor, "noperspective");
+        if (interpolationEnd >= 0) cursor = skipWhitespace(source, interpolationEnd);
+
+        int typeEnd = identifierEnd(source, cursor);
+        if (typeEnd == cursor) return null;
+        int namesStart = skipWhitespace(source, typeEnd);
+        if (namesStart == typeEnd) return null;
+
+        List<String> names = new ArrayList<>();
+        cursor = identifierEnd(source, namesStart);
+        if (cursor == namesStart) return null;
+        names.add(source.substring(namesStart, cursor));
+        while (true) {
+            int afterWhitespace = skipWhitespace(source, cursor);
+            if (afterWhitespace >= source.length() || source.charAt(afterWhitespace) != ',') {
+                cursor = afterWhitespace;
+                break;
+            }
+            int nextName = skipWhitespace(source, afterWhitespace + 1);
+            int nextEnd = identifierEnd(source, nextName);
+            if (nextEnd == nextName) return null;
+            names.add(source.substring(nextName, nextEnd));
+            cursor = nextEnd;
+        }
+        if (names.size() < 2 || cursor >= source.length() || source.charAt(cursor) != ';') return null;
+
+        int semicolon = cursor;
+        int newline = source.indexOf('\n', semicolon + 1);
+        int lineEnd = newline < 0 ? source.length() : newline;
+        int suffixEnd = lineEnd;
+        if (suffixEnd > semicolon + 1 && source.charAt(suffixEnd - 1) == '\r') suffixEnd--;
+        int suffixStart = skipHorizontalWhitespace(source, semicolon + 1);
+        if (suffixStart < suffixEnd && !source.startsWith("//", suffixStart)) return null;
+
+        String lineEnding = newline < 0 ? "" : suffixEnd < lineEnd ? "\r\n" : "\n";
+        return new CommaSeparatedVarying(lineStart, newline < 0 ? source.length() : newline + 1,
+                source.substring(lineStart, namesStart), List.copyOf(names),
+                source.substring(semicolon + 1, suffixEnd), lineEnding);
+    }
+
+    private static int skipHorizontalWhitespace(String source, int cursor) {
+        while (cursor < source.length() && (source.charAt(cursor) == ' ' || source.charAt(cursor) == '\t')) cursor++;
+        return cursor;
+    }
+
+    private static int skipWhitespace(String source, int cursor) {
+        while (cursor < source.length() && Character.isWhitespace(source.charAt(cursor))) cursor++;
+        return cursor;
+    }
+
+    private static int identifierEnd(String source, int cursor) {
+        if (cursor >= source.length() || !isIdentifierStart(source.charAt(cursor))) return cursor;
+        cursor++;
+        while (cursor < source.length() && isIdentifierPart(source.charAt(cursor))) cursor++;
+        return cursor;
+    }
+
+    private static int tokenEnd(String source, int cursor, String token) {
+        int end = cursor + token.length();
+        if (end > source.length() || !source.regionMatches(cursor, token, 0, token.length())) return -1;
+        return end == source.length() || !isIdentifierPart(source.charAt(end)) ? end : -1;
+    }
+
+    private static boolean isIdentifierStart(char character) {
+        return character == '_' || character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z';
+    }
+
+    private static boolean isIdentifierPart(char character) {
+        return isIdentifierStart(character) || character >= '0' && character <= '9';
+    }
+
+    private record CommaSeparatedVarying(int start, int end, String prefix, List<String> names,
+                                         String suffix, String lineEnding) { }
 
     /** GLSL permits interpolation before the storage qualifier (for example, {@code flat in int id}). */
     private static String normalizeLeadingVaryingInterpolation(String source) {
@@ -813,10 +899,7 @@ public final class EntityShaderAdapter {
         }
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
-        for (Map.Entry<String, TerrainVertexShaderAdapter.PackVarying> entry : linkedPackVaryings.entrySet()) {
-            adapted = adapted.replaceAll("\\b" + Pattern.quote(entry.getKey()) + "\\b",
-                    Matcher.quoteReplacement("veyraEntityPackInput_" + entry.getValue().location()));
-        }
+        adapted = replaceLinkedPackVaryings(adapted, linkedPackVaryings);
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
             throw new IOException(programName + " declares inputs that are not provided by Veyra's entity bridge yet.");
         }
@@ -1035,6 +1118,24 @@ public final class EntityShaderAdapter {
         result.append(shaderPackUniforms.macros());
         result.append(outputLayout.entityPipelineDeclarations());
         return result.append(adapted).toString();
+    }
+
+    private static String replaceLinkedPackVaryings(
+            String source, Map<String, TerrainVertexShaderAdapter.PackVarying> linkedPackVaryings) {
+        if (source.isEmpty() || linkedPackVaryings.isEmpty()) return source;
+        Matcher identifiers = GLSL_IDENTIFIER.matcher(source);
+        StringBuilder rewritten = null;
+        int cursor = 0;
+        while (identifiers.find()) {
+            TerrainVertexShaderAdapter.PackVarying varying = linkedPackVaryings.get(identifiers.group());
+            if (varying == null) continue;
+            if (rewritten == null) rewritten = new StringBuilder(source.length());
+            rewritten.append(source, cursor, identifiers.start())
+                    .append("veyraEntityPackInput_")
+                    .append(varying.location());
+            cursor = identifiers.end();
+        }
+        return rewritten == null ? source : rewritten.append(source, cursor, source.length()).toString();
     }
 
     static String bindEntityIdentifiers(String source, String programName,

@@ -53,9 +53,20 @@ final class EntityVertexShaderAdapter {
             "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
                     + "(?:attribute|in)\\s+vec4\\s+mc_Entity\\s*;"
                     + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern ENTITY_MID_BLOCK_ATTRIBUTE_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
+                    + "(?:attribute|in)\\s+vec[34]\\s+at_midBlock\\s*;"
+                    + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern ENTITY_VERTEX_ID = Pattern.compile("\\bgl_VertexID\\b");
+    private static final Pattern MID_BLOCK_REFERENCE = Pattern.compile("\\bat_midBlock\\b");
     private static final Pattern SAMPLER = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(sampler\\w+)\\s+"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern SAMPLER_ARGUMENT = Pattern.compile(
+            "\\b(texture|textureLod|textureGrad|textureProj|textureOffset|textureLodOffset|"
+                    + "textureProjLod|textureProjOffset|textureProjLodOffset|textureGather|"
+                    + "textureGatherOffset|textureGatherOffsets|textureSize|texelFetch|texelFetchOffset)"
+                    + "\\s*\\(\\s*(tex|texture|gtexture|Sampler0|lightmap|Sampler2)\\b");
     private static final Pattern NORMAL_MATRIX = Pattern.compile("\\bgl_NormalMatrix\\b");
     private static final String LIGHTMAP_TEXTURE_MATRIX = "mat4("
             + "0.00390625, 0.0, 0.0, 0.0, "
@@ -177,6 +188,13 @@ final class EntityVertexShaderAdapter {
         source = isEntityShadowProgram(programName)
                 ? replaceShadowEntityMaterialInput(source, programName)
                 : removeUnusedMcEntityDeclaration(source, programName);
+        if (isEntityShadowProgram(programName)) {
+            // Entity and block-entity draws have no block material or mid-block attribute. The
+            // material bridge above maps mc_Entity to zero, so voxel writers take their existing
+            // non-block early return; this zero vector keeps their shared GLSL helpers compilable.
+            source = replaceShadowEntityMidBlockInput(source);
+            source = replaceEntityVertexId(source);
+        }
         Matcher textureMatrix = TEXTURE_MATRIX.matcher(ShaderSource.maskBlockAndLineComments(source));
         while (textureMatrix.find()) {
             if (!Set.of("0", "1").contains(textureMatrix.group(1))) {
@@ -293,6 +311,39 @@ final class EntityVertexShaderAdapter {
         return replaced.append(clean, cursor, clean.length()).toString();
     }
 
+    private static String replaceShadowEntityMidBlockInput(String source) {
+        Matcher declarations = ENTITY_MID_BLOCK_ATTRIBUTE_DECLARATION.matcher(
+                ShaderSource.maskBlockAndLineComments(source));
+        StringBuilder withoutDeclaration = new StringBuilder(source);
+        while (declarations.find()) {
+            for (int index = declarations.start(); index < declarations.end(); index++) {
+                char character = withoutDeclaration.charAt(index);
+                if (character != '\n' && character != '\r') withoutDeclaration.setCharAt(index, ' ');
+            }
+        }
+
+        String clean = withoutDeclaration.toString();
+        Matcher references = MID_BLOCK_REFERENCE.matcher(ShaderSource.maskBlockAndLineComments(clean));
+        StringBuilder replaced = new StringBuilder(clean.length());
+        int cursor = 0;
+        while (references.find()) {
+            replaced.append(clean, cursor, references.start()).append("vec4(0.0)");
+            cursor = references.end();
+        }
+        return replaced.append(clean, cursor, clean.length()).toString();
+    }
+
+    private static String replaceEntityVertexId(String source) {
+        Matcher references = ENTITY_VERTEX_ID.matcher(ShaderSource.maskBlockAndLineComments(source));
+        StringBuilder replaced = new StringBuilder(source.length());
+        int cursor = 0;
+        while (references.find()) {
+            replaced.append(source, cursor, references.start()).append("gl_VertexIndex");
+            cursor = references.end();
+        }
+        return replaced.append(source, cursor, source.length()).toString();
+    }
+
     private static boolean isEntityShadowProgram(String programName) {
         return programName.equals("shadow_entities") || programName.equals("shadow_block");
     }
@@ -302,23 +353,56 @@ final class EntityVertexShaderAdapter {
         StringBuilder clean = new StringBuilder(source.length());
         int cursor = 0;
         boolean noise = false;
+        Set<String> nativeSamplers = new HashSet<>();
         while (matcher.find()) {
             String type = matcher.group(1), name = matcher.group(2);
-            if (!name.equals("noisetex") || !type.equals("sampler2D") || noise) {
+            if (!type.equals("sampler2D")) {
                 throw new IOException(programName + ".vsh uses unsupported sampler '" + name + "'.");
             }
-            noise = true;
+            if (name.equals("noisetex")) {
+                if (noise) throw new IOException(programName + ".vsh declares sampler 'noisetex' more than once.");
+                noise = true;
+            } else if (Set.of("tex", "texture", "gtexture", "Sampler0", "lightmap", "Sampler2").contains(name)) {
+                nativeSamplers.add(name);
+            } else {
+                throw new IOException(programName + ".vsh uses unsupported sampler '" + name + "'.");
+            }
             clean.append(source, cursor, matcher.start());
             cursor = matcher.end();
         }
         clean.append(source, cursor, source.length());
-        String adapted = clean.toString();
-        return new SamplerBridge(adapted, noise ? "uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n" : "",
-                TerrainShaderAdapter.usesNoiseSampler(adapted));
+        SamplerArguments arguments = rewriteSamplerArguments(clean.toString(), nativeSamplers);
+        StringBuilder bridge = new StringBuilder();
+        if (arguments.usesEntityTexture()) bridge.append("uniform sampler2D Sampler0;\n");
+        if (arguments.usesLightmap()) bridge.append("uniform sampler2D Sampler2;\n");
+        if (noise) bridge.append("uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n");
+        return new SamplerBridge(arguments.source(), bridge.toString(),
+                TerrainShaderAdapter.usesNoiseSampler(arguments.source()));
+    }
+
+    private static SamplerArguments rewriteSamplerArguments(String source, Set<String> declaredSamplers) {
+        Matcher matcher = SAMPLER_ARGUMENT.matcher(ShaderSource.maskBlockAndLineComments(source));
+        StringBuilder rewritten = new StringBuilder(source.length());
+        Set<String> nativeSamplers = new HashSet<>(declaredSamplers);
+        int cursor = 0;
+        while (matcher.find()) {
+            String alias = matcher.group(2);
+            String nativeName = alias.equals("lightmap") || alias.equals("Sampler2") ? "Sampler2" : "Sampler0";
+            nativeSamplers.add(nativeName);
+            rewritten.append(source, cursor, matcher.start(2)).append(nativeName);
+            cursor = matcher.end(2);
+        }
+        rewritten.append(source, cursor, source.length());
+        boolean usesEntityTexture = nativeSamplers.stream()
+                .anyMatch(name -> Set.of("tex", "texture", "gtexture", "Sampler0").contains(name));
+        boolean usesLightmap = nativeSamplers.stream()
+                .anyMatch(name -> name.equals("lightmap") || name.equals("Sampler2"));
+        return new SamplerArguments(rewritten.toString(), usesEntityTexture, usesLightmap);
     }
 
     private static OutputBridge extractOutputs(String source, String programName) throws IOException {
-        Matcher matcher = OUTPUT.matcher(ShaderSource.maskBlockAndLineComments(source));
+        String maskedSource = ShaderSource.maskBlockAndLineComments(source);
+        Matcher matcher = OUTPUT.matcher(maskedSource);
         StringBuilder clean = new StringBuilder(source.length());
         StringBuilder declarations = new StringBuilder();
         Map<String, TerrainVertexShaderAdapter.PackVarying> varyings = new LinkedHashMap<>();
@@ -355,8 +439,7 @@ final class EntityVertexShaderAdapter {
             cursor = matcher.end();
         }
         clean.append(source, cursor, source.length());
-        String uncommentedWithoutKnown = ShaderSource.maskBlockAndLineComments(
-                OUTPUT.matcher(ShaderSource.maskBlockAndLineComments(source)).replaceAll(""));
+        String uncommentedWithoutKnown = ShaderSource.maskBlockAndLineComments(clean.toString());
         if (UNSUPPORTED_OUTPUT.matcher(uncommentedWithoutKnown).find()) {
             throw new IOException(programName + ".vsh declares an unsupported vertex output.");
         }
@@ -516,6 +599,7 @@ final class EntityVertexShaderAdapter {
     private record OutputBridge(String source, String declarationsAndMacros,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> varyings) { }
     private record SamplerBridge(String source, String bridge, boolean usesNoiseSampler) { }
+    private record SamplerArguments(String source, boolean usesEntityTexture, boolean usesLightmap) { }
     private record NativeAttribute(String type, int location) { }
     private record MainFunction(int start, int end, int closeBrace) { }
 }

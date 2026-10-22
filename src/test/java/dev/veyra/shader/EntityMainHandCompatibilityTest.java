@@ -21,6 +21,26 @@ class EntityMainHandCompatibilityTest {
     }
 
     @Test
+    void detectsNamesAcrossMultilineCommaSeparatedVaryingDeclarations() {
+        String source = "varying vec3 first,\n        second, isMainHand; // keep this comment\n"
+                + "void main() {}\n";
+
+        assertTrue(EntityShaderAdapter.requiresMainHandInput(source));
+    }
+
+    @Test
+    void handlesLongCommaSeparatedVaryingLists() {
+        StringBuilder source = new StringBuilder("varying vec3 ");
+        for (int index = 0; index < 2048; index++) {
+            if (index > 0) source.append(", ");
+            source.append("varying").append(index);
+        }
+        source.append(", isMainHand;\nvoid main() {}\n");
+
+        assertTrue(EntityShaderAdapter.requiresMainHandInput(source.toString()));
+    }
+
+    @Test
     void specializesTheHandInputForEachLogicalHand() throws IOException {
         String mainHand = EntityShaderAdapter.adaptFragment(HAND_SOURCE, "gbuffers_hand", true,
                 false, -1, -1, ItemIdMap.UNMAPPED, true, true);

@@ -1,15 +1,13 @@
 package dev.veyra.shader;
 
 import java.io.IOException;
-import java.util.regex.Pattern;
 
 /** Separate depth captured after opaque terrain and entity features, before translucent terrain. */
 public final class ShadowDepthSampler {
     public static final String NAME = "VeyraOpaqueShadowSampler";
-    private static final Pattern REFERENCE = Pattern.compile("\\bshadowtex1\\b");
     private ShadowDepthSampler() { }
     public static boolean used(String source) {
-        return REFERENCE.matcher(UnusedSamplerDeclarations.removeUnused(ShaderSource.maskBlockAndLineComments(source))).find();
+        return UnusedSamplerDeclarations.isReferenced(source, "shadowtex1");
     }
     public static void validate(String source, boolean available, int auxiliaryColors) throws IOException {
         if (!used(source)) return;

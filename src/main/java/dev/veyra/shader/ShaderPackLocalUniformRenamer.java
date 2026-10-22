@@ -6,6 +6,8 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,10 +18,11 @@ final class ShaderPackLocalUniformRenamer {
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
                     + "\\s*\\(([^;{}]*)\\)\\s*\\{");
     private static final Pattern LOCAL_DECLARATION_PREFIX = Pattern.compile(
-            "\\b(?:(?:const|highp|mediump|lowp|precise|invariant|readonly|writeonly|coherent|volatile|restrict)\\s+)*"
+            "\\b(?:(?:const|highp|mediump|lowp|precise|invariant|readonly|writeonly|coherent|volatile|restrict)\\s++)*+"
                     + "(?!(?:return|if|else|for|while|switch|case|discard|break|continue|do)\\b)"
-                    + "[A-Za-z_][A-Za-z0-9_]*\\s+");
+                    + "[A-Za-z_][A-Za-z0-9_]*+\\s++");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final ConcurrentMap<String, Pattern> LOCAL_DECLARATIONS = new ConcurrentHashMap<>();
 
     private ShaderPackLocalUniformRenamer() {
     }
@@ -27,16 +30,21 @@ final class ShaderPackLocalUniformRenamer {
     static String renameShadowingLocals(String source, List<String> uniforms) {
         String result = source;
         for (String uniform : uniforms) {
-            result = renameShadowingLocal(result, uniform);
-            result = renameShadowingGlobal(result, uniform);
+            if (!containsIdentifier(result, uniform)) continue;
+            Pattern declaration = localDeclaration(uniform);
+            // Most shader-pack uniforms do not shadow a local in a given pass. Check the raw
+            // source first so those names avoid allocating and scanning a full comment mask.
+            if (!declaration.matcher(result).find()) continue;
+            result = renameShadowingLocal(result, uniform, declaration);
+            result = renameShadowingGlobal(result, uniform, declaration);
         }
         return result;
     }
 
-    private static String renameShadowingGlobal(String source, String uniform) {
+    private static String renameShadowingGlobal(String source, String uniform, Pattern declaration) {
         if (source.isEmpty()) return source;
         String analysis = ShaderSource.maskBlockAndLineComments(source);
-        Matcher declarations = localDeclaration(uniform).matcher(analysis);
+        Matcher declarations = declaration.matcher(analysis);
         int braceDepth = 0;
         int parenthesisDepth = 0;
         int cursor = 0;
@@ -74,7 +82,7 @@ final class ShaderPackLocalUniformRenamer {
         return rewritten.toString();
     }
 
-    private static String renameShadowingLocal(String source, String uniform) {
+    private static String renameShadowingLocal(String source, String uniform, Pattern declaration) {
         if (source.isEmpty() || !IDENTIFIER.matcher(source).find()) return source;
         String analysis = ShaderSource.maskBlockAndLineComments(source);
         List<Replacement> replacements = new ArrayList<>();
@@ -85,7 +93,6 @@ final class ShaderPackLocalUniformRenamer {
             if (functionEnd < 0) continue;
 
             List<Scope> scopes = new ArrayList<>();
-            Pattern declaration = localDeclaration(uniform);
             Matcher parameter = declaration.matcher(analysis);
             parameter.region(functions.start(3), functions.end(3)).useTransparentBounds(true);
             if (parameter.find()) {
@@ -130,8 +137,26 @@ final class ShaderPackLocalUniformRenamer {
     }
 
     private static Pattern localDeclaration(String name) {
-        return Pattern.compile(LOCAL_DECLARATION_PREFIX.pattern()
-                + "(?<name>" + Pattern.quote(name) + ")\\b(?=\\s*(?:=|;|,|\\)|\\[))");
+        return LOCAL_DECLARATIONS.computeIfAbsent(name, uniform -> Pattern.compile(
+                LOCAL_DECLARATION_PREFIX.pattern()
+                        + "(?<name>" + Pattern.quote(uniform) + ")\\b(?=\\s*+(?:=|;|,|\\)|\\[))"));
+    }
+
+    private static boolean containsIdentifier(String source, String name) {
+        if (name.isEmpty()) return false;
+        int cursor = 0;
+        while ((cursor = source.indexOf(name, cursor)) >= 0) {
+            int end = cursor + name.length();
+            boolean leftBoundary = cursor == 0 || !isIdentifierPart(source.charAt(cursor - 1));
+            boolean rightBoundary = end == source.length() || !isIdentifierPart(source.charAt(end));
+            if (leftBoundary && rightBoundary) return true;
+            cursor++;
+        }
+        return false;
+    }
+
+    private static boolean isIdentifierPart(char character) {
+        return character == '_' || Character.isLetterOrDigit(character);
     }
 
     private static String uniqueAlias(String source, String uniform) {

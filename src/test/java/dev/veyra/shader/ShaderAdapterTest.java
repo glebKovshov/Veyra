@@ -531,6 +531,29 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void readsTerrainFragmentLocationsWithMultilineLayoutQualifiers() {
+        String fragment = "layout(\n  location = 0\n) flat in vec4 veyraVertexColor;\n"
+                + "layout(location = 5) in vec2 veyraLightmapCoord;\n";
+
+        Set<Integer> unused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment);
+
+        assertFalse(unused.contains(0));
+        assertFalse(unused.contains(5));
+        assertTrue(unused.contains(1));
+    }
+
+    @Test
+    void scansLongTerrainFragmentInputListsWithoutRegexBacktracking() {
+        StringBuilder fragment = new StringBuilder();
+        for (int index = 0; index < 2048; index++) {
+            fragment.append("layout(location = ").append(index % 20).append(") in vec4 input")
+                    .append(index).append(";\n");
+        }
+
+        assertTrue(TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment.toString()).isEmpty());
+    }
+
+    @Test
     void bridgesIrisTerrainMaterialAndFluidInputs() throws IOException {
         for (String materialType : List.of("int", "float")) {
             String adapted = TerrainShaderAdapter.adaptFragment("""

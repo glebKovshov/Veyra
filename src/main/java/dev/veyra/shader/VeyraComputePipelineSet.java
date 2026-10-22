@@ -2,6 +2,7 @@ package dev.veyra.shader;
 
 import dev.veyra.vulkan.VeyraComputeResources;
 import dev.veyra.vulkan.VeyraDeviceFeatures;
+import dev.veyra.vulkan.VeyraImageDescriptor;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.Renderer;
@@ -100,29 +101,41 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         return plan;
     }
 
-    /** Replaces native sampler descriptors with references to the same images used by shadowcomp. */
+    /** Binds native graphics descriptors to the same custom images used by shadowcomp. */
     void bindRenderPipelineImages(GraphicsPipeline pipeline,
                                   ShaderPackImageBindings.PreparedStage... stages) throws IOException {
         ensureOpen();
         var plan = ShaderPackImageBindings.plan(0, stages);
         List<ImageDescriptor> descriptors = pipeline.getImageDescriptors();
         for (var resource : plan.resources().values()) {
-            if (resource.storageImage()) {
-                throw new IOException("Native RenderPipeline does not support graphics storage image '"
-                        + resource.name() + "'.");
-            }
             ImageDescriptor nativeDescriptor = pipeline.getImageDescriptor(resource.name());
             if (nativeDescriptor == null) {
-                throw new IOException("VulkanMod did not expose the custom sampler '" + resource.name() + "'.");
+                throw new IOException("VulkanMod did not expose the custom image '" + resource.name() + "'.");
             }
             int descriptorIndex = descriptors.indexOf(nativeDescriptor);
             if (descriptorIndex < 0) {
-                throw new IOException("VulkanMod's custom sampler '" + resource.name()
+                throw new IOException("VulkanMod's custom image '" + resource.name()
                         + "' is missing from the native image descriptor list.");
             }
             var nativeBinding = new ComputeShaderAdapter.OpaqueResource(resource.name(), resource.glslType(),
-                    resource.qualifier(), resource.imageName(), false, resource.format(), nativeDescriptor.getBinding());
-            var replacement = resources.graphicsDescriptors(List.of(nativeBinding)).get(0);
+                    resource.qualifier(), resource.imageName(), resource.storageImage(), resource.format(),
+                    nativeDescriptor.getBinding());
+            VeyraImageDescriptor replacement = resources.graphicsDescriptors(List.of(nativeBinding)).get(0);
+            if (resource.storageImage()) {
+                if (!nativeDescriptor.isStorageImage()) {
+                    throw new IOException("VulkanMod compiled graphics storage image '" + resource.name()
+                            + "' as a sampled image.");
+                }
+                if (nativeDescriptor.getImage() != replacement.getImage()) {
+                    throw new IOException("VulkanMod's graphics storage image '" + resource.name()
+                            + "' is not bound to the shader-pack's shared image.");
+                }
+                if (nativeDescriptor.getLayout() != VK_IMAGE_LAYOUT_GENERAL) {
+                    throw new IOException("Graphics storage image '" + resource.name()
+                            + "' is not bound in GENERAL layout.");
+                }
+                continue;
+            }
             // Shared images stay in GENERAL across shadow writes, compute dispatch and graphics sampling.
             // The descriptor layout must match the image's actual Vulkan layout.
             try {
@@ -132,6 +145,11 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                         + resource.name() + "'.", exception);
             }
         }
+    }
+
+    VeyraImageDescriptor graphicsImageDescriptor(ComputeShaderAdapter.OpaqueResource binding) throws IOException {
+        ensureOpen();
+        return resources.graphicsDescriptors(List.of(binding)).getFirst();
     }
 
     /** Dispatches after all shadow stages, matching Iris shadowcomp ordering, then exposes writes to graphics. */

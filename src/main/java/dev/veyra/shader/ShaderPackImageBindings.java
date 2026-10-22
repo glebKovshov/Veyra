@@ -124,8 +124,10 @@ final class ShaderPackImageBindings {
         StringBuilder uniforms = new StringBuilder();
         for (var resource : stage.resources()) {
             if (resource.storageImage()) {
-                throw new IOException("Native RenderPipeline does not support graphics storage image '"
-                        + resource.name() + "'.");
+                // GLSLParser only recognizes sampler2D. Veyra replaces this placeholder's
+                // descriptor and restores the original storage-image declaration at parser output.
+                uniforms.append("uniform sampler2D ").append(resource.name()).append(";\n");
+                continue;
             }
             if (!resource.qualifier().isEmpty()) {
                 throw new IOException("Native RenderPipeline does not support sampler qualifiers on '"

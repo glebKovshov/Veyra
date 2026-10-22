@@ -46,6 +46,24 @@ class ShaderPackLocalUniformRenamerTest {
     }
 
     @Test
+    void renamesParametersAcrossMultilineDeclarations() {
+        String source = """
+                float linearDepth(
+                    highp
+                    float
+                    far
+                ) {
+                    return far;
+                }
+                """;
+
+        String adapted = ShaderPackLocalUniformRenamer.renameShadowingLocals(source, List.of("far"));
+
+        assertTrue(adapted.contains("veyraLocalFar"), adapted);
+        assertTrue(adapted.contains("return veyraLocalFar;"), adapted);
+    }
+
+    @Test
     void renamesGlobalShaderConstantsThatShadowPackUniforms() {
         String source = """
                 const float pi = 3.14159;

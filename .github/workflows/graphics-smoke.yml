@@ -163,6 +163,10 @@ jobs:
           if fixture in shadow_voxel_image_fixtures and result['status']=='passed':
               assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
               assert result['shaderStorageImageExtendedFormatsEnabled'] is True, result
+          if fixture == 'entity-custom-image' and result['status']=='passed':
+              assert result['activeEntityCustomImageGreenPixels'] >= 100, result
+              assert result['disabledEntityCustomImageGreenPixels'] * 4 < result['activeEntityCustomImageGreenPixels'], result
+              assert re.search(r'Descriptor evidence: pipeline=veyra:pipeline/shadow_entities/.*sampler=voxel_img binding=\d+ type=3 image=voxel_img .*layout=1', text), 'Entity shadow storage-image descriptor was not bound'
           if fixture == 'storage-buffer-shadow' and result['status']=='passed':
               assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
               assert result['activeMagentaPixels'] >= 2000

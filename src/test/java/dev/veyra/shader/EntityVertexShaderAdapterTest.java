@@ -137,6 +137,26 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void suppliesEntityShadowFallbacksForBlockOnlyMidBlockAndVertexIdInputs() throws Exception {
+        String pack = """
+                #version 120
+                attribute vec3 at_midBlock;
+                void main() {
+                    vec3 modelPos = at_midBlock.xyz / 64.0;
+                    int vertex = gl_VertexID;
+                    gl_Position = ftransform() + vec4(modelPos, float(vertex % 4) * 0.0);
+                }
+                """;
+
+        EntityVertexShaderAdapter.AdaptedStage adapted = EntityVertexShaderAdapter.adaptStage(
+                NATIVE, pack, "shadow_entities", false);
+
+        assertFalse(adapted.source().contains("at_midBlock"), adapted.source());
+        assertTrue(adapted.source().contains("vec3 modelPos = vec4(0.0).xyz / 64.0;"), adapted.source());
+        assertTrue(adapted.source().contains("int vertex = gl_VertexIndex;"), adapted.source());
+    }
+
+    @Test
     void validatesMidTexCoordWithItsExtendedNativeVertexInput() throws Exception {
         String pack = "#version 120\nattribute vec4 mc_midTexCoord;\n"
                 + "void main(){gl_Position=vec4(mc_midTexCoord.xy,0.0,1.0);}";
@@ -334,6 +354,37 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void linksManyCustomEntityInputsInOneFragmentPass() throws Exception {
+        StringBuilder vertex = new StringBuilder("#version 120\n");
+        StringBuilder fragment = new StringBuilder("#version 120\n");
+        for (int index = 0; index < 8; index++) {
+            String name = "packValue" + index;
+            vertex.append("varying vec3 ").append(name).append(';').append('\n');
+            fragment.append("varying vec3 ").append(name).append(';').append('\n');
+        }
+        vertex.append("void main(){\n");
+        fragment.append("void main(){ vec3 total=vec3(0.0);\n");
+        for (int index = 0; index < 8; index++) {
+            String name = "packValue" + index;
+            vertex.append(name).append("=vec3(1.0);").append('\n');
+            fragment.append("total += ").append(name).append(';').append('\n');
+        }
+        vertex.append("gl_Position=ftransform();}\n");
+        fragment.append("gl_FragColor=vec4(total,1.0);}");
+        var varyings = EntityVertexShaderAdapter.describeVaryings("gbuffers_entities", vertex.toString());
+
+        String adapted = EntityShaderAdapter.adaptGeometryFragment(fragment.toString(), "gbuffers_entities", false,
+                false, -1, -1, ItemIdMap.UNMAPPED, true, false, varyings);
+
+        for (int index = 0; index < 8; index++) {
+            int location = 16 + index;
+            assertTrue(adapted.contains("layout(location = " + location + ") in vec3 veyraEntityPackInput_"
+                    + location + ";"), adapted);
+            assertTrue(adapted.contains("total += veyraEntityPackInput_" + location + ";"), adapted);
+        }
+    }
+
+    @Test
     void linksLeadingFlatShadowInputToTheSelectedShadowVertexStage() throws Exception {
         String vertex = """
                 #version 120
@@ -379,6 +430,34 @@ class EntityVertexShaderAdapterTest {
                 .filter(line -> line.equals("uniform sampler2D VeyraNoiseSampler;")).count());
         assertEquals(1L, adapted.source().lines()
                 .filter(line -> line.equals("#define noisetex VeyraNoiseSampler")).count());
+    }
+
+    @Test
+    void mapsEntityTextureAndLightmapAliasesToNativeVertexSamplers() throws Exception {
+        String pack = """
+                #version 120
+                uniform sampler2D tex;
+                uniform sampler2D texture;
+                uniform sampler2D lightmap;
+                void main() {
+                    gl_Position = ftransform()
+                        + texture2DLod(tex, vec2(0.5), 0.0)
+                        + texture2D(texture, vec2(0.5))
+                        + texture2D(lightmap, vec2(0.5));
+                }
+                """;
+
+        EntityVertexShaderAdapter.AdaptedStage adapted =
+                EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "shadow_entities", false);
+
+        assertTrue(adapted.source().contains("uniform sampler2D Sampler0;"));
+        assertTrue(adapted.source().contains("uniform sampler2D Sampler2;"));
+        assertTrue(adapted.source().contains("textureLod(Sampler0, vec2(0.5), 0.0)"));
+        assertTrue(adapted.source().contains("texture(Sampler0, vec2(0.5))"));
+        assertTrue(adapted.source().contains("texture(Sampler2, vec2(0.5))"));
+        assertFalse(adapted.source().contains("uniform sampler2D tex;"));
+        assertFalse(adapted.source().contains("uniform sampler2D texture;"));
+        assertFalse(adapted.source().contains("uniform sampler2D lightmap;"));
     }
 
     @Test
