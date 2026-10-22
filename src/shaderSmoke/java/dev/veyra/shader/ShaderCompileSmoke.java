@@ -855,14 +855,22 @@ public class ShaderCompileSmoke {
                     }
                     """, "shadow_solid"), "shadow-native-vertex-texture-aliases", true);
             Path imageFixture = Path.of("examples/custom-image-compute/shaders");
-            var imageFixtureProperties = ShaderPackImageProperties.parse(Files.readString(imageFixture.resolve("shaders.properties")));
+            String imagePropertiesSource = Files.readString(imageFixture.resolve("shaders.properties"));
+            var imageFixtureProperties = ShaderPackImageProperties.parse(imagePropertiesSource);
+            var imageFixtureStorageBuffers = ShaderPackStorageBufferProperties.parse(imagePropertiesSource);
             var imageShadowVertex = ShaderPackImageBindings.prepare("shadow.vsh",
                     Files.readString(imageFixture.resolve("shadow.vsh")), imageFixtureProperties);
             String adaptedImageShadow = TerrainVertexShaderAdapter.adapt(terrainVertex, imageShadowVertex.source(), "shadow_solid");
             compileVertex(compiler, options, ShaderPackImageBindings.plan(20, imageShadowVertex).decorate(adaptedImageShadow, imageShadowVertex),
                     "shadow-custom-image-write", true);
-            compileCompute(ComputeShaderAdapter.adapt("shadowcomp.csh", Files.readString(imageFixture.resolve("shadowcomp.csh")),
-                    imageFixtureProperties).source(), "shadow-custom-image-compute");
+            var shadowCompute = ComputeShaderAdapter.adapt("shadowcomp.csh",
+                    Files.readString(imageFixture.resolve("shadowcomp.csh")), imageFixtureProperties);
+            var shadowComputeStorage = ShaderPackStorageBuffers.prepareForVulkanParser(
+                    shadowCompute.source(), imageFixtureStorageBuffers, 4, 4);
+            compileCompute(shadowComputeStorage.directSource(), "shadow-custom-image-compute");
+            compileCompute(ComputeShaderAdapter.adapt("shadowcomp_a.csh",
+                    Files.readString(imageFixture.resolve("shadowcomp_a.csh")), imageFixtureProperties).source(),
+                    "shadow-custom-image-indirect-compute");
             compileVertex(compiler, options, TerrainVertexShaderAdapter.adapt(terrainVertex, """
                     #version 120
                     attribute vec4 at_midBlock;
@@ -956,7 +964,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather and translucent-particle vertex/lightmap/varyings, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, and terrain-sprite-bounds fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather and translucent-particle vertex/lightmap/varyings, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, terrain-sprite-bounds, and shadow-compute indirect-dispatch fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);

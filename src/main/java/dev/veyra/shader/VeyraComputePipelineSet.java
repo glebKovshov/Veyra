@@ -38,6 +38,8 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         }
 
         ShaderPackImageProperties properties = pack.readImageProperties();
+        ShaderPackStorageBufferProperties storageBufferProperties = pack.readStorageBufferProperties();
+        VeyraStorageBufferResources storageBuffers = VeyraStorageBufferResources.active();
         List<ComputeShaderAdapter.AdaptedStage> adapted = new ArrayList<>(files.size());
         for (String file : files) {
             String source = pack.readComputeStage(file)
@@ -69,11 +71,23 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                 if (!hasStorageImage) {
                     throw new IOException(file + " does not declare an active storage image; Veyra shadow compute currently requires image resources.");
                 }
+                String program = file.substring(0, file.length() - ".csh".length());
+                ShaderPackStorageBufferProperties.IndirectDispatch indirect = null;
+                VeyraStorageBufferResources.StorageBuffer indirectBuffer = null;
+                if (storageBufferProperties.indirectDispatches().containsKey(program)) {
+                    if (storageBuffers == null) {
+                        throw new IOException("indirect." + program + " requires active shader-pack storage-buffer resources.");
+                    }
+                    indirect = storageBufferProperties.validateIndirectDispatch(
+                            program, storageBuffers.viewWidth(), storageBuffers.viewHeight());
+                    indirectBuffer = storageBuffers.storageBuffer(indirect.bufferBinding());
+                }
                 VeyraComputePipeline pipeline = VeyraComputePipeline.create(
-                        file.substring(0, file.length() - 4),
+                        program,
                         shader, resources.descriptors(index));
                 compiled.add(new Dispatch(pipeline, shader.workGroupDispatch(),
-                        shader.localSizeX(), shader.localSizeY()));
+                        shader.localSizeX(), shader.localSizeY(), indirectBuffer,
+                        indirect == null ? 0 : indirect.offsetInBuffer()));
             }
             return new VeyraComputePipelineSet(resources, compiled);
         } catch (IOException | RuntimeException exception) {
@@ -156,10 +170,15 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         if (stages.isEmpty()) return;
         List<ResolvedDispatch> resolvedStages = new ArrayList<>(stages.size());
         for (Dispatch dispatch : stages) {
+            if (dispatch.indirectBuffer() != null) {
+                resolvedStages.add(new ResolvedDispatch(dispatch.pipeline(), 0, 0, 0,
+                        dispatch.indirectBuffer(), dispatch.indirectOffset()));
+                continue;
+            }
             int[] groups = dispatch.workGroups().resolve(renderWidth, renderHeight,
                     dispatch.localSizeX(), dispatch.localSizeY());
             if (groups[0] == 0 || groups[1] == 0 || groups[2] == 0) continue;
-            resolvedStages.add(new ResolvedDispatch(dispatch.pipeline(), groups[0], groups[1], groups[2]));
+            resolvedStages.add(new ResolvedDispatch(dispatch.pipeline(), groups[0], groups[1], groups[2], null, 0));
         }
         if (resolvedStages.isEmpty()) return;
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
@@ -171,22 +190,31 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         }
         VeyraComputePipeline.memoryBarrier(commandBuffer,
                 VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
+                        | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
                 VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
-                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
         for (int index = 0; index < resolvedStages.size(); index++) {
             ResolvedDispatch dispatch = resolvedStages.get(index);
-            dispatch.pipeline().dispatchWorkGroups(dispatch.x(), dispatch.y(), dispatch.z());
+            if (dispatch.indirectBuffer() == null) {
+                dispatch.pipeline().dispatchWorkGroups(dispatch.x(), dispatch.y(), dispatch.z());
+            } else {
+                dispatch.pipeline().dispatchIndirect(dispatch.indirectBuffer().buffer().getId(), dispatch.indirectOffset());
+            }
             if (index + 1 < resolvedStages.size()) {
                 VeyraComputePipeline.memoryBarrier(commandBuffer,
-                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                        VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+                        VK_ACCESS_SHADER_WRITE_BIT,
+                        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
             }
         }
         VeyraComputePipeline.memoryBarrier(commandBuffer,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
+                        | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+                VK_ACCESS_SHADER_WRITE_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
     }
 
     public int stageCount() {
@@ -210,9 +238,11 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
     }
 
     private record Dispatch(VeyraComputePipeline pipeline, ComputeWorkGroupDispatch workGroups,
-                            int localSizeX, int localSizeY) {
+                            int localSizeX, int localSizeY,
+                            VeyraStorageBufferResources.StorageBuffer indirectBuffer, int indirectOffset) {
     }
 
-    private record ResolvedDispatch(VeyraComputePipeline pipeline, int x, int y, int z) {
+    private record ResolvedDispatch(VeyraComputePipeline pipeline, int x, int y, int z,
+                                    VeyraStorageBufferResources.StorageBuffer indirectBuffer, int indirectOffset) {
     }
 }

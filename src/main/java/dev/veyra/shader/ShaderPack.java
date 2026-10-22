@@ -1107,7 +1107,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         readCustomTextureProperties();
         String required = properties.getProperty("iris.features.required", "").strip();
-        Set<String> supportedFeatures = configuration.customImages() ? Set.of("CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of();
+        Set<String> supportedFeatures = configuration.customImages()
+                ? Set.of("SSBO", "CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of("SSBO");
         List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())
                 .filter(name -> !supportedFeatures.contains(name)).toList();
         if (!unsupportedFeatures.isEmpty()) {
