@@ -1,3 +1,10 @@
+## Current consolidated beta.31 PR state - 2026-10-22
+
+- PR #84 is closed without merge. PR #85 preserves its commits, targets `main`, remains draft, and is mergeable. The release branch head before this docs sync was `91570ff`; no code change was needed for the compatibility status correction.
+- Re-ran the forced JDK 21 gate on that runtime code tree: **502 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, build, example-pack packaging, and graphics-smoke compilation all passed. Re-ran the pinned audit: 4 archives, 12 defaults, 63 profile cases, 864 geometry fragments accepted / 0 rejected, 18 active compute stages compiled / 0 rejected.
+- Rebuilt and verified the beta.31 JAR: **982,523 bytes**, SHA-256 `653C3B4E3AC0667A11D43006FCBC39F3299937044A6565AE8F2E4AA8A8AA6728`. This is a local candidate, not a published release.
+- This update corrects the active candidate status in `COMPATIBILITY.md` and changes documentation only. T3 watches PR #85; hosted checks are not manually polled. The earlier Lavapipe `VUID-RuntimeSpirv-NonWritable-06341` remains open until fresh exact-head Graphics evidence.
+
 ## Combined beta.31 release candidate — 2026-10-22
 
 - Created `release-prep/beta31-release-batch` from the prior beta.31 prep, then merged current PR #84 head `de8eeac` and local entity-texture commit `b7ebd44`. Pushed the branch and opened linked draft PR #85 (`e980973`) with base `feature/shadowcomp-compute`; it is stacked on PR #84. The parent PR branch, original beta.31 worktrees, and root checkout were not changed.
