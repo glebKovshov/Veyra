@@ -61,8 +61,28 @@ public final class VeyraShaderPackTextures {
         }
     }
 
+    /** Prepare textures lazily restored packs may need before their first pipeline is bound. */
+    public static synchronized void ensurePrepared(ShaderPack pack) throws IOException {
+        Path packPath = pack.path().toAbsolutePath().normalize();
+        for (String resourcePath : pack.readCustomTextureProperties().allTexturePaths()) {
+            if (ShaderPackCustomTextureProperties.isMinecraftBlockAtlas(resourcePath)
+                    || resourcePath.startsWith("minecraft:")) {
+                continue;
+            }
+            Key key = new Key(packPath, normalizeResourcePath(resourcePath));
+            UploadedTexture current = TEXTURES.get(key);
+            if (current == null || current.texture().isClosed() || current.view().isClosed()) {
+                prepare(pack);
+                return;
+            }
+        }
+    }
+
     public static synchronized void bind(VkRenderPass pass, GraphicsPipeline pipeline,
-                                         ShaderPack pack, String programName) throws IOException {
+                                         ShaderPack pack, String fragmentShaderPath) throws IOException {
+        String programName = ShaderPackCustomTextureProperties
+                .programNameForFragmentShaderPath(fragmentShaderPath);
+        if (programName == null) return;
         ShaderPackCustomTextureProperties properties = pack.readCustomTextureProperties();
         for (Map.Entry<String, String> mapping : properties.texturesForProgram(programName).entrySet()) {
             String samplerName = mapping.getKey();

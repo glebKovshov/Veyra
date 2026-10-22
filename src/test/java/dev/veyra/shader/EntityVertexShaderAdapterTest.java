@@ -1,6 +1,7 @@
 package dev.veyra.shader;
 
 import java.io.IOException;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -374,6 +375,25 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void preservesConfiguredCustomTextureSamplersInEntityFragments() throws Exception {
+        String fragment = """
+                #version 120
+                uniform sampler2D lightTint;
+                void main() { gl_FragColor = texture2D(lightTint, vec2(0.5)); }
+                """;
+
+        IOException unsupported = assertThrows(IOException.class,
+                () -> EntityShaderAdapter.adaptGeometryFragment(fragment, "gbuffers_entities", false,
+                        false, -1, -1, ItemIdMap.UNMAPPED, true, false, java.util.Map.of()));
+        assertTrue(unsupported.getMessage().contains("unsupported sampler 'lightTint'"));
+
+        String adapted = EntityShaderAdapter.adaptGeometryFragment(fragment, "gbuffers_entities", false,
+                false, -1, -1, ItemIdMap.UNMAPPED, true, false, java.util.Map.of(), Set.of("lightTint"));
+        assertTrue(adapted.contains("uniform sampler2D lightTint;"), adapted);
+        assertTrue(adapted.contains("veyraEntitySample(lightTint, vec2(0.5))"), adapted);
+    }
+
+    @Test
     void linksManyCustomEntityInputsInOneFragmentPass() throws Exception {
         StringBuilder vertex = new StringBuilder("#version 120\n");
         StringBuilder fragment = new StringBuilder("#version 120\n");
@@ -478,6 +498,27 @@ class EntityVertexShaderAdapterTest {
         assertFalse(adapted.source().contains("uniform sampler2D tex;"));
         assertFalse(adapted.source().contains("uniform sampler2D texture;"));
         assertFalse(adapted.source().contains("uniform sampler2D lightmap;"));
+    }
+
+    @Test
+    void allowsConfiguredCustomTextureSamplersInEntityVertexShaders() throws Exception {
+        String pack = """
+                #version 120
+                uniform sampler2D lightTint;
+                void main() {
+                    gl_Position = ftransform() + vec4(texture2D(lightTint, vec2(0.5)).rgb, 0.0);
+                }
+                """;
+
+        IOException unsupported = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "gbuffers_entities", false));
+        assertTrue(unsupported.getMessage().contains("unsupported sampler 'lightTint'"));
+
+        EntityVertexShaderAdapter.AdaptedStage adapted = EntityVertexShaderAdapter.adaptStage(
+                NATIVE, pack, "gbuffers_entities", false,
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, Set.of("lightTint"));
+        assertTrue(adapted.source().contains("uniform sampler2D lightTint;"), adapted.source());
+        assertTrue(adapted.source().contains("texture(lightTint, vec2(0.5))"), adapted.source());
     }
 
     @Test

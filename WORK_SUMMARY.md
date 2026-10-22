@@ -1,3 +1,12 @@
+## Entity shader-pack texture batch — 2026-10-22
+
+- Added entity pipeline support for program-scoped `texture.gbuffers.*` aliases, including sampler declarations across pack vertex/fragment adapters and entity-specific shader identifiers so runtime bindings resolve the correct program.
+- Fixed startup with a pack restored from settings: restored packs bypass `select()`, so pack-local PNGs were never uploaded. Textures are now ensured before the first Vulkan pipeline selection; successful preparation is cached for the selected pack, and entity pipeline routing is skipped when texture preparation fails.
+- Added the `entity-custom-texture` example and graphics smoke coverage. RTX 3070 smoke passed with **18,315 active / 0 disabled green pixels**. Runtime descriptor evidence shows `marker` bound to the pack PNG at binding 6.
+- Full JDK 21 gate passed: **502 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, `build`, example-pack packaging, and graphics-smoke compilation. `git diff --check` passed.
+- The local beta.30-metadata JAR passed `scripts/verify_jar.py`: **982,505 bytes**, SHA-256 `7D3A5645DA1B2229CC44A48C7B5EEF6307BC192F960DC92F6F7D89808A00CD39`. This is an unpublished candidate.
+- PR #84 remains draft at `b7e8c62`; Build and source audit pass, while Graphics is still in progress. Its earlier Lavapipe VUID has not yet been cleared. These entity texture changes are in this worktree and are not on the PR head.
+
 ## Geometry MRT guard for dimension transitions — 2026-10-22
 
 - Fixed the Complementary Nether-transition crash where a temporary 10×10 scene framebuffer was combined with 800×450 shader-pack color targets. `VeyraGeometryTargets` now validates all color and depth attachment extents before creating an MRT; for an incompatible transition frame it resumes the scene pass, skips custom MRT routing, and emits a deduplicated warning. The Vulkan framebuffer constructor keeps its strict dimension validation.

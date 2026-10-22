@@ -40,6 +40,23 @@ class ShaderPackCustomTexturePropertiesTest {
     }
 
     @Test
+    void resolvesLogicalProgramNamesFromVeyraFragmentShaderIdentifiers() {
+        String hash = "a".repeat(64);
+        assertEquals("gbuffers_entities",
+                ShaderPackCustomTextureProperties.programNameForFragmentShaderPath(
+                        "shaderpack/entities/gbuffers_entities/" + hash));
+        assertEquals("shadow_entities",
+                ShaderPackCustomTextureProperties.programNameForFragmentShaderPath(
+                        "shaderpack/shadow_entities/" + hash));
+        assertEquals("composite0",
+                ShaderPackCustomTextureProperties.programNameForFragmentShaderPath(
+                        "shaderpack/composite0_" + hash));
+        assertEquals(null, ShaderPackCustomTextureProperties.programNameForFragmentShaderPath(
+                "shaderpack/entities/" + hash));
+        assertEquals(null, ShaderPackCustomTextureProperties.programNameForFragmentShaderPath("core/entity"));
+    }
+
+    @Test
     void rejectsInvalidCustomTextureAliasesAndEmptyPaths() {
         assertThrows(java.io.IOException.class, () -> ShaderPackCustomTextureProperties.parse(
                 "customTexture.bad.alias = minecraft:textures/atlas/blocks.png"));
