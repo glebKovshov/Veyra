@@ -1401,6 +1401,26 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void preservesShaderPackShadowComparisonHelper() throws IOException {
+        String adapted = EntityShaderAdapter.adaptFragment("""
+                #version 120
+                uniform sampler2DShadow shadowtex0;
+                varying vec2 texcoord;
+                float texture2DShadow(sampler2DShadow shadowtex, vec3 shadowPos) {
+                    return shadow2D(shadowtex, shadowPos).x;
+                }
+                void main() {
+                    gl_FragColor = vec4(texture2DShadow(shadowtex0, vec3(texcoord, 0.5)));
+                }
+                """, "gbuffers_entities", false, true);
+
+        assertEquals(1, adapted.split("float texture2DShadow\\(", -1).length - 1);
+        assertTrue(adapted.contains("float texture2DShadow(sampler2D shadowtex, vec3 shadowPos)"));
+        assertTrue(adapted.contains("return veyraEntityShadowSample(shadowtex, shadowPos).x;"));
+        assertFalse(adapted.contains("sampler2DShadow"));
+    }
+
+    @Test
     void bridgesLegacyTexSamplerAndTextureSizeToTheBlockAtlas() throws IOException {
         String terrain = TerrainShaderAdapter.adaptFragment("""
                 uniform sampler2D tex;

@@ -26,7 +26,8 @@ class PostFragmentShaderAdapterTest {
 
         String adapted = adapt(source);
 
-        assertEquals(1, occurrences(adapted, "noperspective in vec2 texCoord;"), adapted);
+        assertEquals(1, occurrences(adapted,
+                "#define VEYRA_INTERNAL_POST_IN_0 layout(location = 0) noperspective in vec2 texCoord"), adapted);
         assertTrue(adapted.contains("textureLod(colortex0"), adapted);
         assertFalse(adapted.contains("texture2DLod"), adapted);
         assertTrue(adapted.contains("layout(std140) uniform Fog {"), adapted);
@@ -96,13 +97,23 @@ class PostFragmentShaderAdapterTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static String adapt(String source) throws Exception {
+    static String adapt(String source) throws Exception {
+        return adapt(source, (String) null);
+    }
+
+    @SuppressWarnings("unchecked")
+    static String adapt(String source, String vertexSource) throws Exception {
+        return adapt(source, PostVertexVaryings.link("test", vertexSource, source));
+    }
+
+    @SuppressWarnings("unchecked")
+    static String adapt(String source, PostVertexVaryings.Interface postVaryings) throws Exception {
         Method method = VeyraRenderer.class.getDeclaredMethod(
                 "adaptShader", String.class, String.class, List.class, boolean.class,
-                ShaderPackStorageBufferProperties.class, int.class, int.class);
+                ShaderPackStorageBufferProperties.class, int.class, int.class, PostVertexVaryings.Interface.class);
         method.setAccessible(true);
         List<Object> shaders = (List<Object>) method.invoke(
-                null, "test", source, List.of(), true, null, 0, 0);
+                null, "test", source, List.of(), true, null, 0, 0, postVaryings);
         Object first = shaders.getFirst();
         Method sourceAccessor = first.getClass().getDeclaredMethod("source");
         sourceAccessor.setAccessible(true);

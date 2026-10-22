@@ -89,6 +89,7 @@ class ShaderPackTest {
                 const int colortex2Format = RGB16F;
                 const int colortex3Format = RGBA8;
                 const int colortex4Format = RGBA8_SNORM;
+                const int colortex5Format = RGBA16;
                 const int colortex6Format = RGB8;
                 const int colortex7Format = RGBA16F;
                 const int colortex13Format = R8;
@@ -103,13 +104,16 @@ class ShaderPackTest {
         assertEquals(VK10.VK_FORMAT_R16G16B16_SFLOAT, settings.get(2).format());
         assertEquals(VK10.VK_FORMAT_R8G8B8A8_UNORM, settings.get(3).format());
         assertEquals(VK10.VK_FORMAT_R8G8B8A8_SNORM, settings.get(4).format());
+        assertEquals(VK10.VK_FORMAT_R16G16B16A16_UNORM, settings.get(5).format());
         assertEquals(VK10.VK_FORMAT_R8G8B8_UNORM, settings.get(6).format());
         assertEquals(VK10.VK_FORMAT_R16G16B16A16_SFLOAT, settings.get(7).format());
         assertEquals(VK10.VK_FORMAT_R8_UNORM, settings.get(13).format());
         assertEquals(3, ColorTargetSettings.formatSize(settings.get(1).format()));
         assertEquals(6, ColorTargetSettings.formatSize(settings.get(2).format()));
         assertEquals(4, ColorTargetSettings.formatSize(settings.get(0).format()));
+        assertEquals(8, ColorTargetSettings.formatSize(settings.get(5).format()));
         assertEquals("R11F_G11F_B10F", ColorTargetSettings.formatName(settings.get(0).format()));
+        assertEquals("RGBA16", ColorTargetSettings.formatName(settings.get(5).format()));
         assertEquals("RGBA16F", ColorTargetSettings.formatName(settings.get(7).format()));
     }
 

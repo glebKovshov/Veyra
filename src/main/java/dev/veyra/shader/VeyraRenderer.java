@@ -172,20 +172,10 @@ public final class VeyraRenderer {
             "(?m)\\bconst\\s+int\\s+colortex\\d+Format\\s*=\\s*[A-Za-z_][A-Za-z0-9_]*\\s*;");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
-    private static final Pattern VARYING_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*((?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*)"
-                    + "(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;[\\t ]*(?:\\r?\\n|$)");
-    private static final Pattern POST_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?"
-                    + "(?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*(?:varying|out)\\s+"
-                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;"
-                    + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_INPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?"
                     + "(?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*(?:in|attribute)\\s+"
                     + "[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern POST_VERTEX_OTHER_OUTPUT_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|out)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
@@ -3247,9 +3237,11 @@ public final class VeyraRenderer {
                     .map(shader -> PostVertexNoiseSampler.read(shader, source.name()))
                     .orElse(false);
             if (vertexUsesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            PostVertexVaryings.Interface postVaryings = PostVertexVaryings.link(
+                    source.name(), source.vertexSource().orElse(null), source.source());
             for (AdaptedShader fragmentAdapted : adaptShader(
                     source.name(), customImageStage.source(), vertexUniforms, pack.hasShadowFragment(),
-                    storageBufferProperties, width, height)) {
+                    storageBufferProperties, width, height, postVaryings)) {
                 Set<Integer> combinedColorSamplers = new java.util.TreeSet<>(fragmentAdapted.colorSamplers());
                 combinedColorSamplers.addAll(vertexColorSamplers);
                 AdaptedShader adapted = new AdaptedShader(fragmentAdapted.source(), fragmentAdapted.uniforms(),
@@ -3260,7 +3252,7 @@ public final class VeyraRenderer {
                 String vertexSource = source.vertexSource()
                         .map(shader -> adaptPostVertexShader(
                                 shader, source.name(), adapted.uniforms(),
-                                adapted.colorSamplers(), vertexUsesNoiseSampler))
+                                adapted.colorSamplers(), vertexUsesNoiseSampler, postVaryings))
                         .orElse(null);
                 String variantName = source.name() + "_colortex" + adapted.outputTarget();
                 AdaptedShader linked = customImageStage.resources().isEmpty() ? adapted
@@ -3468,6 +3460,7 @@ public final class VeyraRenderer {
         return format == VK10.VK_FORMAT_R8_UNORM
                 || format == VK10.VK_FORMAT_R8G8B8A8_UNORM
                 || format == VK10.VK_FORMAT_R16_SFLOAT
+                || format == VK10.VK_FORMAT_R16G16B16A16_UNORM
                 || format == VK10.VK_FORMAT_R16G16B16A16_SFLOAT
                 || format == VK10.VK_FORMAT_R32_SFLOAT;
     }
@@ -3594,7 +3587,8 @@ public final class VeyraRenderer {
 
     private static String adaptPostVertexShader(
             String source, String programName, List<String> uniforms,
-            Set<Integer> colorSamplers, boolean usesNoiseSampler) {
+            Set<Integer> colorSamplers, boolean usesNoiseSampler,
+            PostVertexVaryings.Interface postVaryings) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException(programName + ".vsh is empty.");
         }
@@ -3633,37 +3627,7 @@ public final class VeyraRenderer {
                     + ".vsh uses legacy vertex input '" + unsupportedLegacyInput.group()
                     + "' that Veyra does not provide for post passes.");
         }
-        body = livePostVertexSource;
-
-        Matcher outputMatcher = POST_VERTEX_OUTPUT_DECLARATION.matcher(body);
-        StringBuffer withoutOutputs = new StringBuffer();
-        int outputCount = 0;
-        String texCoordInterpolation = "";
-        while (outputMatcher.find()) {
-            String location = outputMatcher.group(1);
-            String type = outputMatcher.group(2);
-            String name = outputMatcher.group(3);
-            if (!type.equals("vec2") || !(name.equals("texcoord") || name.equals("texCoord"))) {
-                outputMatcher.appendReplacement(withoutOutputs, Matcher.quoteReplacement(outputMatcher.group()));
-                continue;
-            }
-            if (location != null && !location.equals("0")) {
-                throw new IllegalArgumentException(programName + ".vsh can output only texcoord at location 0.");
-            }
-            Matcher interpolation = Pattern.compile("\\b(?:flat|smooth|noperspective|centroid|sample)\\b\\s*")
-                    .matcher(outputMatcher.group());
-            StringBuilder qualifiers = new StringBuilder();
-            while (interpolation.find()) qualifiers.append(interpolation.group());
-            texCoordInterpolation = qualifiers.toString();
-            outputCount++;
-            outputMatcher.appendReplacement(withoutOutputs, "");
-        }
-        outputMatcher.appendTail(withoutOutputs);
-        body = withoutOutputs.toString();
-        if (outputCount > 1) {
-            throw new IllegalArgumentException(programName + ".vsh can declare only one texture-coordinate output.");
-        }
-        if (texCoordInterpolation.isEmpty()) texCoordInterpolation = "smooth ";
+        body = PostVertexVaryings.stripVertexDeclarations(livePostVertexSource);
         Matcher mainMatcher = POST_VERTEX_MAIN.matcher(body);
         if (!mainMatcher.find()) {
             throw new IllegalArgumentException(programName + ".vsh must define void main().");
@@ -3684,7 +3648,7 @@ public final class VeyraRenderer {
         body = appendShaderPackUniformBlock(adapted, uniforms, body);
         adapted.append(PostVertexColorSamplers.declarations(colorSamplers))
                 .append(PostVertexNoiseSampler.declaration(usesNoiseSampler));
-        adapted.append(texCoordInterpolation).append("out vec2 texCoord;\n");
+        adapted.append(postVaryings.vertexDeclarations());
         return adapted.append("""
                 vec2 veyraFullscreenUv() {
                     return vec2((gl_VertexIndex << 1) & 2, 1.0 - (gl_VertexIndex & 2));
@@ -6754,7 +6718,8 @@ public final class VeyraRenderer {
 
     private static List<AdaptedShader> adaptShader(
             String programName, String source, List<String> additionalUniforms, boolean shadowPassAvailable,
-            ShaderPackStorageBufferProperties storageBufferProperties, int viewWidth, int viewHeight) throws IOException {
+            ShaderPackStorageBufferProperties storageBufferProperties, int viewWidth, int viewHeight,
+            PostVertexVaryings.Interface postVaryings) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException("Fragment shader is empty.");
         }
@@ -6767,6 +6732,7 @@ public final class VeyraRenderer {
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
         body = PostVertexInterfaceDeclarations.expand(body);
+        body = PostVertexVaryings.stripFragmentDeclarations(body);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(body, "post-processing");
         body = UnreachableGlslFunctions.removeUnreachable(fog.source(), "main");
         body = ShaderPackStorageBuffers.removeUnused(body);
@@ -6836,21 +6802,6 @@ public final class VeyraRenderer {
             extensions.append(extensionMatcher.group());
         }
         body = extensionMatcher.replaceAll("");
-        Matcher varyingMatcher = VARYING_DECLARATION.matcher(body);
-        StringBuffer bodyWithoutTexCoordInput = new StringBuffer();
-        String texCoordInterpolation = "";
-        boolean texCoordInputDeclared = false;
-        while (varyingMatcher.find()) {
-            String interpolation = varyingMatcher.group(1);
-            if (texCoordInputDeclared && !texCoordInterpolation.equals(interpolation)) {
-                throw new IOException("A post fragment shader declares conflicting texture-coordinate interpolation qualifiers.");
-            }
-            texCoordInterpolation = interpolation;
-            texCoordInputDeclared = true;
-            varyingMatcher.appendReplacement(bodyWithoutTexCoordInput, "");
-        }
-        varyingMatcher.appendTail(bodyWithoutTexCoordInput);
-        body = bodyWithoutTexCoordInput.toString();
         body = PostSamplerAdapter.bindPrimaryTexture(body);
         body = COLORTEX_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH_SAMPLER_DECLARATION.matcher(body).replaceAll("");
@@ -6873,7 +6824,7 @@ public final class VeyraRenderer {
                     : explicitOutputs.size() > 1
                     ? lowerExplicitOutputs(body, explicitOutputs, output.fragmentOutputIndex()) : body;
             StringBuilder adapted = new StringBuilder("#version 450\n").append(extensions)
-                    .append(texCoordInterpolation).append("in vec2 texCoord;\n");
+                    .append(postVaryings.fragmentDeclarations());
             if (explicitOutputs.isEmpty()) {
                 adapted.append("out vec4 outColor;\n");
             }

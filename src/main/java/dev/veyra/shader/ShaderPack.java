@@ -73,17 +73,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             "(?s)/\\*(.*?)\\*/");
     private static final Pattern COLOR_TARGET_SIZE_PROPERTY = Pattern.compile("^size\\.buffer\\.colortex(\\d+)$");
     private static final Pattern READONLY_QUALIFIER = Pattern.compile("\\breadonly\\b");
-    private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.of(
-            "R8", VK10.VK_FORMAT_R8_UNORM,
-            "RGB8", VK10.VK_FORMAT_R8G8B8_UNORM,
-            "RGB8_SNORM", VK10.VK_FORMAT_R8G8B8_SNORM,
-            "RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM,
-            "RGBA8_SNORM", VK10.VK_FORMAT_R8G8B8A8_SNORM,
-            "R16F", VK10.VK_FORMAT_R16_SFLOAT,
-            "RGB16F", VK10.VK_FORMAT_R16G16B16_SFLOAT,
-            "RGBA16F", VK10.VK_FORMAT_R16G16B16A16_SFLOAT,
-            "R11F_G11F_B10F", VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32,
-            "R32F", VK10.VK_FORMAT_R32_SFLOAT);
+    private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.ofEntries(
+            Map.entry("R8", VK10.VK_FORMAT_R8_UNORM),
+            Map.entry("RGB8", VK10.VK_FORMAT_R8G8B8_UNORM),
+            Map.entry("RGB8_SNORM", VK10.VK_FORMAT_R8G8B8_SNORM),
+            Map.entry("RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM),
+            Map.entry("RGBA8_SNORM", VK10.VK_FORMAT_R8G8B8A8_SNORM),
+            Map.entry("RGBA16", VK10.VK_FORMAT_R16G16B16A16_UNORM),
+            Map.entry("R16F", VK10.VK_FORMAT_R16_SFLOAT),
+            Map.entry("RGB16F", VK10.VK_FORMAT_R16G16B16_SFLOAT),
+            Map.entry("RGBA16F", VK10.VK_FORMAT_R16G16B16A16_SFLOAT),
+            Map.entry("R11F_G11F_B10F", VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32),
+            Map.entry("R32F", VK10.VK_FORMAT_R32_SFLOAT));
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
     private static final Pattern SHADOW_SETTING = Pattern.compile(

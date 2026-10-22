@@ -20,8 +20,8 @@ class PostVertexShaderAdapterTest {
 
         assertTrue(adapted.contains("} veyraParameters;"), adapted);
         assertTrue(adapted.contains("#define sunAngle veyraParameters.sunAngle"), adapted);
-        assertTrue(adapted.contains("noperspective out vec2 texCoord;"), adapted);
-        assertEquals(1, occurrences(adapted, "out vec2 texCoord;"), adapted);
+        assertTrue(adapted.contains("#define VEYRA_INTERNAL_POST_OUT_0 layout(location = 0) noperspective out vec2 texCoord"), adapted);
+        assertEquals(1, occurrences(adapted, "VEYRA_INTERNAL_POST_OUT_0;"), adapted);
         assertTrue(adapted.contains("mat4(1.0) * vec4(veyraFullscreenUv()"), adapted);
         assertFalse(adapted.contains("gl_TextureMatrix"), adapted);
     }
@@ -70,12 +70,55 @@ class PostVertexShaderAdapterTest {
         assertTrue(adapted.contains("gl_Position.x += near + far"), adapted);
     }
 
+    @Test
+    void linksBslStylePostPassVaryingsAcrossVertexAndFragmentStages() throws Exception {
+        String vertexSource = """
+                varying vec2 texCoord;
+                varying vec3 sunVec, upVec, eastVec;
+                uniform float timeAngle;
+                void main() {
+                    texCoord = gl_MultiTexCoord0.xy;
+                    sunVec = vec3(timeAngle);
+                    upVec = vec3(0.0, 1.0, 0.0);
+                    eastVec = vec3(1.0, 0.0, 0.0);
+                    gl_Position = ftransform();
+                }
+                """;
+        String fragmentSource = """
+                varying vec2 texCoord;
+                varying vec3 sunVec, upVec, eastVec;
+                void main() {
+                    gl_FragColor = vec4(texCoord, dot(sunVec, upVec) + eastVec.x, 1.0);
+                }
+                """;
+
+        PostVertexVaryings.Interface linked = PostVertexVaryings.link("deferred1", vertexSource, fragmentSource);
+        String adaptedVertex = adapt(vertexSource, List.of(), Set.of(), false, linked);
+        String adaptedFragment = PostFragmentShaderAdapterTest.adapt(fragmentSource, linked);
+
+        assertTrue(adaptedVertex.contains("#define VEYRA_INTERNAL_POST_OUT_1 layout(location = 1) out vec3 sunVec"), adaptedVertex);
+        assertTrue(adaptedVertex.contains("#define VEYRA_INTERNAL_POST_OUT_2 layout(location = 2) out vec3 upVec"), adaptedVertex);
+        assertTrue(adaptedVertex.contains("#define VEYRA_INTERNAL_POST_OUT_3 layout(location = 3) out vec3 eastVec"), adaptedVertex);
+        assertTrue(adaptedFragment.contains("#define VEYRA_INTERNAL_POST_IN_1 layout(location = 1) in vec3 sunVec"), adaptedFragment);
+        assertTrue(adaptedFragment.contains("#define VEYRA_INTERNAL_POST_IN_2 layout(location = 2) in vec3 upVec"), adaptedFragment);
+        assertTrue(adaptedFragment.contains("#define VEYRA_INTERNAL_POST_IN_3 layout(location = 3) in vec3 eastVec"), adaptedFragment);
+        assertFalse(adaptedVertex.contains("varying vec3"), adaptedVertex);
+        assertFalse(adaptedFragment.contains("varying vec3"), adaptedFragment);
+    }
+
     private static String adapt(String source, List<String> uniforms, Set<Integer> colorSamplers,
                                 boolean usesNoiseSampler) throws Exception {
+        PostVertexVaryings.Interface linked = PostVertexVaryings.link(
+                "post_fixture", source, "");
+        return adapt(source, uniforms, colorSamplers, usesNoiseSampler, linked);
+    }
+
+    private static String adapt(String source, List<String> uniforms, Set<Integer> colorSamplers,
+                                boolean usesNoiseSampler, PostVertexVaryings.Interface postVaryings) throws Exception {
         Method method = VeyraRenderer.class.getDeclaredMethod("adaptPostVertexShader",
-                String.class, String.class, List.class, Set.class, boolean.class);
+                String.class, String.class, List.class, Set.class, boolean.class, PostVertexVaryings.Interface.class);
         method.setAccessible(true);
-        return (String) method.invoke(null, source, "post_fixture", uniforms, colorSamplers, usesNoiseSampler);
+        return (String) method.invoke(null, source, "post_fixture", uniforms, colorSamplers, usesNoiseSampler, postVaryings);
     }
 
     private static int occurrences(String source, String needle) {

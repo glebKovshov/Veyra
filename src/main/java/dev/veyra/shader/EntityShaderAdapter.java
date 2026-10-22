@@ -41,6 +41,8 @@ public final class EntityShaderAdapter {
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern SHADOWTEX_REFERENCE = Pattern.compile("\\bshadowtex0\\b");
+    private static final Pattern TEXTURE_2D_SHADOW_DEFINITION = Pattern.compile(
+            "\\b(?:float|vec[234])\\s+texture2DShadow\\s*\\([^)]*\\)\\s*\\{");
     private static final Pattern GLSL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
@@ -939,13 +941,16 @@ public final class EntityShaderAdapter {
         }
 
         String outputName = outputLayout.variables().getOrDefault(0, "veyraEntityFragColor");
+        boolean declaresTexture2DShadow = TEXTURE_2D_SHADOW_DEFINITION
+                .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
         adapted = adapted
                 .transform(outputLayout::rewriteLegacy)
                 .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btextureLod\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraEntitySampleGrad(")
                 .replaceAll("\\btextureGrad\\s*\\(", "veyraEntitySampleGrad(")
-                .replaceAll("\\btexture2DShadow\\s*\\(", "veyraEntityShadowCompare(")
+                .replaceAll("\\btexture2DShadow\\s*\\(", declaresTexture2DShadow
+                        ? "texture2DShadow(" : "veyraEntityShadowCompare(")
                 .replaceAll("\\bshadow2D\\s*\\(", "veyraEntityShadowSample(")
                 .replaceAll("\\btexture2D\\s*\\(", "veyraEntitySample(")
                 .replaceAll("\\btexture\\s*\\(", "veyraEntitySample(")
