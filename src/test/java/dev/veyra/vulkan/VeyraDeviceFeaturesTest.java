@@ -4,16 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceVulkan11Features;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 class VeyraDeviceFeaturesTest {
-    @Test void enablesSupportedCoreFeaturesThroughFeatures2AndPreservesTheExistingChain() {
+    @Test void copiesDeviceCreateInfoAndRequestsSupportedFeaturesWithoutChangingTheExistingChain() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceVulkan11Features vulkan11 = VkPhysicalDeviceVulkan11Features.calloc(stack)
                     .sType$Default()
@@ -28,16 +28,17 @@ class VeyraDeviceFeaturesTest {
                     .pEnabledFeatures(requested)
                     .pNext(vulkan11);
 
-            VkPhysicalDeviceFeatures2 enabled = VeyraDeviceFeatures.enableSupportedFeatures(
+            VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
 
-            assertNull(createInfo.pEnabledFeatures());
-            assertEqualsPointer(enabled.address(), createInfo.pNext());
-            assertEqualsPointer(vulkan11.address(), enabled.pNext());
-            assertTrue(enabled.features().vertexPipelineStoresAndAtomics());
-            assertTrue(enabled.features().shaderStorageImageExtendedFormats());
-            assertTrue(enabled.features().samplerAnisotropy());
-            assertTrue(VkPhysicalDeviceVulkan11Features.create(enabled.pNext()).shaderDrawParameters());
+            assertNotSame(createInfo, enabledCreateInfo);
+            assertEquals(requested.address(), createInfo.pEnabledFeatures().address());
+            assertEquals(vulkan11.address(), enabledCreateInfo.pNext());
+            assertTrue(requested.address() != enabledCreateInfo.pEnabledFeatures().address());
+            assertTrue(enabledCreateInfo.pEnabledFeatures().vertexPipelineStoresAndAtomics());
+            assertTrue(enabledCreateInfo.pEnabledFeatures().shaderStorageImageExtendedFormats());
+            assertTrue(enabledCreateInfo.pEnabledFeatures().samplerAnisotropy());
+            assertTrue(VkPhysicalDeviceVulkan11Features.create(enabledCreateInfo.pNext()).shaderDrawParameters());
         }
     }
 
@@ -78,9 +79,5 @@ class VeyraDeviceFeaturesTest {
             assertFalse(result.shaderStorageImageExtendedFormats());
             assertTrue(result.samplerAnisotropy());
         }
-    }
-
-    private static void assertEqualsPointer(long expected, long actual) {
-        org.junit.jupiter.api.Assertions.assertEquals(expected, actual);
     }
 }
