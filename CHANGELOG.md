@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.2.0-beta.31 - release candidate (2026-10-22)
+## 0.2.0-beta.31 (experimental prerelease)
 
 - Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.
 - Add selected fixed-workgroup `shadowcomp` compute, 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
 - Load configured shader-pack PNG textures on supported terrain and shadow geometry, with stage-scoped mappings and `.mcmeta` blur/clamp settings.
-- Keep shadow-dependent sampling safe across dimension and reload transitions until a completed shadow map is available.
-- Pass the local 488-test JDK 21 gate, 96 shader-source checks, 112 direct Vulkan SPIR-V compilations, pinned audit (864 accepted geometry fragments and 18 compiled compute stages), and selected Complementary Reimagined/Unbound RTX 3070 profile smokes. Full third-party pack visuals remain unverified.
+- Keep shadow-dependent sampling safe across dimension and reload transitions until a completed shadow map is available. Adapt BSL fog uniforms/helpers and preserve shader-pack `texture2DShadow` helpers.
+- Pass the local 497-test JDK 21 gate, 96 shader-source checks, 112 direct Vulkan SPIR-V compilations, pinned audit (864 accepted geometry fragments and 18 compiled compute stages), and selected Complementary Reimagined/Unbound plus BSL HIGH RTX 3070 profile/lifecycle smokes. Full third-party pack visuals remain unverified.
 
 ## 0.2.0-beta.30 - 2026-10-21 (experimental prerelease)
 

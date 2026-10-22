@@ -1,4 +1,4 @@
-# Shaderpack compatibility: beta.30 published; next release batch is in draft PR #84
+# Shaderpack compatibility: beta.30 published; beta.31 candidate is in draft PR #84
 
 ## Current unpublished candidate — 2026-10-22
 
@@ -10,6 +10,7 @@ Runtime evidence was collected on Windows with Java 21.0.12, Minecraft 1.21.11, 
 - The Unbound run exercised `texture.gbuffers.gaux4` from `cloud-water.png`, then a world-return transition where the new shadow-ready guard bound a neutral one-pixel input until Vulkan completed the next shadow pass. The client completed the reload without the previous `shadowcolor0` crash. The initial and reloaded Overworld captures render the synthetic scene; the Nether capture is mostly Nether sky because the fixture does not build Nether terrain.
 - The Windows client log for the Unbound run contains no `VUID`, Vulkan validation error, device-lost, or framebuffer-size crash marker. This host has no Vulkan validation layer, so physical-GPU logs do not replace Lavapipe CI.
 - The `entity-custom-image` fixture passed with **18,532 active / 0 disabled** pixels. It is a focused synthetic fixture, not a full-pack result.
+- BSL v10.1.8 `HIGH` passed the full selected-profile lifecycle smoke on the RTX 3070: **225,164 non-black pixels / 38 color buckets**. Resize, Nether transition, Overworld return, disable, re-enable, and resource reload all completed. BSL declares no SSBOs; the smoke verified the empty storage manager is recreated on reload. This is one profile and synthetic-world run, not whole-pack parity.
 
 The refreshed source audit covers four SHA-512-pinned archives, 12 defaults, 63 profile/dimension cases, and 5,178 declared stages. All 75 rows have `errorCount=0`; all retain `visualValidation=false`:
 
@@ -17,12 +18,12 @@ The refreshed source audit covers four SHA-512-pinned archives, 12 defaults, 63 
 | --- | ---: | ---: | ---: | --- |
 | Complementary Reimagined r5.9.3 | 27 | 324 / 0 | 9 / 0 | One `COMPLEMENTARY` profile smoke and lifecycle passed; no whole-pack certification |
 | Complementary Unbound r5.9.3 | 27 | 324 / 0 | 9 / 0 | One `COMPLEMENTARY` profile smoke and lifecycle passed; no whole-pack certification |
-| BSL v10.1.8 | 18 | 198 / 0 | 0 / 0 | Not tested as a complete pack; source audit and focused synthetic fixtures only |
+| BSL v10.1.8 | 18 | 198 / 0 | 0 / 0 | `HIGH` selected-profile lifecycle smoke passed; no whole-pack certification |
 | Sildur's Vibrant Shaders v2.02 Extreme | 3 | 18 / 0 | 0 / 0 | Not tested as a complete pack |
 
-The offline audit cannot verify the selected Complementary profiles' required `vertexPipelineStoresAndAtomics` device feature. Earlier Lavapipe CI reported `VUID-RuntimeSpirv-NonWritable-06341`; the current candidate requests supported core features through the `VkDeviceCreateInfo.pEnabledFeatures` passed to `vkCreateDevice`. T3 is watching the PR; merge remains pending exact-head CI.
+The offline audit cannot verify the selected Complementary profiles' required `vertexPipelineStoresAndAtomics` device feature. Earlier Lavapipe CI reported `VUID-RuntimeSpirv-NonWritable-06341`; keep this issue open until fresh Graphics checks for PR #84 head `b7e8c6267bef06098d9c6adc87f5be9058e8589b` complete successfully. The PR remains draft and T3 is watching this exact head.
 
-The full local JDK 21 gate on feature head `dcb31b0` passed **488 tests** with no failures, errors, or skips; it processed 96 example shaders and compiled 112 to Vulkan SPIR-V, and build, smoke compilation, and example-pack packaging passed. The beta.30-metadata JAR from that run passed `scripts/verify_jar.py` (**967,060 bytes**; SHA-256 `187fab2313a758e25a74677c6b3069f1294a83b166f4bd42d05dd7de29199b7b`), but it is not a beta.31 artifact. The separate local `release-prep/beta31` branch has a versioned build on commit `68967c9`: its JAR passed `scripts/verify_jar.py` at **967,060 bytes**, SHA-256 `6322796300a54d0fcb91a898f593daf5cf7584e30cdf53b487b4b2d429f51d9e`. Exact-head remote PR gates remain unverified and no GitHub Release has been created. PR #84 remains draft and watched. No complete third-party shaderpack compatibility or stable release is claimed.
+The integrated local candidate at `release-prep/beta31-integrated` combines PR head `b7e8c6267bef06098d9c6adc87f5be9058e8589b` with the beta.31 version/changelog preparation. Its JDK 21 gate passed **497 tests** with no failures, errors, or skips, 96 example shaders, 112 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. `scripts/verify_jar.py` accepted the versioned candidate (**979,654 bytes**; SHA-256 `89A8C2632EA2F83A764FAA8997F79279BACB46685AFA7345440EF8345D186113`). The pinned source audit was rerun on this integrated tree: 4 archives, 12 defaults, 63 profile cases, 864 geometry fragments accepted / 0 rejected, and all 18 active compute stages compiled; all records remain source-only (`visualValidation=false`). This local artifact predates the final documentation commit and must be rebuilt by the release workflow from the final merged commit. Exact-head GitHub checks for PR #84 are pending under the T3 watcher. No GitHub Release has been created. No complete third-party shaderpack compatibility or stable release is claimed.
 
 Supported compute remains limited to fixed workgroups and 3D images in the `shadowcomp` family.
 
