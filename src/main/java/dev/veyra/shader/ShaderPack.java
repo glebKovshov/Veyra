@@ -72,6 +72,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern COLOR_TARGET_FORMAT_BLOCK_COMMENT = Pattern.compile(
             "(?is)/\\*\\s*const\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;\\s*\\*/");
     private static final Pattern COLOR_TARGET_SIZE_PROPERTY = Pattern.compile("^size\\.buffer\\.colortex(\\d+)$");
+    private static final Pattern READONLY_QUALIFIER = Pattern.compile("\\breadonly\\b");
     private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.of(
             "R8", VK10.VK_FORMAT_R8_UNORM,
             "RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM,
@@ -1267,10 +1268,33 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private void validateShadowComputeCapabilities() throws IOException {
         if (!hasShadowFragment()) throw new IOException("shadowcomp custom images require an active shadow pass.");
         var properties = readImageProperties();
-        for (String file : activeComputeStageFiles()) {
+        for (String program : SHADOW_PROGRAMS) {
+            if (!isProgramEnabled(program)) continue;
+            Optional<String> vertex = readShadowVertex(program, true);
+            if (vertex.isEmpty()) continue;
+            var prepared = ShaderPackImageBindings.prepare(program + ".vsh", vertex.get(), properties);
+            var writableImage = prepared.resources().stream()
+                    .filter(resource -> resource.storageImage()
+                            && !READONLY_QUALIFIER.matcher(resource.qualifier()).find())
+                    .findFirst();
+            if (writableImage.isPresent() && !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) {
+                throw new IOException("The Vulkan device cannot run writable storage image '"
+                        + writableImage.get().name() + "' in shadow vertex stage " + program
+                        + ": vertexPipelineStoresAndAtomics is unavailable.");
+            }
+        }
+
+        List<String> computeFiles = activeComputeStageFiles();
+        for (String file : computeFiles) {
             if (!file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
                 throw new IOException("Compute dispatch timing for " + file + " is not implemented yet.");
             }
+        }
+        if (!computeFiles.isEmpty() && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
+            throw new IOException("The Vulkan device cannot run shadow-compute custom images: "
+                    + "vertexPipelineStoresAndAtomics and shaderStorageImageExtendedFormats are required.");
+        }
+        for (String file : computeFiles) {
             String source = readComputeStage(file).orElseThrow();
             ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
             var shader = ComputeShaderAdapter.adapt(file, source, properties);

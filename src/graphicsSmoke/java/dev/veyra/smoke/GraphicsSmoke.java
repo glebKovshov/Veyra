@@ -129,10 +129,22 @@ public final class GraphicsSmoke {
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
             handVertexFixture = fixture.equals("hand-vertex-execution");
             storageBufferFixture = fixture.equals("storage-buffer-shadow");
+            boolean shadowVoxelImageFixture = fixture.equals("custom-image-compute")
+                    || fixture.equals("cloud-custom-image") || fixture.equals("basic-custom-image")
+                    || fixture.equals("entity-custom-image") || fixture.equals("composite-custom-image");
             if (storageBufferFixture && !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) {
                 skipReason = "vertexPipelineStoresAndAtomics unavailable";
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(
                         "Skipping storage-buffer fixture: {}", skipReason);
+                finish(client, null, -1);
+                return;
+            }
+            if (shadowVoxelImageFixture && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
+                skipReason = !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled
+                        ? "vertexPipelineStoresAndAtomics unavailable"
+                        : "shaderStorageImageExtendedFormats unavailable";
+                LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                        "Skipping shadow-voxel custom-image fixture: {}", skipReason);
                 finish(client, null, -1);
                 return;
             }
@@ -755,6 +767,8 @@ public final class GraphicsSmoke {
                     + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
                     + ",\"vertexPipelineStoresAndAtomicsEnabled\":"
                     + VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled
+                    + ",\"shaderStorageImageExtendedFormatsEnabled\":"
+                    + VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled
                     + ",\"skipReason\":\"" + escapedSkipReason + "\""
                     + ",\"thirdPartyProfile\":\"" + profile + "\",\"thirdPartyNonBlackPixels\":" + thirdPartyNonBlackPixels
                     + ",\"thirdPartyColorBuckets\":" + thirdPartyColorBuckets

@@ -147,12 +147,22 @@ jobs:
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
           fixture='${{ matrix.fixture }}'
+          shadow_voxel_image_fixtures={'custom-image-compute','cloud-custom-image','basic-custom-image','entity-custom-image','composite-custom-image'}
+          if fixture in shadow_voxel_image_fixtures and result['status']=='skipped':
+              assert (not result['vertexPipelineStoresAndAtomicsEnabled']
+                      or not result['shaderStorageImageExtendedFormatsEnabled']), result
+              assert result['skipReason'] in {'vertexPipelineStoresAndAtomics unavailable',
+                                              'shaderStorageImageExtendedFormats unavailable'}, result
+              print('Shadow-voxel custom-image fixture skipped because the Vulkan device lacks a required storage feature')
           if fixture == 'storage-buffer-shadow' and result['status']=='skipped':
               assert result['vertexPipelineStoresAndAtomicsEnabled'] is False, result
               assert result['skipReason']=='vertexPipelineStoresAndAtomics unavailable', result
               print('Storage-buffer shadow fixture skipped because this Vulkan device lacks vertexPipelineStoresAndAtomics')
-          else:
+          elif result['status']!='skipped':
               assert result['status']=='passed', result
+          if fixture in shadow_voxel_image_fixtures and result['status']=='passed':
+              assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
+              assert result['shaderStorageImageExtendedFormatsEnabled'] is True, result
           if fixture == 'storage-buffer-shadow' and result['status']=='passed':
               assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
               assert result['activeMagentaPixels'] >= 2000

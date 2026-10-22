@@ -1,11 +1,30 @@
 package dev.veyra.shader;
 
+import dev.veyra.vulkan.VeyraDeviceFeatures;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ShaderPackImageBindingsTest {
     private static final String PROPERTIES = "image.voxel_img = voxel_sampler red_integer r16ui unsigned_int true false 4 4 4";
+    private boolean previousVertexStores;
+    private boolean previousExtendedImageFormats;
+
+    @BeforeEach
+    void enableRequiredFeaturesForCapabilityTests() {
+        previousVertexStores = VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled;
+        previousExtendedImageFormats = VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled;
+        VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = true;
+        VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = true;
+    }
+
+    @AfterEach
+    void restoreDeviceFeatures() {
+        VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = previousVertexStores;
+        VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = previousExtendedImageFormats;
+    }
 
     @Test void runtimeCustomImageFixturePassesCapabilitiesWithAnIsolatedFeatureSnapshot() throws Exception {
         var ordinary = ShaderPack.inspect(java.nio.file.Path.of("examples/custom-image-compute"));
@@ -16,6 +35,26 @@ class ShaderPackImageBindingsTest {
         assertEquals(2, runtime.readImageProperties().images().size());
         assertDoesNotThrow(runtime::validatePipelineCapabilities);
         assertTrue(runtime.readStage("gbuffers_terrain.fsh").orElseThrow().contains("floodfill_sampler"));
+    }
+
+    @Test void rejectsShadowStorageImageWritesBeforePipelineCreationWhenVertexStoresAreUnavailable() throws Exception {
+        var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/basic-custom-image")).withRuntimeFeatures();
+        VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = false;
+
+        IOException error = assertThrows(IOException.class, runtime::validatePipelineCapabilities);
+
+        assertTrue(error.getMessage().contains("writable storage image 'voxel_img'"), error.getMessage());
+        assertTrue(error.getMessage().contains("vertexPipelineStoresAndAtomics is unavailable"), error.getMessage());
+    }
+
+    @Test void rejectsShadowComputeBeforePipelineCreationWhenExtendedImageFormatsAreUnavailable() throws Exception {
+        var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/custom-image-compute")).withRuntimeFeatures();
+        VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = false;
+
+        IOException error = assertThrows(IOException.class, runtime::validatePipelineCapabilities);
+
+        assertTrue(error.getMessage().contains("vertexPipelineStoresAndAtomics and shaderStorageImageExtendedFormats are required"),
+                error.getMessage());
     }
 
     @Test void compositePostPassCanConsumeTheSharedComputeImages() throws Exception {
