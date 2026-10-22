@@ -1,23 +1,26 @@
-# Veyra 0.2.0-beta.30+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.31+mc1.21.11 - experimental prerelease
 
-Beta.30 bundles a CloudRenderer crash fix with expanded textured-shader compatibility. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
+Beta.31 batches custom weather and translucent-particle vertex support with selected shadow-compute, shader-pack texture, and shadow-transition work. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
+
+This file is a local release draft. The candidate has not been merged or published; exact-head checks and the versioned release workflow must pass before these notes are used.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.30+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.31+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
-## Changes since beta.29
+## Changes since beta.30
 
-- Fix the CloudRenderer startup crash when Mixin searches for `Tesselator.begin`. The nested Minecraft invocation is now remapped while the enclosing VulkanMod method selector remains unremapped. The published beta.25 and beta.29 JARs were both confirmed to lack the runtime mapping; this release contains it.
-- Bind Minecraft's live lightmap as `Sampler2` for supported world-border and sky-textured pipelines.
-- Link custom `vec4 normal` outputs in `gbuffers_textured` and ignore unused fragment varying declarations before interface linking.
+- Execute supported custom `gbuffers_weather.vsh` and `gbuffers_particles_translucent.vsh` stages. Add generic defaults for the supported world-border `gbuffers_textured` path and make shader uniform/sampler scans comment-safe.
+- Add selected `shadowcomp` compute execution with fixed workgroups and 3D shader-pack images, shadow color MRT, supported shadow vertex/entity stages, selected-profile storage buffers, and expanded post texture slots.
+- Load shader-pack PNGs for configured global `customTexture.*` aliases and stage-scoped `texture.<stage>.<sampler>` mappings on supported terrain and shadow geometry. Honor `.mcmeta` blur/clamp settings; this supports the `texture.gbuffers.gaux4` input used by Complementary Unbound.
+- Bind a neutral shadow input until Vulkan records a completed shadow map, and skip dependent post passes during that transition. This prevents early `shadowcolor0` reads from using an incomplete map.
 
 ## Validation and known limits
 
-Feature PR [#80](https://github.com/glebKovshov/Veyra/pull/80) merged into `main` at `a1ade554`. Build [39563491000](https://github.com/glebKovshov/Veyra/actions/runs/39563491000), pinned source audit [39563491016](https://github.com/glebKovshov/Veyra/actions/runs/39563491016), and Graphics smoke [39563491037](https://github.com/glebKovshov/Veyra/actions/runs/39563491037) passed.
+The local JDK 21 gate passed **488 tests** with no failures, errors, or skips; it processed 96 example shaders, compiled 112 stages to Vulkan SPIR-V, built the mod, compiled graphics-smoke sources, and packaged the example packs. The pinned audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: **864 geometry fragments accepted / 0 rejected** and **18 active compute stages compiled / 0 rejected**. Every audit row has `visualValidation=false`.
 
-The local JDK 21 build passed **334 tests**; 85 example shaders were processed and 98 stages compiled directly to Vulkan SPIR-V. The graphics-smoke Java sources compiled locally; the CI graphics workflow completed successfully.
+Complementary Reimagined and Unbound r5.9.3 each passed one selected `COMPLEMENTARY` profile smoke and resize/dimension/disable/re-enable/reload lifecycle on an RTX 3070. Each synthetic-scene capture had 360,000 non-black pixels and 54 color buckets. These focused runs do not certify complete packs or full Iris parity. The Windows host has no Vulkan validation layer; the release workflow also runs its pinned source audit and Lavapipe graphics smoke before building and verifying the distributable.
 
-The pinned audit covers 4 archives, 75 profile/dimension cases, and 5,178 stages: **789 geometry fragments accepted / 0 rejected**. The remaining first capability blockers are custom `gbuffers_weather.vsh` execution (72 profile/dimension records) and Sildur's active `mc_Entity` input in `gbuffers_textured.vsh` (3 records). Every audit record has `visualValidation=false`; no complete third-party shaderpack has been visually validated. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results.
+Custom pack textures are currently wired to supported terrain and shadow geometry. Compute support remains limited to fixed-workgroup `shadowcomp` programs using 3D images; arbitrary compute stages, pack-defined formats, and complete third-party pack compatibility remain unsupported. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results and limits.

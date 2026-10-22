@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0-beta.31 - release candidate (2026-10-22)
+
+- Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.
+- Add selected fixed-workgroup `shadowcomp` compute, 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
+- Load configured shader-pack PNG textures on supported terrain and shadow geometry, with stage-scoped mappings and `.mcmeta` blur/clamp settings.
+- Keep shadow-dependent sampling safe across dimension and reload transitions until a completed shadow map is available.
+- Pass the local 488-test JDK 21 gate, 96 shader-source checks, 112 direct Vulkan SPIR-V compilations, pinned audit (864 accepted geometry fragments and 18 compiled compute stages), and selected Complementary Reimagined/Unbound RTX 3070 profile smokes. Full third-party pack visuals remain unverified.
+
+## 0.2.0-beta.30 - 2026-10-21 (experimental prerelease)
+
+- Fix the Minecraft `CloudRenderer` crash caused by nested `Tesselator.begin` Mixin remapping.
+- Bind the live Minecraft lightmap to supported world-border and sky-textured pipelines, link custom `gbuffers_textured` normals, and remove unused fragment varyings before linking.
+- Pass 334 local tests and the pinned audit; full third-party shaderpack visuals remain unverified.
+
 ## 0.2.0-beta.29 - 2026-10-21 (experimental prerelease)
 
 - Add supported custom `gbuffers_lightning.vsh`, both native `gbuffers_skytextured.vsh` formats, and the `gbuffers_textured.vsh` world-border path, with checked vertex/fragment varying links and explicit capability validation.
