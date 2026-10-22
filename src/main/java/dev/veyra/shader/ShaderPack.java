@@ -70,14 +70,19 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern COLOR_TARGET_FORMAT = Pattern.compile(
             "(?m)\\bconst\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
     private static final Pattern COLOR_TARGET_FORMAT_BLOCK_COMMENT = Pattern.compile(
-            "(?is)/\\*\\s*const\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;\\s*\\*/");
+            "(?s)/\\*(.*?)\\*/");
     private static final Pattern COLOR_TARGET_SIZE_PROPERTY = Pattern.compile("^size\\.buffer\\.colortex(\\d+)$");
     private static final Pattern READONLY_QUALIFIER = Pattern.compile("\\breadonly\\b");
     private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.of(
             "R8", VK10.VK_FORMAT_R8_UNORM,
+            "RGB8", VK10.VK_FORMAT_R8G8B8_UNORM,
+            "RGB8_SNORM", VK10.VK_FORMAT_R8G8B8_SNORM,
             "RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM,
+            "RGBA8_SNORM", VK10.VK_FORMAT_R8G8B8A8_SNORM,
             "R16F", VK10.VK_FORMAT_R16_SFLOAT,
+            "RGB16F", VK10.VK_FORMAT_R16G16B16_SFLOAT,
             "RGBA16F", VK10.VK_FORMAT_R16G16B16A16_SFLOAT,
+            "R11F_G11F_B10F", VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32,
             "R32F", VK10.VK_FORMAT_R32_SFLOAT);
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
@@ -589,16 +594,18 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static void parseCommentedColorTargetFormats(String source,
                                                         Map<Integer, MutableColorTargetSettings> settings,
                                                         String sourceFile) throws IOException {
-        String withoutLineComments = source.replaceAll("(?m)//[^\\r\\n]*", "");
-        Matcher matcher = COLOR_TARGET_FORMAT_BLOCK_COMMENT.matcher(withoutLineComments);
-        while (matcher.find()) {
-            setColorTargetFormat(settings, Integer.parseInt(matcher.group(1)), matcher.group(2), sourceFile);
+        Matcher comments = COLOR_TARGET_FORMAT_BLOCK_COMMENT.matcher(source);
+        while (comments.find()) {
+            Matcher formats = COLOR_TARGET_FORMAT.matcher(comments.group(1).replaceAll("(?m)//[^\\r\\n]*", ""));
+            while (formats.find()) {
+                setColorTargetFormat(settings, Integer.parseInt(formats.group(1)), formats.group(2), sourceFile);
+            }
         }
     }
 
     private static void setColorTargetFormat(Map<Integer, MutableColorTargetSettings> settings,
                                              int index, String declaredFormat, String sourceFile) throws IOException {
-        if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
+        if (index < 0 || index > MAX_COLOR_TARGET_INDEX) {
             return;
         }
         String formatName = declaredFormat.toUpperCase(java.util.Locale.ROOT);

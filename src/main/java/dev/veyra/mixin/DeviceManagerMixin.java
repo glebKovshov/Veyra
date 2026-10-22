@@ -2,31 +2,40 @@ package dev.veyra.mixin;
 
 import dev.veyra.vulkan.VeyraDeviceFeatures;
 import net.vulkanmod.vulkan.device.DeviceManager;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkAllocationCallbacks;
+import org.lwjgl.vulkan.VkDeviceCreateInfo;
+import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(value = DeviceManager.class, remap = false)
 public abstract class DeviceManagerMixin {
-    @ModifyArg(method = "createLogicalDevice", at = @At(value = "INVOKE", target =
-            "Lorg/lwjgl/vulkan/VkDeviceCreateInfo;pEnabledFeatures(Lorg/lwjgl/vulkan/VkPhysicalDeviceFeatures;)Lorg/lwjgl/vulkan/VkDeviceCreateInfo;"), index = 0)
-    private static VkPhysicalDeviceFeatures veyra$enableSupportedFeatures(VkPhysicalDeviceFeatures requested) {
+    @Redirect(method = "createLogicalDevice", at = @At(value = "INVOKE", target =
+            "Lorg/lwjgl/vulkan/VK10;vkCreateDevice(Lorg/lwjgl/vulkan/VkPhysicalDevice;Lorg/lwjgl/vulkan/VkDeviceCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Lorg/lwjgl/PointerBuffer;)I"))
+    private static int veyra$enableSupportedFeatures(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo createInfo,
+                                                     VkAllocationCallbacks allocator, PointerBuffer device) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceFeatures supported = VkPhysicalDeviceFeatures.calloc(stack);
-            VK10.vkGetPhysicalDeviceFeatures(DeviceManager.physicalDevice, supported);
+            VK10.vkGetPhysicalDeviceFeatures(physicalDevice, supported);
             VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
-            VK10.vkGetPhysicalDeviceProperties(DeviceManager.physicalDevice, properties);
+            VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
+            VkPhysicalDeviceFeatures enabled = createInfo.pEnabledFeatures();
+            if (enabled == null) {
+                enabled = VkPhysicalDeviceFeatures.calloc(stack);
+                createInfo.pEnabledFeatures(enabled);
+            }
+            VeyraDeviceFeatures.mergeSupportedFeatures(enabled, supported);
             VeyraDeviceFeatures.maxColorAttachments = properties.limits().maxColorAttachments();
-            VeyraDeviceFeatures.independentBlendEnabled = supported.independentBlend();
-            VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = supported.vertexPipelineStoresAndAtomics();
-            VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = supported.shaderStorageImageExtendedFormats();
-            return requested.independentBlend(supported.independentBlend())
-                    .vertexPipelineStoresAndAtomics(supported.vertexPipelineStoresAndAtomics())
-                    .shaderStorageImageExtendedFormats(supported.shaderStorageImageExtendedFormats());
+            VeyraDeviceFeatures.independentBlendEnabled = enabled.independentBlend();
+            VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = enabled.vertexPipelineStoresAndAtomics();
+            VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = enabled.shaderStorageImageExtendedFormats();
+            return VK10.vkCreateDevice(physicalDevice, createInfo, allocator, device);
         }
     }
 }

@@ -3,6 +3,7 @@ package dev.veyra.smoke;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.veyra.shader.ShaderPack;
 import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.shader.VeyraStorageBufferResources;
 import dev.veyra.vulkan.VeyraDeviceFeatures;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.vulkan.Renderer;
@@ -29,7 +30,7 @@ public final class GraphicsSmoke {
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private static boolean entityFixtureStarted, vanillaBaseline, thirdPartyShaderpackFixture, thirdPartyScenePrepared,
-            thirdPartyProfileApplied, cloudFixture, cloudSceneColorFixture,
+            thirdPartyLifecycleFixture, thirdPartyProfileApplied, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
@@ -41,7 +42,7 @@ public final class GraphicsSmoke {
             damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture,
             storageBufferFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
-    private static ShaderPack shadowMrtPack;
+    private static ShaderPack shadowMrtPack, thirdPartyPack;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
             disabledCurrentRenderedItemGreenPixels, activeGlintGreenPixels, disabledGlintGreenPixels,
             activeGlintMrtPixels, activeBasicGreenPixels, disabledBasicGreenPixels, activeBasicMrtPixels,
@@ -52,6 +53,12 @@ public final class GraphicsSmoke {
     private static String thirdPartyProfile = "";
     private static String skipReason = "";
     private static int thirdPartyNonBlackPixels, thirdPartyColorBuckets;
+    private static int thirdPartyInitialWidth, thirdPartyInitialHeight;
+    private static long thirdPartyStorageBufferBytes, thirdPartyInitialStorageIdentity;
+    private static java.util.concurrent.CompletableFuture<?> thirdPartyReloadFuture;
+    private static boolean thirdPartyResizePassed, thirdPartyNetherPassed, thirdPartyReturnPassed,
+            thirdPartyDisablePassed, thirdPartyReenablePassed, thirdPartyReloadPassed,
+            thirdPartyLifecycleCompleted;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -72,32 +79,16 @@ public final class GraphicsSmoke {
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
             thirdPartyShaderpackFixture = fixture.equals("third-party-shaderpack");
+            thirdPartyLifecycleFixture = thirdPartyShaderpackFixture
+                    && Boolean.getBoolean("veyra.graphicsSmoke.thirdPartyLifecycle");
             if (thirdPartyShaderpackFixture && !thirdPartyProfileApplied) {
                 thirdPartyProfile = Files.readString(client.gameDirectory.toPath()
                         .resolve("veyra/shaderpack-profile.txt")).trim();
                 ShaderPack pack = VeyraRenderer.selectedPack().orElseThrow(
                         () -> new IllegalStateException("The third-party shaderpack was not selected at startup."));
                 if (thirdPartyProfile.isEmpty()) throw new IllegalStateException("The third-party shaderpack profile is empty.");
-                var profile = pack.readOptions().profiles().get(thirdPartyProfile);
-                if (profile == null || profile.isEmpty()) {
-                    throw new IllegalStateException("Shaderpack profile was not found or has no options: " + thirdPartyProfile);
-                }
-                String applied = VeyraRenderer.applyOptions(pack, profile);
-                if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
-                    throw new IllegalStateException("Could not apply " + thirdPartyProfile + " profile: " + applied
-                            + " (" + VeyraRenderer.getLastError() + ")");
-                }
-                ShaderPack configured = VeyraRenderer.selectedPack().orElseThrow();
-                var effective = configured.readOptions().effective(configured.configuration().options());
-                for (var option : profile.entrySet()) {
-                    if (!option.getValue().equals(effective.get(option.getKey()))) {
-                        throw new IllegalStateException("Profile option did not take effect: " + option.getKey());
-                    }
-                }
-                thirdPartyProfileApplied = true;
-                LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                        "Applied real shaderpack profile {} with {} options from {}", thirdPartyProfile,
-                        profile.size(), configured.name());
+                thirdPartyPack = pack;
+                applyThirdPartyProfile(pack);
             }
             cloudSceneColorFixture = fixture.equals("cloud-colortex0");
             cloudFixture = cloudSceneColorFixture || fixture.equals("cloud-texture-inputs")
@@ -296,14 +287,45 @@ public final class GraphicsSmoke {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
                     throw new IllegalStateException("Vanilla baseline unexpectedly selected a shaderpack");
                 pending = true; requested = true; captureActive = false;
-            } else if (!vanillaBaseline && stage == 0 && worldTicks >= 160) {
+            } else if (!vanillaBaseline && thirdPartyShaderpackFixture && stage == 0 && worldTicks >= 160) {
+                if (thirdPartyLifecycleFixture) requireThirdPartyActive("initial profile capture");
+                pending = true;
+                requested = true;
+                captureActive = true;
+            } else if (!vanillaBaseline && !thirdPartyShaderpackFixture && stage == 0 && worldTicks >= 160) {
                 if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
                 if (cloudSceneColorFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
                     throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
                 pending = true;
                 requested = true; captureActive = true;
-            } else if (!vanillaBaseline && (stage == 1 || stage == 2) && worldTicks >= baselineAt) {
+            } else if (thirdPartyLifecycleFixture && stage >= 1 && worldTicks >= baselineAt) {
+                if (stage == 2) {
+                    if (!client.level.dimension().equals(net.minecraft.world.level.Level.NETHER)) return;
+                    if (VeyraRenderer.selectedPack().map(pack -> pack.configuration().dimension() != -1).orElse(true)) {
+                        throw new IllegalStateException("Complementary profile did not switch to the Nether configuration.");
+                    }
+                } else if (stage == 3) {
+                    if (!client.level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
+                    if (VeyraRenderer.selectedPack().map(pack -> pack.configuration().dimension() != 0).orElse(true)) {
+                        throw new IllegalStateException("Complementary profile did not restore its Overworld configuration.");
+                    }
+                } else if (stage == 4) {
+                    if (VeyraRenderer.isRenderingEnabled() || VeyraStorageBufferResources.active() != null) {
+                        throw new IllegalStateException("Disabling the real shaderpack did not release its active storage-buffer owner.");
+                    }
+                } else if (stage == 6) {
+                    if (thirdPartyReloadFuture == null) throw new IllegalStateException("The resource reload future was not created.");
+                    if (!thirdPartyReloadFuture.isDone()) return;
+                    thirdPartyReloadFuture.join();
+                    thirdPartyReloadFuture = null;
+                }
+                if (stage != 4) requireThirdPartyActive("lifecycle stage " + stage);
+                pending = true;
+                requested = true;
+                captureActive = stage != 4;
+            } else if (!vanillaBaseline && !thirdPartyShaderpackFixture
+                    && (stage == 1 || stage == 2) && worldTicks >= baselineAt) {
                 pending = true;
                 requested = true; captureActive = (skyTexturedStageFixture || shadowColorMrtFixture) && stage == 2;
             } else if (shadowColorMrtLifecycleFixture && stage == 3 && worldTicks >= baselineAt) {
@@ -349,9 +371,14 @@ public final class GraphicsSmoke {
         Buffer glintMrtReadback = null;
         Buffer basicMrtReadback = null;
         ComputeImageProbe computeProbe = null;
+        java.util.List<ShaderPackTargetCapture.Capture> targetCaptures = java.util.List.of();
         try {
             Renderer renderer = Renderer.getInstance();
             renderer.endRenderPass();
+            if (thirdPartyShaderpackFixture && VeyraRenderer.isRenderingEnabled()
+                    && Boolean.getBoolean("veyra.graphicsSmoke.captureColorTargets")) {
+                targetCaptures = ShaderPackTargetCapture.record();
+            }
             if (captureActive && Boolean.getBoolean("veyra.graphicsSmoke.computeProbe")) {
                 computeProbe = ComputeImageProbe.record();
             }
@@ -442,10 +469,14 @@ public final class GraphicsSmoke {
             Buffer completedGlintMrt = glintMrtReadback;
             Buffer completedBasicMrt = basicMrtReadback;
             ComputeImageProbe completedComputeProbe = computeProbe;
+            java.util.List<ShaderPackTargetCapture.Capture> completedTargets = java.util.List.copyOf(targetCaptures);
             boolean active = captureActive;
             MemoryManager.getInstance().addFrameOp(() -> {
                 try {
                     if (completedComputeProbe != null) completedComputeProbe.verify();
+                    for (ShaderPackTargetCapture.Capture target : completedTargets) {
+                        target.write(output.resolve("shaderpack-targets"));
+                    }
                     var bytes = MemoryUtil.memByteBuffer(completed.getDataPtr(), width * height * 4);
                     NativeImage image = new NativeImage(width, height, false);
                     boolean bgra = format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_B8G8R8A8_SRGB;
@@ -484,6 +515,7 @@ public final class GraphicsSmoke {
                 } catch (Throwable failure) { finish(client, failure, -1); }
                 finally {
                     if (completedComputeProbe != null) completedComputeProbe.close();
+                    completedTargets.forEach(ShaderPackTargetCapture.Capture::close);
                     completed.scheduleFree();
                     if (completedGlintMrt != null) completedGlintMrt.scheduleFree();
                     if (completedBasicMrt != null) completedBasicMrt.scheduleFree();
@@ -491,6 +523,7 @@ public final class GraphicsSmoke {
             });
         } catch (Throwable failure) {
             if (computeProbe != null) computeProbe.close();
+            targetCaptures.forEach(ShaderPackTargetCapture.Capture::close);
             if (readback != null) readback.scheduleFree();
             if (glintMrtReadback != null) glintMrtReadback.scheduleFree();
             if (basicMrtReadback != null) basicMrtReadback.scheduleFree();
@@ -513,7 +546,18 @@ public final class GraphicsSmoke {
         boolean[] colors = new boolean[512];
         try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
-                    String imageName = thirdPartyShaderpackFixture ? "third-party-pack-active.png"
+                    String imageName = thirdPartyShaderpackFixture && thirdPartyLifecycleFixture
+                    ? switch (stage) {
+                        case 0 -> "third-party-pack-initial.png";
+                        case 1 -> "third-party-pack-resized.png";
+                        case 2 -> "third-party-pack-nether.png";
+                        case 3 -> "third-party-pack-overworld-return.png";
+                        case 4 -> "third-party-pack-disabled.png";
+                        case 5 -> "third-party-pack-reenabled.png";
+                        case 6 -> "third-party-pack-reloaded.png";
+                        default -> "third-party-pack-stage-" + stage + ".png";
+                    }
+                    : thirdPartyShaderpackFixture ? "third-party-pack-active.png"
                     : storageBufferFixture ? active ? "storage-buffer-active.png" : "storage-buffer-disabled.png"
                     : shadowColorMrtFixture && stage == 2 ? "shadow-mrt-reenabled.png"
                     : shadowColorMrtLifecycleFixture && stage == 3 ? "shadow-mrt-resized.png"
@@ -567,6 +611,11 @@ public final class GraphicsSmoke {
                 if (thirdPartyShaderpackFixture) {
                     thirdPartyNonBlackPixels = nonBlackPixelCount;
                     thirdPartyColorBuckets = colorBucketCount;
+                    if (thirdPartyLifecycleFixture) {
+                        completeThirdPartyLifecycleCapture(client, frameWidth, frameHeight, active,
+                                nonBlackPixelCount, colorBucketCount, count);
+                        return;
+                    }
                     Throwable failure = !thirdPartyProfileApplied || !VeyraRenderer.isRenderingEnabled()
                             || !VeyraRenderer.getLastError().isEmpty()
                             ? new IllegalStateException("The real shaderpack/profile was no longer active: "
@@ -800,6 +849,181 @@ public final class GraphicsSmoke {
         } catch (Throwable failure) { completion = () -> finish(client, failure, -1); }
     }
 
+    private static void applyThirdPartyProfile(ShaderPack pack) {
+        try {
+            var profile = pack.readOptions().profiles().get(thirdPartyProfile);
+            if (profile == null || profile.isEmpty()) {
+                throw new IllegalStateException("Shaderpack profile was not found or has no options: " + thirdPartyProfile);
+            }
+            String applied = VeyraRenderer.applyOptions(pack, profile);
+            if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
+                throw new IllegalStateException("Could not apply " + thirdPartyProfile + " profile: " + applied
+                        + " (" + VeyraRenderer.getLastError() + ")");
+            }
+            ShaderPack configured = VeyraRenderer.selectedPack().orElseThrow();
+            var effective = configured.readOptions().effective(configured.configuration().options());
+            for (var option : profile.entrySet()) {
+                if (!option.getValue().equals(effective.get(option.getKey()))) {
+                    throw new IllegalStateException("Profile option did not take effect: " + option.getKey());
+                }
+            }
+            // applyOptions replaces the configured pack instance; retain that selected snapshot so
+            // a later disable/re-enable restores this profile rather than the pre-profile object.
+            thirdPartyPack = configured;
+            thirdPartyProfileApplied = true;
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Applied real shaderpack profile {} with {} options from {}", thirdPartyProfile,
+                    profile.size(), configured.name());
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("Could not read the real shaderpack profile " + thirdPartyProfile, exception);
+        }
+    }
+
+    private static VeyraStorageBufferResources requireThirdPartyActive(String phase) {
+        if (!thirdPartyProfileApplied || !VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
+            throw new IllegalStateException("The real shaderpack/profile is not active during " + phase + ": "
+                    + VeyraRenderer.getLastError());
+        }
+        VeyraStorageBufferResources resources = VeyraStorageBufferResources.active();
+        if (resources == null || resources.allocatedBytes() <= 0
+                || !resources.properties().buffers().containsKey(0)) {
+            throw new IllegalStateException("Complementary bufferObject.0 is not allocated during " + phase + ".");
+        }
+        if (stage >= 5 && thirdPartyInitialStorageIdentity != 0
+                && resources.identity() == thirdPartyInitialStorageIdentity) {
+            throw new IllegalStateException("Re-enabling Complementary reused the storage-buffer owner released by disable().");
+        }
+        thirdPartyStorageBufferBytes = resources.allocatedBytes();
+        LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                "Complementary lifecycle stage {} has storage-buffer owner {} with {} allocated bytes at {}x{}",
+                stage, resources.identity(), resources.allocatedBytes(), resources.viewWidth(), resources.viewHeight());
+        return resources;
+    }
+
+    private static void completeThirdPartyLifecycleCapture(Minecraft client, int frameWidth, int frameHeight,
+                                                            boolean active, int nonBlackPixels, int colorBuckets,
+                                                            int diagnosticPixels) {
+        if (stage == 4) {
+            if (active || VeyraRenderer.isRenderingEnabled() || VeyraStorageBufferResources.active() != null) {
+                finish(client, new IllegalStateException("The disabled Complementary frame still owns active shader resources."),
+                        diagnosticPixels);
+                return;
+            }
+            thirdPartyDisablePassed = true;
+            if (thirdPartyPack == null) {
+                finish(client, new IllegalStateException("The Complementary lifecycle has no pack to re-enable."),
+                        diagnosticPixels);
+                return;
+            }
+            String selection = VeyraRenderer.selectWithSavedOptions(thirdPartyPack);
+            if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
+                finish(client, new IllegalStateException("Could not re-select Complementary after disable: "
+                        + selection + " (" + VeyraRenderer.getLastError() + ")"), diagnosticPixels);
+                return;
+            }
+            applyThirdPartyProfile(thirdPartyPack);
+            stage = 5;
+            baselineAt = worldTicks + 120;
+            pending = false;
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Complementary disable released its SSBO owner; re-selected the same profile.");
+            return;
+        }
+
+        try {
+            if (!active) throw new IllegalStateException("Expected an active Complementary frame at lifecycle stage " + stage);
+            VeyraStorageBufferResources resources = requireThirdPartyActive("frame capture at stage " + stage);
+            if (nonBlackPixels < 10000 || (stage == 0 || stage == 6) && colorBuckets < 24) {
+                throw new IllegalStateException("The real shaderpack frame failed the visual gate at stage " + stage
+                        + ": nonBlack=" + nonBlackPixels + ", colorBuckets=" + colorBuckets);
+            }
+            thirdPartyNonBlackPixels = nonBlackPixels;
+            thirdPartyColorBuckets = colorBuckets;
+            activePixels = diagnosticPixels;
+
+            switch (stage) {
+                case 0 -> {
+                    thirdPartyInitialWidth = frameWidth;
+                    thirdPartyInitialHeight = frameHeight;
+                    thirdPartyInitialStorageIdentity = resources.identity();
+                    int resizedWidth = frameWidth == 800 ? 960 : 800;
+                    int resizedHeight = resizedWidth * 9 / 16;
+                    client.getWindow().setWindowed(resizedWidth, resizedHeight);
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                            "Resizing active Complementary profile from {}x{} to {}x{}",
+                            frameWidth, frameHeight, resizedWidth, resizedHeight);
+                    stage = 1;
+                    baselineAt = worldTicks + 100;
+                    pending = false;
+                }
+                case 1 -> {
+                    var colortex = VeyraRenderer.geometryColorAttachment(1);
+                    if (frameWidth == thirdPartyInitialWidth && frameHeight == thirdPartyInitialHeight
+                            || colortex.width != frameWidth || colortex.height != frameHeight
+                            || resources.viewWidth() != thirdPartyInitialWidth && resources.viewWidth() != frameWidth
+                            || resources.viewHeight() != thirdPartyInitialHeight && resources.viewHeight() != frameHeight) {
+                        throw new IllegalStateException("Complementary resize resources disagree: initial="
+                                + thirdPartyInitialWidth + "x" + thirdPartyInitialHeight + ", frame="
+                                + frameWidth + "x" + frameHeight + ", colortex1=" + colortex.width + "x" + colortex.height
+                                + ", SSBO viewport=" + resources.viewWidth() + "x" + resources.viewHeight());
+                    }
+                    thirdPartyResizePassed = true;
+                    client.getConnection().sendCommand("execute in minecraft:the_nether run tp @s 0 80 0");
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                            "Complementary resize passed at {}x{}; moving the active profile to Nether", frameWidth, frameHeight);
+                    stage = 2;
+                    baselineAt = worldTicks + 120;
+                    pending = false;
+                }
+                case 2 -> {
+                    thirdPartyNetherPassed = true;
+                    client.getConnection().sendCommand("execute in minecraft:overworld run tp @s 0 72 0");
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                            "Complementary Nether profile passed; returning to Overworld");
+                    stage = 3;
+                    baselineAt = worldTicks + 120;
+                    pending = false;
+                }
+                case 3 -> {
+                    thirdPartyReturnPassed = true;
+                    thirdPartyPack = VeyraRenderer.selectedPack().orElseThrow(
+                            () -> new IllegalStateException("The real shaderpack was not selected before disable."));
+                    String disabled = VeyraRenderer.disable();
+                    if (VeyraRenderer.isRenderingEnabled() || VeyraStorageBufferResources.active() != null) {
+                        throw new IllegalStateException("Complementary disable did not release the active SSBO owner: " + disabled);
+                    }
+                    thirdPartyDisablePassed = true;
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                            "Complementary disable released its {}-byte storage-buffer allocation", thirdPartyStorageBufferBytes);
+                    stage = 4;
+                    baselineAt = worldTicks + 80;
+                    pending = false;
+                }
+                case 5 -> {
+                    thirdPartyReenablePassed = true;
+                    thirdPartyReloadFuture = client.reloadResourcePacks();
+                    if (thirdPartyReloadFuture == null) {
+                        throw new IllegalStateException("Minecraft did not return a resource-reload future.");
+                    }
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                            "Started a real client resource reload with Complementary SSBOs active");
+                    stage = 6;
+                    baselineAt = worldTicks + 100;
+                    pending = false;
+                }
+                case 6 -> {
+                    thirdPartyReloadPassed = true;
+                    thirdPartyLifecycleCompleted = true;
+                    ShutdownEvidence.record("third-party-before-client-stop");
+                    finish(client, null, diagnosticPixels);
+                }
+                default -> throw new IllegalStateException("Unexpected Complementary lifecycle capture stage: " + stage);
+            }
+        } catch (Throwable failure) {
+            finish(client, failure, diagnosticPixels);
+        }
+    }
+
     private static void finish(Minecraft client, Throwable failure, int baseline) {
         if (finished) return;
         finished = true;
@@ -843,6 +1067,15 @@ public final class GraphicsSmoke {
                     + ",\"activeSkyTexturedMoonPixels\":" + activeSkyMoonPixels
                     + ",\"disabledSkyTexturedSunPixels\":" + disabledSkySunPixels
                     + ",\"disabledSkyTexturedMoonPixels\":" + disabledSkyMoonPixels
+                    + ",\"thirdPartyLifecycleEnabled\":" + thirdPartyLifecycleFixture
+                    + ",\"thirdPartyLifecycleCompleted\":" + thirdPartyLifecycleCompleted
+                    + ",\"thirdPartyResizePassed\":" + thirdPartyResizePassed
+                    + ",\"thirdPartyNetherPassed\":" + thirdPartyNetherPassed
+                    + ",\"thirdPartyReturnPassed\":" + thirdPartyReturnPassed
+                    + ",\"thirdPartyDisablePassed\":" + thirdPartyDisablePassed
+                    + ",\"thirdPartyReenablePassed\":" + thirdPartyReenablePassed
+                    + ",\"thirdPartyReloadPassed\":" + thirdPartyReloadPassed
+                    + ",\"thirdPartyStorageBufferBytes\":" + thirdPartyStorageBufferBytes
                     + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);

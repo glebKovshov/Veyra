@@ -1,6 +1,18 @@
 # Veyra 0.2 validation status
 
-## Current feature candidate verification — 2026-10-22
+## Current unpublished shadow/compute candidate — 2026-10-22
+
+The current candidate is the working tree for draft PR [#84](https://github.com/glebKovshov/Veyra/pull/84). On JDK 21.0.12, `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed: **479 tests, 0 failures/errors/skips**, 96 example shaders preprocessed, 112 direct Vulkan SPIR-V compilations, four conditional-include checks, graphics-smoke Java compilation, and example-pack packaging. The unpublished beta.30-metadata JAR passed `scripts/verify_jar.py`: **945,047 bytes**, SHA-256 `493d59dd08c21dd60a9e1c128f4eeec93ff7c5a219c15f7e5b40d0627e6a4e33`.
+
+The refreshed pinned audit covers four SHA-512-pinned packs, 12 defaults and 63 profile/dimension rows / 5,178 declared stages. It accepts **864 geometry fragments / rejects 0** and compiles **18/18 active compute stages**. All rows have zero adapter/source errors. Eighteen selected Complementary rows report a `vertexPipelineStoresAndAtomics` device requirement because the offline audit does not create a Vulkan device. Every row retains `visualValidation=false`.
+
+On an NVIDIA RTX 3070, Complementary Reimagined r5.9.3 `COMPLEMENTARY` passed the captured-frame gate with **230,400 non-black pixels / 57 color buckets** and 14 active post passes. Lifecycle run `complementary-lifecycle5-20261022` also passed: resize to 800×450, Nether, Overworld return, disable, re-enable, client resource reload, and shutdown with the **810,549,248-byte** SSBO active. The run reports all lifecycle checks true. Shutdown evidence showed an active storage buffer before client stop and zero shader-pack buffers before allocator destruction.
+
+After correcting Vulkan device-feature activation, the local `entity-custom-image` smoke passed with **18,532 active / 0 disabled** entity-image pixels. The mixin now merges supported storage features into the final `VkDeviceCreateInfo.pEnabledFeatures` immediately before `vkCreateDevice`. The prior PR head's Lavapipe job showed these features as supported while validation reported `vertexPipelineStoresAndAtomics` disabled. Fresh Lavapipe CI for this direct device-create fix is still required. Local Windows GPU logs have no VUID, validation-error, or device-lost markers, but this host has no Vulkan validation layer.
+
+This candidate is unpublished; the beta.30 JAR remains the current installable release. No complete third-party shaderpack compatibility or stable release is claimed.
+
+## Earlier feature candidate verification — 2026-10-22 (superseded)
 
 The JDK 21 run `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon` passed: **432 tests**, 96 example shaders preprocessed, and 112 shader sources compiled directly to Vulkan SPIR-V. The beta.30-metadata candidate JAR passed `scripts/verify_jar.py` for Minecraft 1.21.11 / VulkanMod 0.6.8 (882,797 bytes; SHA-256 `c6df07d2440a27df2c80893ab55914be792d1004b78218130067b60f52f0d7ce`).
 

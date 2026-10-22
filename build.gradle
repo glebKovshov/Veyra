@@ -246,6 +246,12 @@ loom {
             if (project.hasProperty('graphicsSmokeComputeProbe')) {
                 vmArgs '-Dveyra.graphicsSmoke.computeProbe=true'
             }
+            if (project.hasProperty('graphicsSmokeCaptureColorTargets')) {
+                vmArgs '-Dveyra.graphicsSmoke.captureColorTargets=true'
+            }
+            if (project.hasProperty('graphicsSmokeThirdPartyLifecycle')) {
+                vmArgs '-Dveyra.graphicsSmoke.thirdPartyLifecycle=true'
+            }
         }
     }
 }

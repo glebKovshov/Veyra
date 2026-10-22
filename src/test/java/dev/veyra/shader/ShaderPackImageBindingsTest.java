@@ -47,6 +47,22 @@ class ShaderPackImageBindingsTest {
         assertTrue(error.getMessage().contains("vertexPipelineStoresAndAtomics is unavailable"), error.getMessage());
     }
 
+    @Test void rejectsEntityShadowStorageImageWritesBeforePipelineCreationWhenVertexStoresAreUnavailable() throws Exception {
+        var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/entity-custom-image")).withRuntimeFeatures()
+                .configured(java.util.Map.of(
+                        "program.shadow", "false",
+                        "program.shadow_solid", "false",
+                        "program.shadow_cutout", "false",
+                        "program.shadow_water", "false"), 0);
+        VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = false;
+
+        IOException error = assertThrows(IOException.class, runtime::validatePipelineCapabilities);
+
+        assertTrue(error.getMessage().contains("writable storage image 'voxel_img'"), error.getMessage());
+        assertTrue(error.getMessage().contains("shadow vertex stage shadow_entities"), error.getMessage());
+        assertTrue(error.getMessage().contains("vertexPipelineStoresAndAtomics is unavailable"), error.getMessage());
+    }
+
     @Test void rejectsShadowComputeBeforePipelineCreationWhenExtendedImageFormatsAreUnavailable() throws Exception {
         var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/custom-image-compute")).withRuntimeFeatures();
         VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = false;

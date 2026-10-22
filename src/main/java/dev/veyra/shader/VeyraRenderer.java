@@ -2616,9 +2616,12 @@ public final class VeyraRenderer {
         VeyraStorageBufferResources preparedStorageBuffers = null;
         try {
             pack = pack.withRuntimeFeatures();
+            // Compute preflight resolves shaderpack uniforms through the active set, so install this
+            // candidate before validating stages. A disabled pack clears the active set; validating
+            // first would incorrectly reject valid custom uniforms on a later re-enable.
+            CustomUniforms.activate(pack.readCustomUniforms());
             pack.validatePipelineCapabilities();
             // Adapters size uniform blocks from the active definitions, so install them before compiling.
-            CustomUniforms.activate(pack.readCustomUniforms());
             ItemIdMap.activate(pack.readItemIds());
             EntityIdMap.activate(pack.readEntityIds());
             BlockIdMap nextBlockIds = pack.readBlockIds();
@@ -3005,7 +3008,9 @@ public final class VeyraRenderer {
             if (pipelineSet.usesShadowSampler() && VeyraShadowRenderer.shadowDepthTextureView() == null) {
                 throw new IllegalStateException("The post program requires shadow inputs, but VulkanMod did not produce a shadow map.");
             }
-            ensureSwapTargets(mainTarget.width, mainTarget.height);
+            ColorTargetSettings sceneColorSettings = pipelineSet.colorTargetSettings().getOrDefault(
+                    0, ColorTargetSettings.defaults(0, mainTarget.width, mainTarget.height));
+            ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings.format());
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
             if (phase == ShaderPassPhase.PREPARE) {
@@ -3292,6 +3297,9 @@ public final class VeyraRenderer {
             colorTargetSettings.putIfAbsent(index, ColorTargetSettings.defaults(index, width, height));
         }
         validateColorTargetFormats(colorTargetIndices, colorTargetSettings);
+        if (colorTargetSettings.containsKey(0)) {
+            validateColorTargetFormats(Set.of(0), colorTargetSettings);
+        }
 
         PipelineProgram copyProgram = null;
         if (!programs.isEmpty()) {
@@ -3419,12 +3427,50 @@ public final class VeyraRenderer {
             for (int index : indices) {
                 ColorTargetSettings target = settings.get(index);
                 VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, target.format(), properties);
-                if ((properties.optimalTilingFeatures() & requiredFeatures) != requiredFeatures) {
-                    throw new IOException("colortex" + index + " format " + ColorTargetSettings.formatName(target.format())
-                            + " does not support sampled, linearly-filtered color attachments on this Vulkan device.");
+                boolean unsupportedByVulkanMod = !vulkanModColorTargetFormat(target.format());
+                boolean unsupportedByDevice = (properties.optimalTilingFeatures() & requiredFeatures) != requiredFeatures;
+                if (unsupportedByVulkanMod || unsupportedByDevice) {
+                    int fallbackFormat = colorTargetFormatFallback(target.format());
+                    if (fallbackFormat == 0) {
+                        throw unsupportedColorTargetFormat(index, target.format());
+                    }
+                    VK10.vkGetPhysicalDeviceFormatProperties(
+                            DeviceManager.physicalDevice, fallbackFormat, properties);
+                    if ((properties.optimalTilingFeatures() & requiredFeatures) != requiredFeatures) {
+                        throw unsupportedColorTargetFormat(index, target.format());
+                    }
+                    settings.put(index, new ColorTargetSettings(target.clearEachFrame(), target.clearColor(),
+                            target.width(), target.height(), fallbackFormat));
+                    VeyraClient.LOGGER.info("Shader pack colortex{} uses {}; this Vulkan device uses compatible {} storage.",
+                            index, ColorTargetSettings.formatName(target.format()),
+                            ColorTargetSettings.formatName(fallbackFormat));
                 }
             }
         }
+    }
+
+    private static int colorTargetFormatFallback(int format) {
+        return switch (format) {
+            case VK10.VK_FORMAT_R8G8B8_UNORM -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+            case VK10.VK_FORMAT_R8G8B8_SNORM, VK10.VK_FORMAT_R8G8B8A8_SNORM ->
+                    VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
+            case VK10.VK_FORMAT_R16G16B16_SFLOAT -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
+            case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
+            default -> 0;
+        };
+    }
+
+    private static boolean vulkanModColorTargetFormat(int format) {
+        return format == VK10.VK_FORMAT_R8_UNORM
+                || format == VK10.VK_FORMAT_R8G8B8A8_UNORM
+                || format == VK10.VK_FORMAT_R16_SFLOAT
+                || format == VK10.VK_FORMAT_R16G16B16A16_SFLOAT
+                || format == VK10.VK_FORMAT_R32_SFLOAT;
+    }
+
+    private static IOException unsupportedColorTargetFormat(int index, int format) {
+        return new IOException("colortex" + index + " format " + ColorTargetSettings.formatName(format)
+                + " and its compatible Vulkan fallback do not support sampled, linearly-filtered color attachments.");
     }
 
     private static List<String> readPostVertexUniforms(String source, String programName) {
@@ -7376,7 +7422,7 @@ public final class VeyraRenderer {
         return projectionBuffer;
     }
 
-    private static void ensureSwapTargets(int width, int height) {
+    private static void ensureSwapTargets(int width, int height, int format) {
         if (swapTargetA == null) {
             swapTargetA = new TextureTarget("Veyra shader pack swap A", width, height, false);
         } else if (swapTargetA.width != width || swapTargetA.height != height) {
@@ -7387,6 +7433,8 @@ public final class VeyraRenderer {
         } else if (swapTargetB.width != width || swapTargetB.height != height) {
             swapTargetB.resize(width, height);
         }
+        ensureTargetFormat(swapTargetA, "Veyra shader pack swap A", format);
+        ensureTargetFormat(swapTargetB, "Veyra shader pack swap B", format);
     }
 
     private static void releaseSwapTargets() {
@@ -7523,18 +7571,23 @@ public final class VeyraRenderer {
             target.resize(settings.width(), settings.height());
             changed = true;
         }
+        changed |= ensureTargetFormat(target, "Veyra shader pack colortex" + index + " " + side,
+                settings.format());
+        return changed;
+    }
+
+    private static boolean ensureTargetFormat(RenderTarget target, String name, int format) {
         GpuTexture colorTexture = target.getColorTexture();
         if (!(colorTexture instanceof VkGpuTexture vulkanTexture)) {
-            throw new IllegalStateException("VulkanMod did not create a Vulkan texture for colortex" + index + ".");
+            throw new IllegalStateException("VulkanMod did not create a Vulkan texture for " + name + ".");
         }
-        if (vulkanTexture.getVulkanImage().format != settings.format()
+        if (vulkanTexture.getVulkanImage().format != format
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
-            replaceColorTargetTexture(target, "Veyra shader pack colortex" + index + " " + side,
-                    settings.format());
-            changed = true;
+            replaceColorTargetTexture(target, name, format);
+            return true;
         }
-        return changed;
+        return false;
     }
 
     private static void replaceColorTargetTexture(RenderTarget target, String name, int format) {

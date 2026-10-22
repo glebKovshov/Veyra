@@ -133,6 +133,32 @@ class ComputeShaderAdapterTest {
     }
 
     @Test
+    void resolvesPackCustomUniformsFromTheActivePackBeforeComputePreflight() throws Exception {
+        String source = """
+                #version 430 compatibility
+                layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+                const ivec3 workGroups = ivec3(1, 1, 1);
+                uniform float packBrightness;
+                void main() { float value = packBrightness; }
+                """;
+        CustomUniforms previous = CustomUniforms.active();
+        try {
+            CustomUniforms.activate(CustomUniforms.EMPTY);
+            IOException unavailable = assertThrows(IOException.class, () -> ComputeShaderAdapter.adapt(
+                    "shadowcomp.csh", source, ShaderPackImageProperties.parse("")));
+            assertTrue(unavailable.getMessage().contains("custom uniform 'packBrightness' is not supported yet"),
+                    unavailable.getMessage());
+
+            CustomUniforms.activate(CustomUniforms.parse("uniform.float.packBrightness=0.5\n"));
+            var adapted = ComputeShaderAdapter.adapt("shadowcomp.csh", source, ShaderPackImageProperties.parse(""));
+
+            assertTrue(adapted.uniforms().stream().anyMatch(field -> field.name().equals("packBrightness")));
+        } finally {
+            CustomUniforms.activate(previous);
+        }
+    }
+
+    @Test
     void expandsIrisCustomImageFeatureBranchesBeforeAssigningBindings() throws Exception {
         String source = """
                 #version 430 compatibility

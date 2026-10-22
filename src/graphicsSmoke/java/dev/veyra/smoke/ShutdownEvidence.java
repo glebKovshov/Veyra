@@ -2,6 +2,7 @@ package dev.veyra.smoke;
 
 import com.google.gson.GsonBuilder;
 import dev.veyra.mixin.accessor.NativePipelineRegistryAccessor;
+import dev.veyra.shader.VeyraStorageBufferResources;
 import dev.veyra.smoke.mixin.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.vulkanmod.vulkan.memory.MemoryManager;
@@ -18,11 +19,13 @@ public final class ShutdownEvidence {
     public static void record(String phase) {
         try {
             var memory=(GraphicsMemoryAccessor)MemoryManager.getInstance();
-            List<Object> buffers=new ArrayList<>(),images=new ArrayList<>(),pipelines=new ArrayList<>();
+            List<Object> buffers=new ArrayList<>(),shaderPackBuffers=new ArrayList<>(),images=new ArrayList<>(),pipelines=new ArrayList<>();
             GraphicsMemoryAccessor.buffers().long2ReferenceEntrySet().forEach(e->{
                 var b=e.getValue();
-                buffers.add(Map.of("handle",hex(e.getLongKey()),"currentHandle",hex(b.getId()),
-                        "name",String.valueOf(b.name),"bytes",b.getBufferSize(),"allocation",hex(b.getAllocation())));
+                Object entry=Map.of("handle",hex(e.getLongKey()),"currentHandle",hex(b.getId()),
+                        "name",String.valueOf(b.name),"bytes",b.getBufferSize(),"allocation",hex(b.getAllocation()));
+                buffers.add(entry);
+                if (String.valueOf(b.name).startsWith("Veyra bufferObject.")) shaderPackBuffers.add(entry);
             });
             GraphicsMemoryAccessor.images().long2ReferenceEntrySet().forEach(e->{
                 var i=e.getValue(); images.add(Map.of("handle",hex(e.getLongKey()),"name",String.valueOf(i.name),
@@ -40,12 +43,21 @@ public final class ShutdownEvidence {
                         ? ((GraphicsVariantsAccessor)graphics).variants().values().longStream().mapToObj(ShutdownEvidence::hex).toList():List.of();
                 pipelines.add(Map.of("name",String.valueOf(p.name),"layout",hex(access.pipelineLayout()),"descriptorLayout",hex(access.descriptorSetLayout()),"pools",pools,"variants",variants));
             }
-            var result=Map.of("phase",phase,"buffers",buffers,"images",images,"pipelines",pipelines,
-                    "frameOps",sizes(memory.frameOps()),"bufferFrees",sizes(memory.freeableBuffers()),"imageFrees",sizes(memory.freeableImages()));
+            VeyraStorageBufferResources storageResources=VeyraStorageBufferResources.active();
+            Map<String,Object> result=new LinkedHashMap<>();
+            result.put("phase",phase); result.put("buffers",buffers); result.put("shaderPackBuffers",shaderPackBuffers);
+            result.put("images",images); result.put("pipelines",pipelines);
+            result.put("storageBufferResourcesActive",storageResources!=null);
+            result.put("storageBufferResourcesIdentity",storageResources==null?0:storageResources.identity());
+            result.put("storageBufferResourcesBytes",storageResources==null?0:storageResources.allocatedBytes());
+            result.put("frameOps",sizes(memory.frameOps())); result.put("bufferFrees",sizes(memory.freeableBuffers()));
+            result.put("imageFrees",sizes(memory.freeableImages()));
             Path output=Path.of(System.getProperty("veyra.graphicsSmoke.output","graphics-smoke-output"));
             Files.createDirectories(output);
             Files.writeString(output.resolve("shutdown-"+phase+".json"),new GsonBuilder().setPrettyPrinting().create().toJson(result));
-            LoggerFactory.getLogger("veyra-graphics-smoke").info("Shutdown registry: phase={} buffers={} images={} pipelines={}",phase,buffers.size(),images.size(),pipelines.size());
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Shutdown registry: phase={} buffers={} shaderPackBuffers={} images={} pipelines={} activeStorageBuffers={}",
+                    phase,buffers.size(),shaderPackBuffers.size(),images.size(),pipelines.size(),storageResources!=null);
         } catch(Exception failure){throw new IllegalStateException("Could not record shutdown registries",failure);}
     }
 }

@@ -1,16 +1,20 @@
-# Shaderpack compatibility: beta.30 published; merged weather/textured batch and compute work tracked
+# Shaderpack compatibility: beta.30 published; shadow/compute candidate in draft PR #84
 
-## Unpublished shadow terrain vertex and mid-block candidate
+## Current unpublished candidate — 2026-10-22
 
-### Current production integration
+This branch adds shared 3D custom images, fixed-workgroup `shadowcomp` dispatch, shadow color MRT, entity shadow stages, selected-profile Iris storage buffers, dynamic post texture slots, and the native atlas/lightmap inputs used by the tested shadow stages. The candidate is still under review in draft PR [#84](https://github.com/glebKovshov/Veyra/pull/84); it is not part of the published beta.30 JAR.
 
-Shared 3D-image descriptors now connect shadow terrain vertex/fragment writes, fixed-size post-shadow `shadowcomp` dispatch, and terrain sampling through ordinary shaderpack loading. The new `custom-image-compute` RTX 3070 fixture passed **222,642 active / 0 disabled** control pixels: a shadow atomic writes 5, compute adds 37, and terrain tests for 42. This run does not invoke the standalone development compute probe. No Vulkan validation/device-lost messages appeared in its log; validation layers were not independently established for that Windows run.
+Runtime evidence was collected on Windows with Java 21.0.12, Minecraft 1.21.11, Fabric Loader 0.18.4, VulkanMod 0.6.8+1.21.11, and an NVIDIA RTX 3070:
 
-Terrain and shadow vertex stages can also read the native `tex`/`texture`/`gtexture` block-atlas and `lightmap` samplers through VulkanMod's existing terrain descriptors. The extended fixture writes its voxel only after positive atlas alpha and lightmap samples and passed **222,663 active / 0 disabled** on RTX 3070 (same validation-layer caveat). It proves the descriptors are bound and readable in the vertex stage, not exact texel parity with Iris.
+- Complementary Reimagined r5.9.3, profile `COMPLEMENTARY`, passed the captured-frame gate with **230,400 non-black pixels / 57 color buckets** and all 14 post passes active. This verifies that test frame, not full-scene or whole-pack Iris parity.
+- The follow-up lifecycle smoke passed at **640×360 and 800×450**, with Nether and Overworld transitions, disable/re-enable, client resource reload, and client shutdown while the **810,549,248-byte** SSBO was active. All seven lifecycle flags passed; disabling released the allocation. Shutdown evidence saw an active shader-pack buffer before client stop and zero shader-pack buffers before allocator destruction.
+- The `entity-custom-image` fixture passed with **18,532 active / 0 disabled** pixels. The local log has no Vulkan VUID, validation-error, or device-lost markers. This host has no Vulkan validation layer, so these physical-GPU logs are not a substitute for Lavapipe validation CI.
 
-The current local build passes **365 tests**, 89 example preprocessing checks, 105 direct SPIR-V compilations, and JAR verification. Supported compute is limited to fixed workgroups and 3D images in the shadowcomp family. Custom images outside terrain/shadow, shadow MRT, broader compute timing and full-pack GPU/lifecycle validation remain open.
+The refreshed pinned source audit covers four SHA-512-pinned archives, 12 defaults, 63 profile/dimension cases, and 5,178 declared stages. It accepts **864 geometry fragments / rejects 0** and compiles **18/18 active compute stages**. All 75 rows have `errorCount=0`; 18 selected Complementary rows report a device-feature requirement because the offline audit has no Vulkan device. Every row remains `visualValidation=false`.
 
-The refreshed audit completed for 75 cases: **720 geometry fragments accepted / 144 rejected**, **18 active compute stages compiled / 0 rejected**. Enabling the custom-image feature activates previously inactive Complementary branches: non-terrain `floodfill_sampler`/`voxel_sampler` consumers remain unsupported. After the native vertex samplers were bridged, the repeated full audit has the same fragment and compute totals; the former shadow vertex `tex` blocker (12 cases) is gone, and the only first capability error is basic-stage `floodfill_sampler` (18 cases); 57 cases have no capability error. These are source checks, and every row remains `visualValidation=false`. Earlier feature-off counts below do not establish feature-on compatibility.
+The previous PR head's Lavapipe log showed `vertexPipelineStoresAndAtomics` supported but not enabled at graphics-pipeline creation. The candidate now updates the exact `VkDeviceCreateInfo.pEnabledFeatures` immediately before `vkCreateDevice`; a fresh Lavapipe run is pending. The local JDK 21 gate passed **479 tests**, processed 96 example shaders and compiled 112 to Vulkan SPIR-V. The unpublished beta.30-metadata JAR passed `scripts/verify_jar.py` (945,047 bytes; SHA-256 `493d59dd08c21dd60a9e1c128f4eeec93ff7c5a219c15f7e5b40d0627e6a4e33`). No complete third-party shaderpack compatibility or stable release is claimed.
+
+Supported compute remains limited to fixed workgroups and 3D images in the `shadowcomp` family.
 
 ### Earlier checkpoints
 
