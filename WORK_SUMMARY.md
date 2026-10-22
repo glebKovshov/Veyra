@@ -1296,3 +1296,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - PR #84 remains open, draft, and watched at `b7e8c62`. No comments or reviews are present. Fresh host checks are pending; the earlier Lavapipe VUID remains open until exact-head Graphics completes. Do not merge or publish until required checks pass.
 - Release preflight found no remote tag `v0.2.0-beta.31+mc1.21.11` (`git ls-remote --refs origin` returned no ref). The local `gh` CLI is unavailable; publication must use the repository's gated release workflow after the final commit is merged. Do not push a `release/**` ref before that point because it triggers publication.
 - Inspected the cached VulkanMod 0.6.8+1.21.11 `DeviceManager` bytecode: it passes `VkPhysicalDeviceFeatures2.features()` as `pEnabledFeatures`, then chains `VkPhysicalDeviceVulkan11Features` and dynamic-rendering features. Veyra's redirect copies that create info and preserves the `pNext` chain. This confirms the local call shape, but only the fresh exact-head Lavapipe Graphics result can settle the earlier VUID.
+
+### Exact-head CI recheck for `b7e8c62` — 2026-10-22
+
+- PR #84 was still open/draft on `b7e8c6267bef06098d9c6adc87f5be9058e8589b`. The watcher had stopped again (`watching=false`), so current exact-head checks were checked directly.
+- Build run `39821137700` passed; pinned shaderpack source audit `39821137804` passed; Lavapipe Graphics run `39821137832` is still in progress. The previous `VUID-RuntimeSpirv-NonWritable-06341` remains unresolved until that Graphics run completes.
+- Fetched PR discussion and review submissions: none present. Restart the T3 watcher now that the existing PR state has been checked.
