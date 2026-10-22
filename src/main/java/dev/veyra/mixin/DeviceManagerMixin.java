@@ -37,7 +37,12 @@ public abstract class DeviceManagerMixin {
                     properties.deviceNameString(), properties.apiVersion(), enabled.independentBlend(),
                     enabled.vertexPipelineStoresAndAtomics(), enabled.shaderStorageImageExtendedFormats(),
                     enabledCreateInfo.pEnabledFeatures() == null);
-            return VK10.vkCreateDevice(physicalDevice, enabledCreateInfo, allocator, device);
+            int result = VK10.vkCreateDevice(physicalDevice, enabledCreateInfo, allocator, device);
+            long createdDevice = result == VK10.VK_SUCCESS ? device.get(0) : 0L;
+            VeyraClient.LOGGER.info("vkCreateDevice returned result={} device=0x{}, createInfo=0x{}, pEnabledFeatures=0x{}, pNext=0x{}.",
+                    result, Long.toHexString(createdDevice), Long.toHexString(enabledCreateInfo.address()),
+                    Long.toHexString(enabled.address()), Long.toHexString(enabledCreateInfo.pNext()));
+            return result;
         }
     }
 }
