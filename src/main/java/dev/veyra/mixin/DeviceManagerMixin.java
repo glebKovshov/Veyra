@@ -26,6 +26,7 @@ public abstract class DeviceManagerMixin {
             VK10.vkGetPhysicalDeviceFeatures(physicalDevice, supported);
             VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
             VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
+            VkPhysicalDeviceFeatures originalFeatures = createInfo.pEnabledFeatures();
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
             VkPhysicalDeviceFeatures enabled = enabledCreateInfo.pEnabledFeatures();
@@ -37,12 +38,16 @@ public abstract class DeviceManagerMixin {
                     properties.deviceNameString(), properties.apiVersion(), enabled.independentBlend(),
                     enabled.vertexPipelineStoresAndAtomics(), enabled.shaderStorageImageExtendedFormats(),
                     enabledCreateInfo.pEnabledFeatures() == null);
-            int result = VK10.vkCreateDevice(physicalDevice, enabledCreateInfo, allocator, device);
-            long createdDevice = result == VK10.VK_SUCCESS ? device.get(0) : 0L;
-            VeyraClient.LOGGER.info("vkCreateDevice returned result={} device=0x{}, createInfo=0x{}, pEnabledFeatures=0x{}, pNext=0x{}.",
-                    result, Long.toHexString(createdDevice), Long.toHexString(enabledCreateInfo.address()),
-                    Long.toHexString(enabled.address()), Long.toHexString(enabledCreateInfo.pNext()));
-            return result;
+            try {
+                int result = VK10.vkCreateDevice(physicalDevice, createInfo, allocator, device);
+                long createdDevice = result == VK10.VK_SUCCESS ? device.get(0) : 0L;
+                VeyraClient.LOGGER.info("vkCreateDevice returned result={} device=0x{}, createInfo=0x{}, pEnabledFeatures=0x{}, pNext=0x{}.",
+                        result, Long.toHexString(createdDevice), Long.toHexString(createInfo.address()),
+                        Long.toHexString(enabled.address()), Long.toHexString(createInfo.pNext()));
+                return result;
+            } finally {
+                createInfo.pEnabledFeatures(originalFeatures);
+            }
         }
     }
 }
