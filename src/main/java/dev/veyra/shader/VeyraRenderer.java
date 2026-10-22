@@ -3120,6 +3120,7 @@ public final class VeyraRenderer {
         List<ShaderPack.Program> sources = pack.readPrograms();
         ShaderPackImageProperties customImageProperties = customImageResources == null
                 ? null : pack.readImageProperties();
+        ShaderPackStorageBufferProperties storageBufferProperties = pack.readStorageBufferProperties();
         Map<Integer, ColorTargetSettings> colorTargetSettings = new HashMap<>(pack.readColorTargetSettings(
                 width, height, RenderSystem.getDevice().getMaxTextureSize()));
         List<ProgramGroup> programs = new ArrayList<>(sources.size());
@@ -3178,7 +3179,8 @@ public final class VeyraRenderer {
                     .orElse(false);
             if (vertexUsesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
             for (AdaptedShader fragmentAdapted : adaptShader(
-                    customImageStage.source(), vertexUniforms, pack.hasShadowFragment())) {
+                    customImageStage.source(), vertexUniforms, pack.hasShadowFragment(),
+                    storageBufferProperties, width, height)) {
                 Set<Integer> combinedColorSamplers = new java.util.TreeSet<>(fragmentAdapted.colorSamplers());
                 combinedColorSamplers.addAll(vertexColorSamplers);
                 AdaptedShader adapted = new AdaptedShader(fragmentAdapted.source(), fragmentAdapted.uniforms(),
@@ -6575,6 +6577,12 @@ public final class VeyraRenderer {
 
     private static List<AdaptedShader> adaptShader(
             String source, List<String> additionalUniforms, boolean shadowPassAvailable) throws IOException {
+        return adaptShader(source, additionalUniforms, shadowPassAvailable, null, 0, 0);
+    }
+
+    private static List<AdaptedShader> adaptShader(
+            String source, List<String> additionalUniforms, boolean shadowPassAvailable,
+            ShaderPackStorageBufferProperties storageBufferProperties, int viewWidth, int viewHeight) throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException("Fragment shader is empty.");
         }
@@ -6589,7 +6597,8 @@ public final class VeyraRenderer {
         body = PostVertexInterfaceDeclarations.expand(body);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(body, "post-processing");
         body = UnreachableGlslFunctions.removeUnreachable(fog.source(), "main");
-        body = ShaderPackStorageBuffers.removeUnusedOrReject(body, "post-processing");
+        body = ShaderPackStorageBuffers.removeUnusedOrReject(
+                body, "post-processing", storageBufferProperties, viewWidth, viewHeight);
 
         String unsupportedDepthSampler = DepthSamplerSupport.firstUnsupported(body).orElse(null);
         if (unsupportedDepthSampler != null) {

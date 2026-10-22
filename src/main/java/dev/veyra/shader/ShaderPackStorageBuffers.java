@@ -10,31 +10,38 @@ import java.util.regex.Pattern;
 final class ShaderPackStorageBuffers {
     private static final String ACCESS = "(?:(?:readonly|writeonly|coherent|volatile|restrict)\\s+)*";
     private static final Pattern BLOCK_START = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?" + ACCESS
+            "(?m)^[\\t ]*(?:layout\\s*\\(([^)]*)\\)\\s*)?" + ACCESS
                     + "buffer\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\{");
     private static final Pattern INSTANCE = Pattern.compile("\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
 
     private ShaderPackStorageBuffers() { }
 
     static String removeUnusedOrReject(String source, String programName) throws IOException {
+        return removeUnusedOrReject(source, programName, null, 0, 0);
+    }
+
+    static String removeUnusedOrReject(String source, String programName,
+                                       ShaderPackStorageBufferProperties properties,
+                                       int viewWidth, int viewHeight) throws IOException {
         String analysis = ShaderSource.maskBlockAndLineComments(source);
         Matcher blocks = BLOCK_START.matcher(analysis);
         List<Span> unused = new ArrayList<>();
         while (blocks.find()) {
+            String blockName = blocks.group(2);
             int openingBrace = blocks.end() - 1;
             int closingBrace = matchingBrace(analysis, openingBrace);
             if (closingBrace < 0) {
-                throw new IOException(programName + " has an unterminated storage buffer block '" + blocks.group(1) + "'.");
+                throw new IOException(programName + " has an unterminated storage buffer block '" + blockName + "'.");
             }
             Matcher instance = INSTANCE.matcher(analysis);
             instance.region(closingBrace + 1, analysis.length());
             if (!instance.lookingAt()) {
-                throw unsupported(programName, blocks.group(1));
+                throw unsupported(programName, blockName, binding(blocks.group(1)), properties, viewWidth, viewHeight);
             }
             String instanceName = instance.group(1);
             String references = analysis.substring(0, blocks.start()) + analysis.substring(instance.end());
             if (Pattern.compile("\\b" + Pattern.quote(instanceName) + "\\b").matcher(references).find()) {
-                throw unsupported(programName, blocks.group(1));
+                throw unsupported(programName, blockName, binding(blocks.group(1)), properties, viewWidth, viewHeight);
             }
             unused.add(new Span(blocks.start(), instance.end()));
             blocks.region(instance.end(), analysis.length());
@@ -52,9 +59,30 @@ final class ShaderPackStorageBuffers {
         return result.toString();
     }
 
-    private static IOException unsupported(String programName, String blockName) {
-        return new IOException(programName + " uses active storage buffer '" + blockName
-                + "', which VulkanMod 0.6.8 native RenderPipeline does not support.");
+    private static int binding(String layout) {
+        if (layout == null) return -1;
+        Matcher matcher = Pattern.compile("(?:^|,)\\s*binding\\s*=\\s*(\\d+)\\s*(?:,|$)").matcher(layout);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : -1;
+    }
+
+    private static IOException unsupported(String programName, String blockName, int binding,
+                                          ShaderPackStorageBufferProperties properties,
+                                          int viewWidth, int viewHeight) {
+        String details = "";
+        if (binding >= 0) {
+            if (properties == null || !properties.buffers().containsKey(binding)) {
+                details = " at binding " + binding + " (no bufferObject." + binding + " allocation is declared)";
+            } else {
+                try {
+                    long size = properties.buffers().get(binding).resolveSize(viewWidth, viewHeight);
+                    details = " at binding " + binding + " (" + size + " bytes)";
+                } catch (IOException exception) {
+                    details = " at binding " + binding + " (invalid allocation: " + exception.getMessage() + ")";
+                }
+            }
+        }
+        return new IOException(programName + " uses active storage buffer '" + blockName + "'" + details
+                + ", which VulkanMod 0.6.8 native RenderPipeline does not support yet.");
     }
 
     private static int matchingBrace(String source, int openingBrace) {

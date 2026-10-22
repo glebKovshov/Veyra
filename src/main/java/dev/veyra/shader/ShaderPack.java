@@ -1077,6 +1077,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return ShaderPackImageProperties.parse(readShader("shaders.properties").orElse(""));
     }
 
+    /** Reads Iris storage-buffer allocations after the selected profile and dimension options are applied. */
+    public ShaderPackStorageBufferProperties readStorageBufferProperties() throws IOException {
+        return ShaderPackStorageBufferProperties.parse(readShader("shaders.properties").orElse(""));
+    }
+
     /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
     public void validatePipelineCapabilities() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
