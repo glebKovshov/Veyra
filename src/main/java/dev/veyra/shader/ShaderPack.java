@@ -1084,9 +1084,20 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return ShaderPackStorageBufferProperties.parse(readShader("shaders.properties").orElse(""));
     }
 
+    /** Reads active Iris custom texture aliases after shader-pack options and profiles are applied. */
+    public ShaderPackCustomTextureProperties readCustomTextureProperties() throws IOException {
+        ShaderPackCustomTextureProperties cached = configuration.customTextureProperties();
+        if (cached != null) return cached;
+        ShaderPackCustomTextureProperties parsed = ShaderPackCustomTextureProperties.parse(
+                readShader("shaders.properties").orElse(""));
+        configuration.cacheCustomTextureProperties(parsed);
+        return parsed;
+    }
+
     /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
     public void validatePipelineCapabilities() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        readCustomTextureProperties();
         String required = properties.getProperty("iris.features.required", "").strip();
         Set<String> supportedFeatures = configuration.customImages() ? Set.of("CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of();
         List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())

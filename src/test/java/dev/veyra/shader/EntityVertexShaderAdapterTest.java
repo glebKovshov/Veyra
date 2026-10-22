@@ -54,6 +54,28 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void reusesNativeInverseModelViewUniformInsteadOfDeclaringItAgainForThePack() throws Exception {
+        String nativeSource = NATIVE.replace("uniform mat4 ModelViewMat;",
+                "uniform mat4 ModelViewMat;\nuniform mat4 gbufferModelViewInverse;");
+        String pack = """
+                #version 120
+                uniform mat4 gbufferModelViewInverse;
+                void main() { gl_Position = ftransform() * gbufferModelViewInverse; }
+                """;
+
+        String adapted = EntityVertexShaderAdapter.adaptStage(
+                nativeSource, pack, "gbuffers_entities", false).source();
+
+        assertEquals(1, occurrences(adapted, "uniform mat4 gbufferModelViewInverse;"), adapted);
+    }
+
+    private static int occurrences(String source, String needle) {
+        int count = 0;
+        for (int offset = 0; (offset = source.indexOf(needle, offset)) >= 0; offset += needle.length()) count++;
+        return count;
+    }
+
+    @Test
     void bindsEntityIdentifiersInCustomVertexStagesPerRenderVariant() throws Exception {
         for (String[] identifier : new String[][] {
                 {"gbuffers_entities", "entityId", "37"},

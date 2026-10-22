@@ -94,11 +94,12 @@ final class EntityVertexShaderAdapter {
     static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
                                    boolean handPass, int entityId, int blockEntityId,
                                    int currentRenderedItemId) throws IOException {
-        PreparedStage pack = prepare(shaderPackSource, programName,
-                entityId, blockEntityId, currentRenderedItemId);
         if (minecraftSource == null || minecraftSource.isBlank()) {
             throw new IOException("Minecraft's " + programName + " vertex shader is empty.");
         }
+        PreparedStage pack = prepare(shaderPackSource, programName,
+                entityId, blockEntityId, currentRenderedItemId,
+                IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource));
         Matcher version = VERSION.matcher(minecraftSource);
         if (!version.find()) throw new IOException("Minecraft's " + programName + " vertex shader has no #version directive.");
         StringBuilder extensions = new StringBuilder();
@@ -118,15 +119,17 @@ final class EntityVertexShaderAdapter {
         String bridge = nativeBridge(programName, pack.usesMidTexCoord());
         String wrapper = "\nvoid main() { veyraMinecraftEntityMain(); veyraShaderPackMain();"
                 + (handPass ? " gl_Position.z *= 0.125;" : "") + " }\n";
+        String uniformBridge = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
+                nativeSource, pack.uniformBridge(), programName + " vertex bridge");
         String source = nativeSource + "\n" + pack.outputDeclarations() + bridge
-                + pack.uniformBridge() + pack.source().replaceFirst(
+                + uniformBridge + pack.source().replaceFirst(
                         "(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain(") + wrapper;
         return new AdaptedStage(source, pack.varyings(), pack.usesNoiseSampler(), pack.usesMidTexCoord());
     }
 
     static AdaptedStage validate(String programName, String shaderPackSource, boolean handPass) throws IOException {
         PreparedStage prepared = prepare(shaderPackSource, programName,
-                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED);
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, false);
         String base = validationNativeSource(programName, prepared.usesMidTexCoord());
         String adapted = base + "\n" + prepared.outputDeclarations()
                 + nativeBridge(programName, prepared.usesMidTexCoord())
@@ -140,12 +143,13 @@ final class EntityVertexShaderAdapter {
     static Map<String, TerrainVertexShaderAdapter.PackVarying> describeVaryings(
             String programName, String shaderPackSource) throws IOException {
         return prepare(shaderPackSource, programName,
-                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED).varyings();
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, false).varyings();
     }
 
     private static PreparedStage prepare(String shaderPackSource, String programName,
                                          int entityId, int blockEntityId,
-                                         int currentRenderedItemId) throws IOException {
+                                         int currentRenderedItemId,
+                                         boolean fogValuesAlreadyDeclared) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
@@ -208,7 +212,8 @@ final class EntityVertexShaderAdapter {
         source = samplers.source();
         source = EntityShaderAdapter.bindEntityIdentifiers(source, programName,
                 entityId, blockEntityId, currentRenderedItemId);
-        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(source, programName, true);
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(
+                source, programName, fogValuesAlreadyDeclared);
         ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(fog.source(), programName);
         source = uniforms.source();
         if (UNSUPPORTED_UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {

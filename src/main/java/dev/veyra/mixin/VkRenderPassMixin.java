@@ -51,6 +51,7 @@ public abstract class VkRenderPassMixin {
         if (pipeline != null && pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME) != null) {
             VeyraNoiseTexture.bind(pass);
         }
+        if (pipeline != null) VeyraRenderer.bindCustomTexture(pass, pipeline, "textureAtlas");
         if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")
                 && active.getSamplers().contains("Sampler3")) {
             VeyraShadowRenderer.bindEntityShadowSampler(pass, pipeline);

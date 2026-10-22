@@ -46,6 +46,8 @@
     "VkGpuDeviceMixin",
     "accessor.ShaderCompilationKeyAccessor",
     "DeviceManagerMixin",
+    "VTextureSelectorMixin",
+    "VRenderSystemTextureSlotsMixin",
     "GraphicsPipelineMixin",
     "PipelineDescriptorLayoutMixin",
     "RendererGeometryTargetsMixin",

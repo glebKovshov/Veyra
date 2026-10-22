@@ -41,9 +41,7 @@ class ShadowColorSamplerTest {
         source.append("vec4 inputs(){return ");
         for (int i=1;i<=6;i++) source.append(i==1?"":"+").append("texture2D(colortex").append(i).append(",vec2(0.5))");
         source.append(";}\n");
-        assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(source.toString(), true, true));
-        String five = source.toString().replace("uniform sampler2D colortex6;\n", "").replace("+texture2D(colortex6,vec2(0.5))", "");
-        String adapted = TerrainShaderAdapter.adaptFragment(five, true, true);
-        assertTrue(adapted.contains("layout(binding = 11) uniform sampler2D VeyraGeometryColor5Sampler;"));
+        String adapted = TerrainShaderAdapter.adaptFragment(source.toString(), true, true);
+        assertTrue(adapted.contains("layout(binding = 12) uniform sampler2D VeyraGeometryColor6Sampler;"));
     }
 }

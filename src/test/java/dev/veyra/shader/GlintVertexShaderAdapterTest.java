@@ -51,6 +51,23 @@ class GlintVertexShaderAdapterTest {
     }
 
     @Test
+    void providesFogBlockWhenMinecraftGlintSourceDoesNotImportIt() throws IOException {
+        String adapted = GlintVertexShaderAdapter.adaptStage(MINECRAFT_GLINT_VERTEX, """
+                #version 130
+                uniform vec3 fogColor;
+                out vec2 texCoord;
+                void main() {
+                    gl_Position = ftransform();
+                    texCoord = gl_MultiTexCoord0.xy;
+                    gl_Position.x += fogColor.x;
+                }
+                """, "gbuffers_armor_glint").source();
+
+        assertTrue(adapted.contains("layout(std140) uniform Fog"), adapted);
+        assertTrue(adapted.contains("#define fogColor (FogColor.rgb)"), adapted);
+    }
+
+    @Test
     void rejectsVertexInputsAndVaryingsOutsideTheNativeGlintPipeline() {
         IOException attribute = assertThrows(IOException.class, () -> GlintVertexShaderAdapter.validate(
                 "gbuffers_armor_glint", "attribute vec3 mc_Entity;\nvoid main(){}\n"));

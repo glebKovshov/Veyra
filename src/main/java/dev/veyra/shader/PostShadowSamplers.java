@@ -1,5 +1,6 @@
 package dev.veyra.shader;
 
+import dev.veyra.vulkan.VeyraTextureSlots;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -72,7 +73,16 @@ public final class PostShadowSamplers {
     }
 
     public static void validateBudget(Set<Input> inputs, int otherSamplers) throws IOException {
-        if (otherSamplers + inputs.size() > 12) throw new IOException("Post program exceeds VulkanMod's twelve texture descriptor slots.");
+        validateBudget(inputs, otherSamplers, "Post program");
+    }
+
+    public static void validateBudget(Set<Input> inputs, int otherSamplers, String programName) throws IOException {
+        validateBudget(inputs, otherSamplers, programName, VeyraTextureSlots.maxSamplerDescriptors());
+    }
+
+    static void validateBudget(Set<Input> inputs, int otherSamplers, String programName, int deviceLimit) throws IOException {
+        int total = otherSamplers + inputs.size();
+        VeyraTextureSlots.validateSamplerCount(total, deviceLimit, programName);
     }
 
     public static boolean bilinear(String inputName) {
@@ -85,6 +95,8 @@ public final class PostShadowSamplers {
         if (inputs.contains(Input.DEPTH) || inputs.contains(Input.OPAQUE_DEPTH)) bridge.append("""
                 vec4 veyraSample(sampler2D s, vec2 uv) { return texture(s, uv); }
                 vec4 veyraSample(sampler2D s, vec2 uv, float bias) { return texture(s, uv, bias); }
+                vec4 veyraSample(sampler3D s, vec3 uv) { return texture(s, uv); }
+                vec4 veyraSample(sampler3D s, vec3 uv, float bias) { return texture(s, uv, bias); }
                 float veyraPostShadowCompare(sampler2D s, vec3 uv) { return step(uv.z-0.0005, texture(s,uv.xy).r); }
                 float veyraPostShadowCompare(sampler2D s, vec3 uv, float bias) { return step(uv.z-0.0005,texture(s,uv.xy,bias).r); }
                 vec4 veyraPostShadowSample(sampler2D s, vec3 uv, float bias) { return vec4(veyraPostShadowCompare(s,uv,bias)); }

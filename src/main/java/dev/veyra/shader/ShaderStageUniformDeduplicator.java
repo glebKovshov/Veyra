@@ -6,13 +6,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Removes legacy UBO fields repeated by the fragment stage in VulkanMod's shared stage parser. */
+/** Removes uniform fields repeated by the fragment stage in VulkanMod's shared stage parser. */
 final class ShaderStageUniformDeduplicator {
     private static final Pattern UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?"
                     + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)"
                     + "(\\s*\\[[^]\\r\\n]*\\])?\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-
     private ShaderStageUniformDeduplicator() { }
 
     static String removeFragmentDuplicates(String vertexSource, String fragmentSource, String programName)
@@ -54,4 +53,5 @@ final class ShaderStageUniformDeduplicator {
     private static boolean isSampler(String type) {
         return type.contains("sampler") || type.contains("image");
     }
+
 }

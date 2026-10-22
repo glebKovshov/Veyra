@@ -33,8 +33,19 @@ final class IrisFogUniformAdapter {
                 float FogCloudsEnd;
             };
             """;
+    private static final Pattern MINECRAFT_FOG_IMPORT = Pattern.compile(
+            "(?m)^[\\t ]*#[\\t ]*moj_import[\\t ]*<minecraft:fog\\.glsl>[\\t ]*(?:\\r?\\n|$)");
+    private static final Pattern FOG_BLOCK_DECLARATION = Pattern.compile(
+            "(?is)\\buniform\\s+Fog\\s*\\{[^}]*\\bvec4\\s+FogColor\\s*;");
 
     private IrisFogUniformAdapter() {
+    }
+
+    static boolean nativeFogValuesDeclared(String source) {
+        if (source == null || source.isEmpty()) return false;
+        String uncommented = ShaderSource.maskBlockAndLineComments(source);
+        return MINECRAFT_FOG_IMPORT.matcher(uncommented).find()
+                || FOG_BLOCK_DECLARATION.matcher(uncommented).find();
     }
 
     static AdaptedShader extract(String source, String programName) throws IOException {

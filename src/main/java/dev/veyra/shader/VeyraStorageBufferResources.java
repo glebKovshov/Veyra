@@ -4,9 +4,7 @@ import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.memory.MemoryTypes;
 import net.vulkanmod.vulkan.memory.buffer.Buffer;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
-import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 
 import java.io.IOException;
 import java.util.Map;
@@ -199,15 +197,22 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
     }
 
     private static long maxStorageBufferRange() throws IOException {
-        if (DeviceManager.physicalDevice == null) {
-            throw new IOException("VulkanMod's selected physical device is unavailable for storage-buffer allocation.");
+        if (DeviceManager.deviceProperties == null) {
+            throw new IOException("VulkanMod's selected device properties are unavailable for storage-buffer allocation.");
         }
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            VkPhysicalDeviceProperties deviceProperties = VkPhysicalDeviceProperties.calloc(stack);
-            vkGetPhysicalDeviceProperties(DeviceManager.physicalDevice, deviceProperties);
-            // Vulkan reports this uint32 limit; VulkanMod's descriptor API itself caps ranges at signed-int size.
-            return Integer.toUnsignedLong(deviceProperties.limits().maxStorageBufferRange());
+        // VulkanMod queries and caches this limit during device setup. Descriptor buffer ranges remain signed ints.
+        return descriptorMaxStorageBufferRange(
+                DeviceManager.deviceProperties.limits().maxStorageBufferRange());
+    }
+
+    static long descriptorMaxStorageBufferRange(int reportedRange) throws IOException {
+        // Vulkan defines maxStorageBufferRange as uint32; LWJGL exposes it as a signed int.
+        long unsignedRange = Integer.toUnsignedLong(reportedRange);
+        if (unsignedRange == 0) {
+            throw new IOException("VulkanMod reports an unusable maxStorageBufferRange of 0.");
         }
+        // VulkanMod's UBO/descriptor slice APIs store the range in a signed int.
+        return Math.min(unsignedRange, Integer.MAX_VALUE);
     }
 
     private static long mebibytes(long bytes) {

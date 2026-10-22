@@ -28,7 +28,7 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
-    private static boolean entityFixtureStarted, vanillaBaseline, thirdPartyShaderpackFixture,
+    private static boolean entityFixtureStarted, vanillaBaseline, thirdPartyShaderpackFixture, thirdPartyScenePrepared,
             thirdPartyProfileApplied, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
@@ -236,15 +236,62 @@ public final class GraphicsSmoke {
                 });
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
+            if (thirdPartyShaderpackFixture && !thirdPartyScenePrepared && worldTicks >= 20
+                    && client.getSingleplayerServer() != null) {
+                thirdPartyScenePrepared = true;
+                var server = client.getSingleplayerServer();
+                client.getConnection().sendCommand("tp @s 0 72 0");
+                server.execute(() -> {
+                    var world = server.overworld();
+                    world.setDayTime(1000L);
+                    for (int x = -12; x <= 12; x++) for (int z = -12; z <= 12; z++) {
+                        var block = Math.floorMod(x * 3 + z, 7) == 0
+                                ? net.minecraft.world.level.block.Blocks.SAND.defaultBlockState()
+                                : Math.floorMod(x + z * 2, 9) == 0
+                                ? net.minecraft.world.level.block.Blocks.STONE.defaultBlockState()
+                                : net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState();
+                        world.setBlock(new net.minecraft.core.BlockPos(x, 70, z), block, 3);
+                    }
+                    var materials = new net.minecraft.world.level.block.state.BlockState[]{
+                            net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.BRICKS.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.MOSS_BLOCK.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.COBBLESTONE.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.GOLD_BLOCK.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.LAPIS_BLOCK.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.RED_WOOL.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.BLUE_WOOL.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.YELLOW_WOOL.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.LIME_WOOL.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.PURPLE_WOOL.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.CYAN_WOOL.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.DIAMOND_BLOCK.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.AMETHYST_BLOCK.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.PRISMARINE.defaultBlockState(),
+                            net.minecraft.world.level.block.Blocks.MAGMA_BLOCK.defaultBlockState()
+                    };
+                    for (int row = 0; row < 7; row++) for (int column = 0; column < 17; column++) {
+                        world.setBlock(new net.minecraft.core.BlockPos(-8 + column, 71 + row, 8),
+                                materials[(row + column) % materials.length], 3);
+                    }
+                    world.setBlock(new net.minecraft.core.BlockPos(-9, 71, 8),
+                            net.minecraft.world.level.block.Blocks.GLOWSTONE.defaultBlockState(), 3);
+                    world.setBlock(new net.minecraft.core.BlockPos(9, 71, 8),
+                            net.minecraft.world.level.block.Blocks.GLOWSTONE.defaultBlockState(), 3);
+                });
+                LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                        "Prepared the real shaderpack fixture with daylight, a mixed block field and a lit material wall.");
+            }
             if (damagedBlockVertexFixture && damagedBlockPosition != null
                     && client.level.getBlockState(damagedBlockPosition).isSolid()) {
                 client.levelRenderer.destroyBlockProgress(-9876, damagedBlockPosition, 6);
             }
             client.options.hideGui = !itemFixture;
-            client.player.setXRot(entityFixture || beaconBeamFixture ? 15.0F
+            client.player.setXRot(thirdPartyShaderpackFixture ? -2.0F
+                    : entityFixture || beaconBeamFixture ? 15.0F
                     : damagedBlockVertexFixture ? 20.0F
                     : cloudFixture || skyBasicVertexFixture || skyTexturedStageFixture ? -60.0F : 35.0F);
-            client.player.setYRot(45.0F);
+            client.player.setYRot(thirdPartyShaderpackFixture ? 0.0F : 45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
                     throw new IllegalStateException("Vanilla baseline unexpectedly selected a shaderpack");

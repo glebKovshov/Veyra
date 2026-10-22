@@ -98,9 +98,11 @@ class PostFragmentShaderAdapterTest {
     @SuppressWarnings("unchecked")
     private static String adapt(String source) throws Exception {
         Method method = VeyraRenderer.class.getDeclaredMethod(
-                "adaptShader", String.class, List.class, boolean.class);
+                "adaptShader", String.class, String.class, List.class, boolean.class,
+                ShaderPackStorageBufferProperties.class, int.class, int.class);
         method.setAccessible(true);
-        List<Object> shaders = (List<Object>) method.invoke(null, source, List.of(), true);
+        List<Object> shaders = (List<Object>) method.invoke(
+                null, "test", source, List.of(), true, null, 0, 0);
         Object first = shaders.getFirst();
         Method sourceAccessor = first.getClass().getDeclaredMethod("source");
         sourceAccessor.setAccessible(true);

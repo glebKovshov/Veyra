@@ -19,6 +19,7 @@ class PostShadowSamplersTest {
         String bridge = PostShadowSamplers.bridge(adapted.inputs());
         assertTrue(bridge.contains("#define shadowtex0 VeyraShadowDepthSampler"));
         assertTrue(bridge.contains("#define shadowtex1 VeyraShadowOpaqueDepthSampler"));
+        assertTrue(bridge.contains("vec4 veyraSample(sampler3D s, vec3 uv)"));
         assertTrue(bridge.contains("#define shadowcolor VeyraShadowColorSampler"));
         assertTrue(bridge.contains("#define shadowcolor1 VeyraShadowColor1Sampler"));
         assertTrue(PostShadowSamplers.Input.COLOR.bilinear());
@@ -60,8 +61,10 @@ class PostShadowSamplersTest {
     }
     @Test void enforcesCombinedNativeDescriptorBudgetAfterAliasDeduplication() throws IOException {
         var inputs = Set.of(PostShadowSamplers.Input.DEPTH,PostShadowSamplers.Input.OPAQUE_DEPTH,PostShadowSamplers.Input.COLOR);
-        PostShadowSamplers.validateBudget(inputs,9);
-        assertThrows(IOException.class, () -> PostShadowSamplers.validateBudget(inputs,10));
+        PostShadowSamplers.validateBudget(inputs,9,"composite_colortex7",12);
+        IOException failure = assertThrows(IOException.class,
+                () -> PostShadowSamplers.validateBudget(inputs,10,"composite_colortex7",12));
+        assertTrue(failure.getMessage().contains("composite_colortex7 needs 13 texture descriptors"));
     }
 
     @Test void handlesExpandedBlankRegionsBeforeSamplerDeclarations() {

@@ -11,7 +11,8 @@ import java.util.regex.Matcher;
 /** Filters unused GLSL storage-buffer blocks and reports active blocks before VulkanMod's parser sees them. */
 public final class ShaderPackStorageBuffers {
     /** Keep shader-pack SSBOs clear of VulkanMod's UBO and sampler bindings. */
-    static final int VULKAN_DESCRIPTOR_BINDING_BASE = 16;
+    // Leave the low descriptor range to VulkanMod's uniform blocks and Veyra's image samplers.
+    static final int VULKAN_DESCRIPTOR_BINDING_BASE = 1024;
     private static final String ACCESS = "(?:(?:readonly|writeonly|coherent|volatile|restrict)\\s+)*";
     private static final Pattern BLOCK_START = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(([^)]*)\\)\\s*)?" + ACCESS
@@ -22,6 +23,11 @@ public final class ShaderPackStorageBuffers {
     private static final Pattern INSTANCE = Pattern.compile("\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
 
     private ShaderPackStorageBuffers() { }
+
+    /** VulkanMod's GLSL lexer stops at the first '*' inside block comments; comments are not parser input. */
+    public static String stripCommentsForVulkanParser(String source) {
+        return ShaderSource.maskBlockAndLineComments(source);
+    }
 
     static String removeUnusedOrReject(String source, String programName) throws IOException {
         return removeUnusedOrReject(source, programName, null, 0, 0);

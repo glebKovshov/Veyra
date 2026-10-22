@@ -140,8 +140,9 @@ class ShaderPackStorageBuffersTest {
         assertFalse(prepared.source().contains("buffer blockDataBuffer"), prepared.source());
         assertEquals(1, prepared.storageBlocks().size());
         var block = prepared.storageBlocks().values().iterator().next();
-        assertTrue(prepared.source().contains("layout(binding = 16) uniform VeyraStorageBuffer_0_"), prepared.source());
-        assertEquals(16, block.descriptorBinding());
+        assertTrue(prepared.source().contains("layout(binding = "
+                + ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE + ") uniform VeyraStorageBuffer_0_"), prepared.source());
+        assertEquals(ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE, block.descriptorBinding());
         assertEquals("layout(std430, binding = 23) readonly buffer blockDataBuffer {\n    uvec4 data[];\n} blockDataSSBO;",
                 block.declaration(23));
         assertEquals(128L, block.allocationBytes());
@@ -171,6 +172,22 @@ class ShaderPackStorageBuffersTest {
     }
 
     @Test
+    void stripsBlockCommentsBeforeVulkanModLexing() {
+        String source = "#version 450\n/*\n  comment with *** and " + (char) 92
+                + "\n*/\nvoid main() { }\n";
+
+        String parserSource = ShaderPackStorageBuffers.stripCommentsForVulkanParser(source);
+
+        assertEquals(source.length(), parserSource.length());
+        assertEquals(source.chars().filter(value -> value == '\n').count(),
+                parserSource.chars().filter(value -> value == '\n').count());
+        assertFalse(parserSource.contains(String.valueOf((char) 92)));
+        assertTrue(parserSource.contains("void main()"));
+        GLSLParser parser = new GLSLParser();
+        parser.parse(new Lexer(parserSource), GLSLParser.Stage.FRAGMENT);
+    }
+
+    @Test
     void assignsDifferentVulkanBindingsToDifferentIrisBufferObjects() throws Exception {
         String source = """
                 #version 450
@@ -181,8 +198,10 @@ class ShaderPackStorageBuffersTest {
         var prepared = ShaderPackStorageBuffers.prepareForVulkanParser(source,
                 ShaderPackStorageBufferProperties.parse("bufferObject.0 = 4\nbufferObject.1 = 4\n"), 800, 450);
 
-        assertTrue(prepared.source().contains("layout(binding = 16) uniform VeyraStorageBuffer_0_"), prepared.source());
-        assertTrue(prepared.source().contains("layout(binding = 17) uniform VeyraStorageBuffer_1_"), prepared.source());
+        assertTrue(prepared.source().contains("layout(binding = "
+                + ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE + ") uniform VeyraStorageBuffer_0_"), prepared.source());
+        assertTrue(prepared.source().contains("layout(binding = "
+                + (ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE + 1) + ") uniform VeyraStorageBuffer_1_"), prepared.source());
         assertEquals(2, prepared.storageBlocks().size());
     }
 

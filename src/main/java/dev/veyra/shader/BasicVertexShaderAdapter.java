@@ -84,7 +84,8 @@ final class BasicVertexShaderAdapter {
         if (minecraftSource == null || minecraftSource.isBlank()) {
             throw new IOException("Minecraft's " + format.name().toLowerCase() + " vertex shader is empty.");
         }
-        PreparedStage pack = prepare(shaderPackSource, programName, format);
+        PreparedStage pack = prepare(shaderPackSource, programName, format,
+                IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource));
         Matcher version = VERSION.matcher(minecraftSource);
         if (!version.find()) throw new IOException("Minecraft's " + format.name().toLowerCase() + " vertex shader has no #version directive.");
 
@@ -175,14 +176,15 @@ final class BasicVertexShaderAdapter {
 
     static Map<String, TerrainVertexShaderAdapter.PackVarying> describeVaryings(
             String programName, String shaderPackSource, Format format) throws IOException {
-        return effectiveOutputs(prepare(shaderPackSource, programName, format).outputs(), format);
+        return effectiveOutputs(prepare(shaderPackSource, programName, format, false).outputs(), format);
     }
 
     static Map<String, TerrainVertexShaderAdapter.PackVarying> nativeVaryings(Format format) {
         return effectiveOutputs(Map.of(), format);
     }
 
-    private static PreparedStage prepare(String shaderPackSource, String programName, Format format) throws IOException {
+    private static PreparedStage prepare(String shaderPackSource, String programName, Format format,
+                                         boolean fogValuesAlreadyDeclared) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
 
@@ -235,7 +237,8 @@ final class BasicVertexShaderAdapter {
         source = UnusedSamplerDeclarations.removeUnused(source);
         SamplerBridge samplers = adaptSamplers(programName, source);
         source = samplers.source();
-        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(source, programName, true);
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(
+                source, programName, fogValuesAlreadyDeclared);
         source = UnusedSamplerDeclarations.removeUnused(fog.source());
         ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(source, programName);
         source = uniforms.source();

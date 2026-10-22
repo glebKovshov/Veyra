@@ -1,5 +1,6 @@
 package dev.veyra.shader;
 
+import dev.veyra.vulkan.VeyraTextureSlots;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,7 +12,7 @@ import java.util.regex.Pattern;
 /** Auxiliary color inputs available to supported geometry programs. */
 public final class GeometryColorSamplers {
     public static final int FIRST_IMAGE_SLOT = 6;
-    public static final int MAX_INPUTS = 6; // VulkanMod 0.6.8 has twelve indexed texture slots.
+    public static final int MAX_INPUTS = 15;
     private static final List<String> LEGACY = List.of(
             "gcolor", "gdepth", "gnormal", "composite", "gaux1", "gaux2", "gaux3", "gaux4");
     private static final Pattern DECLARATION = Pattern.compile(
@@ -37,10 +38,15 @@ public final class GeometryColorSamplers {
             inputs.put(name, index);
         }
         Set<Integer> indices = indices(inputs);
-        if (indices.size() > MAX_INPUTS) throw new IOException("Geometry exceeds VulkanMod's six auxiliary color sampler slots.");
+        if (indices.size() > MAX_INPUTS) throw new IOException("Geometry exceeds Veyra's " + MAX_INPUTS
+                + " auxiliary color sampler slots.");
         return Map.copyOf(inputs);
     }
 
     public static Set<Integer> indices(Map<String, Integer> inputs) { return new TreeSet<>(inputs.values()); }
     public static String samplerName(int index) { return "VeyraGeometryColor" + index + "Sampler"; }
+
+    static void validatePipelineSamplerCount(int count) throws IOException {
+        VeyraTextureSlots.validateSamplerCount(count);
+    }
 }

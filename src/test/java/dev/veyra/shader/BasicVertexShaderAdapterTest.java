@@ -237,6 +237,21 @@ class BasicVertexShaderAdapterTest {
     }
 
     @Test
+    void suppliesMinecraftFogBlockWhenTheNativeSkyVertexShaderDoesNotImportIt() throws IOException {
+        String vertex = """
+                #version 120
+                uniform vec3 fogColor;
+                void main() { gl_Position = ftransform() + vec4(fogColor, 0.0); }
+                """;
+
+        String adapted = BasicVertexShaderAdapter.validate(
+                "gbuffers_skybasic", vertex, BasicVertexShaderAdapter.Format.STARS).source();
+
+        assertTrue(adapted.contains("layout(std140) uniform Fog"), adapted);
+        assertTrue(adapted.contains("#define fogColor (FogColor.rgb)"), adapted);
+    }
+
+    @Test
     void bindsRenderStageSeparatelyForEachSkyVertexPipeline() throws IOException {
         String vertex = """
                 #version 120

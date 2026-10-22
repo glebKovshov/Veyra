@@ -56,16 +56,14 @@ class GeometryColorSamplersTest {
         }
     }
 
-    @Test void limitsDistinctImagesRatherThanAliasCount() throws IOException {
+    @Test void acceptsAllFifteenShaderPackColorTargets() throws IOException {
         StringBuilder declarations = new StringBuilder(), sum = new StringBuilder("vec4(0.0)");
-        for (int index = 1; index <= 7; index++) {
+        for (int index = 1; index <= 15; index++) {
             declarations.append("uniform sampler2D colortex").append(index).append(";\n");
             sum.append("+texture2D(colortex").append(index).append(",vec2(0.5))");
-            String source = declarations + "void main(){gl_FragColor=" + sum + ";}\n";
-            if (index <= 6) assertEquals(index, GeometryColorSamplers.read(source).size());
-            else assertTrue(assertThrows(IOException.class, () -> GeometryColorSamplers.read(source))
-                    .getMessage().contains("six auxiliary"));
         }
+        String source = declarations + "void main(){gl_FragColor=" + sum + ";}\n";
+        assertEquals(15, GeometryColorSamplers.read(source).size());
     }
 
     @Test void appendsColorBindingsAfterOptionalDepthNoiseAndShadow() throws IOException {

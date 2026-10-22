@@ -24,20 +24,49 @@ public abstract class GLSLParserMixin {
     private List<Token> veyra$prepareStorageBuffers(Lexer lexer) {
         VeyraStorageBufferResources resources = VeyraStorageBufferResources.active();
         String source = ((LexerAccessor) lexer).veyra$getInput();
-        if (resources == null) return lexer.tokenize();
+        if (resources == null) {
+            return veyra$tokenize(new Lexer(ShaderPackStorageBuffers.stripCommentsForVulkanParser(source)));
+        }
 
         try {
             ShaderPackStorageBuffers.PreparedSource prepared = ShaderPackStorageBuffers.prepareForVulkanParser(
                     source, resources.properties(), resources.viewWidth(), resources.viewHeight());
-            if (prepared.storageBlocks().isEmpty()) return lexer.tokenize();
+            if (prepared.storageBlocks().isEmpty()) {
+                return veyra$tokenize(new Lexer(
+                        ShaderPackStorageBuffers.stripCommentsForVulkanParser(prepared.source())));
+            }
             for (ShaderPackStorageBuffers.StorageBlock block : prepared.storageBlocks().values()) {
                 resources.registerBlock(block);
                 resources.storageBuffer(block.bufferObjectBinding());
             }
-            return new Lexer(prepared.source()).tokenize();
+            return veyra$tokenize(new Lexer(
+                    ShaderPackStorageBuffers.stripCommentsForVulkanParser(prepared.source())));
         } catch (IOException exception) {
             throw new IllegalStateException("Could not prepare shader-pack storage buffers for VulkanMod's GLSL parser: "
                     + exception.getMessage(), exception);
+        }
+    }
+
+    private static List<Token> veyra$tokenize(Lexer lexer) {
+        try {
+            return lexer.tokenize();
+        } catch (RuntimeException exception) {
+            String message = exception.getMessage();
+            if (message == null || !message.contains("Unrecognized char: \\")) throw exception;
+            LexerAccessor accessor = (LexerAccessor) lexer;
+            String input = accessor.veyra$getInput();
+            int offset = Math.max(0, Math.min(accessor.veyra$getCurrentPosition(), input.length()));
+            int lineStart = input.lastIndexOf('\n', Math.max(0, offset - 1)) + 1;
+            int lineEnd = input.indexOf('\n', offset);
+            if (lineEnd < 0) lineEnd = input.length();
+            String line = input.substring(lineStart, lineEnd).replace("\r", "");
+            if (line.length() > 200) line = line.substring(0, 200) + "...";
+            int lineNumber = 1;
+            for (int index = 0; index < lineStart; index++) {
+                if (input.charAt(index) == '\n') lineNumber++;
+            }
+            throw new IllegalStateException(message + " at GLSL line " + lineNumber
+                    + ", column " + (offset - lineStart + 1) + ": " + line.replace("\\", "\\\\"), exception);
         }
     }
 

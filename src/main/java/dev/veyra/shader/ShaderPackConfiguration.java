@@ -14,6 +14,7 @@ public final class ShaderPackConfiguration {
     private int sourceChars;
     private int processedChars;
     private ShaderPackOptions definitions;
+    private ShaderPackCustomTextureProperties customTextureProperties;
     private final Map<String, Boolean> programs = new HashMap<>();
 
     public ShaderPackConfiguration(Map<String, String> options, int dimension) {
@@ -45,4 +46,6 @@ public final class ShaderPackConfiguration {
     void cacheEnabled(String program, boolean enabled) { programs.put(program, enabled); }
     ShaderPackOptions definitions() { return definitions; }
     void cacheDefinitions(ShaderPackOptions options) { definitions = options; }
+    ShaderPackCustomTextureProperties customTextureProperties() { return customTextureProperties; }
+    void cacheCustomTextureProperties(ShaderPackCustomTextureProperties properties) { customTextureProperties = properties; }
 }

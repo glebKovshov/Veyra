@@ -98,6 +98,39 @@ class BeaconBeamVertexShaderAdapterTest {
     }
 
     @Test
+    void suppliesFogBlockWhenNativeBeaconShaderHasNoFogImport() throws IOException {
+        String adapted = BeaconBeamVertexShaderAdapter.adaptStage(NATIVE_VERTEX, """
+                #version 130
+                uniform vec3 fogColor;
+                void main() {
+                    gl_Position = ftransform();
+                    gl_Position.x += fogColor.x;
+                }
+                """, "gbuffers_beaconbeam").source();
+
+        assertTrue(adapted.contains("layout(std140) uniform Fog"), adapted);
+        assertTrue(adapted.contains("#define fogColor (FogColor.rgb)"), adapted);
+    }
+
+    @Test
+    void reusesNativeFogBlockWhenBeaconShaderImportsIt() throws IOException {
+        String minecraftWithFog = NATIVE_VERTEX.replace("#version 330",
+                "#version 330\n#moj_import <minecraft:fog.glsl>");
+        String adapted = BeaconBeamVertexShaderAdapter.adaptStage(minecraftWithFog, """
+                #version 130
+                uniform vec3 fogColor;
+                void main() {
+                    gl_Position = ftransform();
+                    gl_Position.x += fogColor.x;
+                }
+                """, "gbuffers_beaconbeam").source();
+
+        assertFalse(adapted.contains("layout(std140) uniform Fog"), adapted);
+        assertTrue(adapted.contains("#moj_import <minecraft:fog.glsl>"), adapted);
+        assertTrue(adapted.contains("#define fogColor (FogColor.rgb)"), adapted);
+    }
+
+    @Test
     void exposesNativeFallbackOutputsAndRejectsInputsTheBeaconFormatDoesNotHave() throws IOException {
         var nativeOutputs = BeaconBeamVertexShaderAdapter.nativeVaryings();
         assertEquals(0, nativeOutputs.get("vertexColor").location());

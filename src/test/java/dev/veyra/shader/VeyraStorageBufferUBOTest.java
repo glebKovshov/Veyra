@@ -23,7 +23,7 @@ class VeyraStorageBufferUBOTest {
         VeyraStorageBufferUBO descriptor = new VeyraStorageBufferUBO(parsedBlock, allocation);
 
         assertEquals(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, descriptor.getType());
-        assertEquals(16, descriptor.getBinding());
+        assertEquals(ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE, descriptor.getBinding());
         assertEquals(VK_SHADER_STAGE_VERTEX_BIT, descriptor.getStages());
         assertEquals(256, descriptor.getSize());
         assertEquals(256, descriptor.getBufferSlice().getSize());

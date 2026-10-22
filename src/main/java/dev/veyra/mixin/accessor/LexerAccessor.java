@@ -8,4 +8,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface LexerAccessor {
     @Accessor("input")
     String veyra$getInput();
+
+    @Accessor("currentPosition")
+    int veyra$getCurrentPosition();
 }

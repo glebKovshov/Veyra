@@ -33,4 +33,16 @@ class ShaderStageUniformDeduplicatorTest {
         assertEquals(fragment, ShaderStageUniformDeduplicator.removeFragmentDuplicates(
                 "uniform int worldTime;\n", fragment, "shadow_entities"));
     }
+
+    @Test
+    void preservesUniformBlocksRequiredByEachCompiledShaderStage() throws Exception {
+        String block = "layout(std140) uniform Fog {\n"
+                + "    vec4 FogColor;\n    float FogEnvironmentalStart;\n};\n";
+        String fragment = block + "void main() { vec3 color = FogColor.rgb; }\n";
+
+        String result = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
+                block, fragment, "gbuffers_skybasic");
+
+        assertEquals(fragment, result);
+    }
 }
