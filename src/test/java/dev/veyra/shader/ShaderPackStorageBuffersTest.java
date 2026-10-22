@@ -1,6 +1,9 @@
 package dev.veyra.shader;
 
 import org.junit.jupiter.api.Test;
+import net.vulkanmod.vulkan.shader.converter.GLSLParser;
+import net.vulkanmod.vulkan.shader.converter.Lexer;
+import net.vulkanmod.vulkan.shader.descriptor.UBO;
 
 import java.io.IOException;
 
@@ -10,6 +13,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShaderPackStorageBuffersTest {
+    @Test
+    void detectsOnlyReachableWritableStorageBuffers() throws Exception {
+        String writable = """
+                layout(std430, binding = 0) buffer Data { uint value; } dataBuffer;
+                void writeData() { dataBuffer.value = 1u; }
+                void main() { writeData(); }
+                """;
+        String readonly = """
+                layout(std430, binding = 0) readonly buffer Data { uint value; } dataBuffer;
+                void main() { gl_Position = vec4(float(dataBuffer.value)); }
+                """;
+        String inactive = """
+                layout(std430, binding = 0) buffer Data { uint value; } dataBuffer;
+                void unused() { dataBuffer.value = 1u; }
+                void main() { }
+                """;
+
+        assertTrue(ShaderPackStorageBuffers.hasWritableActiveBuffer(
+                UnreachableGlslFunctions.removeUnreachable(writable, "main")));
+        assertFalse(ShaderPackStorageBuffers.hasWritableActiveBuffer(readonly));
+        assertFalse(ShaderPackStorageBuffers.hasWritableActiveBuffer(
+                UnreachableGlslFunctions.removeUnreachable(inactive, "main")));
+    }
+
     @Test
     void stripsAStorageBufferThatOnlyAnUnreachableHelperUses() throws Exception {
         String source = """
@@ -93,6 +120,110 @@ class ShaderPackStorageBuffersTest {
 
         assertEquals(40L, sizes.get(0));
         assertEquals(240_000L, sizes.get(8));
+    }
+
+    @Test
+    void bridgesAnActiveStorageBlockThroughAParserCompatibleUniformBlock() throws Exception {
+        String source = """
+                #version 450
+                layout(std430, binding = 0) readonly buffer blockDataBuffer {
+                    uvec4 data[];
+                } blockDataSSBO;
+                void main() { gl_FragColor = vec4(blockDataSSBO.data[3]); }
+                """;
+        var properties = ShaderPackStorageBufferProperties.parse("bufferObject.0 = 128\n");
+
+        var prepared = ShaderPackStorageBuffers.prepareForVulkanParser(source, properties, 800, 450);
+
+        assertTrue(prepared.source().contains("uniform VeyraStorageBuffer_0_"), prepared.source());
+        assertTrue(prepared.source().contains("blockDataSSBO"), prepared.source());
+        assertFalse(prepared.source().contains("buffer blockDataBuffer"), prepared.source());
+        assertEquals(1, prepared.storageBlocks().size());
+        var block = prepared.storageBlocks().values().iterator().next();
+        assertTrue(prepared.source().contains("layout(binding = 16) uniform VeyraStorageBuffer_0_"), prepared.source());
+        assertEquals(16, block.descriptorBinding());
+        assertEquals("layout(std430, binding = 23) readonly buffer blockDataBuffer {\n    uvec4 data[];\n} blockDataSSBO;",
+                block.declaration(23));
+        assertEquals(128L, block.allocationBytes());
+    }
+
+    @Test
+    void vulkanModParserKeepsTheStoragePlaceholderAsAContiguousDescriptor() throws Exception {
+        String source = """
+                #version 450
+                layout(std430, binding = 0) readonly buffer blockDataBuffer {
+                    uvec4 data[];
+                } blockDataSSBO;
+                void main() { gl_FragColor = vec4(blockDataSSBO.data[0]); }
+                """;
+        var prepared = ShaderPackStorageBuffers.prepareForVulkanParser(source,
+                ShaderPackStorageBufferProperties.parse("bufferObject.0 = 128\n"), 800, 450);
+        String parserSource = prepared.source();
+        GLSLParser parser = new GLSLParser();
+        parser.parse(new Lexer(parserSource), GLSLParser.Stage.FRAGMENT);
+
+        UBO[] descriptors = parser.createUBOs();
+
+        assertEquals(1, descriptors.length);
+        assertEquals(prepared.storageBlocks().keySet().iterator().next(), descriptors[0].name);
+        assertEquals(0, descriptors[0].getBinding());
+        assertTrue(parser.getOutput(GLSLParser.Stage.FRAGMENT).contains("uniform " + descriptors[0].name));
+    }
+
+    @Test
+    void assignsDifferentVulkanBindingsToDifferentIrisBufferObjects() throws Exception {
+        String source = """
+                #version 450
+                layout(std430, binding = 0) buffer First { uint value; } firstBuffer;
+                layout(std430, binding = 1) readonly buffer Second { uint value; } secondBuffer;
+                void main() { gl_Position = vec4(float(firstBuffer.value + secondBuffer.value)); }
+                """;
+        var prepared = ShaderPackStorageBuffers.prepareForVulkanParser(source,
+                ShaderPackStorageBufferProperties.parse("bufferObject.0 = 4\nbufferObject.1 = 4\n"), 800, 450);
+
+        assertTrue(prepared.source().contains("layout(binding = 16) uniform VeyraStorageBuffer_0_"), prepared.source());
+        assertTrue(prepared.source().contains("layout(binding = 17) uniform VeyraStorageBuffer_1_"), prepared.source());
+        assertEquals(2, prepared.storageBlocks().size());
+    }
+
+    @Test
+    void leavesInactiveStorageBlocksOutOfTheParserBridge() throws Exception {
+        String source = """
+                #version 450
+                layout(std430, binding = 0) readonly buffer blockDataBuffer {
+                    uvec4 data[];
+                } blockDataSSBO;
+                void unused() { gl_FragColor = vec4(blockDataSSBO.data[0]); }
+                void main() { }
+                """;
+        var properties = ShaderPackStorageBufferProperties.parse("bufferObject.0 = 128\n");
+
+        var prepared = ShaderPackStorageBuffers.prepareForVulkanParser(
+                UnreachableGlslFunctions.removeUnreachable(source, "main"), properties, 800, 450);
+
+        assertTrue(prepared.storageBlocks().isEmpty());
+        assertFalse(prepared.source().contains("blockDataBuffer"), prepared.source());
+    }
+
+    @Test
+    void rejectsActiveStorageBlocksWithoutAnAllocationOrBinding() throws Exception {
+        String missingAllocation = """
+                layout(std430, binding = 0) buffer Data { uvec4 values[]; } dataBuffer;
+                void main() { gl_Position = vec4(dataBuffer.values[0]); }
+                """;
+        var noAllocation = ShaderPackStorageBufferProperties.parse("");
+        IOException allocationError = assertThrows(IOException.class,
+                () -> ShaderPackStorageBuffers.prepareForVulkanParser(missingAllocation, noAllocation, 640, 360));
+        assertTrue(allocationError.getMessage().contains("no bufferObject.0 allocation"));
+
+        String missingBinding = """
+                buffer Data { uvec4 values[]; } dataBuffer;
+                void main() { gl_Position = vec4(dataBuffer.values[0]); }
+                """;
+        IOException bindingError = assertThrows(IOException.class,
+                () -> ShaderPackStorageBuffers.prepareForVulkanParser(missingBinding,
+                        ShaderPackStorageBufferProperties.parse("bufferObject.0 = 128\n"), 640, 360));
+        assertTrue(bindingError.getMessage().contains("no numeric layout(binding = N)"));
     }
 
     @Test

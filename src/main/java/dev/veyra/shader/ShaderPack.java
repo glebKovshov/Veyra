@@ -19,6 +19,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import dev.veyra.vulkan.VeyraDeviceFeatures;
 import org.lwjgl.vulkan.VK10;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -1093,6 +1094,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             throw new IOException("This pack requires Iris features not implemented by Veyra: " + String.join(" ", unsupportedFeatures));
         }
         if (configuration.customImages()) validateShadowComputeCapabilities();
+        validateVertexStorageBufferCapabilities();
         for (String program : TERRAIN_PROGRAMS.stream().sorted().toList()) {
             if (!isProgramEnabled(program) || !terrainPrograms.contains(program)) continue;
             Optional<String> vertex = readStage(program + ".vsh");
@@ -1222,6 +1224,23 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             }
             if (program.matches("begin\\d*")) {
                 throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
+            }
+        }
+    }
+
+    private void validateVertexStorageBufferCapabilities() throws IOException {
+        if (VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) return;
+        for (String file : stageFiles().stream().filter(name -> name.endsWith(".vsh")).sorted().toList()) {
+            String program = file.substring(0, file.length() - 4);
+            if (IGNORED_IRIS_PROGRAMS.contains(program) || program.startsWith("clrwl_")) continue;
+            if ((program.equals("shadow") || program.startsWith("shadow_")) && !hasShadowFragment()) continue;
+            if (!isProgramEnabled(program)) continue;
+            Optional<String> source = readStage(file);
+            if (source.isEmpty()) continue;
+            String reachable = UnreachableGlslFunctions.removeUnreachable(source.get(), "main");
+            if (ShaderPackStorageBuffers.hasWritableActiveBuffer(reachable)) {
+                throw new IOException("This Vulkan device cannot run writable storage buffers in vertex stage "
+                        + file + ": vertexPipelineStoresAndAtomics is unavailable.");
             }
         }
     }

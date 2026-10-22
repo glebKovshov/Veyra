@@ -30,6 +30,8 @@
     "VulkanCloudRendererMixin",
     "VkCommandEncoderMixin",
     "SPIRVUtilsMixin",
+    "GLSLParserMixin",
+    "UniformBlockMixin",
     "VeyraUniformsMixin",
     "accessor.MinecraftAccessor",
     "accessor.BufferBuilderAccessor",
@@ -45,6 +47,7 @@
     "accessor.ShaderCompilationKeyAccessor",
     "DeviceManagerMixin",
     "GraphicsPipelineMixin",
+    "PipelineDescriptorLayoutMixin",
     "RendererGeometryTargetsMixin",
     "accessor.PipelineStateAccessor",
     "accessor.RendererFramebufferAccessor",
@@ -54,7 +57,8 @@
     "TextureAtlasMixin",
     "accessor.TextureAtlasAccessor",
     "accessor.TextureAtlasSpriteAccessor",
-    "accessor.TextureManagerAccessor"
+    "accessor.TextureManagerAccessor",
+    "accessor.LexerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

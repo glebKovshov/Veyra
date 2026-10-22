@@ -3,6 +3,7 @@ package dev.veyra.smoke;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.veyra.shader.ShaderPack;
 import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.vulkan.VeyraDeviceFeatures;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
@@ -37,7 +38,8 @@ public final class GraphicsSmoke {
             compositeCustomImageFixture,
             skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
-            damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture;
+            damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture,
+            storageBufferFixture;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static ShaderPack shadowMrtPack;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
@@ -48,6 +50,7 @@ public final class GraphicsSmoke {
             activeEntityCustomImageGreenPixels, disabledEntityCustomImageGreenPixels,
             activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static String thirdPartyProfile = "";
+    private static String skipReason = "";
     private static int thirdPartyNonBlackPixels, thirdPartyColorBuckets;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
@@ -125,6 +128,14 @@ public final class GraphicsSmoke {
             blockVertexFixture = fixture.equals("block-vertex-execution");
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
             handVertexFixture = fixture.equals("hand-vertex-execution");
+            storageBufferFixture = fixture.equals("storage-buffer-shadow");
+            if (storageBufferFixture && !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) {
+                skipReason = "vertexPipelineStoresAndAtomics unavailable";
+                LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                        "Skipping storage-buffer fixture: {}", skipReason);
+                finish(client, null, -1);
+                return;
+            }
             if (texturedDefaultAttributesFixture && worldTicks == 1) {
                 var border = client.level.getWorldBorder();
                 border.setCenter(client.player.getX(), client.player.getZ());
@@ -145,7 +156,8 @@ public final class GraphicsSmoke {
                     || fixture.equals("shadow-color-entity") || shadowColorMrtFixture
                     || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
-                    || fixture.equals("entity-vertex-execution") || blockVertexFixture || entityCustomImageFixture;
+                    || fixture.equals("entity-vertex-execution") || blockVertexFixture || entityCustomImageFixture
+                    || storageBufferFixture;
             if ((entityFixture || beaconBeamFixture || damagedBlockVertexFixture) && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
                 entityFixtureStarted = true;
@@ -297,6 +309,7 @@ public final class GraphicsSmoke {
                     && !entityCustomImageFixture && !compositeCustomImageFixture
                     && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     && !weatherVertexFixture && !particleVertexFixture && !texturedDefaultAttributesFixture
+                    && !storageBufferFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
@@ -442,6 +455,7 @@ public final class GraphicsSmoke {
         try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
                     String imageName = thirdPartyShaderpackFixture ? "third-party-pack-active.png"
+                    : storageBufferFixture ? active ? "storage-buffer-active.png" : "storage-buffer-disabled.png"
                     : shadowColorMrtFixture && stage == 2 ? "shadow-mrt-reenabled.png"
                     : shadowColorMrtLifecycleFixture && stage == 3 ? "shadow-mrt-resized.png"
                     : shadowColorMrtLifecycleFixture && stage == 6 ? "shadow-mrt-dimension-return.png"
@@ -507,6 +521,11 @@ public final class GraphicsSmoke {
                 } else if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
                 } else if (active) {
+                    if (storageBufferFixture && count < 2000) {
+                        finish(client, new IllegalStateException("The shadow storage-buffer write/read signal is absent: "
+                                + count + " magenta pixels"), -1);
+                        return;
+                    }
                     if (shadowColorMrtFixture && stage == 2) {
                         reenabledShadowMrtPixels = count;
                         if (shadowColorMrtLifecycleFixture) {
@@ -659,6 +678,10 @@ public final class GraphicsSmoke {
                                 || disabledEntityCustomImageGreenPixels * 4 >= activeEntityCustomImageGreenPixels
                                 ? new IllegalStateException("The entity custom-image signal was absent or unchanged: scene green active/disabled="
                                         + activeEntityCustomImageGreenPixels + "/" + disabledEntityCustomImageGreenPixels) : null;
+                    } else if (storageBufferFixture) {
+                        failure = activePixels < 2000 || count * 4 >= activePixels
+                                ? new IllegalStateException("The shadow storage-buffer signal was absent or unchanged: active="
+                                + activePixels + ", disabled=" + count) : null;
                     } else if (basicCustomImageFixture) {
                         failure = activeBasicGreenPixels < 100
                                 || disabledBasicGreenPixels * 4 >= activeBasicGreenPixels
@@ -726,8 +749,13 @@ public final class GraphicsSmoke {
             String error = failure == null ? "" : failure.toString().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
             String renderer = physicalDeviceName().replace("\\", "\\\\").replace("\"", "\\\"");
             String profile = thirdPartyProfile.replace("\\", "\\\\").replace("\"", "\\\"");
-            Files.writeString(output.resolve("result.json"), "{\"status\":\"" + (failure == null ? "passed" : "failed")
+            String escapedSkipReason = skipReason.replace("\\", "\\\\").replace("\"", "\\\"");
+            String status = failure != null ? "failed" : skipReason.isEmpty() ? "passed" : "skipped";
+            Files.writeString(output.resolve("result.json"), "{\"status\":\"" + status
                     + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
+                    + ",\"vertexPipelineStoresAndAtomicsEnabled\":"
+                    + VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled
+                    + ",\"skipReason\":\"" + escapedSkipReason + "\""
                     + ",\"thirdPartyProfile\":\"" + profile + "\",\"thirdPartyNonBlackPixels\":" + thirdPartyNonBlackPixels
                     + ",\"thirdPartyColorBuckets\":" + thirdPartyColorBuckets
                     + ",\"shadowMrtReenabledPixels\":" + reenabledShadowMrtPixels

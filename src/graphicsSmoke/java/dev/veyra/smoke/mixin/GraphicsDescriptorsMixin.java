@@ -1,6 +1,7 @@
 package dev.veyra.smoke.mixin;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import dev.veyra.shader.VeyraStorageBufferUBO;
 import dev.veyra.vulkan.VeyraMrtFramebuffer;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
 import net.vulkanmod.render.engine.VkCommandEncoder;
@@ -45,6 +46,16 @@ public abstract class GraphicsDescriptorsMixin {
                     "Descriptor evidence: pipeline={} sampler={} binding={} image={} handle={} layout={}",
                     pipeline.getLocation(), descriptor.name, descriptor.getBinding(), image.name,
                     Long.toHexString(image.getId()), image.getCurrentLayout());
+        }
+        for (var buffer : nativePipeline.getBuffers()) {
+            if (!(buffer instanceof VeyraStorageBufferUBO)) continue;
+            String key = pipeline.getLocation() + ":storage:" + buffer.name;
+            if (veyra$seen.add(key)) LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Storage buffer evidence: pipeline={} buffer={} binding={} type={} stages={} global={} handle={} offset={} range={}",
+                    pipeline.getLocation(), buffer.name, buffer.getBinding(), buffer.getType(), buffer.getStages(),
+                    buffer.useGlobalBuffer(),
+                    Long.toHexString(buffer.getBufferSlice().getBuffer().getId()),
+                    buffer.getBufferSlice().getOffset(), buffer.getBufferSlice().getSize());
         }
     }
 

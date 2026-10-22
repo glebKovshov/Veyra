@@ -296,6 +296,7 @@ public final class VeyraRenderer {
     private static final Set<Integer> initializedColorTargets = new java.util.HashSet<>();
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
+    private static VeyraStorageBufferResources storageBufferResources;
     private static PipelineProgram depthTex1CaptureProgram;
     private static PostPass depthTex1CapturePass;
     private static PostPass depthTex2CapturePass;
@@ -2548,6 +2549,7 @@ public final class VeyraRenderer {
         VeyraSpecularTextures.invalidate();
         restoreUniqueOpaqueLayer();
         replacePipelineSet(null);
+        replaceStorageBufferResources(null);
         replaceTerrainPipelines(null);
         replaceEntityPipelines(null);
         replaceBlockEntityPipelines(null);
@@ -2596,6 +2598,8 @@ public final class VeyraRenderer {
         ItemIdMap previousItemIds = ItemIdMap.active();
         EntityIdMap previousEntityIds = EntityIdMap.active();
         BlockIdMap previousBlockIds = BlockIdMap.active();
+        VeyraStorageBufferResources previousStorageBuffers = storageBufferResources;
+        VeyraStorageBufferResources preparedStorageBuffers = null;
         try {
             pack = pack.withRuntimeFeatures();
             pack.validatePipelineCapabilities();
@@ -2609,6 +2613,9 @@ public final class VeyraRenderer {
             ShadowSettings preparedShadowSettings = pack.readShadowSettings();
             Set<Integer> preparedShadowColorTargets = pack.readShadowColorTargetIndices();
             RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+            preparedStorageBuffers = VeyraStorageBufferResources.create(
+                    pack.readStorageBufferProperties(), mainTarget.width, mainTarget.height);
+            VeyraStorageBufferResources.activate(preparedStorageBuffers);
             if (pack.hasTerrainFragment() || pack.hasShadowFragment()) {
                 preparedTerrain = compileTerrainPipelines(pack);
             }
@@ -2700,6 +2707,8 @@ public final class VeyraRenderer {
             preparedBeaconBeams = null;
             replaceCloudPipeline(preparedClouds);
             preparedClouds = null;
+            replaceStorageBufferResources(preparedStorageBuffers);
+            preparedStorageBuffers = null;
             pipelinesDirty = false;
             terrainPipelineDirty = false;
             entityPipelineDirty = false;
@@ -2800,6 +2809,10 @@ public final class VeyraRenderer {
             purgeUnusedPipelines();
             return "Enabled " + pack.name() + " (" + String.join(", ", features) + ").";
         } catch (Exception exception) {
+            if (preparedStorageBuffers != null) {
+                VeyraStorageBufferResources.activate(previousStorageBuffers);
+                preparedStorageBuffers.close();
+            }
             if (repository.getSelected().orElse(null) != pack) {
                 CustomUniforms.activate(previousCustomUniforms);
                 ItemIdMap.activate(previousItemIds);
@@ -2871,6 +2884,7 @@ public final class VeyraRenderer {
         beaconBeamPipelineDirty = false;
         cloudPipelineDirty = false;
         replacePipelineSet(null);
+        replaceStorageBufferResources(null);
         replaceTerrainPipelines(null);
         replaceEntityPipelines(null);
         replaceBlockEntityPipelines(null);
@@ -3062,13 +3076,15 @@ public final class VeyraRenderer {
     private static int graphTraceRuns;
 
     private static void ensurePipelines(int width, int height) throws IOException {
-        if (!pipelinesDirty && pipelineSet != null && pipelineSet.width() == width && pipelineSet.height() == height) {
-            return;
-        }
         ShaderPack pack = repository.getSelected().orElse(null);
         if (pack == null) {
             renderingEnabled = false;
             replacePipelineSet(null);
+            return;
+        }
+        ensureActiveStorageBufferResources(pack, width, height);
+        ensureStorageBufferViewport(width, height);
+        if (!pipelinesDirty && pipelineSet != null && pipelineSet.width() == width && pipelineSet.height() == height) {
             return;
         }
         PipelineSet prepared = compilePipelines(pack, width, height, activeCustomImageResources());
@@ -3078,6 +3094,36 @@ public final class VeyraRenderer {
         lastError = "";
         VeyraClient.LOGGER.info("Loaded {} post-processing pass(es) from shader pack '{}'.",
                 pipelineSet.passCount(), pack.name());
+    }
+
+    private static void ensureStorageBufferViewport(int width, int height) throws IOException {
+        if (width <= 0 || height <= 0) return;
+        VeyraStorageBufferResources current = storageBufferResources;
+        if (current == null || !current.usesRelativeSizes()
+                || current.viewWidth() == width && current.viewHeight() == height) {
+            return;
+        }
+        ShaderPack pack = repository.getSelected().orElse(null);
+        if (pack == null) return;
+        String result = select(pack);
+        if (!result.startsWith("Enabled ")) {
+            throw new IOException("Could not resize screen-relative shader-pack storage buffers: " + result);
+        }
+        VeyraStorageBufferResources resized = storageBufferResources;
+        if (resized == null || resized.viewWidth() != width || resized.viewHeight() != height) {
+            throw new IOException("Shader-pack storage-buffer resize did not use the active viewport dimensions.");
+        }
+    }
+
+    /** A pack restored from config has no resources until it is explicitly selected in the UI. */
+    private static void ensureActiveStorageBufferResources(ShaderPack pack, int width, int height) throws IOException {
+        if (width <= 0 || height <= 0 || VeyraStorageBufferResources.active() != null) return;
+        if (storageBufferResources != null) {
+            VeyraStorageBufferResources.activate(storageBufferResources);
+            return;
+        }
+        replaceStorageBufferResources(VeyraStorageBufferResources.create(
+                pack.readStorageBufferProperties(), width, height));
     }
 
     private static void prepareSampledTargets(FrameGraphBuilder graph,
@@ -3875,22 +3921,28 @@ public final class VeyraRenderer {
     }
 
     static void clearShadowCustomImages() {
-        if (terrainPipelineSet != null && terrainPipelineSet.compute() != null) {
+        VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
+        if (compute != null || storageBufferResources != null) {
             Renderer.getInstance().endRenderPass();
-            terrainPipelineSet.compute().clearForShadowPass();
+            if (compute != null) compute.clearForShadowPass();
+            if (storageBufferResources != null) storageBufferResources.clearForShadowPass();
         }
     }
 
     static void prepareShadowTerrainPipelines() throws IOException {
-        if (!terrainPipelineDirty) return;
+        RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null) return;
+        ensureActiveStorageBufferResources(pack, mainTarget.width, mainTarget.height);
+        ensureStorageBufferViewport(mainTarget.width, mainTarget.height);
+        if (!terrainPipelineDirty) return;
         TerrainPipelineSet prepared = compileTerrainPipelines(pack);
         replaceTerrainPipelines(prepared);
         terrainPipelineDirty = false;
     }
 
     static void dispatchShadowCompute() {
+        if (storageBufferResources != null) storageBufferResources.barrierAfterShadowPass();
         if (terrainPipelineSet != null && terrainPipelineSet.compute() != null) {
             terrainPipelineSet.compute().dispatchAfterShadowPass();
         }
@@ -3934,6 +3986,7 @@ public final class VeyraRenderer {
 
     private static void dumpShaderSource(String name, String source) {
         if (!Boolean.getBoolean("veyra.debug.dumpShaderSources")) return;
+        if (source == null) return;
         try {
             Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"))
                     .resolve("shader-dumps");
@@ -6597,8 +6650,7 @@ public final class VeyraRenderer {
         body = PostVertexInterfaceDeclarations.expand(body);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(body, "post-processing");
         body = UnreachableGlslFunctions.removeUnreachable(fog.source(), "main");
-        body = ShaderPackStorageBuffers.removeUnusedOrReject(
-                body, "post-processing", storageBufferProperties, viewWidth, viewHeight);
+        body = ShaderPackStorageBuffers.removeUnused(body);
 
         String unsupportedDepthSampler = DepthSamplerSupport.firstUnsupported(body).orElse(null);
         if (unsupportedDepthSampler != null) {
@@ -6989,6 +7041,8 @@ public final class VeyraRenderer {
 
     private static String sha256(String source) {
         try {
+            VeyraStorageBufferResources storageBuffers = VeyraStorageBufferResources.active();
+            if (storageBuffers != null) source += "\nveyra-storage-buffer-resource=" + storageBuffers.identity();
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException exception) {
@@ -7606,6 +7660,13 @@ public final class VeyraRenderer {
         if (next == null || !next.usesDepth2Sampler()) {
             depthTex2Snapshot.close();
         }
+    }
+
+    private static void replaceStorageBufferResources(VeyraStorageBufferResources next) {
+        VeyraStorageBufferResources old = storageBufferResources;
+        storageBufferResources = next;
+        VeyraStorageBufferResources.activate(next);
+        if (old != null && old != next) old.close();
     }
 
     private static void replaceTerrainPipelines(TerrainPipelineSet next) {
