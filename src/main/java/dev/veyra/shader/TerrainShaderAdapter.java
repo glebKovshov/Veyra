@@ -355,22 +355,34 @@ public final class TerrainShaderAdapter {
 
     static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings) throws IOException {
-        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, packVaryings, false);
+        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, packVaryings, false,
+                "gbuffers_terrain", Set.of());
     }
 
     static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings,
                                 boolean pipelineNoiseSamplerAvailable) throws IOException {
         return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, packVaryings,
-                pipelineNoiseSamplerAvailable, "gbuffers_terrain");
+                pipelineNoiseSamplerAvailable, "gbuffers_terrain", Set.of());
     }
 
     static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings,
                                 boolean pipelineNoiseSamplerAvailable, String programName) throws IOException {
+        return adaptFragment(source, shadowSamplerAvailable, waterInputsAvailable, packVaryings,
+                pipelineNoiseSamplerAvailable, programName, Set.of());
+    }
+
+    static String adaptFragment(String source, boolean shadowSamplerAvailable, boolean waterInputsAvailable,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings,
+                                boolean pipelineNoiseSamplerAvailable, String programName,
+                                Set<String> customTextureSamplers) throws IOException {
         source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
         Set<String> conflictingShaderPackUniforms = conflictingShaderPackUniforms(source);
-        Map<String, Integer> colorInputs = waterInputsAvailable ? GeometryColorSamplers.read(source) : Map.of();
+        Map<String, Integer> colorInputs = new java.util.LinkedHashMap<>(
+                waterInputsAvailable ? GeometryColorSamplers.read(source) : Map.of());
+        customTextureSamplers.forEach(colorInputs::remove);
+        Set<String> usedCustomSamplers = new java.util.TreeSet<>();
         FragmentOutputs fragmentOutputs = FragmentOutputs.parse(source);
         source = fragmentOutputs.rewriteLegacy(source);
         String adapted = VERSION_DIRECTIVE.matcher(source).replaceAll("");
@@ -396,6 +408,7 @@ public final class TerrainShaderAdapter {
                     && !sampler.equals("noisetex")
                     && !sampler.equals("specular")
                     && !colorInputs.containsKey(sampler)
+                    && !customTextureSamplers.contains(sampler)
                     && !(sampler.equals("depthtex1") && waterInputsAvailable)
                     && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1"))
                     || ShadowColorSampler.isSampler(sampler)) && shadowSamplerAvailable)) {
@@ -407,6 +420,7 @@ public final class TerrainShaderAdapter {
                     && samplerType.equals("sampler2DShadow"))) {
                 throw new IOException("gbuffers_terrain sampler '" + sampler + "' must use sampler2D.");
             }
+            if (customTextureSamplers.contains(sampler)) usedCustomSamplers.add(sampler);
             samplerMatcher.appendReplacement(withoutSamplers, "");
         }
         samplerMatcher.appendTail(withoutSamplers);
@@ -613,6 +627,10 @@ public final class TerrainShaderAdapter {
         }
         colorInputs.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(input -> colorBridge
                 .append("#define ").append(input.getKey()).append(' ').append(GeometryColorSamplers.samplerName(input.getValue())).append('\n'));
+        for (String sampler : usedCustomSamplers) {
+            colorBridge.append("layout(binding = ").append(colorBinding++).append(") uniform sampler2D ")
+                    .append(sampler).append(";\n");
+        }
         bridge = colorBridge + bridge;
         if (hasTangentSpaceInputs) {
             bridge = bridge.replace("#define texture Sampler0", TANGENT_SPACE_BRIDGE + "\n#define texture Sampler0");
@@ -720,6 +738,17 @@ public final class TerrainShaderAdapter {
     public static boolean usesOpaqueDepthSampler(String source) {
         return Pattern.compile("\\bdepthtex1\\b").matcher(
                 UnusedSamplerDeclarations.removeUnused(COMMENTS.matcher(source).replaceAll(""))).find();
+    }
+
+    static Set<String> usedCustomTextureSamplers(String source, Set<String> configuredSamplers) {
+        Matcher matcher = SAMPLER_DECLARATION.matcher(UnusedSamplerDeclarations.removeUnused(
+                ShaderSource.maskBlockAndLineComments(source)));
+        Set<String> used = new java.util.TreeSet<>();
+        while (matcher.find()) {
+            String sampler = matcher.group(2);
+            if (configuredSamplers.contains(sampler)) used.add(sampler);
+        }
+        return Set.copyOf(used);
     }
 
     public static boolean usesSpecularSampler(String source) {

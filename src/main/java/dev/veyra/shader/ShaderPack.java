@@ -1659,6 +1659,22 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private Optional<String> readUncachedShader(String fileName) throws IOException {
+        Optional<byte[]> source = readShaderBytes(fileName);
+        if (source.isEmpty()) return Optional.empty();
+        String portable = fileName.replace('\\', '/');
+        String basename = portable.substring(portable.lastIndexOf('/') + 1);
+        boolean idProperties = basename.equals("item.properties")
+                || basename.equals("entity.properties") || basename.equals("block.properties");
+        return Optional.of(new String(source.get(),
+                idProperties ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8));
+    }
+
+    /** Reads a binary asset inside this pack's shaders directory with the same path checks as shader sources. */
+    public Optional<byte[]> readShaderAsset(String fileName) throws IOException {
+        return readShaderBytes(fileName);
+    }
+
+    private Optional<byte[]> readShaderBytes(String fileName) throws IOException {
         String portable = fileName.replace('\\', '/');
         if (portable.startsWith("/") || java.util.Arrays.asList(portable.split("/")).contains(".."))
             throw new IOException("Shader source escapes its directory: " + fileName);
@@ -1701,11 +1717,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 }
             }
         }
-        String basename = portable.substring(portable.lastIndexOf('/') + 1);
-        boolean idProperties = basename.equals("item.properties")
-                || basename.equals("entity.properties") || basename.equals("block.properties");
-        return Optional.of(new String(bytes,
-                idProperties ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8));
+        return Optional.of(bytes);
     }
 
     private String expandIncludes(String fileName, String source)

@@ -1,6 +1,7 @@
 package dev.veyra.shader;
 
 import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
@@ -31,7 +32,10 @@ import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import net.vulkanmod.vulkan.util.MappedBuffer;
 import net.vulkanmod.render.engine.VkGpuDevice;
+import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkRenderPass;
+import net.vulkanmod.render.engine.VkTextureView;
+import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
@@ -72,13 +76,18 @@ public final class VeyraShadowRenderer {
     /** Indexed texture-table bindings currently pointing at one of the owned shadow color views. */
     private static final Map<Integer, GpuTextureView> colorBindings = new HashMap<>();
     private static GpuSampler shadowSampler;
+    private static VkGpuTexture fallbackTexture;
+    private static VkTextureView fallbackTextureView;
+    private static GpuSampler fallbackSampler;
     private static int opaqueBindingSlot = -1;
     private static RenderBuffers shadowRenderBuffers;
     private static SubmitNodeStorage shadowSubmitNodeStorage;
     private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
     private static boolean rendering;
     private static boolean renderingFeatures;
+    private static boolean shadowMapCompleted;
     private static boolean warnedAboutNonRecordingFrame;
+    private static boolean warnedAboutUnavailableShadowMap;
     private static ShadowSettings shadowSettings = ShadowSettings.DEFAULT;
     private static Vec3 shadowCameraPosition = Vec3.ZERO;
 
@@ -95,6 +104,64 @@ public final class VeyraShadowRenderer {
 
     public static void initialize() {
         // Trigger the static uniform registrations before VulkanMod compiles Veyra's terrain pipelines.
+    }
+
+    /** Prepare a neutral input for the one transition frame before a new shadow map is rendered. */
+    public static synchronized void prepareFallbackTexture() {
+        if (fallbackTexture != null && !fallbackTexture.isClosed()
+                && fallbackTextureView != null && !fallbackTextureView.isClosed()) return;
+        if (!(RenderSystem.getDevice() instanceof VkGpuDevice device)) {
+            throw new IllegalStateException("Veyra shadow fallbacks require VulkanMod's Vulkan device.");
+        }
+        VulkanImage image = null;
+        VkGpuTexture texture = null;
+        VkTextureView view = null;
+        GpuSampler sampler = null;
+        try {
+            image = VulkanImage.builder(1, 1)
+                    .setName("Veyra unavailable-shadow fallback")
+                    .setFormat(org.lwjgl.vulkan.VK10.VK_FORMAT_R8G8B8A8_UNORM)
+                    .setLinearFiltering(true)
+                    .setClamp(true)
+                    .createVulkanImage();
+            texture = device.gpuTextureFromVulkanImage(image);
+            image = null;
+            view = (VkTextureView) device.createTextureView(texture);
+            sampler = device.createSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                    FilterMode.LINEAR, FilterMode.LINEAR, 1, OptionalDouble.empty());
+            try (NativeImage pixels = new NativeImage(NativeImage.Format.RGBA, 1, 1, false)) {
+                pixels.setPixel(0, 0, -1);
+                device.createCommandEncoder().writeToTexture(texture, pixels);
+            }
+            fallbackTexture = texture;
+            fallbackTextureView = view;
+            fallbackSampler = sampler;
+        } catch (RuntimeException | Error failure) {
+            closeAfterFailure(view, failure);
+            closeAfterFailure(texture, failure);
+            closeAfterFailure(sampler, failure);
+            if (image != null) {
+                try {
+                    image.free();
+                } catch (RuntimeException | Error cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                }
+            }
+            throw failure;
+        }
+    }
+
+    public static synchronized void closeFallbackTexture() {
+        if (fallbackTextureView != null && !fallbackTextureView.isClosed()) fallbackTextureView.close();
+        if (fallbackTexture != null && !fallbackTexture.isClosed()) fallbackTexture.close();
+        if (fallbackSampler != null) fallbackSampler.close();
+        fallbackTextureView = null;
+        fallbackTexture = null;
+        fallbackSampler = null;
+    }
+
+    public static boolean hasCompletedShadowMap() {
+        return shadowMapCompleted && target != null && !target.getColorTexture().isClosed();
     }
 
     public static boolean isRendering() {
@@ -141,9 +208,13 @@ public final class VeyraShadowRenderer {
             String sampler = ShadowColorSampler.samplerName(index);
             var descriptor = pipeline.getImageDescriptor(sampler);
             if (descriptor == null) continue;
-            var view = shadowColorTextureView(index);
-            if (rendering || view == null || view.isClosed())
-                throw new IllegalStateException("shadowcolor" + index + " requires its completed shadow color attachment.");
+            if (rendering) throw new IllegalStateException("shadowcolor" + index + " feedback is unsupported.");
+            var view = shadowMapCompleted ? shadowColorTextureView(index) : null;
+            if (view == null || view.isClosed()) {
+                bindTerrainFallback(descriptor.imageIdx);
+                warnUnavailableShadowMap();
+                continue;
+            }
             descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             descriptor.isReadOnlyLayout = false; // The producing render pass owns the transition.
             var image = ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage();
@@ -160,9 +231,19 @@ public final class VeyraShadowRenderer {
             String sampler = ShadowColorSampler.samplerName(index);
             var descriptor = pipeline.getImageDescriptor(sampler);
             if (descriptor == null) continue;
-            var view = shadowColorTextureView(index);
-            if (rendering || view == null || view.isClosed())
-                throw new IllegalStateException("shadowcolor" + index + " requires its completed shadow color attachment.");
+            if (rendering) throw new IllegalStateException("shadowcolor" + index + " feedback is unsupported.");
+            var view = shadowMapCompleted ? shadowColorTextureView(index) : null;
+            if (view == null || view.isClosed()) {
+                prepareFallbackTexture();
+                descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                descriptor.isReadOnlyLayout = false;
+                int slot = descriptor.imageIdx;
+                colorBindings.put(slot, fallbackTextureView);
+                pass.bindTexture(sampler, fallbackTextureView, fallbackSampler);
+                VTextureSelector.bindTexture(slot, fallbackTexture.getVulkanImage());
+                warnUnavailableShadowMap();
+                continue;
+            }
             descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             descriptor.isReadOnlyLayout = false;
             int slot = descriptor.imageIdx;
@@ -177,6 +258,11 @@ public final class VeyraShadowRenderer {
         var descriptor = pipeline.getImageDescriptor(ShadowDepthSampler.NAME);
         if (descriptor == null) return;
         if (rendering) throw new IllegalStateException("Shadow depth attachment feedback is unsupported.");
+        if (!shadowMapCompleted) {
+            bindTerrainFallback(descriptor.imageIdx);
+            warnUnavailableShadowMap();
+            return;
+        }
         var view = opaqueDepth.sampledView();
         descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         descriptor.isReadOnlyLayout = false;
@@ -192,6 +278,15 @@ public final class VeyraShadowRenderer {
         var descriptor = pipeline.getImageDescriptor(ShadowDepthSampler.NAME);
         if (descriptor == null) return;
         if (rendering) throw new IllegalStateException("Shadow depth attachment feedback is unsupported.");
+        if (!shadowMapCompleted) {
+            prepareFallbackTexture();
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
+            pass.bindTexture(ShadowDepthSampler.NAME, fallbackTextureView, fallbackSampler);
+            VTextureSelector.bindTexture(descriptor.imageIdx, fallbackTexture.getVulkanImage());
+            warnUnavailableShadowMap();
+            return;
+        }
         ensureShadowSampler();
         var view = opaqueDepth.sampledView();
         descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -205,7 +300,16 @@ public final class VeyraShadowRenderer {
     public static void bindEntityShadowSampler(VkRenderPass renderPass, GraphicsPipeline pipeline) {
         var descriptor = pipeline.getImageDescriptor("Sampler3");
         GpuTextureView depthView = shadowDepthTextureView();
-        if (descriptor == null || depthView == null || depthView.isClosed()) {
+        if (descriptor == null) {
+            return;
+        }
+        if (!shadowMapCompleted || depthView == null || depthView.isClosed()) {
+            prepareFallbackTexture();
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
+            renderPass.bindTexture("Sampler3", fallbackTextureView, fallbackSampler);
+            VTextureSelector.bindTexture(descriptor.imageIdx, fallbackTexture.getVulkanImage());
+            warnUnavailableShadowMap();
             return;
         }
         ensureShadowSampler();
@@ -276,6 +380,7 @@ public final class VeyraShadowRenderer {
             return;
         }
         warnedAboutNonRecordingFrame = false;
+        shadowMapCompleted = false;
 
         Vec3 cameraPosition = camera.position();
         shadowCameraPosition = cameraPosition;
@@ -354,7 +459,10 @@ public final class VeyraShadowRenderer {
                         .transitionImageLayout(stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
             VeyraRenderer.dispatchShadowCompute();
+            shadowMapCompleted = true;
+            warnedAboutUnavailableShadowMap = false;
         } catch (Exception exception) {
+            shadowMapCompleted = false;
             VeyraClient.LOGGER.error("Could not render the shader pack shadow map.", exception);
             VeyraRenderer.shadowInputFailed(exception);
         } finally {
@@ -379,6 +487,8 @@ public final class VeyraShadowRenderer {
     }
 
     public static void release() {
+        shadowMapCompleted = false;
+        warnedAboutUnavailableShadowMap = false;
         dev.veyra.vulkan.VeyraGeometryTargets.releaseTargets();
         if (rendering) {
             Renderer.getInstance().endRenderPass();
@@ -498,6 +608,29 @@ public final class VeyraShadowRenderer {
         }
         shadowSampler = device.createSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
                 FilterMode.NEAREST, FilterMode.NEAREST, 1, OptionalDouble.empty());
+    }
+
+    private static void bindTerrainFallback(int slot) {
+        prepareFallbackTexture();
+        var descriptorImage = fallbackTexture.getVulkanImage();
+        descriptorImage.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
+        VRenderSystem.setShaderTexture(slot, fallbackTextureView);
+        VTextureSelector.bindTexture(slot, descriptorImage);
+    }
+
+    private static void warnUnavailableShadowMap() {
+        if (warnedAboutUnavailableShadowMap) return;
+        warnedAboutUnavailableShadowMap = true;
+        VeyraClient.LOGGER.warn("Using a neutral shadow input until Vulkan records a completed shader-pack shadow pass.");
+    }
+
+    private static void closeAfterFailure(AutoCloseable resource, Throwable failure) {
+        if (resource == null) return;
+        try {
+            resource.close();
+        } catch (Exception cleanupFailure) {
+            failure.addSuppressed(cleanupFailure);
+        }
     }
 
     private static void renderEntityAndBlockEntityGeometry(
