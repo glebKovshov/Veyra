@@ -190,9 +190,21 @@ public final class EntityShaderAdapter {
                                         boolean isMainHand,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
             throws IOException {
+        return adaptGeometryFragment(source, programName, handPass, shadowSamplerAvailable, entityId,
+                blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, vertexVaryings, java.util.Set.of());
+    }
+
+    /** Adapts declared custom texture aliases alongside the entity geometry inputs. */
+    static String adaptGeometryFragment(String source, String programName, boolean handPass,
+                                        boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                                        java.util.Set<String> customTextureSamplers)
+            throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
                 entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, true,
-                vertexVaryings);
+                vertexVaryings, customTextureSamplers);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -219,6 +231,18 @@ public final class EntityShaderAdapter {
                                           int currentRenderedItemId) throws IOException {
         return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
                 entityId, blockEntityId, currentRenderedItemId);
+    }
+
+    /** Adapts sign text with shader-pack texture aliases declared for its active program. */
+    static String adaptTextFragment(String source, String programName,
+                                    boolean shadowSamplerAvailable,
+                                    int entityId, int blockEntityId,
+                                    int currentRenderedItemId,
+                                    java.util.Set<String> customTextureSamplers) throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId,
+                false, false, false,
+                Map.of(), customTextureSamplers);
     }
 
     /** Whether the active program declares an Iris-bound entity identifier uniform. */
@@ -735,6 +759,19 @@ public final class EntityShaderAdapter {
                                         boolean isMainHand, boolean geometryColorInputsAvailable,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
             throws IOException {
+        return adaptFragment(source, programName, textPipeline, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand,
+                geometryColorInputsAvailable, vertexVaryings, java.util.Set.of());
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline,
+                                        boolean handPass, boolean shadowSamplerAvailable,
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand, boolean geometryColorInputsAvailable,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                                        java.util.Set<String> customTextureSamplers)
+            throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -761,7 +798,7 @@ public final class EntityShaderAdapter {
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         adapted = UnusedUniformDeclarations.removeUnused(adapted);
         Map<String, Integer> geometryColorInputs = geometryColorInputsAvailable
-                ? GeometryColorSamplers.read(source) : Map.of();
+                ? GeometryColorSamplers.read(source, customTextureSamplers) : Map.of();
         boolean usesShadowSampler = usesShadowSampler(adapted);
         int geometryColorInputCount = GeometryColorSamplers.indices(geometryColorInputs).size();
         ShadowColorSampler.validate(source, shadowSamplerAvailable, geometryColorInputCount);
@@ -778,6 +815,7 @@ public final class EntityShaderAdapter {
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
                     && !geometryColorInputs.containsKey(sampler)
+                    && !customTextureSamplers.contains(sampler)
                     && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1"))
                     || ShadowColorSampler.isSampler(sampler)) && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
@@ -1102,6 +1140,10 @@ public final class EntityShaderAdapter {
             bridge = "uniform sampler2D " + ShadowDepthSampler.NAME + ";\n#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
         }
         bridge = ShadowColorSampler.bridge(ShadowColorSampler.indices(source)) + bridge;
+        StringBuilder customTextureBridge = new StringBuilder();
+        customTextureSamplers.stream().sorted().forEach(sampler -> customTextureBridge
+                .append("uniform sampler2D ").append(sampler).append(";\n"));
+        bridge = customTextureBridge + bridge;
         StringBuilder geometryColorBridge = new StringBuilder();
         for (int index : GeometryColorSamplers.indices(geometryColorInputs)) {
             geometryColorBridge.append("uniform sampler2D ")

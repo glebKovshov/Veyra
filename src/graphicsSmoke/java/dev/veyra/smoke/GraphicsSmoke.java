@@ -36,7 +36,8 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
-            glintMrtFixture, shadowColorMrtFixture, shadowColorMrtLifecycleFixture, basicVertexFixture, basicCustomImageFixture, entityCustomImageFixture,
+            glintMrtFixture, shadowColorMrtFixture, shadowColorMrtLifecycleFixture, basicVertexFixture, basicCustomImageFixture,
+            entityCustomImageFixture, entityCustomTextureFixture,
             compositeCustomImageFixture,
             skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
@@ -50,6 +51,7 @@ public final class GraphicsSmoke {
             disabledBasicMrtPixels, activeBeaconBeamGreenPixels, disabledBeaconBeamGreenPixels,
             activeBeaconBeamMrtPixels, disabledBeaconBeamMrtPixels,
             activeEntityCustomImageGreenPixels, disabledEntityCustomImageGreenPixels,
+            activeEntityCustomTextureGreenPixels, disabledEntityCustomTextureGreenPixels,
             activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static String thirdPartyProfile = "";
     private static String skipReason = "";
@@ -112,6 +114,7 @@ public final class GraphicsSmoke {
             shadowColorMrtFixture = fixture.equals("shadow-color-mrt") || shadowColorMrtLifecycleFixture;
             basicCustomImageFixture = fixture.equals("basic-custom-image");
             entityCustomImageFixture = fixture.equals("entity-custom-image");
+            entityCustomTextureFixture = fixture.equals("entity-custom-texture");
             compositeCustomImageFixture = fixture.equals("composite-custom-image");
             basicVertexFixture = fixture.equals("basic-vertex-execution") || basicCustomImageFixture;
             skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
@@ -164,6 +167,7 @@ public final class GraphicsSmoke {
                     || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
                     || fixture.equals("entity-vertex-execution") || blockVertexFixture || entityCustomImageFixture
+                    || entityCustomTextureFixture
                     || storageBufferFixture;
             if ((entityFixture || beaconBeamFixture || damagedBlockVertexFixture) && !entityFixtureStarted && worldTicks >= 20
                     && client.getSingleplayerServer() != null) {
@@ -399,6 +403,7 @@ public final class GraphicsSmoke {
                     && !entityCustomImageFixture && !compositeCustomImageFixture
                     && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     && !weatherVertexFixture && !particleVertexFixture && !texturedDefaultAttributesFixture
+                    && !entityCustomTextureFixture
                     && !storageBufferFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
@@ -600,7 +605,7 @@ public final class GraphicsSmoke {
                 if (skyTexturedStageFixture && green > 220 && red < 24 && blue < 24) skyMoonGreen++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
                 if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture
-                        || beaconBeamFixture || entityCustomImageFixture)
+                        || beaconBeamFixture || entityCustomImageFixture || entityCustomTextureFixture)
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
@@ -735,6 +740,7 @@ public final class GraphicsSmoke {
                     activeBasicGreenPixels = renderedItemGreenCount;
                     activeBasicMrtPixels = basicMrtPixelCount;
                     if (entityCustomImageFixture) activeEntityCustomImageGreenPixels = renderedItemGreenCount;
+                    if (entityCustomTextureFixture) activeEntityCustomTextureGreenPixels = renderedItemGreenCount;
                     if (beaconBeamFixture) {
                         activeBeaconBeamGreenPixels = renderedItemGreenCount;
                         activeBeaconBeamMrtPixels = basicMrtPixelCount;
@@ -760,11 +766,13 @@ public final class GraphicsSmoke {
                     disabledBasicGreenPixels = renderedItemGreenCount;
                     disabledBasicMrtPixels = basicMrtPixelCount;
                     if (entityCustomImageFixture) disabledEntityCustomImageGreenPixels = renderedItemGreenCount;
+                    if (entityCustomTextureFixture) disabledEntityCustomTextureGreenPixels = renderedItemGreenCount;
                     if (beaconBeamFixture) {
                         disabledBeaconBeamGreenPixels = renderedItemGreenCount;
                         disabledBeaconBeamMrtPixels = basicMrtPixelCount;
                     }
                     int minPixels = currentRenderedItemFixture || blockVertexFixture || entityCustomImageFixture
+                            || entityCustomTextureFixture
                             || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture || particleVertexFixture
                             || texturedDefaultAttributesFixture ? 100 : 2000;
                     Throwable failure;
@@ -790,6 +798,11 @@ public final class GraphicsSmoke {
                                 || disabledEntityCustomImageGreenPixels * 4 >= activeEntityCustomImageGreenPixels
                                 ? new IllegalStateException("The entity custom-image signal was absent or unchanged: scene green active/disabled="
                                         + activeEntityCustomImageGreenPixels + "/" + disabledEntityCustomImageGreenPixels) : null;
+                    } else if (entityCustomTextureFixture) {
+                        failure = activeEntityCustomTextureGreenPixels < 100
+                                || disabledEntityCustomTextureGreenPixels * 4 >= activeEntityCustomTextureGreenPixels
+                                ? new IllegalStateException("The entity custom-texture signal was absent or unchanged: scene green active/disabled="
+                                        + activeEntityCustomTextureGreenPixels + "/" + disabledEntityCustomTextureGreenPixels) : null;
                     } else if (storageBufferFixture) {
                         failure = activePixels < 2000 || count * 4 >= activePixels
                                 ? new IllegalStateException("The shadow storage-buffer signal was absent or unchanged: active="
@@ -1108,6 +1121,8 @@ public final class GraphicsSmoke {
                     + ",\"disabledBasicGreenPixels\":" + disabledBasicGreenPixels
                     + ",\"activeEntityCustomImageGreenPixels\":" + activeEntityCustomImageGreenPixels
                     + ",\"disabledEntityCustomImageGreenPixels\":" + disabledEntityCustomImageGreenPixels
+                    + ",\"activeEntityCustomTextureGreenPixels\":" + activeEntityCustomTextureGreenPixels
+                    + ",\"disabledEntityCustomTextureGreenPixels\":" + disabledEntityCustomTextureGreenPixels
                     + ",\"activeBasicMrtPixels\":" + activeBasicMrtPixels
                     + ",\"disabledBasicMrtPixels\":" + disabledBasicMrtPixels
                     + ",\"activeBeaconBeamGreenPixels\":" + activeBeaconBeamGreenPixels

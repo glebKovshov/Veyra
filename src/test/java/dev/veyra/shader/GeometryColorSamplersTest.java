@@ -47,6 +47,18 @@ class GeometryColorSamplersTest {
                 + "uniform sampler2D colortex16;\nvoid main(){gl_FragColor=vec4(1.0);}\n").isEmpty());
     }
 
+    @Test void configuredCustomTexturesTakePrecedenceOverLegacyColorAliases() throws IOException {
+        String source = "uniform sampler2D gaux4;\n"
+                + "void main(){gl_FragColor=texture2D(gaux4,vec2(0.5));}\n";
+        assertEquals(Map.of("gaux4", 7), GeometryColorSamplers.read(source));
+        assertTrue(GeometryColorSamplers.read(source, Set.of("gaux4")).isEmpty());
+
+        String sceneAlias = "uniform sampler2D gcolor;\n"
+                + "void main(){gl_FragColor=texture2D(gcolor,vec2(0.5));}\n";
+        assertThrows(IOException.class, () -> GeometryColorSamplers.read(sceneAlias));
+        assertTrue(GeometryColorSamplers.read(sceneAlias, Set.of("gcolor")).isEmpty());
+    }
+
     @Test void rejectsSceneFeedbackInvalidTypesAndOutOfRangeInputs() {
         for (String declaration : new String[]{"sampler2D colortex0", "sampler2D gcolor",
                 "sampler2D colortex16", "samplerCube colortex5"}) {

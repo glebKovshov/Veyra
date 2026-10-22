@@ -318,6 +318,8 @@ public final class VeyraRenderer {
     private static DamagedBlockPipelineSet damagedBlockPipelineSet;
     private static BeaconBeamPipelineSet beaconBeamPipelineSet;
     private static GraphicsPipeline cloudPipeline;
+    private static ShaderPack shaderPackTexturesPreparedFor;
+    private static ShaderPack shaderPackTexturesFailedFor;
     private static boolean cloudPipelineUsesExtendedVertexFormat;
     private static final VeyraColorTextureSnapshot cloudSceneColorSnapshot =
             new VeyraColorTextureSnapshot("cloud colortex0 scene snapshot");
@@ -1779,6 +1781,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getTerrainPipeline(TerrainRenderType terrainRenderType) {
+        if (!ensureShaderPackTexturesPrepared()) return null;
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (VeyraShadowRenderer.isRendering()) {
@@ -1825,6 +1828,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getCloudsPipeline() {
+        if (!ensureShaderPackTexturesPrepared()) return null;
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasCloudFragment()) {
@@ -1916,6 +1920,25 @@ public final class VeyraRenderer {
             VeyraShaderPackTextures.bind(pass, pipeline, pack, programName);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not bind shader-pack texture inputs for '" + programName + "'.", exception);
+        }
+    }
+
+    /** Prepare pack-local texture inputs for packs restored from settings without calling {@code select()}. */
+    public static boolean ensureShaderPackTexturesPrepared() {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return true;
+        ShaderPack pack = selectedPack().orElse(null);
+        if (pack == null || shaderPackTexturesPreparedFor == pack) return true;
+        if (shaderPackTexturesFailedFor == pack) return false;
+        try {
+            VeyraShaderPackTextures.ensurePrepared(pack);
+            shaderPackTexturesPreparedFor = pack;
+            shaderPackTexturesFailedFor = null;
+            return true;
+        } catch (IOException exception) {
+            shaderPackTexturesFailedFor = pack;
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not prepare shader-pack texture inputs for '{}'.", pack.name(), exception);
+            return false;
         }
     }
 
@@ -2045,13 +2068,15 @@ public final class VeyraRenderer {
         try {
             String fragmentSource = spec.textPipeline()
                     ? EntityShaderAdapter.adaptTextFragment(spec.fragmentSource(), spec.programName(),
-                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId)
+                            spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
+                            spec.customTextureSamplers())
                     : EntityShaderAdapter.adaptGeometryFragment(spec.fragmentSource(), spec.programName(), spec.handPass(),
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
                             !isItemEntityTranslucentCullPipeline(original), selectedMainHand,
-                            spec.vertexVaryings());
+                            spec.vertexVaryings(), spec.customTextureSamplers());
             String sourceHash = sha256(spec.programName() + '\n' + fragmentSource + '\n'
-                    + (spec.vertexSource() == null ? "" : spec.vertexSource()) + '\n' + identifiers);
+                    + (spec.vertexSource() == null ? "" : spec.vertexSource()) + '\n' + identifiers
+                    + '\n' + new java.util.TreeSet<>(spec.customTextureSamplers()));
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, spec.programName(), sourceHash,
                     spec.outputLayout(), spec.blendSettings(), spec.shadowPass(), spec.customImageResources());
             RenderPipeline pipeline = ENTITY_PIPELINE_CACHE.get(cacheKey);
@@ -2069,14 +2094,14 @@ public final class VeyraRenderer {
                                 spec.shadowFragmentImageStage() == null
                                         ? new ShaderPackImageBindings.PreparedStage("", List.of())
                                         : spec.shadowFragmentImageStage(),
-                                spec.customImageResources())
+                                spec.customImageResources(), spec.customTextureSamplers())
                         : compileEntityPipeline(original, fragmentSource, sourceHash,
                                 spec.requiresNormal(), spec.requiresLightmap(), spec.requiresViewPosition(),
                                 spec.requiresViewNormal(), false, spec.handPass(), spec.programName(),
                                 spec.outputLayout(), spec.blendSettings(), spec.colorInputs(),
                                 spec.vertexSource(), spec.vertexVaryings(), selectedEntityId,
                                 selectedBlockId, selectedItemId, spec.customImageResources(),
-                                spec.customImageStage());
+                                spec.customImageStage(), spec.customTextureSamplers());
                 ENTITY_PIPELINE_CACHE.put(cacheKey, pipeline);
             }
             if (spec.shadowPass()) {
@@ -2577,6 +2602,8 @@ public final class VeyraRenderer {
         VeyraCloudTexture.close();
         VeyraShadowRenderer.closeFallbackTexture();
         VeyraShaderPackTextures.closeAll();
+        shaderPackTexturesPreparedFor = null;
+        shaderPackTexturesFailedFor = null;
     }
 
     public static String select(ShaderPack pack) {
@@ -2678,6 +2705,8 @@ public final class VeyraRenderer {
                 preparedClouds = compileCloudPipeline(pack, preparedTerrain == null ? null : preparedTerrain.compute());
             }
             repository.select(pack);
+            shaderPackTexturesPreparedFor = pack;
+            shaderPackTexturesFailedFor = null;
             BlockIdMap.activate(nextBlockIds);
             VeyraShadowRenderer.configure(preparedShadowSettings, preparedShadowColorTargets);
             boolean terrainRebuilt = updateTerrainLayerMode(pack);
@@ -2876,6 +2905,8 @@ public final class VeyraRenderer {
         }
         // Disabling must remain possible even when the configuration directory is read-only.
         repository.clearSelection();
+        shaderPackTexturesPreparedFor = null;
+        shaderPackTexturesFailedFor = null;
         VeyraShadowRenderer.configure(ShadowSettings.DEFAULT);
         updateTerrainLayerMode(null);
         renderingEnabled = false;
@@ -4263,6 +4294,7 @@ public final class VeyraRenderer {
 
     private static EntityPipelineSet compileEntityPipelines(
             ShaderPack pack, boolean hand, VeyraComputePipelineSet customImages) throws IOException {
+        ShaderPackCustomTextureProperties packTextures = pack.readCustomTextureProperties();
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isEntityRenderPipeline)
                 .toList();
@@ -4287,6 +4319,7 @@ public final class VeyraRenderer {
             boolean requiresViewPosition = false;
             boolean requiresViewNormal = false;
             Set<Integer> colorInputs = Set.of();
+            Set<String> customTextureSamplers = Set.of();
             FragmentOutputs outputLayout = null;
             GeometryBlendSettings blendSettings = null;
             String packVertexSource = null;
@@ -4296,14 +4329,21 @@ public final class VeyraRenderer {
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 customImageStage = prepareNativeImageSamplers(pack, programName, rawFragmentSource, customImages);
                 rawFragmentSource = customImageStage.source();
+                Set<String> configuredTextureSamplers = packTextures.samplersForProgram(programName);
+                customTextureSamplers = new HashSet<>(TerrainShaderAdapter.usedCustomTextureSamplers(
+                        rawFragmentSource, configuredTextureSamplers));
                 Optional<String> customVertex = pack.readStage(programName + ".vsh");
                 if (customVertex.isPresent()) {
                     packVertexSource = customVertex.get();
-                    packVertexVaryings = EntityVertexShaderAdapter.describeVaryings(programName, packVertexSource);
+                    customTextureSamplers.addAll(TerrainShaderAdapter.usedCustomTextureSamplers(
+                            packVertexSource, configuredTextureSamplers));
+                    packVertexVaryings = EntityVertexShaderAdapter.describeVaryings(
+                            programName, packVertexSource, customTextureSamplers);
                 }
                 outputLayout = FragmentOutputs.parse(rawFragmentSource);
                 blendSettings = pack.readGeometryBlendSettings(programName);
-                colorInputs = GeometryColorSamplers.indices(GeometryColorSamplers.read(rawFragmentSource));
+                colorInputs = GeometryColorSamplers.indices(
+                        GeometryColorSamplers.read(rawFragmentSource, customTextureSamplers));
                 fragmentSource = rawFragmentSource;
                 if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)
                         || packVertexSource != null && TerrainShaderAdapter.usesNoiseSampler(packVertexSource)) {
@@ -4316,7 +4356,7 @@ public final class VeyraRenderer {
                 fragmentSource = EntityShaderAdapter.adaptGeometryFragment(
                         fragmentSource, programName, hand, pack.hasShadowFragment(), -1, -1,
                         ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original), false,
-                        packVertexVaryings);
+                        packVertexVaryings, customTextureSamplers);
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -4326,7 +4366,8 @@ public final class VeyraRenderer {
                 continue;
             }
             String sourceHash = sha256(programName + '\n' + fragmentSource + '\n'
-                    + (packVertexSource == null ? "" : packVertexSource) + '\n' + customImageStage.resources());
+                    + (packVertexSource == null ? "" : packVertexSource) + '\n' + customImageStage.resources()
+                    + '\n' + new java.util.TreeSet<>(customTextureSamplers));
             VeyraComputePipelineSet imageResourceIdentity = customImageStage.resources().isEmpty() ? null : customImages;
             EntityPipelineKey cacheKey = new EntityPipelineKey(
                     original, programName, sourceHash, outputLayout, blendSettings, false, imageResourceIdentity);
@@ -4338,7 +4379,7 @@ public final class VeyraRenderer {
                             requiresViewPosition, requiresViewNormal, false, hand, programName,
                             outputLayout, blendSettings, colorInputs, packVertexSource, packVertexVaryings,
                             EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
-                            imageResourceIdentity, customImageStage);
+                            imageResourceIdentity, customImageStage, customTextureSamplers);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -4353,7 +4394,8 @@ public final class VeyraRenderer {
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
                     false, hand, false, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs,
-                    packVertexSource, packVertexVaryings, imageResourceIdentity, customImageStage, null));
+                    packVertexSource, packVertexVaryings, imageResourceIdentity, customTextureSamplers,
+                    customImageStage, null));
         }
         if (pipelines.isEmpty() && (hand
                 ? pack.hasHandFragment() || pack.hasHandWaterFragment()
@@ -4367,20 +4409,28 @@ public final class VeyraRenderer {
 
     private static EntityPipelineSet compileShadowEntityPipelines(ShaderPack pack, String programName) throws IOException {
         VeyraComputePipelineSet customImages = activeCustomImageResources();
+        ShaderPackCustomTextureProperties packTextures = pack.readCustomTextureProperties();
         String rawFragmentSource = pack.readShadowFragment(programName, customImages != null)
                 .orElseThrow(() -> new IOException("The pack no longer contains a supported shadow fragment."));
         ShaderPackImageBindings.PreparedStage fragmentImages = prepareNativeImageSamplers(
                 pack, programName, "fsh", rawFragmentSource, customImages, false);
         rawFragmentSource = fragmentImages.source();
+        Set<String> configuredTextureSamplers = packTextures.samplersForProgram(programName);
+        Set<String> customTextureSamplers = new HashSet<>(TerrainShaderAdapter.usedCustomTextureSamplers(
+                rawFragmentSource, configuredTextureSamplers));
         Optional<String> selectedShadowVertex = pack.readShadowVertex(programName, customImages != null);
         ShaderPackImageBindings.PreparedStage vertexImages = selectedShadowVertex.isPresent()
                 ? prepareNativeImageSamplers(pack, programName, "vsh", selectedShadowVertex.get(), customImages, true)
                 : new ShaderPackImageBindings.PreparedStage("", List.of());
         selectedShadowVertex = selectedShadowVertex.map(ignored -> vertexImages.source());
+        selectedShadowVertex.ifPresent(vertexSource -> customTextureSamplers.addAll(
+                TerrainShaderAdapter.usedCustomTextureSamplers(vertexSource, configuredTextureSamplers)));
         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings = selectedShadowVertex.isPresent()
-                ? EntityVertexShaderAdapter.describeVaryings(programName, selectedShadowVertex.get()) : Map.of();
+                ? EntityVertexShaderAdapter.describeVaryings(
+                        programName, selectedShadowVertex.get(), customTextureSamplers) : Map.of();
         FragmentOutputs outputLayout = FragmentOutputs.parse(rawFragmentSource);
         GeometryBlendSettings blendSettings = pack.readGeometryBlendSettings(programName);
+        Set<Integer> colorInputs = Set.of();
         boolean usesNoiseSampler = EntityShaderAdapter.usesNoiseSampler(rawFragmentSource)
                 || selectedShadowVertex.isPresent()
                 && TerrainShaderAdapter.usesNoiseSampler(selectedShadowVertex.get());
@@ -4395,9 +4445,10 @@ public final class VeyraRenderer {
                 && !vertexVaryings.containsKey("position");
         String fragmentSource = EntityShaderAdapter.adaptGeometryFragment(
                 rawFragmentSource, programName, false, true, -1, -1,
-                ItemIdMap.UNMAPPED, false, false, vertexVaryings);
+                ItemIdMap.UNMAPPED, false, false, vertexVaryings, customTextureSamplers);
         String sourceHash = sha256(programName + '\n' + fragmentSource + '\n'
-                + selectedShadowVertex.orElse("") + '\n' + vertexImages.resources() + '\n' + fragmentImages.resources());
+                + selectedShadowVertex.orElse("") + '\n' + vertexImages.resources() + '\n' + fragmentImages.resources()
+                + '\n' + new java.util.TreeSet<>(customTextureSamplers));
         VeyraComputePipelineSet imageResourceIdentity = vertexImages.resources().isEmpty()
                 && fragmentImages.resources().isEmpty() ? null : customImages;
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
@@ -4413,7 +4464,7 @@ public final class VeyraRenderer {
                 shadowPipeline = compileShadowEntityPipeline(original, programName, fragmentSource, sourceHash,
                         requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
                         requiresShadowPosition, selectedShadowVertex.orElse(null), vertexVaryings,
-                        vertexImages, fragmentImages, imageResourceIdentity);
+                        vertexImages, fragmentImages, imageResourceIdentity, customTextureSamplers);
                 ENTITY_PIPELINE_CACHE.put(cacheKey, shadowPipeline);
             }
             GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(shadowPipeline).getPipeline();
@@ -4423,9 +4474,9 @@ public final class VeyraRenderer {
             pipelines.put(original, shadowPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
-                    true, false, false, false, outputLayout, blendSettings, Set.of(),
-                    selectedShadowVertex.orElse(null), vertexVaryings, imageResourceIdentity, vertexImages,
-                    fragmentImages));
+                    true, false, false, false, outputLayout, blendSettings, colorInputs,
+                    selectedShadowVertex.orElse(null), vertexVaryings, imageResourceIdentity,
+                    customTextureSamplers, vertexImages, fragmentImages));
         }
         if (pipelines.isEmpty()) {
             throw new IOException("Minecraft's entity render pipelines were not found for the shadow pass.");
@@ -4441,7 +4492,8 @@ public final class VeyraRenderer {
             Map<String, TerrainVertexShaderAdapter.PackVarying> packVertexVaryings,
             ShaderPackImageBindings.PreparedStage vertexImages,
             ShaderPackImageBindings.PreparedStage fragmentImages,
-            VeyraComputePipelineSet customImages) throws IOException {
+            VeyraComputePipelineSet customImages,
+            Set<String> customTextureSamplers) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
                 "veyra", "shaderpack/" + programName + "/" + sourceHash);
         Identifier location = Identifier.fromNamespaceAndPath("veyra",
@@ -4467,7 +4519,9 @@ public final class VeyraRenderer {
                 adaptedVertex = minecraftVertex;
             } else {
                 EntityVertexShaderAdapter.AdaptedStage selectedVertex = EntityVertexShaderAdapter.adaptStage(
-                        minecraftVertex, packVertexSource, programName, false);
+                        minecraftVertex, packVertexSource, programName, false,
+                        EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
+                        customTextureSamplers);
                 adaptedVertex = selectedVertex.source();
                 usesMidTexCoord = selectedVertex.usesMidTexCoord();
             }
@@ -4506,6 +4560,7 @@ public final class VeyraRenderer {
         };
         Set<String> customImageSamplers = new HashSet<>(customImageSamplerNames(vertexImages));
         customImageSamplers.addAll(customImageSamplerNames(fragmentImages));
+        customImageSamplers.addAll(customTextureSamplers);
         if (usesMidTexCoord && original.getVertexFormatMode() != VertexFormat.Mode.QUADS) {
             throw new IOException(programName + ".vsh uses mc_midTexCoord, but " + original.getLocation()
                     + " does not emit QUADS.");
@@ -4538,6 +4593,7 @@ public final class VeyraRenderer {
 
     private static EntityPipelineSet compileBlockEntityPipelines(
             ShaderPack pack, VeyraComputePipelineSet customImages) throws IOException {
+        ShaderPackCustomTextureProperties packTextures = pack.readCustomTextureProperties();
         List<RenderPipeline> candidates = RenderPipelines.getStaticPipelines().stream()
                 .filter(VeyraRenderer::isEntityRenderPipeline)
                 .toList();
@@ -4557,6 +4613,7 @@ public final class VeyraRenderer {
             boolean requiresViewPosition = false;
             boolean requiresViewNormal = false;
             Set<Integer> colorInputs = Set.of();
+            Set<String> customTextureSamplers = Set.of();
             FragmentOutputs outputLayout = null;
             GeometryBlendSettings blendSettings = null;
             String packVertexSource = null;
@@ -4566,14 +4623,21 @@ public final class VeyraRenderer {
                         .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
                 customImageStage = prepareNativeImageSamplers(pack, programName, rawFragmentSource, customImages);
                 rawFragmentSource = customImageStage.source();
+                Set<String> configuredTextureSamplers = packTextures.samplersForProgram(programName);
+                customTextureSamplers = new HashSet<>(TerrainShaderAdapter.usedCustomTextureSamplers(
+                        rawFragmentSource, configuredTextureSamplers));
                 Optional<String> customVertex = pack.readStage(programName + ".vsh");
                 if (customVertex.isPresent()) {
                     packVertexSource = customVertex.get();
-                    packVertexVaryings = EntityVertexShaderAdapter.describeVaryings(programName, packVertexSource);
+                    customTextureSamplers.addAll(TerrainShaderAdapter.usedCustomTextureSamplers(
+                            packVertexSource, configuredTextureSamplers));
+                    packVertexVaryings = EntityVertexShaderAdapter.describeVaryings(
+                            programName, packVertexSource, customTextureSamplers);
                 }
                 outputLayout = FragmentOutputs.parse(rawFragmentSource);
                 blendSettings = pack.readGeometryBlendSettings(programName);
-                colorInputs = GeometryColorSamplers.indices(GeometryColorSamplers.read(rawFragmentSource));
+                colorInputs = GeometryColorSamplers.indices(
+                        GeometryColorSamplers.read(rawFragmentSource, customTextureSamplers));
                 fragmentSource = rawFragmentSource;
                 if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)
                         || packVertexSource != null && TerrainShaderAdapter.usesNoiseSampler(packVertexSource)) {
@@ -4586,7 +4650,7 @@ public final class VeyraRenderer {
                 fragmentSource = EntityShaderAdapter.adaptGeometryFragment(
                         fragmentSource, programName, false, pack.hasShadowFragment(), -1, -1,
                         ItemIdMap.UNMAPPED, !isItemEntityTranslucentCullPipeline(original), false,
-                        packVertexVaryings);
+                        packVertexVaryings, customTextureSamplers);
             } catch (IOException exception) {
                 if (!fallback) {
                     throw exception;
@@ -4596,7 +4660,8 @@ public final class VeyraRenderer {
                 continue;
             }
             String sourceHash = sha256(programName + '\n' + fragmentSource + '\n'
-                    + (packVertexSource == null ? "" : packVertexSource) + '\n' + customImageStage.resources());
+                    + (packVertexSource == null ? "" : packVertexSource) + '\n' + customImageStage.resources()
+                    + '\n' + new java.util.TreeSet<>(customTextureSamplers));
             VeyraComputePipelineSet imageResourceIdentity = customImageStage.resources().isEmpty() ? null : customImages;
             EntityPipelineKey cacheKey = new EntityPipelineKey(
                     original, programName, sourceHash, outputLayout, blendSettings, false, imageResourceIdentity);
@@ -4608,7 +4673,7 @@ public final class VeyraRenderer {
                             requiresViewPosition, requiresViewNormal, false, false, programName,
                             outputLayout, blendSettings, colorInputs, packVertexSource, packVertexVaryings,
                             EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
-                            imageResourceIdentity, customImageStage);
+                            imageResourceIdentity, customImageStage, customTextureSamplers);
                 } catch (IOException exception) {
                     if (!fallback) {
                         throw exception;
@@ -4623,7 +4688,8 @@ public final class VeyraRenderer {
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
                     false, false, false, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs,
-                    packVertexSource, packVertexVaryings, imageResourceIdentity, customImageStage, null));
+                    packVertexSource, packVertexVaryings, imageResourceIdentity, customTextureSamplers,
+                    customImageStage, null));
         }
         compileSignTextPipelines(pack, customImages, pipelines, variantSources);
         if (pipelines.isEmpty() && !pack.blockPrograms().isEmpty()) {
@@ -4650,11 +4716,14 @@ public final class VeyraRenderer {
         FragmentOutputs outputLayout;
         GeometryBlendSettings blendSettings;
         ShaderPackImageBindings.PreparedStage customImageStage;
+        Set<String> customTextureSamplers = Set.of();
         try {
             rawFragmentSource = pack.readBlockFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
             customImageStage = prepareNativeImageSamplers(pack, programName, rawFragmentSource, customImages);
             rawFragmentSource = customImageStage.source();
+            customTextureSamplers = TerrainShaderAdapter.usedCustomTextureSamplers(
+                    rawFragmentSource, pack.readCustomTextureProperties().samplersForProgram(programName));
             outputLayout = FragmentOutputs.parse(rawFragmentSource);
             blendSettings = pack.readGeometryBlendSettings(programName);
             fragmentSource = rawFragmentSource;
@@ -4664,14 +4733,15 @@ public final class VeyraRenderer {
             requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
             requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
             fragmentSource = EntityShaderAdapter.adaptTextFragment(
-                    fragmentSource, programName, pack.hasShadowFragment(), -1, -1);
+                    fragmentSource, programName, pack.hasShadowFragment(), -1, -1,
+                    ItemIdMap.UNMAPPED, customTextureSamplers);
         } catch (IOException exception) {
             VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
                     programName, exception.getMessage());
             return;
         }
         String sourceHash = sha256("sign_text_" + programName + '\n' + fragmentSource
-                + '\n' + customImageStage.resources());
+                + '\n' + customImageStage.resources() + '\n' + new java.util.TreeSet<>(customTextureSamplers));
         for (RenderPipeline original : candidates) {
             VeyraComputePipelineSet imageResourceIdentity = customImageStage.resources().isEmpty() ? null : customImages;
             EntityPipelineKey cacheKey = new EntityPipelineKey(original, "sign_text_" + programName,
@@ -4684,7 +4754,7 @@ public final class VeyraRenderer {
                             requiresViewPosition, false, false, false, programName,
                             outputLayout, blendSettings, Set.of(), null, Map.of(),
                             EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
-                            imageResourceIdentity, customImageStage);
+                            imageResourceIdentity, customImageStage, customTextureSamplers);
                 } catch (IOException exception) {
                     VeyraClient.LOGGER.warn("Skipping sign text pipeline {} for {}: {}",
                             original.getLocation(), programName, exception.getMessage());
@@ -4696,7 +4766,7 @@ public final class VeyraRenderer {
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     false, requiresLightmap, requiresViewPosition, false,
                     false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, Set.of(), null, Map.of(),
-                    imageResourceIdentity, customImageStage, null));
+                    imageResourceIdentity, customTextureSamplers, customImageStage, null));
         }
     }
 
@@ -4865,8 +4935,28 @@ public final class VeyraRenderer {
             int entityId, int blockEntityId, int currentRenderedItemId,
             VeyraComputePipelineSet customImages,
             ShaderPackImageBindings.PreparedStage customImageStage) throws IOException {
+        return compileEntityPipeline(original, fragmentSource, sourceHash,
+                requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal,
+                shadowPass, handPass, programName, outputLayout, blendSettings, colorInputs,
+                shaderPackVertexSource, vertexVaryings, entityId, blockEntityId, currentRenderedItemId,
+                customImages, customImageStage, Set.of());
+    }
+
+    private static RenderPipeline compileEntityPipeline(
+            RenderPipeline original, String fragmentSource, String sourceHash,
+            boolean requiresNormal, boolean requiresLightmap,
+            boolean requiresViewPosition, boolean requiresViewNormal,
+            boolean shadowPass, boolean handPass, String programName,
+            FragmentOutputs outputLayout, GeometryBlendSettings blendSettings,
+            Set<Integer> colorInputs,
+            String shaderPackVertexSource,
+            Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+            int entityId, int blockEntityId, int currentRenderedItemId,
+            VeyraComputePipelineSet customImages,
+            ShaderPackImageBindings.PreparedStage customImageStage,
+            Set<String> customTextureSamplers) throws IOException {
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
-                "veyra", "shaderpack/entities/" + sourceHash);
+                "veyra", "shaderpack/entities/" + programName + "/" + sourceHash);
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
@@ -4882,7 +4972,7 @@ public final class VeyraRenderer {
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, false);
             EntityVertexShaderAdapter.AdaptedStage selectedVertex = EntityVertexShaderAdapter.adaptStage(
                     minecraftVertex, shaderPackVertexSource, programName, handPass,
-                    entityId, blockEntityId, currentRenderedItemId);
+                    entityId, blockEntityId, currentRenderedItemId, customTextureSamplers);
             adaptedVertex = selectedVertex.source();
             usesMidTexCoord = selectedVertex.usesMidTexCoord();
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
@@ -4921,11 +5011,14 @@ public final class VeyraRenderer {
             throw new IOException(programName + ".vsh uses mc_midTexCoord, but " + original.getLocation()
                     + " does not emit QUADS.");
         }
+        Set<String> extraSamplers = new HashSet<>(customImageStage == null
+                ? Set.of() : customImageSamplerNames(customImageStage));
+        extraSamplers.addAll(customTextureSamplers);
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
                 fragmentShader, usesNoiseSampler, usesShadowSampler, TerrainShaderAdapter.usesSpecularSampler(fragmentSource),
                 ShadowColorSampler.used(fragmentSource), ShadowDepthSampler.used(fragmentSource), colorInputs,
-                false, customImageStage == null ? Set.of() : customImageSamplerNames(customImageStage),
+                false, extraSamplers,
                 ShadowColorSampler.indices(fragmentSource), usesMidTexCoord);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
@@ -8057,6 +8150,7 @@ public final class VeyraRenderer {
                                       String vertexSource,
                                       Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
                                       VeyraComputePipelineSet customImageResources,
+                                      Set<String> customTextureSamplers,
                                       ShaderPackImageBindings.PreparedStage customImageStage,
                                       ShaderPackImageBindings.PreparedStage shadowFragmentImageStage) {
         private boolean usesEntityId() {

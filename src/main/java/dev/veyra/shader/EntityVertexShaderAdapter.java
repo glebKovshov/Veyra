@@ -105,12 +105,19 @@ final class EntityVertexShaderAdapter {
     static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
                                    boolean handPass, int entityId, int blockEntityId,
                                    int currentRenderedItemId) throws IOException {
+        return adaptStage(minecraftSource, shaderPackSource, programName, handPass,
+                entityId, blockEntityId, currentRenderedItemId, Set.of());
+    }
+
+    static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName,
+                                   boolean handPass, int entityId, int blockEntityId,
+                                   int currentRenderedItemId, Set<String> customTextureSamplers) throws IOException {
         if (minecraftSource == null || minecraftSource.isBlank()) {
             throw new IOException("Minecraft's " + programName + " vertex shader is empty.");
         }
         PreparedStage pack = prepare(shaderPackSource, programName,
                 entityId, blockEntityId, currentRenderedItemId,
-                IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource));
+                IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource), customTextureSamplers);
         Matcher version = VERSION.matcher(minecraftSource);
         if (!version.find()) throw new IOException("Minecraft's " + programName + " vertex shader has no #version directive.");
         StringBuilder extensions = new StringBuilder();
@@ -142,7 +149,7 @@ final class EntityVertexShaderAdapter {
 
     static AdaptedStage validate(String programName, String shaderPackSource, boolean handPass) throws IOException {
         PreparedStage prepared = prepare(shaderPackSource, programName,
-                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, false);
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, false, Set.of());
         String base = validationNativeSource(programName, prepared.usesMidTexCoord());
         String adapted = base + "\n" + prepared.outputDeclarations()
                 + nativeBridge(programName, prepared.usesMidTexCoord())
@@ -155,14 +162,21 @@ final class EntityVertexShaderAdapter {
 
     static Map<String, TerrainVertexShaderAdapter.PackVarying> describeVaryings(
             String programName, String shaderPackSource) throws IOException {
+        return describeVaryings(programName, shaderPackSource, Set.of());
+    }
+
+    static Map<String, TerrainVertexShaderAdapter.PackVarying> describeVaryings(
+            String programName, String shaderPackSource, Set<String> customTextureSamplers) throws IOException {
         return prepare(shaderPackSource, programName,
-                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, false).varyings();
+                EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED, false,
+                customTextureSamplers).varyings();
     }
 
     private static PreparedStage prepare(String shaderPackSource, String programName,
                                          int entityId, int blockEntityId,
                                          int currentRenderedItemId,
-                                         boolean fogValuesAlreadyDeclared) throws IOException {
+                                         boolean fogValuesAlreadyDeclared,
+                                         Set<String> customTextureSamplers) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
@@ -228,7 +242,7 @@ final class EntityVertexShaderAdapter {
         if (main.find()) throw new IOException(programName + ".vsh must contain exactly one active main() entrypoint.");
 
         source = UnusedSamplerDeclarations.removeUnused(source);
-        SamplerBridge samplers = adaptSamplers(source, programName);
+        SamplerBridge samplers = adaptSamplers(source, programName, customTextureSamplers);
         source = samplers.source();
         source = EntityShaderAdapter.bindEntityIdentifiers(source, programName,
                 entityId, blockEntityId, currentRenderedItemId);
@@ -350,12 +364,14 @@ final class EntityVertexShaderAdapter {
         return programName.equals("shadow_entities") || programName.equals("shadow_block");
     }
 
-    private static SamplerBridge adaptSamplers(String source, String programName) throws IOException {
+    private static SamplerBridge adaptSamplers(String source, String programName,
+                                               Set<String> customTextureSamplers) throws IOException {
         Matcher matcher = SAMPLER.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuilder clean = new StringBuilder(source.length());
         int cursor = 0;
         boolean noise = false;
         Set<String> nativeSamplers = new HashSet<>();
+        Set<String> customSamplers = new java.util.TreeSet<>();
         while (matcher.find()) {
             String type = matcher.group(1), name = matcher.group(2);
             if (!type.equals("sampler2D")) {
@@ -364,6 +380,8 @@ final class EntityVertexShaderAdapter {
             if (name.equals("noisetex")) {
                 if (noise) throw new IOException(programName + ".vsh declares sampler 'noisetex' more than once.");
                 noise = true;
+            } else if (customTextureSamplers.contains(name)) {
+                customSamplers.add(name);
             } else if (Set.of("tex", "texture", "gtexture", "Sampler0", "lightmap", "Sampler2").contains(name)) {
                 nativeSamplers.add(name);
             } else {
@@ -378,6 +396,7 @@ final class EntityVertexShaderAdapter {
         if (arguments.usesEntityTexture()) bridge.append("uniform sampler2D Sampler0;\n");
         if (arguments.usesLightmap()) bridge.append("uniform sampler2D Sampler2;\n");
         if (noise) bridge.append("uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n");
+        for (String sampler : customSamplers) bridge.append("uniform sampler2D ").append(sampler).append(";\n");
         return new SamplerBridge(arguments.source(), bridge.toString(),
                 TerrainShaderAdapter.usesNoiseSampler(arguments.source()));
     }

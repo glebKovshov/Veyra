@@ -103,6 +103,7 @@ public abstract class VkRenderPassMixin {
 
     @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true, remap = false)
     private RenderPipeline veyra$routeEntityPipeline(RenderPipeline original) {
+        if (!VeyraRenderer.ensureShaderPackTexturesPrepared()) return original;
         RenderPipeline replacement = VeyraRenderer.getHandPipeline(original);
         if (replacement == null) {
             replacement = VeyraRenderer.getSignTextPipeline(original);

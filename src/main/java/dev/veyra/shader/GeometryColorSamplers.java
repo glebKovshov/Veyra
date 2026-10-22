@@ -21,11 +21,17 @@ public final class GeometryColorSamplers {
     private GeometryColorSamplers() { }
 
     public static Map<String, Integer> read(String source) throws IOException {
+        return read(source, Set.of());
+    }
+
+    /** Read color-buffer aliases while excluding names bound to shader-pack texture assets. */
+    public static Map<String, Integer> read(String source, Set<String> ignoredSamplers) throws IOException {
         String active = UnusedSamplerDeclarations.removeUnused(ShaderSource.maskBlockAndLineComments(source));
         var matcher = DECLARATION.matcher(active);
         Map<String, Integer> inputs = new LinkedHashMap<>();
         while (matcher.find()) {
             String name = matcher.group(2);
+            if (ignoredSamplers.contains(name)) continue;
             int index = LEGACY.indexOf(name);
             if (name.matches("colortex\\d+")) {
                 try { index = Integer.parseInt(name.substring(8)); }

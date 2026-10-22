@@ -26,21 +26,27 @@ public class ShaderCompileSmoke {
                     String programName = name.substring(0, name.length() - 4);
                     Path vertexPath = path.getParent().resolve(programName + ".vsh");
                     Path properties = path.getParent().resolve("shaders.properties");
-                    var imageProperties = ShaderPackImageProperties.parse(Files.exists(properties) ? Files.readString(properties) : "");
+                    String propertySource = Files.exists(properties) ? Files.readString(properties) : "";
+                    var imageProperties = ShaderPackImageProperties.parse(propertySource);
+                    var customTextureProperties = ShaderPackCustomTextureProperties.parse(propertySource);
                     source = GlslPreprocessor.process(name, source, imageProperties.images().isEmpty()
                             ? Map.of() : Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
                     var customImages = imageProperties.images().isEmpty()
                             ? new ShaderPackImageBindings.PreparedStage(source, List.of())
                             : ShaderPackImageBindings.prepare(name, source, imageProperties);
                     source = customImages.source();
+                    Set<String> customTextureSamplers = new HashSet<>(TerrainShaderAdapter.usedCustomTextureSamplers(
+                            source, customTextureProperties.samplersForProgram(programName)));
                     CustomUniforms.activate(Files.exists(properties)
-                            ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
+                            ? CustomUniforms.parse(propertySource) : CustomUniforms.EMPTY);
                     Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings = Map.of();
                     if (Files.exists(vertexPath)) {
                         String packVertex = ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
                             Path file = vertexPath.getParent().resolve(included);
                             return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                         });
+                        customTextureSamplers.addAll(TerrainShaderAdapter.usedCustomTextureSamplers(
+                                packVertex, customTextureProperties.samplersForProgram(programName)));
                         if (EntityVertexShaderAdapter.supportsProgram(programName)) {
                             boolean hand = programName.startsWith("gbuffers_hand");
                             String nativeInput = programName.equals("gbuffers_damagedblock")
@@ -53,7 +59,9 @@ public class ShaderCompileSmoke {
                                     EntityShaderAdapter.requiresViewPositionInput(source),
                                     EntityShaderAdapter.requiresViewNormalInput(source), false);
                             EntityVertexShaderAdapter.AdaptedStage adaptedVertex = EntityVertexShaderAdapter.adaptStage(
-                                    nativeVertex, packVertex, programName, hand);
+                                    nativeVertex, packVertex, programName, hand,
+                                    EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
+                                    customTextureSamplers);
                             compileVertex(compiler, options, adaptedVertex.source(),
                                     path.getParent().getFileName() + "/" + programName + ".vsh", true);
                             packVaryings = adaptedVertex.varyings();
@@ -74,9 +82,9 @@ public class ShaderCompileSmoke {
                             ? EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
                             programName.startsWith("gbuffers_hand"), Files.exists(path.getParent().resolve("shadow.fsh")),
                             -1, -1, ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
-                                    name.substring(0, name.length()-4)), false, packVaryings)
+                                    name.substring(0, name.length()-4)), false, packVaryings, customTextureSamplers)
                             : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
-                                    packVaryings);
+                                    packVaryings, false, programName, customTextureSamplers);
                     adapted = ShaderPackImageBindings.plan(20, customImages).decorate(adapted, customImages);
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);

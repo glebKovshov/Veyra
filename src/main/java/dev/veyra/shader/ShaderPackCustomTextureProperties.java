@@ -92,6 +92,28 @@ public record ShaderPackCustomTextureProperties(
         return BLOCK_ATLAS.equals(path);
     }
 
+    /** Resolve the logical shader-pack program name encoded in a Veyra fragment shader identifier path. */
+    public static String programNameForFragmentShaderPath(String shaderPath) {
+        if (shaderPath == null || !shaderPath.startsWith("shaderpack/")) return null;
+        String encoded = shaderPath.substring("shaderpack/".length());
+        if (encoded.startsWith("entities/")) {
+            String[] parts = encoded.split("/", -1);
+            return parts.length == 3 && !parts[1].isBlank() && parts[2].matches("[0-9a-f]{64}")
+                    ? parts[1] : null;
+        }
+        String[] parts = encoded.split("/", -1);
+        if (parts.length == 2 && !parts[0].isBlank() && parts[1].matches("[0-9a-f]{64}")) {
+            return parts[0];
+        }
+        if (parts.length == 1) {
+            int hashSeparator = parts[0].lastIndexOf('_');
+            if (hashSeparator > 0 && parts[0].substring(hashSeparator + 1).matches("[0-9a-f]{64}")) {
+                return parts[0].substring(0, hashSeparator);
+            }
+        }
+        return null;
+    }
+
     private static String programStage(String programName) {
         if (programName.startsWith("shadow_")) return "gbuffers";
         for (String stage : PROGRAM_STAGES) {

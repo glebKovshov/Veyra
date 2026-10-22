@@ -37,24 +37,32 @@ class ShaderAdapterTest {
                         ? new ShaderPackImageBindings.PreparedStage(source, List.of())
                         : ShaderPackImageBindings.prepare(name, source, imageProperties);
                 source = customImages.source();
+                String programName = name.substring(0, name.length() - 4);
+                var customTextureProperties = ShaderPackCustomTextureProperties.parse(
+                        Files.exists(properties) ? Files.readString(properties) : "");
+                Set<String> customTextureSamplers = new java.util.HashSet<>(
+                        TerrainShaderAdapter.usedCustomTextureSamplers(
+                                source, customTextureProperties.samplersForProgram(programName)));
                 CustomUniforms.activate(Files.exists(properties)
                         ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
                 String adapted;
                 try {
-                String programName = name.substring(0, name.length() - 4);
                 Path vertexPath = path.getParent().resolve(programName + ".vsh");
+                String packVertexSource = Files.exists(vertexPath)
+                        ? ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
+                            Path file = vertexPath.getParent().resolve(included);
+                            return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
+                        }) : null;
+                if (packVertexSource != null) {
+                    customTextureSamplers.addAll(TerrainShaderAdapter.usedCustomTextureSamplers(
+                            packVertexSource, customTextureProperties.samplersForProgram(programName)));
+                }
                 var packVaryings = Files.exists(vertexPath)
                         ? EntityVertexShaderAdapter.supportsProgram(programName)
-                                ? EntityVertexShaderAdapter.describeVaryings(programName,
-                                        ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
-                                            Path file = vertexPath.getParent().resolve(included);
-                                            return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
-                                        }))
+                                ? EntityVertexShaderAdapter.describeVaryings(
+                                        programName, packVertexSource, customTextureSamplers)
                                 : TerrainVertexShaderAdapter.validateAndGetVaryings(programName,
-                                        ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
-                                            Path file = vertexPath.getParent().resolve(included);
-                                            return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
-                                        }))
+                                        packVertexSource)
                         : java.util.Map.<String, TerrainVertexShaderAdapter.PackVarying>of();
                 if (name.equals("gbuffers_clouds.fsh")) {
                     Set<String> cloudCustomSamplers = customImages.resources().stream()
@@ -71,7 +79,7 @@ class ShaderAdapterTest {
                             programName.startsWith("gbuffers_hand"),
                             Files.exists(path.getParent().resolve("shadow.fsh")), -1, -1,
                             ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
-                                    name.substring(0, name.length()-4)), false, packVaryings);
+                                    name.substring(0, name.length()-4)), false, packVaryings, customTextureSamplers);
                 } else {
                     adapted = TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
                             packVaryings);
