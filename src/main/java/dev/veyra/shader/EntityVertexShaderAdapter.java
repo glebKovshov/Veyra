@@ -132,6 +132,8 @@ final class EntityVertexShaderAdapter {
                 + (handPass ? " gl_Position.z *= 0.125;" : "") + " }\n";
         String uniformBridge = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
                 nativeSource, pack.uniformBridge(), programName + " vertex bridge");
+        uniformBridge = ShaderStageUniformDeduplicator.removeDuplicateSamplers(
+                nativeSource, uniformBridge, programName + " vertex bridge");
         String source = nativeSource + "\n" + pack.outputDeclarations() + bridge
                 + uniformBridge + pack.source().replaceFirst(
                         "(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain(") + wrapper;

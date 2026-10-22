@@ -69,6 +69,26 @@ class EntityVertexShaderAdapterTest {
         assertEquals(1, occurrences(adapted, "uniform mat4 gbufferModelViewInverse;"), adapted);
     }
 
+    @Test
+    void reusesNativeLightmapSamplerInsteadOfDeclaringItAgainForThePack() throws Exception {
+        String nativeSource = NATIVE.replace("uniform mat4 ModelViewMat;",
+                "uniform mat4 ModelViewMat;\nuniform sampler2D Sampler2;");
+        String pack = """
+                #version 120
+                uniform sampler2D lightmap;
+                void main() {
+                    gl_Position = ftransform();
+                    vec4 lightmapSample = texture2D(lightmap, vec2(0.0));
+                }
+                """;
+
+        String adapted = EntityVertexShaderAdapter.adaptStage(
+                nativeSource, pack, "shadow_entities", false).source();
+
+        assertEquals(1, occurrences(adapted, "uniform sampler2D Sampler2;"), adapted);
+        assertTrue(adapted.contains("texture(Sampler2, vec2(0.0))"), adapted);
+    }
+
     private static int occurrences(String source, String needle) {
         int count = 0;
         for (int offset = 0; (offset = source.indexOf(needle, offset)) >= 0; offset += needle.length()) count++;
