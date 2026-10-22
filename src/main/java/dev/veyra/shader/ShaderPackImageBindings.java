@@ -21,7 +21,8 @@ final class ShaderPackImageBindings {
     private ShaderPackImageBindings() { }
 
     static PreparedStage prepare(String file, String source, ShaderPackImageProperties properties) throws IOException {
-        String active = GlslPreprocessor.process(file, source, Map.of(
+        String directivesSelected = RenderTargetDirectives.keepActiveComments(file, source);
+        String active = GlslPreprocessor.process(file, directivesSelected, Map.of(
                 "IRIS_FEATURE_CUSTOM_IMAGES", "1", "IRIS_FEATURE_COMPUTE_SHADERS", "1"));
         active = UnreachableGlslFunctions.removeUnreachable(active, "main");
         var declarations = UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(active));

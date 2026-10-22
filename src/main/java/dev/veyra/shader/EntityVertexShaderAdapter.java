@@ -41,10 +41,14 @@ final class EntityVertexShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:sampler\\w+|\\w+)\\s+\\w+\\s*;");
     private static final Pattern MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
+    private static final Pattern FUNCTION_INPUT_QUALIFIER = Pattern.compile(
+            "([,(][\\t \\r\\n]*)in\\b(?=[\\t \\r\\n]+[A-Za-z_][A-Za-z0-9_]*[\\t \\r\\n]+[A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern SHADER_HEADER = Pattern.compile(
+            "(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)(?:(?:[\\t ]*#extension[^\\r\\n]*)(?:\\r?\\n|$))*");
     private static final Pattern LEGACY_BLOCK_OVERLAY_INPUT = Pattern.compile("\\bgl_MultiTexCoord2\\b");
     private static final Pattern LEGACY_INPUT = Pattern.compile(
             "\\b(gl_MultiTexCoord[3-7]|gl_VertexID|gl_InstanceID|gl_ClipVertex|gl_FrontColor|gl_BackColor|"
-                    + "mc_Entity|at_tangent|mc_midTexCoord|at_midBlock|mc_midBlock)\\b");
+                    + "mc_Entity|at_tangent|at_midBlock|mc_midBlock)\\b");
     private static final Pattern MC_ENTITY_ATTRIBUTE_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
                     + "(?:attribute|in)\\s+vec4\\s+mc_Entity\\s*;"
@@ -64,7 +68,8 @@ final class EntityVertexShaderAdapter {
             "UV0", new NativeAttribute("vec2", 2),
             "UV1", new NativeAttribute("ivec2", 3),
             "UV2", new NativeAttribute("ivec2", 4),
-            "Normal", new NativeAttribute("vec3", 5));
+            "Normal", new NativeAttribute("vec3", 5),
+            "mc_midTexCoord", new NativeAttribute("vec4", 6));
     private static final Map<String, NativeAttribute> BLOCK_ATTRIBUTES = Map.of(
             "Position", new NativeAttribute("vec3", 0),
             "Color", new NativeAttribute("vec4", 1),
@@ -104,25 +109,32 @@ final class EntityVertexShaderAdapter {
         nativeSource = nativeSource.substring(0, nativeMain.start()) + "void veyraMinecraftEntityMain()"
                 + nativeSource.substring(nativeMain.end());
 
-        String bridge = nativeBridge(programName);
+        if (pack.usesMidTexCoord()) {
+            Matcher header = SHADER_HEADER.matcher(nativeSource);
+            if (!header.find()) throw new IOException("Minecraft's " + programName + " vertex shader has no #version header.");
+            nativeSource = nativeSource.substring(0, header.end()) + "in vec2 MidTexCoord;\n"
+                    + nativeSource.substring(header.end());
+        }
+        String bridge = nativeBridge(programName, pack.usesMidTexCoord());
         String wrapper = "\nvoid main() { veyraMinecraftEntityMain(); veyraShaderPackMain();"
                 + (handPass ? " gl_Position.z *= 0.125;" : "") + " }\n";
         String source = nativeSource + "\n" + pack.outputDeclarations() + bridge
                 + pack.uniformBridge() + pack.source().replaceFirst(
                         "(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain(") + wrapper;
-        return new AdaptedStage(source, pack.varyings(), pack.usesNoiseSampler());
+        return new AdaptedStage(source, pack.varyings(), pack.usesNoiseSampler(), pack.usesMidTexCoord());
     }
 
     static AdaptedStage validate(String programName, String shaderPackSource, boolean handPass) throws IOException {
-        String base = validationNativeSource(programName);
         PreparedStage prepared = prepare(shaderPackSource, programName,
                 EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED);
+        String base = validationNativeSource(programName, prepared.usesMidTexCoord());
         String adapted = base + "\n" + prepared.outputDeclarations()
-                + nativeBridge(programName)
+                + nativeBridge(programName, prepared.usesMidTexCoord())
                 + prepared.uniformBridge() + prepared.source().replaceFirst(
                         "(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain(");
         if (handPass) adapted += "\n// hand-depth is applied by the runtime wrapper after the pack entrypoint\n";
-        return new AdaptedStage(adapted, prepared.varyings(), prepared.usesNoiseSampler());
+        return new AdaptedStage(adapted, prepared.varyings(), prepared.usesNoiseSampler(),
+                prepared.usesMidTexCoord());
     }
 
     static Map<String, TerrainVertexShaderAdapter.PackVarying> describeVaryings(
@@ -137,6 +149,7 @@ final class EntityVertexShaderAdapter {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
+        source = removeDefaultFunctionInputQualifiers(source);
         source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName);
         source = UnreachableGlslFunctions.removeUnreachable(source, "main");
         source = UnusedUniformDeclarations.removeUnused(source);
@@ -171,6 +184,11 @@ final class EntityVertexShaderAdapter {
         if (unsupportedInput.find()) throw new IOException(programName + ".vsh uses legacy interface '"
                 + unsupportedInput.group(1) + "', which is not provided by Minecraft's "
                 + vertexFormatName(programName) + " vertex format.");
+        boolean usesMidTexCoord = Pattern.compile("\\bmc_midTexCoord\\b")
+                .matcher(ShaderSource.maskBlockAndLineComments(source)).find();
+        if (usesMidTexCoord && usesBlockFormat(programName)) {
+            throw new IOException(programName + ".vsh uses legacy interface 'mc_midTexCoord', which is not provided by Minecraft's BLOCK vertex format.");
+        }
         if (usesBlockFormat(programName)
                 && LEGACY_BLOCK_OVERLAY_INPUT.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
             throw new IOException(programName + ".vsh uses legacy interface 'gl_MultiTexCoord2', which is not provided by Minecraft's BLOCK vertex format.");
@@ -201,7 +219,7 @@ final class EntityVertexShaderAdapter {
         }
         String uniformBridge = fog.bridge() + uniforms.declarations() + uniforms.macros() + samplers.bridge();
         return new PreparedStage(source, List.copyOf(extensions), uniformBridge,
-                outputs.declarationsAndMacros(), outputs.varyings(), samplers.usesNoiseSampler());
+                outputs.declarationsAndMacros(), outputs.varyings(), samplers.usesNoiseSampler(), usesMidTexCoord);
     }
 
     private static String removeUnusedMcEntityDeclaration(String source, String programName) throws IOException {
@@ -230,6 +248,17 @@ final class EntityVertexShaderAdapter {
         }
         clean.append(source, cursor, source.length());
         return clean.toString();
+    }
+
+    private static String removeDefaultFunctionInputQualifiers(String source) {
+        Matcher matcher = FUNCTION_INPUT_QUALIFIER.matcher(ShaderSource.maskBlockAndLineComments(source));
+        StringBuilder normalized = new StringBuilder(source.length());
+        int cursor = 0;
+        while (matcher.find()) {
+            normalized.append(source, cursor, matcher.end(1));
+            cursor = matcher.end();
+        }
+        return normalized.append(source, cursor, source.length()).toString();
     }
 
     /** Entity and block-entity shadow draws have no block-material vertex attribute; zero is the Iris sentinel. */
@@ -366,7 +395,7 @@ final class EntityVertexShaderAdapter {
         return usesBlockFormat(programName) ? BLOCK_ATTRIBUTES : NEW_ENTITY_ATTRIBUTES;
     }
 
-    private static String nativeBridge(String programName) {
+    private static String nativeBridge(String programName, boolean usesMidTexCoord) {
         String lightmapAliases = usesBlockFormat(programName)
                 ? """
                 #define gl_MultiTexCoord1 vec4(vec2(UV2), 0.0, 1.0)
@@ -380,7 +409,8 @@ final class EntityVertexShaderAdapter {
                 #define gl_Color Color
                 #define gl_Normal Normal
                 #define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)
-                """ + lightmapAliases + """
+                """ + lightmapAliases + (usesMidTexCoord
+                ? "#define mc_midTexCoord vec4(MidTexCoord, 0.0, 1.0)\n" : "") + """
                 #define gl_ModelViewMatrix ModelViewMat
                 #define gl_ProjectionMatrix ProjMat
                 #define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)
@@ -390,14 +420,22 @@ final class EntityVertexShaderAdapter {
     }
 
     private static String validationNativeSource(String programName) {
+        return validationNativeSource(programName, false);
+    }
+
+    private static String validationNativeSource(String programName, boolean usesMidTexCoord) {
         StringBuilder source = new StringBuilder("""
                 #version 460
                 """);
         nativeAttributes(programName).entrySet().stream()
+                .filter(entry -> !usesMidTexCoord || !entry.getKey().equals("mc_midTexCoord"))
                 .sorted(java.util.Comparator.comparingInt(entry -> entry.getValue().location()))
                 .forEach(entry -> source.append("layout(location=").append(entry.getValue().location())
                         .append(") in ").append(entry.getValue().type()).append(' ').append(entry.getKey()).append(';')
                         .append('\n'));
+        if (usesMidTexCoord) {
+            source.append("in vec2 MidTexCoord;\n");
+        }
         return source.append("""
                 layout(location=0) out vec4 vertexColor;
                 layout(location=1) out vec2 texCoord0;
@@ -465,11 +503,11 @@ final class EntityVertexShaderAdapter {
     private static String sanitize(String name) { return name.replaceAll("[^A-Za-z0-9_]", "_"); }
 
     record AdaptedStage(String source, Map<String, TerrainVertexShaderAdapter.PackVarying> varyings,
-                        boolean usesNoiseSampler) { }
+                        boolean usesNoiseSampler, boolean usesMidTexCoord) { }
     private record PreparedStage(String source, List<String> extensions, String uniformBridge,
                                  String outputDeclarations,
                                  Map<String, TerrainVertexShaderAdapter.PackVarying> varyings,
-                                 boolean usesNoiseSampler) { }
+                                 boolean usesNoiseSampler, boolean usesMidTexCoord) { }
     private record OutputBridge(String source, String declarationsAndMacros,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> varyings) { }
     private record SamplerBridge(String source, String bridge, boolean usesNoiseSampler) { }

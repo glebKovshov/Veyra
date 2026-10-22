@@ -17,6 +17,7 @@
     "ShaderManagerMixin",
     "PipelineManagerMixin",
     "CustomVertexFormatMixin",
+    "EntityMidTexCoordBufferBuilderMixin",
     "TerrainBufferBuilderMixin",
     "TerrainBuilderMixin",
     "TerrainBlockRendererMixin",

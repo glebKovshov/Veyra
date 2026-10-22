@@ -74,11 +74,12 @@ final class IrisFogUniformAdapter {
             usesFog = true;
         }
         if (!usesFog) {
-            return new AdaptedShader(source, "", List.of());
+            return new AdaptedShader(source, "", List.of(), Set.of());
         }
         remaining.append(source, cursor, source.length());
         return new AdaptedShader(remaining.toString(),
-                (fogValuesAlreadyDeclared ? "" : FOG_BLOCK) + macros, List.copyOf(fields));
+                (fogValuesAlreadyDeclared ? "" : FOG_BLOCK) + macros,
+                List.copyOf(fields), Set.copyOf(declaredUniforms));
     }
 
     private static LegacyFogRewrite rewriteLegacyFog(String source, String programName) throws IOException {
@@ -106,7 +107,8 @@ final class IrisFogUniformAdapter {
         return new LegacyFogRewrite(rewritten.toString(), used);
     }
 
-    record AdaptedShader(String source, String bridge, List<ShaderPackUniformAdapter.UniformField> fields) {
+    record AdaptedShader(String source, String bridge, List<ShaderPackUniformAdapter.UniformField> fields,
+                         Set<String> aliasedUniforms) {
     }
 
     private record LegacyFogRewrite(String source, boolean used) {

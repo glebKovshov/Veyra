@@ -1,5 +1,23 @@
 # Veyra 0.2 validation status
 
+## Current feature candidate verification — 2026-10-22
+
+The JDK 21 run `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon` passed: **432 tests**, 96 example shaders preprocessed, and 112 shader sources compiled directly to Vulkan SPIR-V. The beta.30-metadata candidate JAR passed `scripts/verify_jar.py` for Minecraft 1.21.11 / VulkanMod 0.6.8 (882,797 bytes; SHA-256 `c6df07d2440a27df2c80893ab55914be792d1004b78218130067b60f52f0d7ce`).
+
+RTX 3070 runtime smokes passed for entity custom-image (**18,410 active / 0 disabled**), composite custom-image (**230,400 / 0**), and shadow MRT (**145,682 active / 0 disabled / 145,682 re-enabled**). The shadow entity pipeline bound an MRT containing `shadowcolor1`. No Vulkan VUID, validation-error, or device-lost markers appeared in these fixture logs.
+
+The refreshed pinned audit covers 4 packs / 75 cases (12 defaults + 63 profile/dimension cases), 5,178 declared stages / 5,124 preprocessed stages, 864 geometry fragments accepted / 0 rejected, and 18/18 active compute stages compiled. It reports 0 capability/adapter-error rows. Every row still has `visualValidation=false`; this is source validation, not whole-pack visual proof.
+
+The real Complementary Reimagined `COMPLEMENTARY` GPU smoke is still blocked before visual validation: `composite_colortex7` declares and uses active SSBO `blockDataBuffer`, which VulkanMod 0.6.8's native `RenderPipeline` cannot bind. Veyra now reports this as an explicit unsupported-capability error rather than letting the native parser crash. PR #84 remains draft; the latest CI results are for the previous remote head and must be rerun after the verified local fixes are pushed.
+
+## Cloud render-stage input and entity midpoint investigation — 2026-10-22
+
+Cloud `renderStage` now binds to Iris `MC_RENDER_STAGE_CLOUDS` (20) in the vertex and fragment adapters. The RTX 3070 `cloud-custom-image` runtime fixture passed with **52,446 active magenta pixels / 0 disabled**. It checks both the shared 3D image read and the cloud render-stage value. No Vulkan VUID, validation-error, or device-lost markers appeared; the fixture log retains the existing capability rejection for native entity shadow storage-image writes.
+
+The fresh four-pack audit covers 12 defaults and 63 profile cases / 5,178 declared stages / 5,124 preprocessed. It accepts **648** and rejects **216** geometry fragments; all **18/18** active compute stages compile. There are **0 cloud `renderStage` errors**, while 54 Complementary cases still reject entity/hand `mc_midTexCoord`. No row claims visual validation.
+
+Minecraft 1.21.11's mapped `NEW_ENTITY` format has Position, Color, UV0, UV1, UV2, Normal, and padding, with no per-quad midpoint. An accurate bridge currently has no isolated Veyra-only buffer contract; expanding the shared format would affect vanilla and third-party entity/item buffers, so the adapter retains its explicit capability error. Full JDK 21 build/tests passed **393/393**; the unpublished candidate JAR is 849,547 bytes (SHA-256 `9d0dfde44538512e445025d5f84f93654c2c7e6e732e8083a374d48c53f40b16`). PR #84 remains draft. The next step is to investigate an isolated entity/hand vertex format and retry the real Complementary profile.
+
 
 ## Shadow entity-stage linking follow-up - 2026-10-22
 

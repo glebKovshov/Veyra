@@ -1116,6 +1116,34 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void bindsIrisRenderStageForCloudVertexAndFragmentPrograms() throws IOException {
+        String cloudVertex = GlslPreprocessor.process("gbuffers_clouds.vsh", """
+                uniform int renderStage;
+                varying vec4 color;
+                void main() {
+                    gl_Position = ftransform();
+                    color = renderStage == MC_RENDER_STAGE_CLOUDS ? gl_Color : vec4(1.0, 0.0, 1.0, 1.0);
+                }
+                """);
+        CloudShaderAdapter.AdaptedVertex vertex = CloudShaderAdapter.adaptVertexWithMetadata(
+                "#version 450\nvoid main() { gl_Position = vec4(0.0); }\n", cloudVertex);
+        assertTrue(vertex.source().contains("const int renderStage = 20;"), vertex.source());
+        assertFalse(vertex.source().contains("uniform int renderStage"), vertex.source());
+
+        String cloudFragment = GlslPreprocessor.process("gbuffers_clouds.fsh", """
+                uniform int renderStage;
+                varying vec4 color;
+                void main() {
+                    gl_FragColor = renderStage == MC_RENDER_STAGE_CLOUDS
+                            ? color : vec4(1.0, 0.0, 1.0, 1.0);
+                }
+                """);
+        String fragment = CloudShaderAdapter.adaptFragment(cloudFragment);
+        assertTrue(fragment.contains("const int renderStage = 20;"), fragment);
+        assertFalse(fragment.contains("uniform int renderStage"), fragment);
+    }
+
+    @Test
     void mapsIrisFogUniformsIntoCloudPipelineFields() throws IOException {
         CloudShaderAdapter.AdaptedFragment adapted = CloudShaderAdapter.adapt("""
                 #version 120

@@ -21,6 +21,7 @@ class IrisRenderStagesTest {
         assertEquals("5", macros.get("MC_RENDER_STAGE_MOON"));
         assertEquals("6", macros.get("MC_RENDER_STAGE_STARS"));
         assertEquals("23", macros.get("MC_RENDER_STAGE_HAND_TRANSLUCENT"));
+        assertEquals("20", macros.get("MC_RENDER_STAGE_CLOUDS"));
 
         String processed = GlslPreprocessor.process("render-stage.glsl", """
                 #if MC_RENDER_STAGE_MOON == 5 && MC_RENDER_STAGE_STARS == 6
@@ -57,6 +58,7 @@ class IrisRenderStagesTest {
         assertEquals(13, IrisRenderStages.forProgram("gbuffers_damagedblock"));
         assertEquals(16, IrisRenderStages.forProgram("gbuffers_hand"));
         assertEquals(23, IrisRenderStages.forProgram("gbuffers_hand_water"));
+        assertEquals(20, IrisRenderStages.forProgram("gbuffers_clouds"));
         assertNull(IrisRenderStages.forProgram("gbuffers_weather"));
     }
 

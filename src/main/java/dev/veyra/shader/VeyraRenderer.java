@@ -21,6 +21,7 @@ import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.veyra.VeyraClient;
 import dev.veyra.vulkan.VeyraPipelineResources;
 import dev.veyra.vulkan.VeyraGeometryTargets;
@@ -170,11 +171,18 @@ public final class VeyraRenderer {
             "(?m)\\bconst\\s+int\\s+colortex\\d+Format\\s*=\\s*[A-Za-z_][A-Za-z0-9_]*\\s*;");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern LOCATION_LAYOUT = Pattern.compile("layout\\s*\\(\\s*location\\s*=\\s*\\d+\\s*\\)\\s*");
-    private static final Pattern VARYING_DECLARATION = Pattern.compile("(?m)^[\\t ]*(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;\\s*$");
+    private static final Pattern VARYING_DECLARATION = Pattern.compile(
+            "(?m)^[\\t ]*((?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*)"
+                    + "(?:varying|in)\\s+vec2\\s+(?:texcoord|texCoord)\\s*;[\\t ]*(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_OUTPUT_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|out)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?"
+                    + "(?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*(?:varying|out)\\s+"
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;"
+                    + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_INPUT_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:in|attribute)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?"
+                    + "(?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*(?:in|attribute)\\s+"
+                    + "[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_OTHER_OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|out)\\s+[^;]+;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern POST_VERTEX_UNIFORM_DECLARATION = Pattern.compile(
@@ -182,7 +190,9 @@ public final class VeyraRenderer {
     private static final Pattern UNSUPPORTED_VERTEX_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern POST_VERTEX_MAIN = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
     private static final Pattern POST_VERTEX_LEGACY_ATTRIBUTES = Pattern.compile(
-            "\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|gl_ModelViewProjectionMatrix)\\b");
+            "(?:\\b(?:gl_Normal|gl_Color|gl_MultiTexCoord[1-9][0-9]*|gl_ModelViewMatrix|gl_ProjectionMatrix|"
+                    + "gl_ModelViewProjectionMatrix|gl_NormalMatrix)\\b|"
+                    + "\\bgl_TextureMatrix\\s*\\[\\s*[1-9][0-9]*\\s*\\])");
     private static final Pattern MAIN_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+sampler2D\\s+(?:colortex0|Sampler0|InSampler)\\s*;\\s*$");
     private static final Pattern COLORTEX_SAMPLER_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler2D\\s+colortex(?:[1-9]|1[0-5])\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern SUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\s+(?:float|int|bool)\\s+(?:near|far|heldBlockLightValue2?|heldItemId2?|darknessLightFactor|shadowFade|velocity|playerMood|biome_precipitation|viewWidth|viewHeight|aspectRatio|frameTimeCounter|frameTime|frameCounter|sunAngle|rainStrength|wetness|thunderStrength|worldTime|worldDay|moonPhase|bedrockLevel|cloudHeight|endFlashIntensity|eyeAltitude|screenBrightness|blindness|nightVision|darknessFactor|isEyeInWater|isSpectator|is_sneaking|is_sprinting|is_on_ground|is_hurt|is_invisible|is_burning)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
@@ -193,7 +203,6 @@ public final class VeyraRenderer {
     private static final Pattern SUPPORTED_CAMERA_UNIFORM_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(?:vec3|ivec3|vec4)\\s+(?:lightningBoltPosition|playerLookVector|skyColor|eyePosition|relativeEyePosition|cameraPosition|cameraPositionInt|cameraPositionFract|previousCameraPosition|previousCameraPositionInt|previousCameraPositionFract)\\s*;[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern COLORTEX_SAMPLER = Pattern.compile("\\bcolortex([0-9]+)\\b");
-    private static final Pattern UNSUPPORTED_DEPTH_SAMPLER = Pattern.compile("\\bdepthtex(?![012]\\b)[A-Za-z0-9_]*\\b");
     private static final Pattern DEPTH_SAMPLER = Pattern.compile("\\b(?:depthtex0|DepthSampler)\\b");
     private static final Pattern DEPTH1_SAMPLER = Pattern.compile("\\bdepthtex1\\b");
     private static final Pattern DEPTH2_SAMPLER = Pattern.compile("\\bdepthtex2\\b");
@@ -1677,7 +1686,7 @@ public final class VeyraRenderer {
             return originalType;
         }
         if (isHandRendering()) {
-            if (!item || itemId == ItemIdMap.UNMAPPED || !pack.supportsHandPipeline()
+            if (!item || !pack.supportsHandPipeline()
                     || !isEntityRenderPipeline(original)) {
                 return originalType;
             }
@@ -3161,9 +3170,26 @@ public final class VeyraRenderer {
             List<String> vertexUniforms = source.vertexSource()
                     .map(shader -> readPostVertexUniforms(shader, source.name()))
                     .orElse(List.of());
-            for (AdaptedShader adapted : adaptShader(customImageStage.source(), vertexUniforms, pack.hasShadowFragment())) {
+            Set<Integer> vertexColorSamplers = source.vertexSource()
+                    .map(shader -> PostVertexColorSamplers.read(shader, source.name()))
+                    .orElse(Set.of());
+            boolean vertexUsesNoiseSampler = source.vertexSource()
+                    .map(shader -> PostVertexNoiseSampler.read(shader, source.name()))
+                    .orElse(false);
+            if (vertexUsesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+            for (AdaptedShader fragmentAdapted : adaptShader(
+                    customImageStage.source(), vertexUniforms, pack.hasShadowFragment())) {
+                Set<Integer> combinedColorSamplers = new java.util.TreeSet<>(fragmentAdapted.colorSamplers());
+                combinedColorSamplers.addAll(vertexColorSamplers);
+                AdaptedShader adapted = new AdaptedShader(fragmentAdapted.source(), fragmentAdapted.uniforms(),
+                        fragmentAdapted.usesDepthSampler(), fragmentAdapted.usesDepth1Sampler(),
+                        fragmentAdapted.usesDepth2Sampler(), fragmentAdapted.usesShadowSampler(),
+                        fragmentAdapted.shadowInputs(), Set.copyOf(combinedColorSamplers),
+                        fragmentAdapted.outputTarget());
                 String vertexSource = source.vertexSource()
-                        .map(shader -> adaptPostVertexShader(shader, source.name(), adapted.uniforms()))
+                        .map(shader -> adaptPostVertexShader(
+                                shader, source.name(), adapted.uniforms(),
+                                adapted.colorSamplers(), vertexUsesNoiseSampler))
                         .orElse(null);
                 String variantName = source.name() + "_colortex" + adapted.outputTarget();
                 AdaptedShader linked = customImageStage.resources().isEmpty() ? adapted
@@ -3172,6 +3198,9 @@ public final class VeyraRenderer {
                                 adapted.usesDepthSampler(), adapted.usesDepth1Sampler(), adapted.usesDepth2Sampler(),
                                 adapted.usesShadowSampler(), adapted.shadowInputs(), adapted.colorSamplers(),
                                 adapted.outputTarget());
+                dumpShaderSource("post-" + variantName + ".vsh", vertexSource);
+                dumpShaderSource("post-" + variantName + ".fsh", linked.source());
+                dumpShaderSource("post-" + variantName + ".uniforms", String.join("\n", adapted.uniforms()));
                 List<String> customSamplers = customImageStage.resources().stream()
                         .map(ComputeShaderAdapter.OpaqueResource::name).toList();
                 PipelineProgram program = pipelineProgram(variantName, linked, vertexSource,
@@ -3346,6 +3375,8 @@ public final class VeyraRenderer {
 
         source = UnusedUniformDeclarations.removeUnused(source);
         String uncommented = COMMENTS.matcher(source.replace("\uFEFF", "")).replaceAll("");
+        uncommented = PostVertexColorSamplers.stripDeclarations(uncommented);
+        uncommented = PostVertexNoiseSampler.stripDeclarations(uncommented);
         Matcher matcher = POST_VERTEX_UNIFORM_DECLARATION.matcher(uncommented);
         Set<String> declaredUniforms = new HashSet<>();
         while (matcher.find()) {
@@ -3416,10 +3447,16 @@ public final class VeyraRenderer {
         return SUPPORTED_UNIFORMS.contains(uniform) ? "float" : null;
     }
 
-    private static void appendShaderPackUniformBlock(StringBuilder source, List<String> uniforms) {
+    private static String appendShaderPackUniformBlock(StringBuilder source, List<String> uniforms, String shaderSource) {
+        return appendShaderPackUniformBlock(source, uniforms, shaderSource, Set.of());
+    }
+
+    private static String appendShaderPackUniformBlock(StringBuilder source, List<String> uniforms, String shaderSource,
+                                                       Set<String> uniformsAliasedByAnotherBlock) {
         if (uniforms.isEmpty()) {
-            return;
+            return shaderSource;
         }
+        String aliasSafeSource = ShaderPackLocalUniformRenamer.renameShadowingLocals(shaderSource, uniforms);
         source.append("layout(std140) uniform ").append(SHADERPACK_UNIFORMS).append(" {\n");
         for (String uniform : uniforms) {
             String type = shaderPackUniformType(uniform);
@@ -3427,16 +3464,25 @@ public final class VeyraRenderer {
             String memberName = isBooleanUniform(uniform) ? "veyra_" + uniform : uniform;
             source.append("    ").append(type).append(' ').append(memberName).append(";\n");
         }
-        source.append("};\n");
+        source.append("} veyraParameters;\n");
         for (String uniform : uniforms) {
+            if (uniformsAliasedByAnotherBlock.contains(uniform)) continue;
+            // A textual alias macro would also rewrite a local or parameter with the same name
+            // (Complementary defines a local `const float pi`). Keep that identifier in its own scope.
             if (isBooleanUniform(uniform)) {
-                source.append("#define ").append(uniform).append(" (veyra_")
+                source.append("#define ").append(uniform).append(" (veyraParameters.veyra_")
                         .append(uniform).append(" != 0)\n");
+            } else {
+                source.append("#define ").append(uniform).append(" veyraParameters.")
+                        .append(uniform).append('\n');
             }
         }
+        return aliasSafeSource;
     }
 
-    private static String adaptPostVertexShader(String source, String programName, List<String> uniforms) {
+    private static String adaptPostVertexShader(
+            String source, String programName, List<String> uniforms,
+            Set<Integer> colorSamplers, boolean usesNoiseSampler) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException(programName + ".vsh is empty.");
         }
@@ -3455,6 +3501,7 @@ public final class VeyraRenderer {
         body = Pattern.compile("(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)")
                 .matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
+        body = PostVertexInterfaceDeclarations.expand(body);
 
         if (UNSUPPORTED_VERTEX_UNIFORM_DECLARATION.matcher(POST_VERTEX_UNIFORM_DECLARATION.matcher(body).replaceAll(""))
                 .find()) {
@@ -3466,25 +3513,36 @@ public final class VeyraRenderer {
             throw new IllegalArgumentException(programName
                     + ".vsh vertex attributes are not available in Veyra's full-screen triangle bridge.");
         }
-        if (POST_VERTEX_LEGACY_ATTRIBUTES.matcher(body).find()) {
+        String livePostVertexSource = PostVertexLegacyFunctionFilter.removeUnreferencedDefinitions(
+                body, POST_VERTEX_LEGACY_ATTRIBUTES);
+        Matcher unsupportedLegacyInput = POST_VERTEX_LEGACY_ATTRIBUTES.matcher(livePostVertexSource);
+        if (unsupportedLegacyInput.find()) {
             throw new IllegalArgumentException(programName
-                    + ".vsh uses legacy vertex attributes or matrices that Veyra does not provide for post passes.");
+                    + ".vsh uses legacy vertex input '" + unsupportedLegacyInput.group()
+                    + "' that Veyra does not provide for post passes.");
         }
+        body = livePostVertexSource;
 
         Matcher outputMatcher = POST_VERTEX_OUTPUT_DECLARATION.matcher(body);
         StringBuffer withoutOutputs = new StringBuffer();
         int outputCount = 0;
+        String texCoordInterpolation = "";
         while (outputMatcher.find()) {
             String location = outputMatcher.group(1);
             String type = outputMatcher.group(2);
             String name = outputMatcher.group(3);
+            if (!type.equals("vec2") || !(name.equals("texcoord") || name.equals("texCoord"))) {
+                outputMatcher.appendReplacement(withoutOutputs, Matcher.quoteReplacement(outputMatcher.group()));
+                continue;
+            }
             if (location != null && !location.equals("0")) {
                 throw new IllegalArgumentException(programName + ".vsh can output only texcoord at location 0.");
             }
-            if (!type.equals("vec2") || !(name.equals("texcoord") || name.equals("texCoord"))) {
-                throw new IllegalArgumentException(programName
-                        + ".vsh output '" + name + "' is unsupported; declare only vec2 texcoord or vec2 texCoord.");
-            }
+            Matcher interpolation = Pattern.compile("\\b(?:flat|smooth|noperspective|centroid|sample)\\b\\s*")
+                    .matcher(outputMatcher.group());
+            StringBuilder qualifiers = new StringBuilder();
+            while (interpolation.find()) qualifiers.append(interpolation.group());
+            texCoordInterpolation = qualifiers.toString();
             outputCount++;
             outputMatcher.appendReplacement(withoutOutputs, "");
         }
@@ -3493,11 +3551,7 @@ public final class VeyraRenderer {
         if (outputCount > 1) {
             throw new IllegalArgumentException(programName + ".vsh can declare only one texture-coordinate output.");
         }
-        if (POST_VERTEX_OTHER_OUTPUT_DECLARATION.matcher(body).find()) {
-            throw new IllegalArgumentException(programName
-                    + ".vsh declares unsupported outputs; use only vec2 texcoord or vec2 texCoord.");
-        }
-
+        if (texCoordInterpolation.isEmpty()) texCoordInterpolation = "smooth ";
         Matcher mainMatcher = POST_VERTEX_MAIN.matcher(body);
         if (!mainMatcher.find()) {
             throw new IllegalArgumentException(programName + ".vsh must define void main().");
@@ -3507,15 +3561,19 @@ public final class VeyraRenderer {
         body = body.replaceAll("\\bgl_VertexID\\b", "gl_VertexIndex")
                 .replaceAll("\\bgl_TexCoord\\s*\\[\\s*0\\s*\\]", "texCoord")
                 .replaceAll("\\bgl_MultiTexCoord0\\b", "vec4(veyraFullscreenUv(), 0.0, 1.0)")
+                .replaceAll("\\bgl_TextureMatrix\\s*\\[\\s*0\\s*\\]", "mat4(1.0)")
                 .replaceAll("\\bgl_Vertex\\b", "veyraFullscreenPosition()")
                 .replaceAll("\\bftransform\\s*\\(\\s*\\)", "veyraFullscreenPosition()")
                 .replaceAll("\\btexcoord\\b", "texCoord")
+                .replaceAll("\\btexture2DLod\\s*\\(", "textureLod(")
                 .replaceAll("texture2D\\s*\\(", "texture(");
 
         StringBuilder adapted = new StringBuilder("#version 450\n").append(extensions);
-        appendShaderPackUniformBlock(adapted, uniforms);
+        body = appendShaderPackUniformBlock(adapted, uniforms, body);
+        adapted.append(PostVertexColorSamplers.declarations(colorSamplers))
+                .append(PostVertexNoiseSampler.declaration(usesNoiseSampler));
+        adapted.append(texCoordInterpolation).append("out vec2 texCoord;\n");
         return adapted.append("""
-                out vec2 texCoord;
                 vec2 veyraFullscreenUv() {
                     return vec2((gl_VertexIndex << 1) & 2, 1.0 - (gl_VertexIndex & 2));
                 }
@@ -4264,6 +4322,7 @@ public final class VeyraRenderer {
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
+        boolean usesMidTexCoord = false;
         if (packVertexSource != null || requiresNormal || requiresLightmap
                 || requiresViewPosition || requiresViewNormal || requiresShadowPosition) {
             String minecraftVertex = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
@@ -4276,9 +4335,14 @@ public final class VeyraRenderer {
                         requiresViewNormal && !packVertexVaryings.containsKey("viewNormal"),
                         false, requiresShadowPosition);
             }
-            adaptedVertex = packVertexSource == null ? minecraftVertex
-                    : EntityVertexShaderAdapter.adaptStage(minecraftVertex, packVertexSource,
-                            programName, false).source();
+            if (packVertexSource == null) {
+                adaptedVertex = minecraftVertex;
+            } else {
+                EntityVertexShaderAdapter.AdaptedStage selectedVertex = EntityVertexShaderAdapter.adaptStage(
+                        minecraftVertex, packVertexSource, programName, false);
+                adaptedVertex = selectedVertex.source();
+                usesMidTexCoord = selectedVertex.usesMidTexCoord();
+            }
             vertexShader = entityNormalVertexShader(original, sourceHash, true);
         }
         Identifier selectedVertexShader = vertexShader;
@@ -4290,25 +4354,36 @@ public final class VeyraRenderer {
         boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D VeyraNoiseSampler;")
                 || selectedVertexSource != null
                 && selectedVertexSource.contains("uniform sampler2D VeyraNoiseSampler;");
+        String parserSafeVertexSource = nativeVertexSource == null ? null
+                : dev.veyra.shader.ShaderSource.maskBlockAndLineComments(nativeVertexSource);
         String parserSafeFragmentSource = dev.veyra.shader.ShaderSource.maskBlockAndLineComments(nativeFragmentSource);
+        if (packVertexSource != null && parserSafeVertexSource != null) {
+            parserSafeFragmentSource = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
+                    parserSafeVertexSource, parserSafeFragmentSource, programName);
+        }
+        String fragmentSourceForParser = parserSafeFragmentSource;
         if (selectedVertexSource != null) {
-            dumpShaderSource("shadow-entity-" + programName + ".vsh", nativeVertexSource);
+            dumpShaderSource("shadow-entity-" + programName + ".vsh", parserSafeVertexSource);
         }
         dumpShaderSource("shadow-entity-" + programName + ".fsh", parserSafeFragmentSource);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
-                return parserSafeFragmentSource;
+                return fragmentSourceForParser;
             }
-            if (nativeVertexSource != null && identifier.equals(selectedVertexShader)
+            if (parserSafeVertexSource != null && identifier.equals(selectedVertexShader)
                     && type == ShaderType.VERTEX) {
-                return nativeVertexSource;
+                return parserSafeVertexSource;
             }
             return shaderManager.getShader(identifier, type);
         };
         Set<String> customImageSamplers = new HashSet<>(customImageSamplerNames(vertexImages));
         customImageSamplers.addAll(customImageSamplerNames(fragmentImages));
+        if (usesMidTexCoord && original.getVertexFormatMode() != VertexFormat.Mode.QUADS) {
+            throw new IOException(programName + ".vsh uses mc_midTexCoord, but " + original.getLocation()
+                    + " does not emit QUADS.");
+        }
         RenderPipeline shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader,
-                fragmentShader, usesNoiseSampler, customImageSamplers);
+                fragmentShader, usesNoiseSampler, customImageSamplers, usesMidTexCoord);
         VeyraPipelineResources.track(shadowPipeline);
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
         if (!compiled.isValid()) {
@@ -4662,6 +4737,7 @@ public final class VeyraRenderer {
         ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
         Identifier vertexShader = original.getVertexShader();
         String adaptedVertex = null;
+        boolean usesMidTexCoord = false;
         boolean itemEntityPipeline = isItemEntityTranslucentCullPipeline(original);
         if (shaderPackVertexSource != null) {
             String vertexSource = shaderManager.getShader(vertexShader, ShaderType.VERTEX);
@@ -4671,9 +4747,11 @@ public final class VeyraRenderer {
             String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
                     vertexSource, shadowPass, programName,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, false);
-            adaptedVertex = EntityVertexShaderAdapter.adaptStage(
+            EntityVertexShaderAdapter.AdaptedStage selectedVertex = EntityVertexShaderAdapter.adaptStage(
                     minecraftVertex, shaderPackVertexSource, programName, handPass,
-                    entityId, blockEntityId, currentRenderedItemId).source();
+                    entityId, blockEntityId, currentRenderedItemId);
+            adaptedVertex = selectedVertex.source();
+            usesMidTexCoord = selectedVertex.usesMidTexCoord();
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         } else if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
                 || itemEntityPipeline) {
@@ -4694,18 +4772,31 @@ public final class VeyraRenderer {
         boolean usesShadowSampler = fragmentSource.contains("uniform sampler2D Sampler3;");
         String nativeFragmentSource = customImageStage == null ? fragmentSource
                 : ShaderPackImageBindings.decorateNativeSamplers(fragmentSource, customImageStage);
+        String parserSafeFragmentSource = nativeFragmentSource;
+        if (shaderPackVertexSource != null && selectedVertexSource != null) {
+            parserSafeFragmentSource = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
+                    selectedVertexSource, nativeFragmentSource, programName);
+        }
+        String fragmentSourceForParser = parserSafeFragmentSource;
+        if (selectedVertexSource != null) {
+            dumpShaderSource("entity-" + programName + ".vsh", selectedVertexSource);
+        }
         if (customImageStage != null && !customImageStage.resources().isEmpty() && customImages == null) {
             throw new IOException(programName + " has custom image samplers but no shared image resource set.");
+        }
+        if (usesMidTexCoord && original.getVertexFormatMode() != VertexFormat.Mode.QUADS) {
+            throw new IOException(programName + ".vsh uses mc_midTexCoord, but " + original.getLocation()
+                    + " does not emit QUADS.");
         }
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
                 fragmentShader, usesNoiseSampler, usesShadowSampler, TerrainShaderAdapter.usesSpecularSampler(fragmentSource),
                 ShadowColorSampler.used(fragmentSource), ShadowDepthSampler.used(fragmentSource), colorInputs,
                 false, customImageStage == null ? Set.of() : customImageSamplerNames(customImageStage),
-                ShadowColorSampler.indices(fragmentSource));
+                ShadowColorSampler.indices(fragmentSource), usesMidTexCoord);
         ShaderSource source = (identifier, type) -> {
             if (identifier.equals(fragmentShader) && type == ShaderType.FRAGMENT) {
-                return nativeFragmentSource;
+                return fragmentSourceForParser;
             }
             if (selectedVertexSource != null && identifier.equals(selectedVertexShader)
                     && type == ShaderType.VERTEX) {
@@ -6071,6 +6162,19 @@ public final class VeyraRenderer {
             boolean useNoiseSampler, boolean useShadowSampler, boolean useSpecularSampler,
             boolean useShadowColor, boolean useOpaqueShadow, Set<Integer> geometryColorInputs,
             boolean useLightmapSampler, Set<String> customImageSamplers, Set<Integer> shadowColorInputs) {
+        return copyPipelineWithShaders(original, vertexShader, fragmentShader, useNoiseSampler, useShadowSampler,
+                useSpecularSampler, useShadowColor, useOpaqueShadow, geometryColorInputs, useLightmapSampler,
+                customImageSamplers, shadowColorInputs, false);
+    }
+
+    private static RenderPipeline copyPipelineWithShaders(
+            RenderPipeline original, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler, boolean useShadowSampler, boolean useSpecularSampler,
+            boolean useShadowColor, boolean useOpaqueShadow, Set<Integer> geometryColorInputs,
+            boolean useLightmapSampler, Set<String> customImageSamplers, Set<Integer> shadowColorInputs,
+            boolean useEntityMidTexCoord) {
+        VertexFormat vertexFormat = useEntityMidTexCoord
+                ? EntityMidTexCoord.VERTEX_FORMAT : original.getVertexFormat();
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(original.getLocation())
                 .withVertexShader(vertexShader)
@@ -6080,7 +6184,7 @@ public final class VeyraRenderer {
                 .withCull(original.isCull())
                 .withColorWrite(original.isWriteColor(), original.isWriteAlpha())
                 .withDepthWrite(original.isWriteDepth())
-                .withVertexFormat(original.getVertexFormat(), original.getVertexFormatMode())
+                .withVertexFormat(vertexFormat, original.getVertexFormatMode())
                 .withDepthBias(original.getDepthBiasScaleFactor(), original.getDepthBiasConstant());
 
         original.getBlendFunction().ifPresent(builder::withBlend);
@@ -6150,6 +6254,15 @@ public final class VeyraRenderer {
     private static RenderPipeline copyShadowPipelineWithShaders(
             RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader,
             boolean useNoiseSampler, Set<String> customImageSamplers) {
+        return copyShadowPipelineWithShaders(original, location, vertexShader, fragmentShader,
+                useNoiseSampler, customImageSamplers, false);
+    }
+
+    private static RenderPipeline copyShadowPipelineWithShaders(
+            RenderPipeline original, Identifier location, Identifier vertexShader, Identifier fragmentShader,
+            boolean useNoiseSampler, Set<String> customImageSamplers, boolean useEntityMidTexCoord) {
+        VertexFormat vertexFormat = useEntityMidTexCoord
+                ? EntityMidTexCoord.VERTEX_FORMAT : original.getVertexFormat();
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(location)
                 .withVertexShader(vertexShader)
@@ -6159,7 +6272,7 @@ public final class VeyraRenderer {
                 .withCull(false)
                 .withColorWrite(false, false)
                 .withDepthWrite(true)
-                .withVertexFormat(original.getVertexFormat(), original.getVertexFormatMode())
+                .withVertexFormat(vertexFormat, original.getVertexFormatMode())
                 .withDepthBias(original.getDepthBiasScaleFactor(), original.getDepthBiasConstant());
 
         ShaderDefines defines = original.getShaderDefines();
@@ -6291,7 +6404,9 @@ public final class VeyraRenderer {
                     for (PostShadowSamplers.Input input : PostShadowSamplers.Input.values())
                         if (program.shadowInputs().contains(input)) inputs.add(new ExternalTextureInput(input.inputName()));
                     if (program.fragmentSource().contains("uniform sampler2D "
-                            + VeyraNoiseTexture.SAMPLER_NAME + ";")) {
+                            + VeyraNoiseTexture.SAMPLER_NAME + ";")
+                            || program.vertexSource() != null && program.vertexSource().contains(
+                                    "uniform sampler2D " + VeyraNoiseTexture.SAMPLER_NAME + ";")) {
                         inputs.add(new ExternalTextureInput(NOISE_INPUT_NAME));
                     }
                     PostPass pass = new PostPass(program.pipeline(),
@@ -6371,7 +6486,11 @@ public final class VeyraRenderer {
                     : Identifier.fromNamespaceAndPath("veyra", "shaderpack_vertex/" + suffix);
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
             boolean usesNoiseSampler = shader.source().contains("uniform sampler2D "
-                    + VeyraNoiseTexture.SAMPLER_NAME + ";");
+                    + VeyraNoiseTexture.SAMPLER_NAME + ";")
+                    || vertexSource != null && vertexSource.contains(
+                            "uniform sampler2D " + VeyraNoiseTexture.SAMPLER_NAME + ";");
+            boolean usesFogUniforms = shader.source().contains("uniform Fog {")
+                    || vertexSource != null && vertexSource.contains("uniform Fog {");
             return new PipelineProgram(shaderId, shader.source(), vertexShaderId, vertexSource, shader.uniforms(),
                     shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
                     shader.usesShadowSampler(), shader.shadowInputs(),
@@ -6379,7 +6498,7 @@ public final class VeyraRenderer {
                     createPipeline(pipelineId, shaderId, vertexShaderId, shader.uniforms(),
                             shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
                             shader.shadowInputs(),
-                            usesNoiseSampler,
+                            usesNoiseSampler, usesFogUniforms,
                             shader.colorSamplers(), customSamplers));
         });
     }
@@ -6414,6 +6533,7 @@ public final class VeyraRenderer {
             boolean usesDepthSampler, boolean usesDepth1Sampler, boolean usesDepth2Sampler,
             Set<PostShadowSamplers.Input> shadowInputs,
             boolean usesNoiseSampler,
+            boolean usesFogUniforms,
             Set<Integer> colorSamplers,
             List<String> customSamplers) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
@@ -6435,6 +6555,9 @@ public final class VeyraRenderer {
             if (shadowInputs.contains(input)) builder.withSampler(input.samplerName());
         if (usesNoiseSampler) {
             builder.withSampler(VeyraNoiseTexture.SAMPLER_NAME);
+        }
+        if (usesFogUniforms) {
+            builder.withUniform("Fog", UniformType.UNIFORM_BUFFER);
         }
         for (int colorSampler : colorSamplers) {
             if (colorSampler > 0) {
@@ -6463,10 +6586,15 @@ public final class VeyraRenderer {
         body = RENDERTARGETS_DIRECTIVE.matcher(body).replaceAll("");
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
+        body = PostVertexInterfaceDeclarations.expand(body);
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(body, "post-processing");
+        body = UnreachableGlslFunctions.removeUnreachable(fog.source(), "main");
+        body = ShaderPackStorageBuffers.removeUnusedOrReject(body, "post-processing");
 
-        Matcher unsupportedDepthSampler = UNSUPPORTED_DEPTH_SAMPLER.matcher(body);
-        if (unsupportedDepthSampler.find()) {
-            throw new IOException("Veyra supports depthtex0, depthtex1, and depthtex2 for depth texture sampling on VulkanMod.");
+        String unsupportedDepthSampler = DepthSamplerSupport.firstUnsupported(body).orElse(null);
+        if (unsupportedDepthSampler != null) {
+            throw new IOException("Veyra supports depthtex0, depthtex1, and depthtex2 for depth texture sampling on VulkanMod; found "
+                    + unsupportedDepthSampler + ".");
         }
         PostShadowSamplers.Adapted shadows = PostShadowSamplers.adapt(body, shadowPassAvailable);
         body = shadows.source();
@@ -6528,7 +6656,21 @@ public final class VeyraRenderer {
             extensions.append(extensionMatcher.group());
         }
         body = extensionMatcher.replaceAll("");
-        body = VARYING_DECLARATION.matcher(body).replaceAll("");
+        Matcher varyingMatcher = VARYING_DECLARATION.matcher(body);
+        StringBuffer bodyWithoutTexCoordInput = new StringBuffer();
+        String texCoordInterpolation = "";
+        boolean texCoordInputDeclared = false;
+        while (varyingMatcher.find()) {
+            String interpolation = varyingMatcher.group(1);
+            if (texCoordInputDeclared && !texCoordInterpolation.equals(interpolation)) {
+                throw new IOException("A post fragment shader declares conflicting texture-coordinate interpolation qualifiers.");
+            }
+            texCoordInterpolation = interpolation;
+            texCoordInputDeclared = true;
+            varyingMatcher.appendReplacement(bodyWithoutTexCoordInput, "");
+        }
+        varyingMatcher.appendTail(bodyWithoutTexCoordInput);
+        body = bodyWithoutTexCoordInput.toString();
         body = MAIN_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = COLORTEX_SAMPLER_DECLARATION.matcher(body).replaceAll("");
         body = DEPTH_SAMPLER_DECLARATION.matcher(body).replaceAll("");
@@ -6541,7 +6683,8 @@ public final class VeyraRenderer {
         body = SUPPORTED_MATRIX_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = SUPPORTED_CAMERA_UNIFORM_DECLARATION.matcher(body).replaceAll("");
         body = LOCATION_LAYOUT.matcher(body).replaceAll("");
-        body = body.replaceAll("\\btexture2D\\s*\\(", "texture(");
+        body = body.replaceAll("\\btexture2DLod\\s*\\(", "textureLod(")
+                .replaceAll("\\btexture2D\\s*\\(", "texture(");
 
         List<AdaptedShader> adaptedShaders = new ArrayList<>(outputMappings.size());
         for (OutputMapping output : outputMappings) {
@@ -6550,7 +6693,7 @@ public final class VeyraRenderer {
                     : explicitOutputs.size() > 1
                     ? lowerExplicitOutputs(body, explicitOutputs, output.fragmentOutputIndex()) : body;
             StringBuilder adapted = new StringBuilder("#version 450\n").append(extensions)
-                    .append("in vec2 texCoord;\n");
+                    .append(texCoordInterpolation).append("in vec2 texCoord;\n");
             if (explicitOutputs.isEmpty()) {
                 adapted.append("out vec4 outColor;\n");
             }
@@ -6567,7 +6710,8 @@ public final class VeyraRenderer {
                     adapted.append("vec4 veyraDiscardOutput").append(discarded).append(";\n");
                 }
             }
-            appendShaderPackUniformBlock(adapted, uniforms);
+            outputBody = appendShaderPackUniformBlock(adapted, uniforms, outputBody, fog.aliasedUniforms());
+            adapted.append(fog.bridge());
             adapted.append(PostShadowSamplers.bridge(shadows.inputs()));
             adapted.append("uniform sampler2D InSampler;\n")
                     .append("#define colortex0 InSampler\n")
@@ -6721,41 +6865,7 @@ public final class VeyraRenderer {
     }
 
     private static List<Integer> declaredColorTargets(String source) throws IOException {
-        Matcher renderTargets = RENDERTARGETS_DIRECTIVE.matcher(source);
-        Matcher drawBuffers = DRAWBUFFERS_DIRECTIVE.matcher(source);
-        boolean hasRenderTargets = renderTargets.find();
-        boolean hasDrawBuffers = drawBuffers.find();
-        if (hasRenderTargets && hasDrawBuffers) {
-            throw new IOException("A shader cannot declare both RENDERTARGETS and DRAWBUFFERS.");
-        }
-        if (!hasRenderTargets && !hasDrawBuffers) {
-            return null;
-        }
-        List<Integer> targets = new ArrayList<>();
-        if (hasRenderTargets) {
-            String[] values = renderTargets.group(1).split(",");
-            for (String value : values) {
-                if (value.isBlank()) {
-                    throw new IOException("RENDERTARGETS contains an empty target index.");
-                }
-                targets.add(Integer.parseInt(value.trim()));
-            }
-            if (renderTargets.find()) {
-                throw new IOException("A shader can declare only one RENDERTARGETS directive.");
-            }
-        } else {
-            String value = drawBuffers.group(1);
-            for (int index = 0; index < value.length(); index++) {
-                targets.add(Character.digit(value.charAt(index), 10));
-            }
-            if (drawBuffers.find()) {
-                throw new IOException("A shader can declare only one DRAWBUFFERS directive.");
-            }
-        }
-        if (targets.isEmpty()) {
-            throw new IOException("The render-target directive must name at least one target.");
-        }
-        return List.copyOf(targets);
+        return RenderTargetDirectives.activeTargets(source);
     }
 
     private static String lowerFragData(String source, int selectedOutput) {

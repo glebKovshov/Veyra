@@ -78,6 +78,7 @@ final class IrisRenderStages {
             case "gbuffers_text" -> Stage.BLOCK_ENTITIES.ordinal();
             case "gbuffers_hand" -> Stage.HAND_SOLID.ordinal();
             case "gbuffers_hand_water" -> Stage.HAND_TRANSLUCENT.ordinal();
+            case "gbuffers_clouds" -> Stage.CLOUDS.ordinal();
             default -> null;
         };
     }

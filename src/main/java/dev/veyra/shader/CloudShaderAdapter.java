@@ -122,6 +122,8 @@ public final class CloudShaderAdapter {
         source = PRECISION_DECLARATION.matcher(source).replaceAll("");
         source = removeUnreachableCloudFunctions(source);
         source = UnusedSamplerDeclarations.removeUnused(source);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram("gbuffers_clouds"),
+                "gbuffers_clouds");
         String uncommented = maskComments(source);
 
         Matcher unsupportedVertexInput = UNSUPPORTED_CLOUD_VERTEX_INPUT.matcher(uncommented);
@@ -362,6 +364,8 @@ public final class CloudShaderAdapter {
         }
         adapted = extensionMatcher.replaceAll("");
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
+        adapted = IrisRenderStages.bindUniform(adapted, IrisRenderStages.forProgram("gbuffers_clouds"),
+                "gbuffers_clouds");
         IrisFogUniformAdapter.AdaptedShader fogUniforms =
                 IrisFogUniformAdapter.extract(adapted, "gbuffers_clouds", true);
         adapted = fogUniforms.source();

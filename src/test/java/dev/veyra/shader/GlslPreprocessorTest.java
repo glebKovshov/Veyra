@@ -20,6 +20,11 @@ class GlslPreprocessorTest {
         assertTrue(result.contains("vec4(1.0)"));
         assertFalse(result.contains("#define"));
     }
+    @Test void activeCodeMarkersDistinguishConditionalCommentDirectives() throws IOException {
+        String result = GlslPreprocessor.process("test", "#if 0\nVEYRA_MARKER_INACTIVE\n#else\nVEYRA_MARKER_ACTIVE\n#endif\n");
+        assertFalse(result.contains("VEYRA_MARKER_INACTIVE"));
+        assertTrue(result.contains("VEYRA_MARKER_ACTIVE"));
+    }
     @Test void hoistsOnlyActiveExtensions() throws IOException {
         String result = GlslPreprocessor.process("test", "#version 120\n#if 0\n#extension GL_NOT_REAL : require\n#endif\n#extension GL_ARB_shader_texture_lod : enable\nvoid main(){}\n");
         assertTrue(result.startsWith("#version 120\n#extension GL_ARB_shader_texture_lod : enable"));

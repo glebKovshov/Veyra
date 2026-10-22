@@ -91,6 +91,64 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void bridgesEntityAndHandMidTexCoordToTheVeyraQuadInput() throws Exception {
+        String pack = """
+                #version 120
+                attribute vec4 mc_midTexCoord;
+                void main() {
+                    gl_Position = ftransform() + vec4(mc_midTexCoord.xy, 0.0, 0.0);
+                }
+                """;
+
+        for (String program : new String[] {"gbuffers_entities", "gbuffers_hand", "shadow_entities"}) {
+            EntityVertexShaderAdapter.AdaptedStage adapted = EntityVertexShaderAdapter.adaptStage(
+                    NATIVE, pack, program, program.equals("gbuffers_hand"));
+
+            assertTrue(adapted.usesMidTexCoord(), program);
+            assertFalse(adapted.source().contains("attribute vec4 mc_midTexCoord"), adapted.source());
+            assertTrue(adapted.source().contains("in vec2 MidTexCoord;"), adapted.source());
+            assertTrue(adapted.source().indexOf("in vec2 MidTexCoord;")
+                            < adapted.source().indexOf("out "), adapted.source());
+            assertTrue(adapted.source().contains("#define mc_midTexCoord vec4(MidTexCoord, 0.0, 1.0)"),
+                    adapted.source());
+        }
+    }
+
+    @Test
+    void validatesMidTexCoordWithItsExtendedNativeVertexInput() throws Exception {
+        String pack = "#version 120\nattribute vec4 mc_midTexCoord;\n"
+                + "void main(){gl_Position=vec4(mc_midTexCoord.xy,0.0,1.0);}";
+
+        EntityVertexShaderAdapter.AdaptedStage adapted =
+                EntityVertexShaderAdapter.validate("gbuffers_entities", pack, false);
+
+        assertTrue(adapted.usesMidTexCoord());
+        assertTrue(adapted.source().contains("in vec2 MidTexCoord;"), adapted.source());
+    }
+
+    @Test
+    void removesRedundantInputQualifiersFromPackVertexFunctionParameters() throws Exception {
+        String pack = "vec3 GetRawWave(in vec3 pos, float wind) { return pos * wind; }\n"
+                + "void main() { gl_Position = vec4(GetRawWave(Position, 1.0), 1.0); }\n";
+
+        String adapted = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "shadow_entities", false).source();
+
+        assertTrue(adapted.contains("GetRawWave( vec3 pos, float wind)"), adapted);
+        assertTrue(adapted.contains("in vec3 Position;"), adapted);
+    }
+
+    @Test
+    void rejectsMidTexCoordForTheDamagedBlockFormat() {
+        String pack = "#version 120\nvoid main(){gl_Position=vec4(mc_midTexCoord.xy,0.0,1.0);}";
+
+        IOException error = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.validate("gbuffers_damagedblock", pack, false));
+
+        assertTrue(error.getMessage().contains("mc_midTexCoord"), error.getMessage());
+        assertTrue(error.getMessage().contains("BLOCK vertex format"), error.getMessage());
+    }
+
+    @Test
     void reconstructsShadowEntityWorldPositionAfterTheNativeClipTransform() throws Exception {
         String adapted = EntityShaderAdapter.adaptVertexShader(
                 NATIVE, true, "shadow_entities", false, false, false, false, false, true);
