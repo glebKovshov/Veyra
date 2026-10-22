@@ -37,6 +37,9 @@ final class IrisFogUniformAdapter {
             "(?m)^[\\t ]*#[\\t ]*moj_import[\\t ]*<minecraft:fog\\.glsl>[\\t ]*(?:\\r?\\n|$)");
     private static final Pattern FOG_BLOCK_DECLARATION = Pattern.compile(
             "(?is)\\buniform\\s+Fog\\s*\\{[^}]*\\bvec4\\s+FogColor\\s*;");
+    private static final Pattern FOG_FUNCTION_DECLARATION = Pattern.compile(
+            "\\b[A-Za-z_][A-Za-z0-9_]*\\s+Fog\\s*\\(");
+    private static final Pattern FOG_FUNCTION_REFERENCE = Pattern.compile("\\bFog\\b(?=\\s*\\()");
 
     private IrisFogUniformAdapter() {
     }
@@ -85,12 +88,39 @@ final class IrisFogUniformAdapter {
             usesFog = true;
         }
         if (!usesFog) {
-            return new AdaptedShader(source, "", List.of(), Set.of());
+            String adaptedSource = fogValuesAlreadyDeclared
+                    ? renameFogFunctionThatConflictsWithUniformBlock(source) : source;
+            return new AdaptedShader(adaptedSource, "", List.of(), Set.of());
         }
         remaining.append(source, cursor, source.length());
-        return new AdaptedShader(remaining.toString(),
+        String adaptedSource = ShaderPackLocalUniformRenamer.renameShadowingLocals(
+                remaining.toString(), declaredUniforms.stream().sorted().toList());
+        adaptedSource = renameFogFunctionThatConflictsWithUniformBlock(adaptedSource);
+        return new AdaptedShader(adaptedSource,
                 (fogValuesAlreadyDeclared ? "" : FOG_BLOCK) + macros,
                 List.copyOf(fields), Set.copyOf(declaredUniforms));
+    }
+
+    private static String renameFogFunctionThatConflictsWithUniformBlock(String source) {
+        String analysis = ShaderSource.maskBlockAndLineComments(source);
+        if (!FOG_FUNCTION_DECLARATION.matcher(analysis).find()) return source;
+
+        String aliasBase = "veyraShaderPackFog";
+        String alias = aliasBase;
+        int suffix = 2;
+        while (Pattern.compile("\\b" + Pattern.quote(alias) + "\\b").matcher(analysis).find()) {
+            alias = aliasBase + "_" + suffix++;
+        }
+
+        List<Integer> offsets = new ArrayList<>();
+        Matcher references = FOG_FUNCTION_REFERENCE.matcher(analysis);
+        while (references.find()) offsets.add(references.start());
+        StringBuilder renamed = new StringBuilder(source);
+        for (int index = offsets.size() - 1; index >= 0; index--) {
+            int start = offsets.get(index);
+            renamed.replace(start, start + "Fog".length(), alias);
+        }
+        return renamed.toString();
     }
 
     private static LegacyFogRewrite rewriteLegacyFog(String source, String programName) throws IOException {

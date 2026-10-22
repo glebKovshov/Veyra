@@ -199,6 +199,12 @@ public final class VeyraShadowRenderer {
         return target == null ? null : target.getDepthTextureView();
     }
 
+    /** Neutral post-processing input for shader-pack programs whose dimension disables its shadow pass. */
+    public static GpuTextureView neutralFallbackTextureView() {
+        prepareFallbackTexture();
+        return fallbackTextureView;
+    }
+
     public static GpuTextureView opaqueShadowDepthTextureView() {
         return opaqueDepth.sampledView();
     }

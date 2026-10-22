@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 /** Exercise a real client/world and measure the fixture's shader output against a baseline. */
 public final class GraphicsSmoke {
@@ -55,10 +56,13 @@ public final class GraphicsSmoke {
     private static int thirdPartyNonBlackPixels, thirdPartyColorBuckets;
     private static int thirdPartyInitialWidth, thirdPartyInitialHeight;
     private static long thirdPartyStorageBufferBytes, thirdPartyInitialStorageIdentity;
+    private static Set<Integer> thirdPartyInitialStorageBindings = Set.of();
     private static java.util.concurrent.CompletableFuture<?> thirdPartyReloadFuture;
     private static boolean thirdPartyResizePassed, thirdPartyNetherPassed, thirdPartyReturnPassed,
             thirdPartyDisablePassed, thirdPartyReenablePassed, thirdPartyReloadPassed,
-            thirdPartyLifecycleCompleted;
+            thirdPartyLifecycleCompleted, thirdPartyStorageBufferExpected,
+            thirdPartyStorageBufferOwnerReleased, thirdPartyStorageBufferOwnerRecreated,
+            thirdPartyStorageBufferManagerRecreated;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
 
@@ -303,16 +307,16 @@ public final class GraphicsSmoke {
                 if (stage == 2) {
                     if (!client.level.dimension().equals(net.minecraft.world.level.Level.NETHER)) return;
                     if (VeyraRenderer.selectedPack().map(pack -> pack.configuration().dimension() != -1).orElse(true)) {
-                        throw new IllegalStateException("Complementary profile did not switch to the Nether configuration.");
+                        throw new IllegalStateException("The real shaderpack profile did not switch to the Nether configuration.");
                     }
                 } else if (stage == 3) {
                     if (!client.level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
                     if (VeyraRenderer.selectedPack().map(pack -> pack.configuration().dimension() != 0).orElse(true)) {
-                        throw new IllegalStateException("Complementary profile did not restore its Overworld configuration.");
+                        throw new IllegalStateException("The real shaderpack profile did not restore its Overworld configuration.");
                     }
                 } else if (stage == 4) {
                     if (VeyraRenderer.isRenderingEnabled() || VeyraStorageBufferResources.active() != null) {
-                        throw new IllegalStateException("Disabling the real shaderpack did not release its active storage-buffer owner.");
+                        throw new IllegalStateException("Disabling the real shaderpack did not release its active GPU resource owners.");
                     }
                 } else if (stage == 6) {
                     if (thirdPartyReloadFuture == null) throw new IllegalStateException("The resource reload future was not created.");
@@ -884,19 +888,59 @@ public final class GraphicsSmoke {
             throw new IllegalStateException("The real shaderpack/profile is not active during " + phase + ": "
                     + VeyraRenderer.getLastError());
         }
-        VeyraStorageBufferResources resources = VeyraStorageBufferResources.active();
-        if (resources == null || resources.allocatedBytes() <= 0
-                || !resources.properties().buffers().containsKey(0)) {
-            throw new IllegalStateException("Complementary bufferObject.0 is not allocated during " + phase + ".");
+        ShaderPack selected = VeyraRenderer.selectedPack().orElseThrow(
+                () -> new IllegalStateException("The real shaderpack selection disappeared during " + phase + "."));
+        Set<Integer> declaredBindings;
+        try {
+            declaredBindings = Set.copyOf(selected.readStorageBufferProperties().buffers().keySet());
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("Could not inspect the selected shaderpack storage-buffer declarations during "
+                    + phase + ".", exception);
         }
-        if (stage >= 5 && thirdPartyInitialStorageIdentity != 0
+        VeyraStorageBufferResources resources = VeyraStorageBufferResources.active();
+        if (declaredBindings.isEmpty()) {
+            if (resources != null && (!resources.properties().buffers().isEmpty() || resources.allocatedBytes() != 0)) {
+                throw new IllegalStateException("The real shaderpack declares no storage buffers, but its active Veyra manager has "
+                        + resources.properties().buffers().size() + " declarations and " + resources.allocatedBytes()
+                        + " allocated bytes during " + phase + ".");
+            }
+            if (stage == 0 && resources != null) thirdPartyInitialStorageIdentity = resources.identity();
+            if (stage >= 5 && resources != null && thirdPartyInitialStorageIdentity != 0) {
+                if (resources.identity() == thirdPartyInitialStorageIdentity) {
+                    throw new IllegalStateException("Re-enabling the real shaderpack reused its storage-buffer manager after disable().");
+                }
+                thirdPartyStorageBufferManagerRecreated = true;
+            }
+            thirdPartyStorageBufferBytes = 0;
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "The real shaderpack declares no storage buffers during lifecycle stage {}; its active manager owns no GPU allocation",
+                    stage);
+            return null;
+        }
+        if (resources == null || resources.allocatedBytes() <= 0
+                || !resources.properties().buffers().keySet().equals(declaredBindings)) {
+            throw new IllegalStateException("The real shaderpack's declared storage buffers " + declaredBindings
+                    + " do not match its active Veyra allocation during " + phase + ".");
+        }
+        thirdPartyStorageBufferExpected = true;
+        if (stage == 0) {
+            thirdPartyInitialStorageBindings = declaredBindings;
+            thirdPartyInitialStorageIdentity = resources.identity();
+        }
+        if (stage >= 5 && !thirdPartyInitialStorageBindings.isEmpty()
                 && resources.identity() == thirdPartyInitialStorageIdentity) {
-            throw new IllegalStateException("Re-enabling Complementary reused the storage-buffer owner released by disable().");
+            throw new IllegalStateException("Re-enabling the real shaderpack reused the storage-buffer owner released by disable().");
+        }
+        if (stage >= 5 && !thirdPartyInitialStorageBindings.isEmpty()) {
+            thirdPartyStorageBufferOwnerRecreated = true;
+        }
+        if (stage >= 5 && thirdPartyInitialStorageIdentity != 0) {
+            thirdPartyStorageBufferManagerRecreated = true;
         }
         thirdPartyStorageBufferBytes = resources.allocatedBytes();
         LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                "Complementary lifecycle stage {} has storage-buffer owner {} with {} allocated bytes at {}x{}",
-                stage, resources.identity(), resources.allocatedBytes(), resources.viewWidth(), resources.viewHeight());
+                "The real shaderpack lifecycle stage {} has storage-buffer bindings {} under owner {} with {} allocated bytes at {}x{}",
+                stage, declaredBindings, resources.identity(), resources.allocatedBytes(), resources.viewWidth(), resources.viewHeight());
         return resources;
     }
 
@@ -905,19 +949,19 @@ public final class GraphicsSmoke {
                                                             int diagnosticPixels) {
         if (stage == 4) {
             if (active || VeyraRenderer.isRenderingEnabled() || VeyraStorageBufferResources.active() != null) {
-                finish(client, new IllegalStateException("The disabled Complementary frame still owns active shader resources."),
+                finish(client, new IllegalStateException("The disabled shaderpack frame still owns active shader resources."),
                         diagnosticPixels);
                 return;
             }
             thirdPartyDisablePassed = true;
             if (thirdPartyPack == null) {
-                finish(client, new IllegalStateException("The Complementary lifecycle has no pack to re-enable."),
+                finish(client, new IllegalStateException("The shaderpack lifecycle has no pack to re-enable."),
                         diagnosticPixels);
                 return;
             }
             String selection = VeyraRenderer.selectWithSavedOptions(thirdPartyPack);
             if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
-                finish(client, new IllegalStateException("Could not re-select Complementary after disable: "
+                finish(client, new IllegalStateException("Could not re-select the shaderpack after disable: "
                         + selection + " (" + VeyraRenderer.getLastError() + ")"), diagnosticPixels);
                 return;
             }
@@ -926,12 +970,12 @@ public final class GraphicsSmoke {
             baselineAt = worldTicks + 120;
             pending = false;
             LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                    "Complementary disable released its SSBO owner; re-selected the same profile.");
+                    "The shaderpack was re-selected with the same profile after disable.");
             return;
         }
 
         try {
-            if (!active) throw new IllegalStateException("Expected an active Complementary frame at lifecycle stage " + stage);
+            if (!active) throw new IllegalStateException("Expected an active shaderpack frame at lifecycle stage " + stage);
             VeyraStorageBufferResources resources = requireThirdPartyActive("frame capture at stage " + stage);
             if (nonBlackPixels < 10000 || (stage == 0 || stage == 6) && colorBuckets < 24) {
                 throw new IllegalStateException("The real shaderpack frame failed the visual gate at stage " + stage
@@ -945,12 +989,11 @@ public final class GraphicsSmoke {
                 case 0 -> {
                     thirdPartyInitialWidth = frameWidth;
                     thirdPartyInitialHeight = frameHeight;
-                    thirdPartyInitialStorageIdentity = resources.identity();
                     int resizedWidth = frameWidth == 800 ? 960 : 800;
                     int resizedHeight = resizedWidth * 9 / 16;
                     client.getWindow().setWindowed(resizedWidth, resizedHeight);
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                            "Resizing active Complementary profile from {}x{} to {}x{}",
+                            "Resizing active shaderpack profile from {}x{} to {}x{}",
                             frameWidth, frameHeight, resizedWidth, resizedHeight);
                     stage = 1;
                     baselineAt = worldTicks + 100;
@@ -958,19 +1001,22 @@ public final class GraphicsSmoke {
                 }
                 case 1 -> {
                     var colortex = VeyraRenderer.geometryColorAttachment(1);
+                    boolean storageBufferViewportMismatch = resources != null
+                            && (resources.viewWidth() != thirdPartyInitialWidth && resources.viewWidth() != frameWidth
+                            || resources.viewHeight() != thirdPartyInitialHeight && resources.viewHeight() != frameHeight);
                     if (frameWidth == thirdPartyInitialWidth && frameHeight == thirdPartyInitialHeight
                             || colortex.width != frameWidth || colortex.height != frameHeight
-                            || resources.viewWidth() != thirdPartyInitialWidth && resources.viewWidth() != frameWidth
-                            || resources.viewHeight() != thirdPartyInitialHeight && resources.viewHeight() != frameHeight) {
-                        throw new IllegalStateException("Complementary resize resources disagree: initial="
+                            || storageBufferViewportMismatch) {
+                        throw new IllegalStateException("Shaderpack resize resources disagree: initial="
                                 + thirdPartyInitialWidth + "x" + thirdPartyInitialHeight + ", frame="
                                 + frameWidth + "x" + frameHeight + ", colortex1=" + colortex.width + "x" + colortex.height
-                                + ", SSBO viewport=" + resources.viewWidth() + "x" + resources.viewHeight());
+                                + ", SSBO viewport=" + (resources == null ? "not declared"
+                                : resources.viewWidth() + "x" + resources.viewHeight()));
                     }
                     thirdPartyResizePassed = true;
                     client.getConnection().sendCommand("execute in minecraft:the_nether run tp @s 0 80 0");
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                            "Complementary resize passed at {}x{}; moving the active profile to Nether", frameWidth, frameHeight);
+                            "Shaderpack resize passed at {}x{}; moving the active profile to Nether", frameWidth, frameHeight);
                     stage = 2;
                     baselineAt = worldTicks + 120;
                     pending = false;
@@ -979,7 +1025,7 @@ public final class GraphicsSmoke {
                     thirdPartyNetherPassed = true;
                     client.getConnection().sendCommand("execute in minecraft:overworld run tp @s 0 72 0");
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                            "Complementary Nether profile passed; returning to Overworld");
+                            "Shaderpack Nether profile passed; returning to Overworld");
                     stage = 3;
                     baselineAt = worldTicks + 120;
                     pending = false;
@@ -988,13 +1034,18 @@ public final class GraphicsSmoke {
                     thirdPartyReturnPassed = true;
                     thirdPartyPack = VeyraRenderer.selectedPack().orElseThrow(
                             () -> new IllegalStateException("The real shaderpack was not selected before disable."));
+                    VeyraStorageBufferResources storageBuffersBeforeDisable = VeyraStorageBufferResources.active();
+                    boolean storageBufferOwnerBeforeDisable = storageBuffersBeforeDisable != null
+                            && storageBuffersBeforeDisable.allocatedBytes() > 0;
                     String disabled = VeyraRenderer.disable();
                     if (VeyraRenderer.isRenderingEnabled() || VeyraStorageBufferResources.active() != null) {
-                        throw new IllegalStateException("Complementary disable did not release the active SSBO owner: " + disabled);
+                        throw new IllegalStateException("Shaderpack disable did not release active GPU resource owners: " + disabled);
                     }
+                    thirdPartyStorageBufferOwnerReleased |= storageBufferOwnerBeforeDisable;
                     thirdPartyDisablePassed = true;
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                            "Complementary disable released its {}-byte storage-buffer allocation", thirdPartyStorageBufferBytes);
+                            "Shaderpack disable completed; storage-buffer allocation before disable was {} bytes",
+                            thirdPartyStorageBufferBytes);
                     stage = 4;
                     baselineAt = worldTicks + 80;
                     pending = false;
@@ -1006,7 +1057,7 @@ public final class GraphicsSmoke {
                         throw new IllegalStateException("Minecraft did not return a resource-reload future.");
                     }
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                            "Started a real client resource reload with Complementary SSBOs active");
+                            "Started a real client resource reload with the shaderpack active");
                     stage = 6;
                     baselineAt = worldTicks + 100;
                     pending = false;
@@ -1017,7 +1068,7 @@ public final class GraphicsSmoke {
                     ShutdownEvidence.record("third-party-before-client-stop");
                     finish(client, null, diagnosticPixels);
                 }
-                default -> throw new IllegalStateException("Unexpected Complementary lifecycle capture stage: " + stage);
+                default -> throw new IllegalStateException("Unexpected shaderpack lifecycle capture stage: " + stage);
             }
         } catch (Throwable failure) {
             finish(client, failure, diagnosticPixels);
@@ -1076,6 +1127,10 @@ public final class GraphicsSmoke {
                     + ",\"thirdPartyReenablePassed\":" + thirdPartyReenablePassed
                     + ",\"thirdPartyReloadPassed\":" + thirdPartyReloadPassed
                     + ",\"thirdPartyStorageBufferBytes\":" + thirdPartyStorageBufferBytes
+                    + ",\"thirdPartyStorageBufferExpected\":" + thirdPartyStorageBufferExpected
+                    + ",\"thirdPartyStorageBufferOwnerReleased\":" + thirdPartyStorageBufferOwnerReleased
+                    + ",\"thirdPartyStorageBufferOwnerRecreated\":" + thirdPartyStorageBufferOwnerRecreated
+                    + ",\"thirdPartyStorageBufferManagerRecreated\":" + thirdPartyStorageBufferManagerRecreated
                     + ",\"error\":\"" + error + "\"}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);

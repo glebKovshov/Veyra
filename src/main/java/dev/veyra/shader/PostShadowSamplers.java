@@ -34,6 +34,11 @@ public final class PostShadowSamplers {
     private PostShadowSamplers() { }
 
     public static Adapted adapt(String source, boolean available) throws IOException {
+        return adapt(source, available, false);
+    }
+
+    public static Adapted adapt(String source, boolean shadowPassAvailable, boolean neutralFallbackAvailable)
+            throws IOException {
         String active = UnusedSamplerDeclarations.removeUnused(ShaderSource.maskBlockAndLineComments(source));
         EnumSet<Input> inputs = EnumSet.noneOf(Input.class);
         var references = REFERENCE.matcher(active);
@@ -43,7 +48,9 @@ public final class PostShadowSamplers {
             if (input == null) throw new IOException("Unsupported post shadow sampler: " + name);
             inputs.add(input);
         }
-        if (!inputs.isEmpty() && !available) throw new IOException("Post shadow inputs require a supported shadow pass.");
+        if (!inputs.isEmpty() && !shadowPassAvailable && !neutralFallbackAvailable) {
+            throw new IOException("Post shadow inputs require a supported shadow pass or a neutral fallback.");
+        }
         Set<String> comparisons = new HashSet<>();
         var comparisonNames = Pattern.compile("\\bsampler2DShadow\\s+(\\w+)").matcher(active);
         while (comparisonNames.find()) comparisons.add(comparisonNames.group(1));

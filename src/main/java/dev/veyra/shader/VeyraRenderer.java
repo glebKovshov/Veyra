@@ -6742,7 +6742,7 @@ public final class VeyraRenderer {
             throw new IOException("Veyra supports depthtex0, depthtex1, and depthtex2 for depth texture sampling on VulkanMod; found "
                     + unsupportedDepthSampler + ".");
         }
-        PostShadowSamplers.Adapted shadows = PostShadowSamplers.adapt(body, shadowPassAvailable);
+        PostShadowSamplers.Adapted shadows = PostShadowSamplers.adapt(body, shadowPassAvailable, true);
         body = shadows.source();
         boolean usesNoiseSampler = NOISETEX_REFERENCE.matcher(body).find();
         boolean usesShadowSampler = !shadows.inputs().isEmpty();
@@ -8141,15 +8141,20 @@ public final class VeyraRenderer {
                 return depthTex2Snapshot.sampledView();
             }
             if (samplerName.equals(PostShadowSamplers.Input.OPAQUE_DEPTH.inputName()))
-                return VeyraShadowRenderer.opaqueShadowDepthTextureView();
+                return completedShadowTexture(VeyraShadowRenderer.opaqueShadowDepthTextureView());
             for (PostShadowSamplers.Input input : PostShadowSamplers.Input.values()) {
                 if (input.shadowColorIndex() >= 0 && samplerName.equals(input.inputName()))
-                    return VeyraShadowRenderer.shadowColorTextureView(input.shadowColorIndex());
+                    return completedShadowTexture(VeyraShadowRenderer.shadowColorTextureView(input.shadowColorIndex()));
             }
             if (samplerName.equals(PostShadowSamplers.Input.DEPTH.inputName())) {
-                return VeyraShadowRenderer.shadowDepthTextureView();
+                return completedShadowTexture(VeyraShadowRenderer.shadowDepthTextureView());
             }
             return sampledDepthTextureView();
+        }
+
+        private static GpuTextureView completedShadowTexture(GpuTextureView view) {
+            if (VeyraShadowRenderer.hasCompletedShadowMap() && view != null && !view.isClosed()) return view;
+            return VeyraShadowRenderer.neutralFallbackTextureView();
         }
 
         @Override

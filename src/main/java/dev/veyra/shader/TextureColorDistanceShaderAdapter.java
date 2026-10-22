@@ -36,6 +36,9 @@ public final class TextureColorDistanceShaderAdapter {
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:(?:2D)?(?:Gather|Offset|Proj)|QueryLod)\\w*\\s*\\(");
+    private static final Pattern LIGHTMAP_TEXTURE_SAMPLE = Pattern.compile(
+            "\\b(?:texture|texture2D|textureLod|texture2DLod|textureGrad|texture2DGrad|textureProj|texture2DProj|texelFetch)"
+                    + "\\s*\\(\\s*lightmap\\b");
     private static final Map<String, String> INPUT_TYPES = Map.ofEntries(
             Map.entry("texcoord", "vec2"),
             Map.entry("texCoord", "vec2"),
@@ -392,7 +395,7 @@ public final class TextureColorDistanceShaderAdapter {
         stripped.append(source, copiedThrough, source.length());
 
         String uncommented = ShaderSource.maskBlockAndLineComments(stripped.toString());
-        usesLightmap |= allowIrisSamplers && Pattern.compile("\\blightmap\\b").matcher(uncommented).find();
+        usesLightmap |= allowIrisSamplers && LIGHTMAP_TEXTURE_SAMPLE.matcher(uncommented).find();
         if (usesLightmap && !lightmapSamplerAvailable) {
             throw new IOException(programName + " requires Minecraft's lightmap sampler, which this pipeline does not provide.");
         }
@@ -429,12 +432,37 @@ public final class TextureColorDistanceShaderAdapter {
                     }
                     """);
         }
-        String result = stripped.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D")
+        String result = renamePackShadowComparisonFunction(stripped.toString())
+                .replaceAll("\\bsampler2DShadow\\b", "sampler2D")
                 .replaceAll("\\btexture2DShadow\\s*\\(", "veyraTextureShadowCompare(")
                 .replaceAll("\\bshadow2D\\s*\\(", "veyraTextureShadowSample(");
         return new SamplerBridge(result, bridge.toString(), new SamplerInputs(
                 usesNoise, usesShadow, usesSpecular, usesLightmap, usesShadowColor, usesOpaqueShadow,
                 Set.copyOf(geometryIndices), Set.of(), Set.copyOf(shadowColorInputs)));
+    }
+
+    private static String renamePackShadowComparisonFunction(String source) {
+        String analysis = ShaderSource.maskBlockAndLineComments(source);
+        Pattern declaration = Pattern.compile(
+                "\\b(?!(?:return|if|while|for|switch|case)\\b)[A-Za-z_][A-Za-z0-9_]*\\s+texture2DShadow\\s*\\(");
+        if (!declaration.matcher(analysis).find()) return source;
+
+        String aliasBase = "veyraShaderPackTexture2DShadow";
+        String alias = aliasBase;
+        int suffix = 2;
+        while (Pattern.compile("\\b" + Pattern.quote(alias) + "\\b").matcher(analysis).find()) {
+            alias = aliasBase + "_" + suffix++;
+        }
+
+        List<Integer> offsets = new ArrayList<>();
+        Matcher references = Pattern.compile("\\btexture2DShadow\\b(?=\\s*\\()").matcher(analysis);
+        while (references.find()) offsets.add(references.start());
+        StringBuilder renamed = new StringBuilder(source);
+        for (int index = offsets.size() - 1; index >= 0; index--) {
+            int start = offsets.get(index);
+            renamed.replace(start, start + "texture2DShadow".length(), alias);
+        }
+        return renamed.toString();
     }
 
     static SamplerInputs inspectSamplers(String source, String programName,

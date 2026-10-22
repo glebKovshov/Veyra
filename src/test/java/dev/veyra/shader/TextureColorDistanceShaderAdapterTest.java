@@ -292,4 +292,37 @@ class TextureColorDistanceShaderAdapterTest {
                         """, "gbuffers_line", outputs, false, false));
         assertTrue(shadowError.getMessage().contains("shadowtex0"), shadowError.getMessage());
     }
+
+    @Test
+    void doesNotTreatALocalLightmapCoordinateAsAMissingSampler() throws IOException {
+        var samplers = TextureColorDistanceShaderAdapter.inspectSamplers("""
+                flat in vec2 lmCoord;
+                vec4 shadeBasic() {
+                    vec2 lightmap = clamp(lmCoord, vec2(0.0), vec2(1.0));
+                    return vec4(lightmap, 0.0, 1.0);
+                }
+                void main() { gl_FragColor = shadeBasic(); }
+                """, "gbuffers_basic", true, false);
+
+        assertFalse(samplers.usesLightmapSampler());
+    }
+
+    @Test
+    void renamesPackShadowComparisonHelpersBeforeAddingItsVulkanBridge() throws IOException {
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
+                uniform sampler2DShadow shadowtex0;
+                float texture2DShadow(sampler2DShadow sourceSampler, vec3 sourceCoord) {
+                    return shadow2D(sourceSampler, sourceCoord).x;
+                }
+                void main() {
+                    float shadow = texture2DShadow(shadowtex0, vec3(0.5));
+                    gl_FragColor = vec4(shadow);
+                }
+                """, "gbuffers_basic", true, true, true, true, true);
+
+        assertTrue(adapted.contains("float veyraShaderPackTexture2DShadow(sampler2D sourceSampler, vec3 sourceCoord)"), adapted);
+        assertTrue(adapted.contains("return veyraTextureShadowSample(sourceSampler, sourceCoord).x;"), adapted);
+        assertTrue(adapted.contains("float shadow = veyraShaderPackTexture2DShadow(shadowtex0, vec3(0.5));"), adapted);
+        assertFalse(adapted.contains("float texture2DShadow("), adapted);
+    }
 }

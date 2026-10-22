@@ -59,6 +59,12 @@ class PostShadowSamplersTest {
         assertThrows(IOException.class, () -> PostShadowSamplers.adapt("uniform sampler2D shadowtex1;\n"+source, true));
         assertThrows(IOException.class, () -> PostShadowSamplers.adapt(source.replace("sampler2D","sampler2DShadow").replace("shadowtex1","shadowcolor0"), true));
     }
+    @Test void allowsUnavailablePassInputsWhenTheRendererProvidesANeutralFallback() throws IOException {
+        String source="uniform sampler2D shadowtex1;\nvoid main(){gl_FragColor=texture2D(shadowtex1,vec2(0));}\n";
+        var adapted = PostShadowSamplers.adapt(source, false, true);
+        assertEquals(Set.of(PostShadowSamplers.Input.OPAQUE_DEPTH), adapted.inputs());
+        assertTrue(adapted.source().contains("veyraSample(shadowtex1"));
+    }
     @Test void enforcesCombinedNativeDescriptorBudgetAfterAliasDeduplication() throws IOException {
         var inputs = Set.of(PostShadowSamplers.Input.DEPTH,PostShadowSamplers.Input.OPAQUE_DEPTH,PostShadowSamplers.Input.COLOR);
         PostShadowSamplers.validateBudget(inputs,9,"composite_colortex7",12);
