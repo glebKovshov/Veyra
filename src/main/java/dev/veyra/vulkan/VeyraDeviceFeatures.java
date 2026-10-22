@@ -28,16 +28,15 @@ public final class VeyraDeviceFeatures {
                 .shaderStorageImageExtendedFormats(supported.shaderStorageImageExtendedFormats());
     }
 
-    /** Copies the device create info and requests supported core features without changing VulkanMod's pNext chain. */
+    /** Points VulkanMod's create info at a copied core-feature block without changing its pNext chain. */
     public static VkDeviceCreateInfo withSupportedFeatures(VkDeviceCreateInfo createInfo,
                                                             VkPhysicalDeviceFeatures supported,
                                                             MemoryStack stack) {
-        VkDeviceCreateInfo enabledCreateInfo = VkDeviceCreateInfo.calloc(stack).set(createInfo);
         VkPhysicalDeviceFeatures enabled = VkPhysicalDeviceFeatures.calloc(stack);
         VkPhysicalDeviceFeatures requested = createInfo.pEnabledFeatures();
         if (requested != null) enabled.set(requested);
         mergeSupportedFeatures(enabled, supported);
-        enabledCreateInfo.pEnabledFeatures(enabled);
-        return enabledCreateInfo;
+        createInfo.pEnabledFeatures(enabled);
+        return createInfo;
     }
 }

@@ -1,3 +1,12 @@
+## Lavapipe feature activation investigation - 2026-10-22
+
+- Exact-head PR #84 checks on `b7e8c6267bef06098d9c6adc87f5be9058e8589b`: Build `39821137700` and shaderpack source audit `39821137804` passed; Graphics smoke `39821137832` failed in five custom-image fixtures. Each failed before shutdown with `VUID-RuntimeSpirv-NonWritable-06341`; the other 20 completed fixtures passed and 5 were cancelled after fail-fast.
+- The failure is reproducible despite `DeviceManagerMixin` reporting supported `vertexPipelineStoresAndAtomics=true` immediately before `vkCreateDevice`; the validation layer later reports that feature disabled on the pipeline's device. The Windows GPU has no validation layer, so a successful local frame does not close this issue.
+- Changed the feature request experiment to point VulkanMod's original `VkDeviceCreateInfo.pEnabledFeatures` at a supported-feature copy only during `vkCreateDevice`, restoring its original pointer immediately afterward. This preserves the existing `pNext` chain and the original create-info object; it remains an experiment pending Lavapipe validation.
+- Full forced JDK 21 gate passed: **497 tests, 0 failures/errors/skips**, 96 example shaders, 112 Vulkan SPIR-V compiles, `build`, example-pack packaging, and graphics-smoke compilation. `git diff --check` passed.
+- RTX 3070 `custom-image-compute` smoke passed with **223,290 active / 0 disabled** magenta pixels and all 14 entity shadow pipelines loaded. This host has no Vulkan validation layer; it does not establish that the Lavapipe feature-enable VUID is fixed.
+- The unpublished beta.30-metadata JAR passed `scripts/verify_jar.py`: **979,672 bytes**, SHA-256 `66293814AF5BC94A46837389B71F09777F649E3E9FFE693E29C0ED195C24E7EE`.
+- PR #84 remains draft. Do not merge or publish until the next exact-head Lavapipe run either clears the VUID or identifies the remaining feature-enable defect.
 ## Geometry MRT guard for dimension transitions — 2026-10-22
 
 - Fixed the Complementary Nether-transition crash where a temporary 10×10 scene framebuffer was combined with 800×450 shader-pack color targets. `VeyraGeometryTargets` now validates all color and depth attachment extents before creating an MRT; for an incompatible transition frame it resumes the scene pass, skips custom MRT routing, and emits a deduplicated warning. The Vulkan framebuffer constructor keeps its strict dimension validation.
