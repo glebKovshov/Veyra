@@ -1,12 +1,12 @@
 ## Combined beta.31 release candidate — 2026-10-22
 
-- Created local-only `release-prep/beta31-release-batch` from the prior beta.31 prep, then merged current PR #84 head `de8eeac` and local entity-texture commit `b7ebd44`. The watched PR branch, original beta.31 worktrees, and root checkout were not changed.
+- Created `release-prep/beta31-release-batch` from the prior beta.31 prep, then merged current PR #84 head `de8eeac` and local entity-texture commit `b7ebd44`. Pushed the branch and opened linked draft PR #85 (`e980973`) with base `feature/shadowcomp-compute`; it is stacked on PR #84. The parent PR branch, original beta.31 worktrees, and root checkout were not changed.
 - Forced JDK 21 gate `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed: **502 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, example-pack packaging, and build.
 - Pinned shaderpack audit passed for 4 archives, 12 defaults, and 63 profile/dimension cases: 864 geometry fragments accepted / 0 rejected, 18 active compute stages compiled / 0 rejected. All records retain `visualValidation=false`.
 - `scripts/verify_jar.py` accepted `veyra-0.2.0-beta.31+mc1.21.11.jar`: **982,523 bytes**, SHA-256 `653C3B4E3AC0667A11D43006FCBC39F3299937044A6565AE8F2E4AA8A8AA6728`.
 - Fresh combined-candidate RTX 3070 `entity-custom-texture` smoke passed: **18,293 active / 0 disabled green pixels**, with pack PNG `textures/marker.png` bound as sampler `marker` at descriptor binding 6. `custom-image-compute` also passed on this branch with **222,994 active magenta pixels** and both required device feature flags true. These are synthetic GPU fixtures; Windows has no Vulkan validation layer.
-- PR #84 remains open/draft on `de8eeac` and T3 watcher is active; hosted exact-head checks were not manually polled. The prior Lavapipe `VUID-RuntimeSpirv-NonWritable-06341` remains unresolved until fresh Graphics evidence.
-- Release docs now include the entity-texture feature and measured fixture result. Rebuild and rerun artifact verification from the final merged commit before publication; this local candidate has not been pushed and no beta.31 Release exists.
+- PR #84 remains open/draft on `de8eeac`; PR #85 is open/draft on `e980973`. T3 watcher tracks both; hosted exact-head checks were not manually polled. The prior Lavapipe `VUID-RuntimeSpirv-NonWritable-06341` remains unresolved until fresh Graphics evidence.
+- Release docs now include the entity-texture feature and measured fixture results. Rebuild and rerun artifact verification from the final merged commit before publication; beta.31 is not merged or released.
 
 ## Lavapipe feature activation investigation - 2026-10-22
 
@@ -25,7 +25,7 @@
 - Added the `entity-custom-texture` example and graphics smoke coverage. RTX 3070 smoke passed with **18,315 active / 0 disabled green pixels**. Runtime descriptor evidence shows `marker` bound to the pack PNG at binding 6.
 - Full JDK 21 gate passed: **502 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, `build`, example-pack packaging, and graphics-smoke compilation. `git diff --check` passed.
 - The historical beta.30-metadata JAR passed `scripts/verify_jar.py`: **982,505 bytes**, SHA-256 `7D3A5645DA1B2229CC44A48C7B5EEF6307BC192F960DC92F6F7D89808A00CD39`. This is not the beta.31 release asset.
-- Commit `b7ebd44` is merged only into the isolated local `release-prep/beta31-release-batch` candidate together with PR head `de8eeac`; the combined local gate and RTX entity-texture smoke now pass, but this candidate has no fresh hosted CI and has not been pushed.
+- Commit `b7ebd44` is merged into `release-prep/beta31-release-batch` together with PR head `de8eeac`; the combined local gate and RTX smokes pass. The branch is now PR #85, stacked on #84; fresh hosted checks are awaited.
 
 ## Geometry MRT guard for dimension transitions — 2026-10-22
 
