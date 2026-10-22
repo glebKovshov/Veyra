@@ -1,3 +1,13 @@
+## Geometry MRT guard for dimension transitions — 2026-10-22
+
+- Fixed the Complementary Nether-transition crash where a temporary 10×10 scene framebuffer was combined with 800×450 shader-pack color targets. `VeyraGeometryTargets` now validates all color and depth attachment extents before creating an MRT; for an incompatible transition frame it resumes the scene pass, skips custom MRT routing, and emits a deduplicated warning. The Vulkan framebuffer constructor keeps its strict dimension validation.
+- Added three regression tests for matching target sizes, the 10×10 versus 800×450 case, and a depth attachment with a different extent.
+- The fresh RTX 3070 Complementary `COMPLEMENTARY` lifecycle smoke passed on `run-graphics-complementary-mrtguard-a151219-20261022`: resize, Nether, Overworld return, disable, re-enable, and reload all passed; 360,000 non-black output pixels, 54 color buckets, 810,549,248-byte shader-pack storage buffer, and an empty error field. No client crash occurred.
+- Full JDK 21 `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon` passed: **485 tests, 0 failures/errors/skips**, 96 example shaders preprocessed, and 112 direct Vulkan SPIR-V compilations. `build` and example-pack packaging passed.
+- The pinned source audit passed for 4 packs, 12 defaults, and 63 declared-profile cases: 864 geometry fragments accepted / 0 rejected, 18 active compute stages compiled / 0 rejected. All records retain `visualValidation=false` for source-only checks.
+- `scripts/verify_jar.py` accepted the local beta.30-metadata JAR for Minecraft 1.21.11 / VulkanMod 0.6.8: **952,204 bytes**, SHA-256 `6a0cc978e7f6044a58bc9f668cb0fe4b2a706586332bc95ca6244bb37ceadd0e`. The release metadata is unchanged; this artifact is not published.
+- PR #84 remains the active draft for this compatibility batch. Merge only after CI passes on the pushed exact head; keep version/changelog work in the final release-prep batch.
+
 ## Native graphics storage images in entity shadow pipelines — 2026-10-22
 
 - Added a scoped VulkanMod `GLSLParser` bridge for `shadow_entities` vertex storage images. Veyra gives the parser a sampler placeholder, replaces the resulting descriptor with its shared storage-image descriptor, restores the shader-pack image declaration with the assigned binding and format, then verifies the compiled pipeline still references the shared image in `GENERAL` layout. The path is restricted to the entity shadow vertex stage; other native graphics storage-image routes retain their explicit rejection.
