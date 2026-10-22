@@ -1338,3 +1338,11 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - PR #84 was still open/draft on `b7e8c6267bef06098d9c6adc87f5be9058e8589b`. The watcher had stopped again (`watching=false`), so current exact-head checks were checked directly.
 - Build run `39821137700` passed; pinned shaderpack source audit `39821137804` passed; Lavapipe Graphics run `39821137832` is still in progress. The previous `VUID-RuntimeSpirv-NonWritable-06341` remains unresolved until that Graphics run completes.
 - Fetched PR discussion and review submissions: none present. Restart the T3 watcher now that the existing PR state has been checked.
+
+### Vulkan core-feature chain correction for beta.31 — 2026-10-22
+
+- PR #85 exact-head `4e017be0f03b70a7c29f176a55bc250aca6c028b` had passing Build and pinned source-audit checks, but Lavapipe Graphics failed five fixtures with `VUID-RuntimeSpirv-NonWritable-06341`; validation treated `vertexPipelineStoresAndAtomics` as disabled.
+- VulkanMod 0.6.8 bytecode confirms it placed `VkPhysicalDeviceFeatures2.features()` in `pEnabledFeatures` and chained Vulkan 1.1 plus dynamic-rendering feature structs. Veyra now supplies merged core features as a `VkPhysicalDeviceFeatures2` node at the front of that chain, sets `pEnabledFeatures` to null as required for the features2 path, and restores the original create-info pointers after `vkCreateDevice` returns. Added regression tests for preserving both core features and VulkanMod's existing feature chain.
+- Full local JDK 21 gate passed on this change: **503 tests, 0 failures/errors/skips**, 97 example shaders / 113 Vulkan SPIR-V compilations, graphics-smoke Java compilation, build, and example-pack packaging. `git diff --check` passed.
+- Fresh pinned source audit passed: 4 packs, 12 defaults, 63 profile cases, 864 geometry fragments accepted / 0 rejected, and 18 active compute stages compiled / 0 rejected. Local beta.31 JAR verification passed at **982,808 bytes**, SHA-256 `6A646805E08D1BEAF31AEDD552AC4ED2204505C41E4EECF62FD965ACCFE35ACE`.
+- The Windows host has no Vulkan validation layer, so only a fresh exact-head hosted Lavapipe Graphics result can close the VUID. Keep PR #85 unmerged and beta.31 unpublished until Build, source audit, and Graphics pass on the exact pushed head.
