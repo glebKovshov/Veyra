@@ -1363,3 +1363,11 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Updated current candidate compatibility documentation to record the RTX 3070 Sildur's Vibrant 2.02 Extreme attempt: the frame stayed black after deferred; probes show attachment/depth data but do not localize the lighting cause. Wording explicitly limits the result to this harness and does not claim universal incompatibility.
 - Updated beta.31 changelog and release notes from the earlier 502-test checkpoint to the verified 519-test JDK 21 gate. Preserved the source-audit result and synthetic Complementary/BSL/custom-image limits; full packs remain uncertified.
 - Exact hosted validation is still required on the latest PR head before merge/release.
+
+### Vulkan core features: in-place device-create verification — 2026-10-23
+
+- Replaced the failing `VkPhysicalDeviceFeatures2` chain experiment with an in-place request on the exact `VkPhysicalDeviceFeatures` structure that VulkanMod 0.6.8 passes as `VkDeviceCreateInfo.pEnabledFeatures`. The original `pNext` chain is left untouched; the original feature values are restored after `vkCreateDevice` returns.
+- Targeted `VeyraDeviceFeaturesTest` passed **4/4**. The forced JDK 21 gate `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed **503 tests, 0 failures/errors/skips**, 97 example shaders and 113 direct SPIR-V compilations, smoke compilation, build, and example-pack packaging. The pinned four-pack audit passed with 12 defaults, 63 profile cases, 864 geometry fragments accepted / 0 rejected, and 18 active compute stages compiled / 0 rejected.
+- RTX 3070 `custom-image-compute` smoke passed with **222,038 active / 0 disabled magenta pixels**; both required storage features report enabled and the error field is empty. The Windows host has no Vulkan validation layer, so this confirms device creation and rendering but does not close the hosted Lavapipe VUID.
+- `scripts/verify_jar.py` accepted the beta.31 candidate at **982,599 bytes**, SHA-256 `0C7862646AEADA5CB3B467E5F27B5F0A7594161B3A8B0CF39EB15E83ABFA8702`. This remains a local candidate, not a release artifact.
+- Push this implementation to PR #85 and require fresh exact-head Build, pinned source-audit, and Lavapipe Graphics results before merging either PR or publishing beta.31.

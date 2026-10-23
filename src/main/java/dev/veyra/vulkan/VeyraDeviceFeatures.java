@@ -1,7 +1,6 @@
 package dev.veyra.vulkan;
 
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 
@@ -29,19 +28,16 @@ public final class VeyraDeviceFeatures {
                 .shaderStorageImageExtendedFormats(supported.shaderStorageImageExtendedFormats());
     }
 
-    /** Copies the create info and requests core features through the Vulkan 1.1 feature chain. */
+    /** Temporarily requests supported core features through VulkanMod's original feature block. */
     public static VkDeviceCreateInfo withSupportedFeatures(VkDeviceCreateInfo createInfo,
                                                             VkPhysicalDeviceFeatures supported,
                                                             MemoryStack stack) {
-        VkDeviceCreateInfo enabledCreateInfo = VkDeviceCreateInfo.calloc(stack).set(createInfo);
-        VkPhysicalDeviceFeatures2 enabledFeatures = VkPhysicalDeviceFeatures2.calloc(stack).sType$Default();
-        VkPhysicalDeviceFeatures enabled = enabledFeatures.features();
-        VkPhysicalDeviceFeatures requested = createInfo.pEnabledFeatures();
-        if (requested != null) enabled.set(requested);
+        VkPhysicalDeviceFeatures enabled = createInfo.pEnabledFeatures();
+        if (enabled == null) {
+            enabled = VkPhysicalDeviceFeatures.calloc(stack);
+            createInfo.pEnabledFeatures(enabled);
+        }
         mergeSupportedFeatures(enabled, supported);
-        enabledFeatures.pNext(createInfo.pNext());
-        enabledCreateInfo.pEnabledFeatures((VkPhysicalDeviceFeatures) null);
-        enabledCreateInfo.pNext(enabledFeatures);
-        return enabledCreateInfo;
+        return createInfo;
     }
 }
