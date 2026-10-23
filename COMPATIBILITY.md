@@ -2,7 +2,7 @@
 
 ## Beta.31 release and post-release verification - 2026-10-23
 
-Beta.31 prerelease `v0.2.0-beta.31+mc1.21.11` is published from the merged #85/#86 stack. The tag build and 47-job release workflow passed; the published JAR is verified in `WORK_SUMMARY.md`. This file also records a local post-release compatibility follow-up on `fix/nether-commented-varyings`, based on published `main` `9257933`. That branch is not included in the beta.31 asset and still needs hosted exact-head checks before merge or a subsequent release.
+Beta.31 prerelease `v0.2.0-beta.31+mc1.21.11` is published from the merged #85/#86 stack. The tag build and 47-job release workflow passed; the published JAR is verified in `WORK_SUMMARY.md`. This file also records a post-release compatibility follow-up in [PR #88](https://github.com/GlebKovshov/Veyra/pull/88), based on published `main` `9257933`. Its checks are pending; those changes are not included in the beta.31 asset.
 
 Runtime evidence was collected on Windows with Java 21.0.12, Minecraft 1.21.11, Fabric Loader 0.18.4, VulkanMod 0.6.8+1.21.11, and an NVIDIA RTX 3070:
 
