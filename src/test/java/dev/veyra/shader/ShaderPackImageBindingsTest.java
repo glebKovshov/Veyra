@@ -32,7 +32,7 @@ class ShaderPackImageBindingsTest {
         var runtime = ordinary.withRuntimeFeatures();
         assertFalse(ordinary.configuration().customImages());
         assertTrue(runtime.configuration().customImages());
-        assertEquals(2, runtime.readImageProperties().images().size());
+        assertEquals(3, runtime.readImageProperties().images().size());
         assertDoesNotThrow(runtime::validatePipelineCapabilities);
         assertTrue(runtime.readStage("gbuffers_terrain.fsh").orElseThrow().contains("floodfill_sampler"));
     }

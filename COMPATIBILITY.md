@@ -10,6 +10,12 @@ The final pinned source audit passed for four archives, 12 default and 63 declar
 
 The final PR #94 head passed **52/52 exact-head hosted checks**, including all 49 Lavapipe graphics jobs, Build, and the pinned source audit. On the merged beta.36 release candidate, the forced local JDK 21 gate passed **554 tests** (0 failures/errors/skips), validated 102 example shaders, compiled 118 shaders to Vulkan SPIR-V, built the mod, packaged examples, and compiled graphics-smoke sources. `scripts/verify_jar.py` accepted the local beta.36 candidate JAR (1,038,705 bytes; SHA-256 `bc374f24bb370e5d8858d100f85fa4f7c76195d80115982adc0e85e1720d38f7`); the published release asset and checksum are tracked in `WORK_SUMMARY.md` after release verification.
 
+## Local compute 2D custom-image checkpoint - candidate, not published - 2026-10-23
+
+Shadow compute stages now allocate declared 2D custom images alongside 3D images, and graphics stages can sample either dimension from the shared resource set. The `custom-image-compute` fixture writes value 42 to both image types and only renders magenta when both samples match. On an NVIDIA RTX 3070, the physical-GPU fixture passed with **222,709 active magenta pixels**, both requested storage-image device features enabled, and no client-log Vulkan VUID or device-loss markers. Khronos validation was not enabled. This checks the named synthetic image path; it does not establish shaderpack-wide compute support.
+
+The forced local JDK 21 gate passed **555 tests** (0 failures/errors/skips), validated the shader fixtures, built the mod, compiled graphics-smoke sources, and packaged example packs. The local candidate JAR passed `scripts/verify_jar.py`. Hosted validation and release publication remain pending. Supported compute remains limited to `shadowcomp`, fixed or render-relative workgroups, validated indirect SSBO dispatch, and declared supported image formats; other compute program families remain unsupported.
+
 ## Published beta.35 results: animated resource-pack PBR maps — 2026-10-23
 
 The published beta.35 release adds animated `_n.png` normal and `_s.png` specular maps for terrain/shadow atlases. Atlas companion images follow the base sprite animation frame and sub-frame; resource-backed entity `SimpleTexture` images use a per-material animation clock. Normal interpolation is vector-aware and renormalized, and specular data channels are interpolated with the albedo animation.
@@ -54,7 +60,7 @@ The offline audit cannot verify Vulkan device features. Previous hosted Lavapipe
 
 The combined local #85+#86 preflight with terrain varying compaction passed the JDK 21 gate: **523 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. The pinned audit covers 4 archives, 12 defaults, and 63 profile cases: 864 geometry fragments accepted / 0 rejected and 18 active compute stages compiled / 0 rejected; all rows remain `visualValidation=false`. The combined local JAR passed `scripts/verify_jar.py` (**995,925 bytes**; SHA-256 `71B593BBD68D577F9A9F55E7BB6AA2413C0CE1499C198E523CEE1E29AAE88CF6`). This is a preflight artifact, not a release asset. Physical-GPU fixtures include `entity-custom-texture` (18,293 active / 0 disabled; binding 6), diagnostic head 3c470ce `entity-custom-image` (18,532 active / 0 disabled), and a prior `custom-image-compute` feature2 experiment (223,587 active / 0 disabled, optional 64-texel `r16ui` probe returned 42). These synthetic runs do not replace hosted Lavapipe validation. No beta.31 GitHub Release exists; no complete third-party pack or stable Iris parity is claimed.
 
-Supported compute remains limited to `shadowcomp` using 3D images, fixed or render-relative workgroups, and indirect dispatch through validated SSBO command buffers; other compute program families and arbitrary image formats remain unsupported.
+Supported compute remains limited to `shadowcomp` using declared 2D and 3D custom images, fixed or render-relative workgroups, and indirect dispatch through validated SSBO command buffers; other compute program families and arbitrary image formats remain unsupported.
 
 ### Earlier checkpoints
 
