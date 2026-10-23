@@ -1,23 +1,22 @@
-# Veyra 0.2.0-beta.32+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.33+mc1.21.11 - experimental prerelease
 
-Beta.32 includes a post-beta.31 compatibility follow-up for the unmodified Sildur's Vibrant Shaders v2.02 Extreme `__DEFAULT__` profile. The fixes cover comment-aware varying and entity capability scans, linear blank-line scanning for unused varying declarations, VulkanMod's handling of `in`/`out` function parameters, lightmap sampling on the line pipeline, and the world-border entity-color fallback. Veyra remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
+Beta.33 adds static Iris `normals` sampling for terrain and shadow block atlases. Resource-pack `_n.png` sprites are packed into the live albedo atlas, missing sprites receive a flat tangent-space normal, and vector-aware resampling keeps generated mip levels normalized. This release remains an experimental compatibility subset: entity normal maps and animated normal/specular maps are unsupported, and no whole-pack Iris parity is claimed.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.32+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.33+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
-## Changes since beta.31
+## Changes since beta.32
 
-- Ignore GLSL varying, uniform, and capability declarations that occur only inside comments, so inactive shader code does not reserve locations or reject a shaderpack.
-- Preserve GLSL function semantics while bypassing VulkanMod 0.6.8's broken attribute-parser path for `in` and `out` function parameters.
-- Bind the shaderpack lightmap sampler for Veyra's basic line pipeline and world-border pipeline.
-- Supply a transparent entity-color fallback for the world-border pipeline, whose vanilla layout has no overlay-color input.
-- Scan blank shader lines in one pass during unused-varying cleanup, with a 60,000-line regression test to guard large-source performance.
+- Load static terrain and shadow block-atlas normal maps from resource-pack `_n.png` sprites and expose the normal sampler to supported terrain/shadow fragments.
+- Use the flat normal `(127, 127, 255, 255)` when a sprite has no normal map; resample vectors and renormalize every generated mip level.
+- Reserve descriptor image slot 6 for the normal atlas, shift auxiliary geometry images, and invalidate cached atlas materials when resources reload or pipelines shut down.
+- Add a `normal-atlas` example and graphics-smoke fixture that checks authored normal-map sampling at mip level 2.
 
 ## Validation and limits
 
-The JDK 21 gate passed **532 tests, 0 failures/errors/skips**; 98 shader examples were preprocessed and 114 stages compiled directly to Vulkan SPIR-V. `validateShaders`, `build`, `packageExamplePacks`, and `compileGraphicsSmokeJava` passed. The pinned source audit covers four archives, 12 defaults and 63 profile/dimension cases: 864 geometry fragments accepted / 0 rejected and 18 active compute stages compiled / 0 rejected, with no audit errors. Source audit rows retain `visualValidation=false`.
+The local JDK 21 gate passed **538 tests, 0 failures/errors/skips**; `validateShaders` processed 99 examples and compiled 115 shader stages to Vulkan SPIR-V. `build`, `packageExamplePacks`, and `compileGraphicsSmokeJava` passed. On an NVIDIA RTX 3070, the `normal-atlas` fixture passed with **223,177 active magenta pixels** while sampling authored `_n.png` data at mip level 2. PR #90 Build, the pinned Shaderpack source audit, and all **46/46** hosted Graphics jobs passed on the exact feature head. The release workflow runs these gates again for the release candidate and verifies the published distributables.
 
-On an NVIDIA RTX 3070, the unmodified pinned Sildur v2.02 Extreme `__DEFAULT__` profile completed resize, Nether transition, Overworld return, disable, re-enable, and resource reload, with 360,000 non-black pixels / 48 color buckets. This GPU smoke did not enable Khronos VVL and covers one profile/fixture. It does not certify the full pack or Iris parity. The release workflow runs the pinned source audit, Lavapipe Graphics matrix, JDK 21 build/tests, and distributable verification.
+This support is limited to static terrain and shadow block-atlas maps. Entity normal maps and animated normal/specular maps remain unsupported. The focused GPU fixture and hosted smoke suite do not certify full shaderpack visuals, full Iris parity, or every lifecycle path. See [COMPATIBILITY.md](COMPATIBILITY.md) for the measured support boundaries.

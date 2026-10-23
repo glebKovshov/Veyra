@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.33 (experimental prerelease)
+
+- Add static Iris `normals` sampling for terrain and shadow block atlases. Resource-pack `_n.png` sprites are mapped into the live albedo atlas; missing sprites use the flat tangent-space normal.
+- Resample and generate normal-map mip levels as normalized vectors, reserve Vulkan texture slot 6 for the normal atlas, and invalidate cached atlas material textures on reload and shutdown.
+- Pass the JDK 21 feature gate and all 46 hosted Graphics fixtures, including the real `normal-atlas` Lavapipe case. A focused RTX 3070 fixture sampled authored normal-map data through mip level 2.
+- Keep the supported subset explicit: entity normal maps and animated normal/specular maps are not supported; this is not full Iris parity or whole-pack certification.
+
 ## 0.2.0-beta.32 (experimental prerelease)
 
 - Fix default-profile Sildur v2.02 Extreme lifecycle compatibility: ignore inactive GLSL declarations inside comments, handle VulkanMod function-parameter qualifiers safely, and bind the expected lightmap/entity-color inputs on line and world-border pipelines.

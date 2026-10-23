@@ -1570,3 +1570,14 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Added the Iris normals sampler for terrain and shadow block-atlas fragments. Static resource-pack _n.png sprites are packed into live albedo atlas rectangles, missing sprites use (127,127,255,255), and resampling/mips normalize tangent-space vectors. Descriptor slot 6 is reserved for this atlas and auxiliary geometry texture slots now begin at 7. Atlas/resource reload and pipeline shutdown invalidate the normal texture cache.
 - Entity normal maps and animated normal/specular maps remain unsupported. No full-pack parity claim is made.
 - Full JDK 21 gate passed: 538 tests, 0 failures/errors/skips; validateShaders processed 99 examples and compiled 115 shader stages to Vulkan SPIR-V; build, packageExamplePacks, and compileGraphicsSmokeJava passed. The original normal-atlas RTX 3070 run passed with 223,177 active magenta pixels after reading mip level 2; hosted Graphics is pending.
+
+### Beta.33 release preparation — 2026-10-23
+
+- Merged PR [#90](https://github.com/GlebKovshov/Veyra/pull/90) into `main` with exact-head guard: PR head `5bcc410408e201a3adc83be6eebe88d6a97e61cc`, merge commit `703647b20677808dedc09544586e0ee44b9455ce`. Hosted Build `39947414721`, Shaderpack source audit `39947414817`, and all 46/46 jobs in Graphics `39947414610` passed; no review comments or inline threads were present.
+- Started beta.33 release preparation from published beta.32 commit `ee14e9c2f06cf69f454336cd42fcda4ec5ad61a0`, then merged current `origin/main` to retain release ancestry and include PR #90. Candidate release branch: `release/0.2.0-beta.33+mc1.21.11`.
+- Beta.33 metadata now documents static terrain/shadow atlas normals, validation and support limits. Local RTX 3070 `normal-atlas` run passed with 223,177 active magenta pixels after sampling authored `_n.png` data at mip level 2. The final versioned local gate and release workflow are pending.
+### Beta.33 versioned local gate — 2026-10-23
+
+- On the merged beta.32 + current `main` candidate with `mod_version=0.2.0-beta.33+mc1.21.11`, the full JDK 21 command `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks` completed successfully. Result: **538 tests, 0 failures/errors/skips**; 99 examples and 115 Vulkan SPIR-V stages; all requested Gradle tasks passed.
+- `scripts/verify_jar.py` passed against the beta.33 installable JAR (Minecraft 1.21.11, VulkanMod 0.6.8, correct mod version). Local Windows outputs: JAR 1,010,629 bytes, SHA-256 `3f02289c845d532753192743f148155d190e07437905f383265623a17d7c5535`; example-packs ZIP 117,788 bytes. The hosted Linux release workflow will produce and verify the published assets.
+- The `normal-atlas` example is included in the 99-shader gate and packaged example archive. Hosted release publication is pending after commit/push.
