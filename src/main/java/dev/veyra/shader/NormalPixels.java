@@ -13,6 +13,21 @@ public final class NormalPixels {
 
     private NormalPixels() { }
 
+    /** Linearly blend encoded normal vectors, then renormalize the result. */
+    public static int interpolate(int from, int to, float amount) {
+        if (!Float.isFinite(amount) || amount < 0.0F || amount > 1.0F)
+            throw new IllegalArgumentException("Normal interpolation amount must be between zero and one.");
+        double[] a = decode(from), b = decode(to);
+        double x = a[0] * (1.0 - amount) + b[0] * amount;
+        double y = a[1] * (1.0 - amount) + b[1] * amount;
+        double z = a[2] * (1.0 - amount) + b[2] * amount;
+        double length = Math.sqrt(x * x + y * y + z * z);
+        if (length < 1e-8) return FLAT_NORMAL;
+        int alpha = Math.clamp(Math.round(channel(from, 24) * (1.0F - amount)
+                + channel(to, 24) * amount), 0, 255);
+        return alpha << 24 | encode(x / length) << 16 | encode(y / length) << 8 | encode(z / length);
+    }
+
     public static String path(String base, boolean atlasSprite) {
         if (atlasSprite) return (base.startsWith("optifine/cit/") ? "" : "textures/") + base + "_n.png";
         int extension = base.lastIndexOf('.');

@@ -61,6 +61,7 @@
     "TextureAtlasMixin",
     "accessor.TextureAtlasAccessor",
     "accessor.TextureAtlasSpriteAccessor",
+    "accessor.SpriteAnimationStateAccessor",
     "accessor.TextureManagerAccessor",
     "accessor.LexerAccessor"
   ],

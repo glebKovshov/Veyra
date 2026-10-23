@@ -29,6 +29,20 @@ def normal_png(path, width=16, height=16):
                      + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
 
 
+def rgba_animation_png(path, first, second, width=16, height=16):
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = b''.join(b'\0' + bytes(color) * width for color in (first, second) for _ in range(height))
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height * 2, 8, 6, 0, 0, 0))
+                     + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
+
+
+def animation_metadata(path):
+    path.with_suffix(path.suffix + '.mcmeta').write_text(
+        json.dumps({'animation': {'frametime': 40, 'frames': [0, 1]}}), encoding='utf-8')
+
+
 def string(value):
     data = value.encode("utf-8")
     return struct.pack(">H", len(data)) + data
@@ -57,7 +71,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-atlas-animated', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
     parser.add_argument('--shaderpack-name', default='')
@@ -175,6 +189,24 @@ def main():
                 normal_png(textures / f'entity/cow/{variant}_n.png', 64, 64)
         elif fixture == 'normal-entity-missing':
             pass
+        elif fixture == 'normal-atlas-animated':
+            for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
+                if sprite == 'grass_block_top':
+                    path = textures / f'block/{sprite}_n.png'
+                    rgba_animation_png(path, [255, 128, 128, 255], [0, 128, 128, 255])
+                    animation_metadata(path)
+                    rgba_animation_png(textures / f'block/{sprite}_s.png',
+                                       [242, 5, 204, 255], [0, 5, 204, 255])
+                    animation_metadata(textures / f'block/{sprite}_s.png')
+                    albedo = textures / f'block/{sprite}.png'
+                    rgba_animation_png(albedo, [70, 180, 45, 255], [80, 190, 50, 255])
+                    animation_metadata(albedo)
+                else:
+                    normal_png(textures / f'block/{sprite}_n.png')
+                    material_png(textures / f'block/{sprite}_s.png')
+            properties = resource_pack / 'assets/minecraft/optifine/texture.properties'
+            properties.parent.mkdir(parents=True, exist_ok=True)
+            properties.write_text('format=lab-pbr/1.3\n', encoding='utf-8')
         else:
             for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
                 normal_png(textures / f'block/{sprite}_n.png')

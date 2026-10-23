@@ -9,6 +9,8 @@ import dev.veyra.mixin.accessor.TextureAtlasAccessor;
 import dev.veyra.mixin.accessor.TextureAtlasSpriteAccessor;
 import dev.veyra.mixin.accessor.TextureManagerAccessor;
 import dev.veyra.shader.NormalPixels;
+import dev.veyra.shader.PbrAnimation;
+import dev.veyra.shader.PbrAnimationClock;
 import dev.veyra.shader.VeyraRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -31,25 +33,58 @@ import net.vulkanmod.vulkan.texture.VulkanImage;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.VK_FORMAT_R8G8B8A8_UNORM;
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-/** Static resource-pack normal maps for terrain atlases and entity SimpleTextures. */
+/** Resource-pack normal maps for terrain atlases and entity SimpleTextures. */
 public final class VeyraNormalTextures {
     public static final String SAMPLER = "VeyraNormalSampler";
     public static final int IMAGE_SLOT = 6;
     private static final long MAX_PIXELS = 64L * 1024 * 1024;
     private static final long CACHE_BYTES = 512L * 1024 * 1024;
+    private static final long MAX_ANIMATION_MAP_PIXELS = 4L * 1024 * 1024;
+    private static final long MAX_ANIMATION_BYTES_PER_MATERIAL = 64L * 1024 * 1024;
+    private static final long ANIMATION_CACHE_BYTES = 128L * 1024 * 1024;
     private static final LinkedHashMap<GpuTexture, Material> cache = new LinkedHashMap<>(16, .75F, true);
     private static Material fallback;
     private static long bytes;
+    private static long animationBytes;
     private static GpuTextureView terrainBinding;
 
-    private record Material(VkGpuTexture texture, GpuTextureView view, long bytes) { }
+    private record LoadedMap(NormalPixels.Image firstFrame, PbrAnimation animation) { }
+    private record TextureData(NormalPixels.Image pixels, List<AnimatedRegion> animations) { }
+    private record Material(VkGpuTexture texture, GpuTextureView view, long bytes, long animationBytes,
+                            List<AnimatedRegion> animations, int mipLevels, int width, int height) { }
+
+    private static final class AnimatedRegion {
+        private final Identifier sprite;
+        private final PbrAnimation animation;
+        private final int x, y, width, height, padding;
+        private final long startedAt;
+        private PbrAnimation.Position position;
+
+        private AnimatedRegion(Identifier sprite, PbrAnimation animation, int x, int y, int width, int height,
+                               int padding, long startedAt) {
+            this.sprite = sprite;
+            this.animation = animation;
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.padding = padding;
+            this.startedAt = startedAt;
+            this.position = animation.positionAt(0);
+        }
+
+        private long sourceBytes() { return (long) animation.pixelCount() * Integer.BYTES; }
+    }
 
     private VeyraNormalTextures() { }
 
@@ -115,26 +150,32 @@ public final class VeyraNormalTextures {
         GpuTexture albedo = base.getTexture();
         Material existing = cache.get(albedo);
         if (existing != null) return existing;
-        NormalPixels.Image pixels = null;
+        TextureData data = null;
         if (base instanceof TextureAtlas atlas) {
-            pixels = atlas(atlas, albedo);
+            data = atlas(atlas, albedo);
         } else if (base instanceof SimpleTexture simple) {
             Identifier id = simple.resourceId().withPath(path -> NormalPixels.path(path, false));
-            NormalPixels.Image source = load(id);
+            LoadedMap source = load(id);
             if (source != null) {
-                pixels = flat(albedo.getWidth(0), albedo.getHeight(0));
-                NormalPixels.tile(pixels, source, 0, 0, pixels.width(), pixels.height(), 0);
+                NormalPixels.Image pixels = flat(albedo.getWidth(0), albedo.getHeight(0));
+                NormalPixels.tile(pixels, source.firstFrame(), 0, 0, pixels.width(), pixels.height(), 0);
+                List<AnimatedRegion> animations = source.animation() == null ? List.of() : List.of(
+                        new AnimatedRegion(null, source.animation(), 0, 0, pixels.width(), pixels.height(), 0,
+                                PbrAnimationClock.ticks()));
+                data = new TextureData(pixels, animations);
             }
         }
-        Material material = pixels == null ? missing() : upload(pixels, mipLevels(pixels, albedo));
+        Material material = data == null ? missing() : upload(data.pixels(), mipLevels(data.pixels(), albedo), data.animations());
         cache.put(albedo, material);
         bytes += material == fallback ? 0 : material.bytes();
-        while (cache.size() > 256 || bytes > CACHE_BYTES) {
+        animationBytes += material == fallback ? 0 : material.animationBytes();
+        while (cache.size() > 256 || bytes > CACHE_BYTES || animationBytes > ANIMATION_CACHE_BYTES) {
             var iterator = cache.entrySet().iterator();
             Material old = iterator.next().getValue();
             iterator.remove();
             if (old != fallback) {
                 bytes -= old.bytes();
+                animationBytes -= old.animationBytes();
                 retire(old);
             }
         }
@@ -147,27 +188,43 @@ public final class VeyraNormalTextures {
         return Math.max(1, Math.min(Math.max(1, albedo.getMipLevels()), imageLevels));
     }
 
-    private static NormalPixels.Image atlas(TextureAtlas atlas, GpuTexture albedo) throws IOException {
+    private static TextureData atlas(TextureAtlas atlas, GpuTexture albedo) throws IOException {
         NormalPixels.Image result = null;
+        List<AnimatedRegion> animations = new ArrayList<>();
+        long animationBytes = 0;
         for (TextureAtlasSprite sprite : ((TextureAtlasAccessor) atlas).veyra$getSprites().values()) {
             Identifier id = sprite.contents().name().withPath(path -> NormalPixels.path(path, true));
-            NormalPixels.Image image = load(id);
-            if (image == null) continue;
+            LoadedMap loaded = load(id);
+            if (loaded == null) continue;
             if (result == null) result = flat(albedo.getWidth(0), albedo.getHeight(0));
-            NormalPixels.tile(result, image, sprite.getX(), sprite.getY(), sprite.contents().width(),
+            NormalPixels.tile(result, loaded.firstFrame(), sprite.getX(), sprite.getY(), sprite.contents().width(),
                     sprite.contents().height(), ((TextureAtlasSpriteAccessor) sprite).veyra$getPadding());
+            if (loaded.animation() != null) {
+                animationBytes += (long) loaded.animation().pixelCount() * Integer.BYTES;
+                if (animationBytes > MAX_ANIMATION_BYTES_PER_MATERIAL)
+                    throw new IOException("Animated normal maps in one atlas exceed the 64-megabyte animation limit.");
+                animations.add(new AnimatedRegion(sprite.contents().name(), loaded.animation(), sprite.getX(),
+                        sprite.getY(), sprite.contents().width(), sprite.contents().height(),
+                        ((TextureAtlasSpriteAccessor) sprite).veyra$getPadding(), PbrAnimationClock.ticks()));
+            }
         }
-        return result;
+        return result == null ? null : new TextureData(result, List.copyOf(animations));
     }
 
-    private static NormalPixels.Image load(Identifier id) throws IOException {
+    private static LoadedMap load(Identifier id) throws IOException {
         Optional<Resource> resource = Minecraft.getInstance().getResourceManager().getResource(id);
         if (resource.isEmpty()) return null;
         try (var stream = resource.get().open(); NativeImage image = NativeImage.read(stream)) {
             checkSize(image.getWidth(), image.getHeight());
-            if (resource.get().metadata().getSection(AnimationMetadataSection.TYPE).isPresent())
-                throw new IOException("Animated normal maps are not implemented: " + id);
-            return new NormalPixels.Image(image.getWidth(), image.getHeight(), image.getPixels());
+            var metadata = resource.get().metadata().getSection(AnimationMetadataSection.TYPE);
+            if (metadata.isEmpty())
+                return new LoadedMap(new NormalPixels.Image(image.getWidth(), image.getHeight(), image.getPixels()), null);
+            if ((long) image.getWidth() * image.getHeight() > MAX_ANIMATION_MAP_PIXELS)
+                throw new IOException("Animated normal map exceeds the four-megapixel animation limit: " + id);
+            PbrAnimation animation = PbrAnimation.fromSheet(image.getWidth(), image.getHeight(), image.getPixels(),
+                    metadata.get());
+            return new LoadedMap(new NormalPixels.Image(animation.frameWidth(), animation.frameHeight(),
+                    animation.firstFramePixels()), animation.isAnimated() ? animation : null);
         }
     }
 
@@ -182,11 +239,13 @@ public final class VeyraNormalTextures {
     }
 
     private static Material missing() {
-        if (fallback == null) fallback = upload(NormalPixels.flat(1, 1), 1);
+        if (fallback == null) fallback = upload(NormalPixels.flat(1, 1), 1, List.of());
         return fallback;
     }
 
-    private static Material upload(NormalPixels.Image pixels, int mipLevels) {
+    private static Material upload(NormalPixels.Image pixels, int mipLevels, List<AnimatedRegion> animations) {
+        int textureWidth = pixels.width();
+        int textureHeight = pixels.height();
         var device = (VkGpuDevice) RenderSystem.getDevice();
         VulkanImage image = VulkanImage.builder(pixels.width(), pixels.height()).setName("Veyra normal map")
                 .setFormat(VK_FORMAT_R8G8B8A8_UNORM).setMipLevels(mipLevels).setClamp(true).createVulkanImage();
@@ -209,11 +268,59 @@ public final class VeyraNormalTextures {
                 if (level + 1 < mipLevels) pixels = NormalPixels.mip(pixels);
             }
             image.setSampler(SamplerManager.getSampler(true, false, mipLevels - 1));
-            return new Material(texture, view, size);
+            long animationBytes = animations.stream().mapToLong(AnimatedRegion::sourceBytes).sum();
+            return new Material(texture, view, size, animationBytes, List.copyOf(animations), mipLevels,
+                    textureWidth, textureHeight);
         } catch (RuntimeException | Error failure) {
             if (view != null) view.close();
             texture.close();
             throw failure;
+        }
+    }
+
+    public static void tickAnimations(long tick, Map<Identifier, PbrAnimationClock.BaseFrame> spriteFrames) {
+        try {
+            for (Material material : cache.values()) {
+                for (AnimatedRegion region : material.animations()) {
+                    PbrAnimationClock.BaseFrame baseFrame = region.sprite == null ? null : spriteFrames.get(region.sprite);
+                    PbrAnimation.Position position = baseFrame == null
+                            ? region.animation.positionAt(Math.max(0, tick - region.startedAt))
+                            : region.animation.positionForFrameSlot(baseFrame.frameSlot(), baseFrame.elapsedTicks());
+                    if (!position.visuallyDiffersFrom(region.position)) continue;
+                    updateRegion(material, region, position);
+                    region.position = position;
+                }
+            }
+        } catch (RuntimeException failure) {
+            VeyraRenderer.materialInputFailed(failure);
+        }
+    }
+
+    private static void updateRegion(Material material, AnimatedRegion region, PbrAnimation.Position position) {
+        int[] framePixels = new int[Math.multiplyExact(region.animation.frameWidth(), region.animation.frameHeight())];
+        region.animation.copyPixels(position, framePixels, NormalPixels::interpolate);
+        NormalPixels.Image frame = new NormalPixels.Image(region.animation.frameWidth(),
+                region.animation.frameHeight(), framePixels);
+        NormalPixels.Image patch = NormalPixels.flat(region.width + 2 * region.padding,
+                region.height + 2 * region.padding);
+        NormalPixels.tile(patch, frame, 0, 0, region.width, region.height, region.padding);
+
+        VulkanImage image = material.texture().getVulkanImage();
+        for (int level = 0; level < material.mipLevels(); level++) {
+            int x = (region.x - region.padding) >> level;
+            int y = (region.y - region.padding) >> level;
+            int levelWidth = Math.max(1, material.width() >> level);
+            int levelHeight = Math.max(1, material.height() >> level);
+            if (x < 0 || y < 0 || x + patch.width() > levelWidth || y + patch.height() > levelHeight)
+                throw new IllegalStateException("Animated normal-map sprite patch exceeds mip level " + level + ".");
+            try (NativeImage data = new NativeImage(patch.width(), patch.height(), false)) {
+                for (int py = 0; py < patch.height(); py++) for (int px = 0; px < patch.width(); px++)
+                    data.setPixel(px, py, patch.pixels()[py * patch.width() + px]);
+                SpriteUpdateUtil.addTransitionedLayout(image);
+                image.uploadSubTextureAsync(level, 0, patch.width(), patch.height(), x, y, 0, 0,
+                        patch.width(), data.getPointer());
+            }
+            if (level + 1 < material.mipLevels()) patch = NormalPixels.mip(patch);
         }
     }
 
@@ -227,6 +334,7 @@ public final class VeyraNormalTextures {
         cache.clear();
         fallback = null;
         bytes = 0;
+        animationBytes = 0;
         old.forEach(VeyraNormalTextures::retire);
     }
 
