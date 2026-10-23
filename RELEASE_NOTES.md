@@ -10,7 +10,7 @@ Beta.37 adds Iris `setup` and pre-shadow `begin` compute programs, pre-shadow `b
 
 ## Validation and known limits
 
-The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; it validated **102 example shader sources**, compiled **118 stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. Separate RTX 3070 runs of the SSBO-only compute, setup, begin-compute, and begin-fragment fixtures each produced **230,400 active / 0 disabled marker pixels**. Setup-on-resize was not separately exercised on the physical GPU. Khronos validation was not enabled in these Windows runs; the client logs contained no VUID or device-loss markers.
+The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; it validated **102 example shader sources**, compiled **118 stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. The versioned local beta.37 candidate's `begin-fragment-stage` fixture passed on an RTX 3070 with **230,400 active / 0 disabled marker pixels**. Separate RTX 3070 runs of the SSBO-only compute, setup, and begin-compute fixtures also produced **230,400 / 0**. Setup-on-resize was not separately exercised on the physical GPU. Khronos validation was not enabled in these Windows runs; the candidate client log contained no VUID or device-loss markers.
 
 The local pinned source-only audit passed for four archives across 12 defaults and 63 declared-profile/dimension cases: **864 geometry fragments accepted / 0 rejected** and **18/18 active compute stages compiled**. All 75 report rows retain `visualValidation: false`; the audit does not establish runtime or visual compatibility.
 
