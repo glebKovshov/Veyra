@@ -1217,19 +1217,21 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (!isProgramEnabled(parent)) continue;
             if (configuration.customImages() && Set.of("vsh", "fsh").contains(extension)
                     && !TERRAIN_PROGRAMS.contains(program) && !SHADOW_PROGRAMS.contains(program)) {
-                var images = ShaderPackImageBindings.prepare(file, readStage(file).orElseThrow(), readImageProperties());
+                var images = ShaderPackImageBindings.prepare(
+                        file, readCustomImageStage(file).orElseThrow(), readImageProperties());
                 if (!images.resources().isEmpty()) {
-                    boolean basicFragment = program.equals(BASIC_PROGRAM) && extension.equals("fsh");
+                    boolean basicLineStage = Set.of(BASIC_PROGRAM, LINE_PROGRAM).contains(program);
                     boolean texturedFragment = program.equals(TEXTURED_PROGRAM) && extension.equals("fsh");
                     boolean entityFragment = extension.equals("fsh") && isNativeEntityFragment(program);
                     boolean postFragment = extension.equals("fsh") && isPostProcessingProgram(program);
-                    if (!program.equals("gbuffers_clouds") && !basicFragment && !texturedFragment
+                    if (!program.equals("gbuffers_clouds") && !basicLineStage && !texturedFragment
                             && !entityFragment && !postFragment) {
                         throw new IOException("Custom images for " + file + " are not integrated yet.");
                     }
-                    if ((texturedFragment || entityFragment || postFragment)
+                    if ((basicLineStage || texturedFragment || entityFragment || postFragment)
                             && images.resources().stream().anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
-                        throw new IOException(program + " cannot write graphics storage images through Minecraft's native RenderPipeline.");
+                        throw new IOException(program
+                                + " cannot write graphics storage images through Minecraft's native RenderPipeline.");
                     }
                     if (program.equals("gbuffers_clouds") && extension.equals("fsh")) {
                         Set<String> customSamplers = images.resources().stream()
@@ -1543,11 +1545,16 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private void validateBasicLineCapabilities() throws IOException {
-        Optional<String> basicVertex = readStage(BASIC_PROGRAM + ".vsh");
+        Optional<String> basicVertex = configuration.customImages()
+                ? readCustomImageStage(BASIC_PROGRAM + ".vsh") : readStage(BASIC_PROGRAM + ".vsh");
+        if (basicVertex.isPresent() && configuration.customImages()) {
+            basicVertex = Optional.of(prepareBasicImageStage(BASIC_PROGRAM, "vsh", basicVertex.get()));
+        }
         if (hasBasicFragment) {
-            String fragment = readBasicFragment().orElseThrow(
+            String fragment = (configuration.customImages()
+                    ? readCustomImageStage(BASIC_PROGRAM + ".fsh") : readBasicFragment()).orElseThrow(
                     () -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
-            fragment = prepareBasicImageFragment(fragment);
+            fragment = prepareBasicImageStage(BASIC_PROGRAM, "fsh", fragment);
             validateBasicLineProgram(BASIC_PROGRAM, fragment, basicVertex,
                     BasicVertexShaderAdapter.Format.LEASH);
             readGeometryBlendSettings(BASIC_PROGRAM);
@@ -1556,21 +1563,29 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (hasLineFragment || hasBasicFragment) {
             String fragmentProgram = hasLineFragment ? LINE_PROGRAM : BASIC_PROGRAM;
             String fragment = hasLineFragment
-                    ? readLineFragment().orElseThrow(() -> new IOException("The pack no longer contains gbuffers_line.fsh."))
-                    : readBasicFragment().orElseThrow(() -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
-            if (!hasLineFragment) fragment = prepareBasicImageFragment(fragment);
-            Optional<String> lineVertex = readStage(LINE_PROGRAM + ".vsh").or(() -> basicVertex);
+                    ? (configuration.customImages() ? readCustomImageStage(LINE_PROGRAM + ".fsh") : readLineFragment())
+                            .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_line.fsh."))
+                    : (configuration.customImages() ? readCustomImageStage(BASIC_PROGRAM + ".fsh") : readBasicFragment())
+                            .orElseThrow(() -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
+            fragment = prepareBasicImageStage(fragmentProgram, "fsh", fragment);
+            Optional<String> explicitLineVertex = configuration.customImages()
+                    ? readCustomImageStage(LINE_PROGRAM + ".vsh") : readStage(LINE_PROGRAM + ".vsh");
+            if (explicitLineVertex.isPresent() && configuration.customImages()) {
+                explicitLineVertex = Optional.of(prepareBasicImageStage(LINE_PROGRAM, "vsh", explicitLineVertex.get()));
+            }
+            Optional<String> lineVertex = explicitLineVertex.isPresent() ? explicitLineVertex : basicVertex;
             validateBasicLineProgram(fragmentProgram, fragment, lineVertex,
                     BasicVertexShaderAdapter.Format.LINE);
             readGeometryBlendSettings(fragmentProgram);
         }
     }
 
-    private String prepareBasicImageFragment(String source) throws IOException {
+    private String prepareBasicImageStage(String programName, String extension, String source) throws IOException {
         if (!configuration.customImages()) return source;
-        var prepared = ShaderPackImageBindings.prepare(BASIC_PROGRAM + ".fsh", source, readImageProperties());
+        var prepared = ShaderPackImageBindings.prepare(programName + "." + extension, source, readImageProperties());
         if (prepared.resources().stream().anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
-            throw new IOException("gbuffers_basic cannot write graphics storage images through Minecraft's native RenderPipeline.");
+            throw new IOException(programName
+                    + " cannot write graphics storage images through Minecraft's native RenderPipeline.");
         }
         return prepared.source();
     }
@@ -1583,7 +1598,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String fragmentProgram = hasSkyBasicFragment ? SKY_BASIC_PROGRAM : BASIC_PROGRAM;
         String fragment = readSkyBasicFragment().orElseThrow(
                 () -> new IOException("The pack no longer contains a sky-basic or basic fragment shader."));
-        if (!hasSkyBasicFragment) fragment = prepareBasicImageFragment(fragment);
+        if (!hasSkyBasicFragment) fragment = prepareBasicImageStage(BASIC_PROGRAM, "fsh", fragment);
         FragmentOutputs.parse(GlslPreprocessor.process(fragmentProgram + ".fsh", fragment));
         readGeometryBlendSettings(fragmentProgram);
         for (BasicVertexShaderAdapter.Format format : List.of(

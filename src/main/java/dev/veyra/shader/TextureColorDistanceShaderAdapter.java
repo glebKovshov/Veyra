@@ -516,9 +516,11 @@ public final class TextureColorDistanceShaderAdapter {
         }
 
         SamplerInputs withCustomImageSamplers(Set<String> samplers) {
+            Set<String> combined = new java.util.HashSet<>(customImageSamplers);
+            combined.addAll(samplers);
             return new SamplerInputs(usesNoiseSampler, usesShadowSampler, usesSpecularSampler,
                     usesLightmapSampler, usesShadowColor, usesOpaqueShadow,
-                    geometryColorInputs, Set.copyOf(samplers), shadowColorInputs);
+                    geometryColorInputs, Set.copyOf(combined), shadowColorInputs);
         }
     }
 
