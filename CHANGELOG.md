@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.36 - 2026-10-23 (experimental prerelease)
+
+- Support read-only custom-image sampling from `gbuffers_basic.vsh` and `gbuffers_line.vsh`. Prepare image samplers before native vertex adaptation and merge their descriptor bindings with fragment-stage samplers. Storage-image writes through these basic/line graphics pipelines remain unsupported.
+- Extend `examples/basic-custom-image` so both basic vertex and fragment stages consume the compute-backed image; hosted Lavapipe readback measured 471 active green pixels / 0 disabled and no runtime Vulkan validation errors. Add a line vertex example and `LINE` capability regression; the graphics fixture does not draw or certify that line pipeline.
+- Final local JDK 21 gate: 554 tests, 0 failures/errors/skips, 102 shader examples, 118 direct Vulkan SPIR-V compilations, build, example-pack packaging, and graphics-smoke compilation. Pinned source audit passed for four archives, 12 defaults and 63 declared-profile cases: 864 geometry fragments accepted / 0 rejected, 18/18 active compute stages compiled. Every audit row has `visualValidation=false`.
+- The release workflow gates publication on a fresh pinned source audit, the complete Lavapipe graphics matrix, versioned build/tests, and distributable verification. This remains an experimental Iris-compatible subset; no complete third-party pack or stable Iris parity is claimed.
+
 ## 0.2.0-beta.35 - 2026-10-23 (experimental prerelease)
 
 - Support animated resource-pack `_n.png` and `_s.png` maps in block/shadow atlases. Atlas companion maps follow the base sprite's animation frame and sub-frame, including vector-aware normal interpolation and LabPBR/data-channel mip updates; resource-backed entity `SimpleTexture` maps use their own animation clock. Each animated map is capped at four million source pixels, with a 64 MiB source-animation limit per texture material, with separate 128 MiB source-animation LRU caches for normal and specular maps (256 MiB combined). Downloaded player skins are not covered.
