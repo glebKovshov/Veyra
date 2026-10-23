@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased (animated PBR batch)
+## 0.2.0-beta.35 - 2026-10-23 (experimental prerelease)
 
-- Support animated resource-pack `_n.png` and `_s.png` maps in block/shadow atlases. Atlas companion maps follow the base sprite's animation frame and sub-frame, including vector-aware normal interpolation and LabPBR/data-channel mip updates; resource-backed entity `SimpleTexture` maps use their own animation clock. Each animated map is capped at four million source pixels, with a 64 MiB per-material animation-data limit. Downloaded player skins are not covered.
+- Support animated resource-pack `_n.png` and `_s.png` maps in block/shadow atlases. Atlas companion maps follow the base sprite's animation frame and sub-frame, including vector-aware normal interpolation and LabPBR/data-channel mip updates; resource-backed entity `SimpleTexture` maps use their own animation clock. Each animated map is capped at four million source pixels, with a 64 MiB source-animation limit per texture material, with separate 128 MiB source-animation LRU caches for normal and specular maps (256 MiB combined). Downloaded player skins are not covered.
 - Add the `normal-atlas-animated` GPU fixture. On RTX 3070, the final diagnostic read back 222,724 magenta pixels and 222,722 green pixels across the two synchronized frame states, then 0 of each after shader disable.
+- Validate selected `COMPLEMENTARY` lifecycle profiles for Complementary Reimagined and Unbound r5.9.3 on RTX 3070: 337,813 / 57 and 359,954 / 60 non-black pixels/color buckets. Both completed resize, Nether, Overworld return, disable, re-enable, and reload in a synthetic world; this is not full-pack visual certification.
+- Pass the fresh pinned source-only audit for 4 archives / 75 profile-dimension records / 5,178 stages: 864 geometry-fragment programs accepted, 0 rejected, and 18/18 active compute stages compiled. Eighteen Complementary profile/dimension records still report the unavailable writable `voxel_img` shadow-vertex capability; audit records do not claim visual validation.
 
 ## 0.2.0-beta.34 (experimental prerelease)
 
