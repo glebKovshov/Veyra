@@ -17,7 +17,7 @@ import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-/** Owns active begin, shadow, and post-processing compute stages and their shared images. */
+/** Owns active setup, begin, shadow, and post-processing compute stages and their shared images. */
 public final class VeyraComputePipelineSet implements AutoCloseable {
     private final VeyraComputeResources resources;
     private final List<Dispatch> stages;
@@ -172,7 +172,8 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         LinkedHashSet<String> names = new LinkedHashSet<>();
         for (Dispatch stage : stages) {
             if (isShadowComputeFile(stage.programName() + ".csh")
-                    || isBeginComputeFile(stage.stageProgram() + ".csh")) continue;
+                    || isBeginComputeFile(stage.stageProgram() + ".csh")
+                    || isSetupComputeFile(stage.stageProgram() + ".csh")) continue;
             if (ShaderPassPhase.forProgram(stage.programName()) == phase) names.add(stage.programName());
         }
         return List.copyOf(names);
@@ -192,6 +193,24 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
     public void dispatchBeginPrograms(int renderWidth, int renderHeight) {
         ensureOpen();
         for (String programName : beginProgramNames()) {
+            dispatchProgram(programName, renderWidth, renderHeight);
+        }
+    }
+
+    /** Returns setup compute programs in pass/component order for one-time pipeline initialization. */
+    public List<String> setupProgramNames() {
+        ensureOpen();
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Dispatch stage : stages) {
+            if (isSetupComputeFile(stage.stageProgram() + ".csh")) names.add(stage.programName());
+        }
+        return List.copyOf(names);
+    }
+
+    /** Dispatches setup programs once after the compute pipeline is installed or resized. */
+    public void dispatchSetupPrograms(int renderWidth, int renderHeight) {
+        ensureOpen();
+        for (String programName : setupProgramNames()) {
             dispatchProgram(programName, renderWidth, renderHeight);
         }
     }
@@ -302,5 +321,9 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
 
     private static boolean isBeginComputeFile(String file) {
         return file.matches("begin(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
+    }
+
+    private static boolean isSetupComputeFile(String file) {
+        return file.matches("setup(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
     }
 }

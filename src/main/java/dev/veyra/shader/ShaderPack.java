@@ -1095,12 +1095,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private static int computeStageFamilyOrder(String file) {
         return switch (computeStageFamily(file)) {
-            case "begin" -> 0;
-            case "shadowcomp" -> 1;
-            case "prepare" -> 2;
-            case "deferred" -> 3;
-            case "composite" -> 4;
-            case "final" -> 5;
+            case "setup" -> 0;
+            case "begin" -> 1;
+            case "shadowcomp" -> 2;
+            case "prepare" -> 3;
+            case "deferred" -> 4;
+            case "composite" -> 5;
+            case "final" -> 6;
             default -> Integer.MAX_VALUE;
         };
     }
@@ -2027,6 +2028,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private static boolean isPostProcessingProgramFile(String fileName) {
+        if (fileName.matches("setup(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
+            return true;
+        }
         if (fileName.matches("begin(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
             return true;
         }
