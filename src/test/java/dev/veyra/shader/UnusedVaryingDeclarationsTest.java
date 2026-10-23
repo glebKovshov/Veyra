@@ -29,6 +29,14 @@ class UnusedVaryingDeclarationsTest {
     }
 
     @Test
+    void skipsBlankLinesWithoutRescanningTheRemainingSource() {
+        String source = "\n".repeat(60_000) + "void main() {}\n";
+
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () ->
+                assertEquals(source, UnusedVaryingDeclarations.removeUnused(source)));
+    }
+
+    @Test
     void handlesManyDeclarationsWithoutRegexBacktracking() {
         StringBuilder source = new StringBuilder("in vec3 used;\n");
         for (int index = 0; index < 2048; index++) {

@@ -57,7 +57,7 @@ final class UnusedVaryingDeclarations {
     }
 
     private static ParsedDeclaration parseDeclaration(String source, int start) {
-        int cursor = skipWhitespace(source, start);
+        int cursor = skipLineLeadingWhitespace(source, start);
         if (matchesToken(source, cursor, "layout")) {
             cursor = skipWhitespace(source, cursor + "layout".length());
             if (cursor >= source.length() || source.charAt(cursor) != '(') return null;
@@ -97,6 +97,12 @@ final class UnusedVaryingDeclarations {
             if (matchesToken(source, cursor, qualifier)) return cursor + qualifier.length();
         }
         return -1;
+    }
+
+    private static int skipLineLeadingWhitespace(String source, int cursor) {
+        while (cursor < source.length() && source.charAt(cursor) != '\r' && source.charAt(cursor) != '\n'
+                && Character.isWhitespace(source.charAt(cursor))) cursor++;
+        return cursor;
     }
 
     private static int skipWhitespace(String source, int cursor) {
