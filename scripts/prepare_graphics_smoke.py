@@ -52,7 +52,8 @@ def main():
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
     parser.add_argument('--shaderpack-name', default='')
-    parser.add_argument('--profile', default='')
+    parser.add_argument('--profile', default='',
+                        help='Declared profile name, or __DEFAULT__ for unmodified pack defaults')
     arguments = parser.parse_args()
     fixture = arguments.fixture
     third_party = fixture == 'third-party-shaderpack'

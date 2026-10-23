@@ -905,6 +905,18 @@ public final class GraphicsSmoke {
 
     private static void applyThirdPartyProfile(ShaderPack pack) {
         try {
+            if (thirdPartyProfile.equals("__DEFAULT__")) {
+                if (!pack.configuration().options().isEmpty() || !VeyraRenderer.isRenderingEnabled()
+                        || !VeyraRenderer.getLastError().isEmpty()) {
+                    throw new IllegalStateException("Default shaderpack smoke requires an active pack without option overrides: "
+                            + VeyraRenderer.getLastError());
+                }
+                thirdPartyPack = pack;
+                thirdPartyProfileApplied = true;
+                LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                        "Using unmodified shaderpack defaults from {}", pack.name());
+                return;
+            }
             var definitions = pack.readOptions();
             var profile = definitions.profiles().get(thirdPartyProfile);
             if (profile == null || profile.isEmpty()) {

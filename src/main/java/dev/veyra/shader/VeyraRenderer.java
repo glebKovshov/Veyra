@@ -3891,7 +3891,7 @@ public final class VeyraRenderer {
                         fragmentSource = TerrainShaderAdapter.adaptFragment(
                                 fragmentSource, false, false, varyings, usesNoiseSampler, programName,
                                 customTextureSamplers);
-                        Set<Integer> finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource);
+                        Set<Integer> finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, varyings);
                         if (!finalUnused.equals(unusedLocations)) {
                             unusedLocations = finalUnused;
                             varyings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, shadowVertex.get(), unusedLocations);
@@ -3899,7 +3899,7 @@ public final class VeyraRenderer {
                             fragmentSource = TerrainShaderAdapter.adaptFragment(
                                     originalFragmentSource, false, false, varyings, usesNoiseSampler, programName,
                                     customTextureSamplers);
-                            finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource);
+                            finalUnused = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, varyings);
                         }
                         if (!finalUnused.equals(unusedLocations)) throw new IOException(programName + " shadow varying interface did not converge.");
                         shadowVertexSource = TerrainVertexShaderAdapter.adaptStage(
