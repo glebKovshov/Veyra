@@ -202,6 +202,23 @@ class ShaderPackStorageBuffersTest {
     }
 
     @Test
+    void validatesScreenRelativeComputeStorageBuffersWithoutAssumingAViewport() throws Exception {
+        String source = """
+                #version 450
+                layout(std430, binding = 2) buffer computeState {
+                    uint value;
+                } computeStateBuffer;
+                void main() { computeStateBuffer.value = 7u; }
+                """;
+        var properties = ShaderPackStorageBufferProperties.parse("bufferObject.2 = 8 true 0.5 0.5\n");
+
+        var prepared = ShaderPackStorageBuffers.validateForVulkanParser(source, properties);
+
+        assertEquals(1, prepared.storageBlocks().size());
+        assertEquals(0L, prepared.storageBlocks().values().iterator().next().allocationBytes());
+    }
+
+    @Test
     void rewritesAnActiveStorageBlockForDirectShadercCompilation() throws Exception {
         String source = """
                 #version 450

@@ -1390,17 +1390,25 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             throw new IOException("The Vulkan device cannot run shadow-compute custom images: "
                     + "vertexPipelineStoresAndAtomics and shaderStorageImageExtendedFormats are required.");
         }
-        if (!computeFiles.isEmpty() && !VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled) {
-            throw new IOException("The Vulkan device cannot run compute custom images: "
-                    + "shaderStorageImageExtendedFormats is required.");
-        }
+        ShaderPackStorageBufferProperties storageBufferProperties = readStorageBufferProperties();
+        boolean computeUsesStorageImage = false;
         for (String file : computeFiles) {
             String source = readComputeStage(file).orElseThrow();
             ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
             var shader = ComputeShaderAdapter.adapt(file, source, properties);
-            if (shader.resources().stream().noneMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
-                throw new IOException(file + " has no supported storage-image output.");
+            boolean hasStorageImage = shader.resources().stream()
+                    .anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage);
+            var storageBuffers = ShaderPackStorageBuffers.validateForVulkanParser(
+                    shader.source(), storageBufferProperties);
+            boolean hasStorageBuffer = !storageBuffers.storageBlocks().isEmpty();
+            if (!hasStorageImage && !hasStorageBuffer) {
+                throw new IOException(file + " must use an active storage image or an allocated bufferObject SSBO.");
             }
+            computeUsesStorageImage |= hasStorageImage;
+        }
+        if (computeUsesStorageImage && !VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled) {
+            throw new IOException("The Vulkan device cannot run compute custom images: "
+                    + "shaderStorageImageExtendedFormats is required.");
         }
     }
 
@@ -1682,7 +1690,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public ShaderPack withRuntimeFeatures() throws IOException {
         if (configuration.customImages()) return this;
         ShaderPack candidate = inspect(path, new ShaderPackConfiguration(configuration.options(), configuration.dimension(), true));
-        return candidate.activeComputeStageFiles("shadowcomp").isEmpty() ? this : candidate;
+        return candidate.activeComputeStageFiles().isEmpty() ? this : candidate;
     }
 
     private Map<String, String> featureOptions(Map<String, String> options) {
