@@ -1524,3 +1524,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Marked #85 ready and merged it using GitHub's expected-head guard and merge-commit method, preserving history. Published main merge commit: **031cafa9abf364aed54086859ccfd95dab9f81f9**. No branch was deleted and the user-owned root checkout was not switched or cleaned.
 - Fetched main into the isolated integration worktree and merged it as `65f424dd2bcbd0a72cfee494a91f4a4296c31b8c`. Its tree is identical to the locally validated c95d068 tree; both the merged #85 parent and remote #86 e15c502 are ancestors. The 523-test, shader/audit/runtime results remain the code preflight evidence.
 - Retargeted draft #86 from release-prep/beta31-release-batch to **main**. Preparing the fast-forward head update from the integration branch, including all existing compute/uniform/route work plus terrain varying compaction and original-default smoke support. Require fresh hosted checks on its own new head; #85's successful checks do not substitute for them. Beta.31 tag and release are not yet published.
+
+### Shader-pack vec3/ivec3 std140 uniform packing — 2026-10-23
+
+- Shader-pack `vec3`/`ivec3` built-ins (camera/eye positions, skyColor, fogColor, playerLookVector, Iris extra vec3) now use `ShaderPackVec3Uniform`/`ShaderPackIVec3Uniform`, so a following scalar packs into the vec3's fourth component as std140 requires. A unit test checks the offsets against real shaderc SPIR-V reflection (`lwjgl-shaderc` test dependency).
+- The custom-uniforms example now checks a vec3 followed by scalars and compares GPU `worldTime` with a CPU custom uniform. The old fixed `worldTime=6000` assumption was wrong because time keeps advancing. RTX 3070 graphics smoke `vec3-uniform-regression-final-20261023` passed with **222,757 active magenta pixels**.
+- JDK 21 gate passed: **524 tests**, shader validation, example packaging, graphics-smoke compilation.

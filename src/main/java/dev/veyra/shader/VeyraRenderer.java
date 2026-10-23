@@ -961,7 +961,7 @@ public final class VeyraRenderer {
             case INT, BOOL -> new UniformValue.IntUniform((int) irisExtraScalar(name));
             case VEC3 -> {
                 float[] vector = IrisExtraUniforms.vector(name);
-                yield new UniformValue.Vec3Uniform(new Vector3f(vector[0], vector[1], vector[2]));
+                yield new ShaderPackVec3Uniform(new Vector3f(vector[0], vector[1], vector[2]));
             }
         };
     }
@@ -7276,9 +7276,9 @@ public final class VeyraRenderer {
                 case "darknessLightFactor" -> new UniformValue.FloatUniform(darknessLightFactor);
                 case "playerMood" -> new UniformValue.FloatUniform(playerMood());
                 case "biome_precipitation" -> new UniformValue.IntUniform(biomePrecipitation());
-                case "playerLookVector" -> new UniformValue.Vec3Uniform(frameUniforms.camera().playerLookVector());
-                case "skyColor" -> new UniformValue.Vec3Uniform(frameUniforms.camera().skyColor());
-                case "fogColor" -> new UniformValue.Vec3Uniform(new Vector3f(irisFogColor));
+                case "playerLookVector" -> new ShaderPackVec3Uniform(frameUniforms.camera().playerLookVector());
+                case "skyColor" -> new ShaderPackVec3Uniform(frameUniforms.camera().skyColor());
+                case "fogColor" -> new ShaderPackVec3Uniform(new Vector3f(irisFogColor));
                 case "lightningBoltPosition" -> new UniformValue.Vec4Uniform(frameUniforms.camera().lightningBoltPosition());
                 case "heldBlockLightValue" -> new UniformValue.IntUniform(
                         heldBlockLightValue(net.minecraft.world.InteractionHand.MAIN_HAND));
@@ -7335,14 +7335,14 @@ public final class VeyraRenderer {
                 case "shadowModelViewInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowModelViewInverse());
                 case "shadowProjection" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowProjection());
                 case "shadowProjectionInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowProjectionInverse());
-                case "cameraPosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().cameraPosition());
-                case "cameraPositionInt" -> new UniformValue.IVec3Uniform(frameUniforms.camera().cameraPositionInt());
-                case "cameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().cameraPositionFract());
-                case "previousCameraPosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPosition());
-                case "previousCameraPositionInt" -> new UniformValue.IVec3Uniform(frameUniforms.camera().previousCameraPositionInt());
-                case "previousCameraPositionFract" -> new UniformValue.Vec3Uniform(frameUniforms.camera().previousCameraPositionFract());
-                case "eyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().eyePosition());
-                case "relativeEyePosition" -> new UniformValue.Vec3Uniform(frameUniforms.camera().relativeEyePosition());
+                case "cameraPosition" -> new ShaderPackVec3Uniform(frameUniforms.camera().cameraPosition());
+                case "cameraPositionInt" -> new ShaderPackIVec3Uniform(frameUniforms.camera().cameraPositionInt());
+                case "cameraPositionFract" -> new ShaderPackVec3Uniform(frameUniforms.camera().cameraPositionFract());
+                case "previousCameraPosition" -> new ShaderPackVec3Uniform(frameUniforms.camera().previousCameraPosition());
+                case "previousCameraPositionInt" -> new ShaderPackIVec3Uniform(frameUniforms.camera().previousCameraPositionInt());
+                case "previousCameraPositionFract" -> new ShaderPackVec3Uniform(frameUniforms.camera().previousCameraPositionFract());
+                case "eyePosition" -> new ShaderPackVec3Uniform(frameUniforms.camera().eyePosition());
+                case "relativeEyePosition" -> new ShaderPackVec3Uniform(frameUniforms.camera().relativeEyePosition());
                 default -> CustomUniforms.active().uniform(uniform) != null
                         ? customUniformValue(uniform)
                         : IrisExtraUniforms.contains(uniform) ? irisExtraUniformValue(uniform)
