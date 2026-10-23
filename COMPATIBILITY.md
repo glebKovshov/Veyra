@@ -1,8 +1,18 @@
-# Shaderpack compatibility: beta.35 candidate; beta.34 published
+# Shaderpack compatibility - beta.36 validation
 
-## Current beta.35 candidate: animated resource-pack PBR maps — 2026-10-23
+## Beta.36 results: read-only custom-image samplers in basic and line vertex stages - 2026-10-23
 
-The published beta.34 release remains the latest downloadable artifact while beta.35 is validated. This candidate adds animated `_n.png` normal and `_s.png` specular maps for terrain/shadow atlases. Atlas companion images follow the base sprite animation frame and sub-frame; resource-backed entity `SimpleTexture` images use a per-material animation clock. Normal interpolation is vector-aware and renormalized, and specular data channels are interpolated with the albedo animation.
+Beta.36 adds read-only custom-image sampler support to `gbuffers_basic.vsh` and `gbuffers_line.vsh`. Their image declarations are removed before native vertex adaptation, and native descriptor layouts merge image samplers declared in vertex and fragment stages. Storage-image writes through these basic/line graphics pipelines remain explicitly unsupported.
+
+The final PR #94 head passed the hosted `basic-custom-image` Lavapipe fixture: the basic vertex and fragment stages both sampled the compute-backed image, with **471 active green pixels / 0 after disabling the pack** and **0 runtime Vulkan validation errors**. Twenty process-teardown diagnostics were retained separately. The example also includes a line vertex stage that reuses the basic fragment; capability validation covers its `LINE` interface, but this fixture does not provide a line-specific GPU readback. These generated-scene checks do not certify a complete third-party pack or natural-world visuals.
+
+The final pinned source audit passed for four archives, 12 default and 63 declared-profile cases: **864 geometry-fragment programs accepted / 0 rejected**, and **18/18 active compute stages compiled**. Every audit row remains `visualValidation: false`; writable shadow images still depend on runtime device features and source audit does not establish rendered output.
+
+The final PR #94 head passed **52/52 exact-head hosted checks**, including all 49 Lavapipe graphics jobs, Build, and the pinned source audit. On the merged beta.36 release candidate, the forced local JDK 21 gate passed **554 tests** (0 failures/errors/skips), validated 102 example shaders, compiled 118 shaders to Vulkan SPIR-V, built the mod, packaged examples, and compiled graphics-smoke sources. `scripts/verify_jar.py` accepted the local beta.36 candidate JAR (1,038,705 bytes; SHA-256 `bc374f24bb370e5d8858d100f85fa4f7c76195d80115982adc0e85e1720d38f7`); the published release asset and checksum are tracked in `WORK_SUMMARY.md` after release verification.
+
+## Published beta.35 results: animated resource-pack PBR maps — 2026-10-23
+
+The published beta.35 release adds animated `_n.png` normal and `_s.png` specular maps for terrain/shadow atlases. Atlas companion images follow the base sprite animation frame and sub-frame; resource-backed entity `SimpleTexture` images use a per-material animation clock. Normal interpolation is vector-aware and renormalized, and specular data channels are interpolated with the albedo animation.
 
 The `normal-atlas-animated` RTX 3070 fixture captured both requested base-frame states (0 → 1): **222,724 magenta / 222,722 green pixels** across the synchronized states and **0 / 0** after shaders were disabled. This validates the named animated atlas path; it does not establish whole-pack visuals. Local resource limits are four million source pixels per animated map, 64 MiB of source animation data per texture material, and separate 128 MiB animation caches for normal and specular maps (256 MiB combined). Downloaded player skins are not included.
 
