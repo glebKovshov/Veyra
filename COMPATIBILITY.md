@@ -1,9 +1,12 @@
-# Shaderpack compatibility: beta.34 candidate; beta.33 published
+# Shaderpack compatibility: beta.35 candidate; beta.34 published
 
-## Current beta.34 candidate: static entity normal maps — 2026-10-23
+## Current beta.35 candidate: animated resource-pack PBR maps — 2026-10-23
 
-The published beta.33 release remains the last downloadable asset while beta.34 is validated. The current candidate pairs static `_n.png` files with resource-backed entity `SimpleTexture` images and bridges Iris `normals` to supported entity fragments. On an NVIDIA RTX 3070, the latest clean run with an authored 64×64 cow map read back **18,648 active magenta pixels / 0 after shader-pack disable**; when the map was absent, the fallback produced **18,410 active red pixels / 0 after disable**. Terrain retained its separate green signal. The local JDK 21 gate passed **544 tests**, validated **101 example shaders**, compiled **117 stages to Vulkan SPIR-V**, built the mod, and verified the beta.34 candidate JAR. Downloaded player skins, animated maps, and complete third-party pack visuals are not covered. The hosted release gate remains required before publication.
+The published beta.34 release remains the latest downloadable artifact while beta.35 is validated. This candidate adds animated `_n.png` normal and `_s.png` specular maps for terrain/shadow atlases. Atlas companion images follow the base sprite animation frame and sub-frame; resource-backed entity `SimpleTexture` images use a per-material animation clock. Normal interpolation is vector-aware and renormalized, and specular data channels are interpolated with the albedo animation.
 
+The `normal-atlas-animated` RTX 3070 fixture captured both requested base-frame states (0 → 1): **222,724 magenta / 222,722 green pixels** across the synchronized states and **0 / 0** after shaders were disabled. This validates the named animated atlas path; it does not establish whole-pack visuals. Local resource limits are four million source pixels per animated map, 64 MiB of animation data per material, and a 128 MiB shared animation cache. Downloaded player skins are not included.
+
+The published compatibility record below retains the measured Complementary, BSL, and Sildur outcomes. Complete third-party pack compatibility remains unverified; Sildur's original-default full-pack run still renders black after deferred, while selected-profile Complementary Reimagined/Unbound and BSL HIGH runs have focused frame and lifecycle evidence.
 ## Historical beta.31 release and post-release verification - 2026-10-23
 
 Beta.31 prerelease `v0.2.0-beta.31+mc1.21.11` is published from the merged #85/#86 stack. The tag build and 47-job release workflow passed; the published JAR is verified in `WORK_SUMMARY.md`. This file also records a post-release compatibility follow-up in [PR #88](https://github.com/GlebKovshov/Veyra/pull/88), based on published `main` `9257933`. Its checks are pending; those changes are not included in the beta.31 asset.
