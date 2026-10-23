@@ -209,6 +209,35 @@ class ShaderAdapterTest {
     }
 
     @Test
+    void ignoresPackVaryingsInsideDisabledCommentBlocks() throws IOException {
+        String fragment = """
+                #version 120
+                /*
+                #if defined Shadows && defined PCSS
+                varying vec4 PCSS_data;
+                #endif
+                */
+                void main() { gl_FragColor = vec4(1.0); }
+                """;
+
+        String adapted = TerrainShaderAdapter.adaptFragment(fragment, false, false, Map.of(), false,
+                "gbuffers_terrain", Set.of());
+
+        assertFalse(adapted.contains("PCSS_data"), adapted);
+    }
+
+    @Test
+    void commentedTerrainVaryingsDoNotReserveBridgeLocations() throws IOException {
+        String fragment = """
+                #version 120
+                /* varying vec2 texcoord; */
+                void main() { gl_FragColor = vec4(1.0); }
+                """;
+
+        assertTrue(TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment, Map.of()).contains(1));
+    }
+
+    @Test
     void adaptsPackColorToTerrainVertexColorInput() throws IOException {
         String adapted = TerrainShaderAdapter.adaptFragment("""
                 #version 120

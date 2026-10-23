@@ -5653,13 +5653,13 @@ public final class VeyraRenderer {
                 vertexSource = adaptedVertex.source();
                 usesNoiseSampler = adaptedVertex.usesNoiseSampler();
                 samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(
-                        source, programName, pack.hasShadowFragment(), original.getSamplers().contains("Sampler2"));
+                        source, programName, pack.hasShadowFragment(), true);
                 usesNoiseSampler |= samplerInputs.usesNoiseSampler();
                 if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                 if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                 fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
                         source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
-                        original.getSamplers().contains("Sampler2"));
+                        true);
             } else {
                 fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
                         source, programName, isLeashPipeline(original));
@@ -5810,6 +5810,13 @@ public final class VeyraRenderer {
                     customVertexSource, nativeFragmentSource, programName);
         }
         String fragmentSourceForParser = nativeFragmentSource;
+        String debugPipelineName = original.getLocation().getPath().replace('/', '-');
+        dumpShaderSource("color-distance-" + programName + "-" + debugPipelineName + ".fsh",
+                fragmentSourceForParser);
+        if (customVertexSource != null) {
+            dumpShaderSource("color-distance-" + programName + "-" + debugPipelineName + ".vsh",
+                    customVertexSource);
+        }
         if (customImageStage != null && !customImageStage.resources().isEmpty() && customImages == null) {
             throw new IOException(programName + " has custom image samplers but no shared image resource set.");
         }
@@ -6256,7 +6263,7 @@ public final class VeyraRenderer {
                     if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
-                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(), true);
+                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(), true, false);
                     outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
                     blendSettings = pack.readGeometryBlendSettings(programName);
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
@@ -6268,7 +6275,7 @@ public final class VeyraRenderer {
                     if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
-                            source, programName, false, false, true, pack.hasShadowFragment(), true);
+                            source, programName, false, false, true, pack.hasShadowFragment(), true, false);
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
                 }
             } catch (IOException exception) {

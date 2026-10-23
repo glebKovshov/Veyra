@@ -336,7 +336,7 @@ public final class TerrainShaderAdapter {
                                          Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings)
             throws IOException {
         String processed = GlslPreprocessor.process(programName + ".fsh", fragmentSource);
-        Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(processed));
+        Matcher matcher = VARYING_DECLARATION.matcher(activeVaryingDeclarations(processed));
         while (matcher.find()) {
             String type = matcher.group(2);
             String name = matcher.group(3);
@@ -469,7 +469,7 @@ public final class TerrainShaderAdapter {
         }
 
         adapted = UnusedVaryingDeclarations.removeUnused(expandCommaSeparatedVaryings(adapted));
-        Matcher varyingMatcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(adapted));
+        Matcher varyingMatcher = VARYING_DECLARATION.matcher(activeVaryingDeclarations(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         List<String> declaredVaryings = new ArrayList<>();
         Map<String, String> linkedPackVaryings = new java.util.LinkedHashMap<>();
@@ -1074,7 +1074,7 @@ public final class TerrainShaderAdapter {
     static Set<Integer> unusedTerrainVertexOutputs(String fragmentSource,
             Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings) throws IOException {
         String processed = GlslPreprocessor.process("gbuffers_terrain.fsh", fragmentSource);
-        Matcher inputs = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(processed));
+        Matcher inputs = VARYING_DECLARATION.matcher(activeVaryingDeclarations(processed));
         Set<Integer> required = new HashSet<>();
         boolean derivedNormal = false;
         boolean derivedTangentFrame = false;
@@ -1146,6 +1146,10 @@ public final class TerrainShaderAdapter {
         }
         matcher.appendTail(expanded);
         return expanded.toString();
+    }
+
+    private static String activeVaryingDeclarations(String source) {
+        return expandCommaSeparatedVaryings(maskComments(source));
     }
 
     private static String renameMainForTerrainInitialization(String source) throws IOException {

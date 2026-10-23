@@ -28,11 +28,7 @@ public abstract class VkRenderPassMixin {
         if (active == null) return;
         var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
         if (pipeline != null) VeyraGeometryTargets.beforeBind(pipeline);
-        String pipelinePath = active.getLocation().getPath();
-        boolean lightmapPipeline = pipelinePath.equals("pipeline/world_border")
-                || pipelinePath.equals("pipeline/celestial") || pipelinePath.equals("pipeline/end_sky");
-        if (pipeline != null && lightmapPipeline
-                && active.getFragmentShader().getNamespace().equals("veyra")
+        if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")
                 && active.getSamplers().contains("Sampler2")) {
             GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
             var descriptor = pipeline.getImageDescriptor("Sampler2");

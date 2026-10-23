@@ -11,6 +11,8 @@ import net.vulkanmod.vulkan.shader.converter.Token;
 import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Invoker;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -21,6 +23,32 @@ import java.util.List;
 
 @Mixin(value = GLSLParser.class, remap = false)
 public abstract class GLSLParserMixin {
+    @Shadow(remap = false) private List<Token> tokens;
+    @Shadow(remap = false) private int currentTokenIdx;
+
+    @Redirect(method = "parse", at = @At(value = "INVOKE", target =
+            "Lnet/vulkanmod/vulkan/shader/converter/GLSLParser;parseAttribute()V"), remap = false)
+    private void veyra$skipFunctionParameterDirections(GLSLParser parser) {
+        if (!veyra$isFunctionParameterDirection()) {
+            veyra$invokeParseAttribute();
+        }
+    }
+
+    @Invoker(value = "parseAttribute", remap = false)
+    protected abstract void veyra$invokeParseAttribute();
+
+    private boolean veyra$isFunctionParameterDirection() {
+        for (int index = currentTokenIdx - 2; index >= 0; index--) {
+            Token.TokenType type = tokens.get(index).type;
+            if (type == Token.TokenType.SPACING || type == Token.TokenType.COMMENT
+                    || type == Token.TokenType.PREPROCESSOR) {
+                continue;
+            }
+            return type == Token.TokenType.LEFT_PARENTHESIS || type == Token.TokenType.COMMA;
+        }
+        return false;
+    }
+
     @Redirect(method = "parse", at = @At(value = "INVOKE", target =
             "Lnet/vulkanmod/vulkan/shader/converter/Lexer;tokenize()Ljava/util/List;"), remap = false)
     private List<Token> veyra$prepareStorageBuffers(Lexer lexer) {
