@@ -1380,3 +1380,28 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - На точном #86 code head `ea4b9e287676a255a213c76ae987f5001f473273` прошёл `custom-image-compute` graphics smoke: `status=passed`, **223,587 active / 0 disabled magenta pixels**. Runtime log подтверждает `independentBlend`, `vertexPipelineStoresAndAtomics`, `shaderStorageImageExtendedFormats`, `pEnabledFeaturesNull=true` и `vkCreateDevice result=0`.
 - Дополнительный `r16ui` compute probe прошёл: 64 texels содержат ожидаемое значение 42. Smoke проведён в отдельном `run-graphics-smoke-feature2-20261023` на RTX 3070. Windows host не имеет Vulkan validation layer; для merge всё равно нужен exact-head hosted Lavapipe Graphics.
 - Release-facing docs синхронизированы с этим runtime evidence; beta.31 сохраняет experimental subset статус и не заявляет whole-pack Iris parity. После документационного commit PR #86 должен пройти свежие exact-head checks.
+
+### Vulkan core features: повторная диагностика и Features2 — 2026-10-23
+
+- На exact head `cc075136a87b8c415c05129ac662c8d138722e35` hosted Graphics действительно завершился ошибкой: в Lavapipe runtime custom-image job напечатал `independentBlend=true`, `vertexPipelineStoresAndAtomics=true`, `shaderStorageImageExtendedFormats=true` перед `vkCreateDevice`, но validation layer зарегистрировал 7 `VUID-RuntimeSpirv-NonWritable-06341`; прежняя замена на копию `VkDeviceCreateInfo` проблему не устранила. До свежего зелёного Graphics merge/release не выполнять.
+- Проверил remapped jar VulkanMod 0.6.8, реально использованный проектом: `DeviceManager.createLogicalDevice` строит `pNext` из `VkPhysicalDeviceVulkan11Features` и `VkPhysicalDeviceDynamicRenderingFeaturesKHR`, а core feature buffer задаёт отдельно. Это убирает ошибочную гипотезу о том, что текущая цепочка сама содержит `VkPhysicalDeviceFeatures2` и конфликтует с `pEnabledFeatures`.
+- В существующем release worktree подготовлена следующая коррекция: скопированный `VkDeviceCreateInfo` получает `pEnabledFeatures=null`; объединённые supported core features помещаются в `VkPhysicalDeviceFeatures2` в начале `pNext`, а исходная VulkanMod feature-chain сохраняется следом. Тесты проверяют новый head, null legacy pointer, сохранённые requested features и исходный Vulkan 1.1 node.
+- Проверки в этом worktree: targeted `VeyraDeviceFeaturesTest` — **4/4**; полный forced JDK 21 gate — **519 tests, 0 failures/errors/skips**, 97 shader examples, 113 Vulkan SPIR-V compilations, graphics-smoke compilation, `build` и `packageExamplePacks`; `git diff --check` прошёл. `scripts/verify_jar.py` принял beta.31 JAR: **982,750 bytes**, SHA-256 `F0AA677270140FABB5E09DFE2E7D9A120E467B8D8EE3640878CECD815C3C57CB`. Эти локальные проверки не заменяют hosted Lavapipe runtime validation; correction ещё нужно запушить и проверить на новом exact head.
+- #85/#86 остаются открытыми; #85 exact-head Build/source audit зелёные, Graphics старого `cc07513` красный. Следующий шаг — зафиксировать и отправить Features2 correction в #85, затем дождаться complete Build/source-audit/Graphics на exact head, сохраняя порядок стека #85 → #86.
+### Beta.31 prerelease installation links — 2026-10-23
+
+- README previously directed users to GitHub's `/releases/latest` endpoint, while the release workflow intentionally marks beta releases `--prerelease --latest=false`. Updated both download/install links to the releases listing so beta.31 remains discoverable without replacing GitHub's latest non-prerelease selection.
+- This documentation correction is being added to the existing #85 release branch. It changes the PR head, so exact-head hosted checks must be assessed on the new head before merge.
+### Beta.31 compatibility documentation sync — 2026-10-23
+
+- Updated current candidate compatibility documentation to record the RTX 3070 Sildur's Vibrant 2.02 Extreme attempt: the frame stayed black after deferred; probes show attachment/depth data but do not localize the lighting cause. Wording explicitly limits the result to this harness and does not claim universal incompatibility.
+- Updated beta.31 changelog and release notes from the earlier 502-test checkpoint to the verified 519-test JDK 21 gate. Preserved the source-audit result and synthetic Complementary/BSL/custom-image limits; full packs remain uncertified.
+- Exact hosted validation is still required on the latest PR head before merge/release.
+
+
+### Combined beta.31 stack preflight merge - 2026-10-23
+
+- In isolated worktree `veyra-beta31-stack-preflight`, merged current PR #85 code head `8466a47` into PR #86 head `d95e732` to prepare stack synchronization. Code and `COMPATIBILITY.md` merged automatically; reconciled `CHANGELOG.md`, `RELEASE_NOTES.md`, and this journal while preserving both prior histories. Updated the Sildur table to show the focused ambient pass and later finalclass failure, with full-pack/lifecycle unverified. No PR branch or remote ref was changed.
+- Forced JDK 21 gate on the combined code tree passed: **519 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. `git diff --check` passed after documentation reconciliation.
+- Pinned audit passed on the same tree: 4 SHA-512-pinned packs, 12 defaults and 63 profile/dimension cases, 864 geometry programs accepted / 0 rejected, 18 active compute stages compiled / 0 rejected, no errors; all rows remain `visualValidation=false`.
+- The built beta.31 JAR passed `scripts/verify_jar.py`: **993,760 bytes**, SHA-256 `B5AEAF7E2170A8768A797045FC5F225E1D47858F44DCB51B4CB680486DC33912`. The merged preflight is local evidence; hosted exact-head Graphics is still required before merging/publishing.

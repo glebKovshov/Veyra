@@ -13,6 +13,7 @@ Runtime evidence was collected on Windows with Java 21.0.12, Minecraft 1.21.11, 
 - The `entity-custom-texture` fixture passed on the combined candidate with **18,293 active / 0 disabled** green pixels. Runtime descriptor evidence binds `marker` to the pack PNG at binding 6. This is a synthetic fixture, not a third-party pack result.
 - The original `custom-image-compute` RTX 3070 run produced **222,994 active magenta pixels** before the Vulkan feature correction. A post-correction rerun passed with **223,587 active / 0 disabled pixels**; the runtime log confirms `vertexPipelineStoresAndAtomics=true`, `shaderStorageImageExtendedFormats=true`, `pEnabledFeaturesNull=true`, and successful `vkCreateDevice`. An optional `r16ui` probe read all 64 texels as 42. This remains synthetic physical-GPU evidence: the host has no validation layer, so the hosted Lavapipe Graphics gate is still required.
 - BSL v10.1.8 `HIGH` passed the full selected-profile lifecycle smoke on the RTX 3070: **225,164 non-black pixels / 38 color buckets**. Resize, Nether transition, Overworld return, disable, re-enable, and resource reload all completed. BSL declares no SSBOs; the smoke verified the empty storage manager is recreated on reload. This is one profile and synthetic-world run, not whole-pack parity.
+- Sildur's Vibrant 2.02 Extreme remains unverified as a complete pack. After the custom-uniform fix, an instrumented `VeyraSmoke` ambient profile reported `framemod8=6` and passed its focused frame assertion (24,550 non-black pixels / 69 color buckets), but did not exercise lifecycle. A later `finalclass` probe failed with a nearly uniform frame (230,400 non-black pixels / 23 color buckets). These are harness results, not a whole-pack certification or universal incompatibility finding.
 
 The refreshed source audit covers four SHA-512-pinned archives, 12 defaults, 63 profile/dimension cases, and 5,178 declared stages. All 75 rows have `errorCount=0`; all retain `visualValidation=false`:
 
@@ -21,7 +22,7 @@ The refreshed source audit covers four SHA-512-pinned archives, 12 defaults, 63 
 | Complementary Reimagined r5.9.3 | 27 | 324 / 0 | 9 / 0 | One `COMPLEMENTARY` profile smoke and lifecycle passed; no whole-pack certification |
 | Complementary Unbound r5.9.3 | 27 | 324 / 0 | 9 / 0 | One `COMPLEMENTARY` profile smoke and lifecycle passed; no whole-pack certification |
 | BSL v10.1.8 | 18 | 198 / 0 | 0 / 0 | `HIGH` selected-profile lifecycle smoke passed; no whole-pack certification |
-| Sildur's Vibrant Shaders v2.02 Extreme | 3 | 18 / 0 | 0 / 0 | Not tested as a complete pack |
+| Sildur's Vibrant Shaders v2.02 Extreme | 3 | 18 / 0 | 0 / 0 | Focused VeyraSmoke ambient assertion passed; finalclass probe failed; full pack/lifecycle unverified |
 
 The offline audit cannot verify the selected Complementary profiles' required `vertexPipelineStoresAndAtomics` device feature. Earlier Lavapipe CI reported `VUID-RuntimeSpirv-NonWritable-06341`; Veyra now supplies core features through a `VkPhysicalDeviceFeatures2` node at the head of VulkanMod's existing `pNext` chain and sets `pEnabledFeatures` to null. Keep this issue open until fresh exact-head Graphics checks for PRs #85/#86 complete successfully. Both PRs remain draft and T3 is watching them.
 

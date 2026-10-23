@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
+import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceVulkan11Features;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VeyraDeviceFeaturesTest {
-    @Test void copiesDeviceCreateInfoAndPreservesItsFeatureAndPNextInputs() {
+    @Test void requestsCoreFeaturesThroughFeatures2AndPreservesTheExistingFeatureChain() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceVulkan11Features vulkan11 = VkPhysicalDeviceVulkan11Features.calloc(stack)
                     .sType$Default()
@@ -31,20 +32,23 @@ class VeyraDeviceFeaturesTest {
 
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
-            VkPhysicalDeviceFeatures enabled = enabledCreateInfo.pEnabledFeatures();
+            VkPhysicalDeviceFeatures2 enabledFeatures = VkPhysicalDeviceFeatures2.create(
+                    enabledCreateInfo.pNext());
+            VkPhysicalDeviceFeatures enabled = enabledFeatures.features();
 
             assertNotSame(createInfo, enabledCreateInfo);
-            assertNotSame(requested, enabled);
-            assertEquals(vulkan11.address(), enabledCreateInfo.pNext());
+            assertNull(enabledCreateInfo.pEnabledFeatures());
+            assertEquals(enabledFeatures.address(), enabledCreateInfo.pNext());
+            assertEquals(vulkan11.address(), enabledFeatures.pNext());
             assertEquals(requested.address(), createInfo.pEnabledFeatures().address());
             assertTrue(enabled.vertexPipelineStoresAndAtomics());
             assertTrue(enabled.shaderStorageImageExtendedFormats());
             assertTrue(enabled.samplerAnisotropy());
-            assertTrue(VkPhysicalDeviceVulkan11Features.create(enabledCreateInfo.pNext()).shaderDrawParameters());
+            assertTrue(VkPhysicalDeviceVulkan11Features.create(enabledFeatures.pNext()).shaderDrawParameters());
         }
     }
 
-    @Test void copiesDeviceCreateInfoAndRequestsSupportedFeaturesWhenVulkanModLeavesThemUnset() {
+    @Test void requestsSupportedFeaturesWhenVulkanModLeavesCoreFeaturesUnset() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceFeatures supported = VkPhysicalDeviceFeatures.calloc(stack)
                     .independentBlend(true)
@@ -54,12 +58,15 @@ class VeyraDeviceFeaturesTest {
 
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
+            VkPhysicalDeviceFeatures2 enabledFeatures = VkPhysicalDeviceFeatures2.create(
+                    enabledCreateInfo.pNext());
 
             assertNull(createInfo.pEnabledFeatures());
-            assertTrue(enabledCreateInfo.pEnabledFeatures().independentBlend());
-            assertTrue(enabledCreateInfo.pEnabledFeatures().vertexPipelineStoresAndAtomics());
-            assertTrue(enabledCreateInfo.pEnabledFeatures().shaderStorageImageExtendedFormats());
-            assertEquals(createInfo.pNext(), enabledCreateInfo.pNext());
+            assertNull(enabledCreateInfo.pEnabledFeatures());
+            assertTrue(enabledFeatures.features().independentBlend());
+            assertTrue(enabledFeatures.features().vertexPipelineStoresAndAtomics());
+            assertTrue(enabledFeatures.features().shaderStorageImageExtendedFormats());
+            assertEquals(createInfo.pNext(), enabledFeatures.pNext());
         }
     }
 
