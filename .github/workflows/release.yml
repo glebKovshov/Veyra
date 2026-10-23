@@ -71,6 +71,24 @@ jobs:
           if [[ "${RELEASE_TAG%%+*}" == *-* ]]; then
             release_flags+=(--prerelease --latest=false)
           fi
-          gh release create "$RELEASE_TAG" release-assets/* \
-            --target "$GITHUB_SHA" --title "Veyra ${RELEASE_TAG#v}" \
-            --notes-file RELEASE_NOTES.md "${release_flags[@]}"
+          # The release branch run creates a v* tag, which starts a second run.
+          # Reuse that release on the tag run instead of creating it twice.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            existing_assets=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+            expected_assets=$(cd release-assets && printf '%s\n' *)
+            missing_asset=false
+            while IFS= read -r asset; do
+              if ! grep -Fxq "$asset" <<<"$existing_assets"; then
+                missing_asset=true
+              fi
+            done <<<"$expected_assets"
+            if [[ "$missing_asset" == true ]]; then
+              gh release upload "$RELEASE_TAG" release-assets/* --clobber
+            else
+              echo "Release already contains all assets; skipping duplicate publish."
+            fi
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --target "$GITHUB_SHA" --title "Veyra ${RELEASE_TAG#v}" \
+              --notes-file RELEASE_NOTES.md "${release_flags[@]}"
+          fi
