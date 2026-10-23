@@ -47,7 +47,7 @@ public final class GraphicsSmoke {
             skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
             damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture,
-            storageBufferFixture;
+            storageBufferFixture, normalAtlasAnimatedFixture, animatedPbrFramesChanged;
     private static volatile net.minecraft.core.BlockPos damagedBlockPosition;
     private static ShaderPack shadowMrtPack, thirdPartyPack;
     private static int activeOppositeMidTexCoordPixels, activeCurrentRenderedItemGreenPixels,
@@ -58,6 +58,9 @@ public final class GraphicsSmoke {
             activeEntityCustomImageGreenPixels, disabledEntityCustomImageGreenPixels,
             activeEntityCustomTextureGreenPixels, disabledEntityCustomTextureGreenPixels,
             activeEntityNormalFallbackRedPixels, disabledEntityNormalFallbackRedPixels,
+            animatedPbrMagentaFirst, animatedPbrGreenFirst, animatedPbrMagentaSecond,
+            animatedPbrGreenSecond, disabledAnimatedPbrMagenta, disabledAnimatedPbrGreen,
+            animatedPbrFirstRequestedFrameSlot = -1, animatedPbrSecondRequestedFrameSlot = -1,
             activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static String thirdPartyProfile = "";
     private static String skipReason = "";
@@ -127,6 +130,7 @@ public final class GraphicsSmoke {
             geometryViewSpaceFixture = fixture.equals("geometry-view-space");
             geometryMidTexCoordFixture = fixture.equals("geometry-mid-texcoord");
             terrainMaterialFixture = fixture.equals("terrain-block-id");
+            normalAtlasAnimatedFixture = fixture.equals("normal-atlas-animated");
             terrainVertexExecutionFixture = fixture.equals("terrain-vertex-execution");
             terrainVertexVaryingsFixture = fixture.equals("terrain-vertex-varyings") || fixture.equals("custom-image-compute");
             waterMaterialFixture = fixture.equals("water-block-id");
@@ -334,7 +338,15 @@ public final class GraphicsSmoke {
                 if (cloudSceneColorFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
                     throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
                 pending = true;
+                if (normalAtlasAnimatedFixture)
+                    animatedPbrFirstRequestedFrameSlot = currentAnimatedPbrFrameSlot(client);
                 requested = true; captureActive = true;
+            } else if (normalAtlasAnimatedFixture && stage == 2 && worldTicks >= baselineAt
+                    && currentAnimatedPbrFrameSlot(client) == 1 - animatedPbrFirstRequestedFrameSlot) {
+                animatedPbrSecondRequestedFrameSlot = currentAnimatedPbrFrameSlot(client);
+                pending = true;
+                requested = true;
+                captureActive = true;
             } else if (thirdPartyLifecycleFixture && stage >= 1 && worldTicks >= baselineAt) {
                 if (stage == 2) {
                     if (!client.level.dimension().equals(net.minecraft.world.level.Level.NETHER)) return;
@@ -361,7 +373,8 @@ public final class GraphicsSmoke {
                 requested = true;
                 captureActive = stage != 4;
             } else if (!vanillaBaseline && !thirdPartyShaderpackFixture
-                    && (stage == 1 || stage == 2) && worldTicks >= baselineAt) {
+                    && (stage == 1 || stage == 2) && worldTicks >= baselineAt
+                    && !(normalAtlasAnimatedFixture && stage == 2)) {
                 pending = true;
                 requested = true; captureActive = (skyTexturedStageFixture || shadowColorMrtFixture) && stage == 2;
             } else if (shadowColorMrtLifecycleFixture && stage == 3 && worldTicks >= baselineAt) {
@@ -587,6 +600,7 @@ public final class GraphicsSmoke {
         int frameWidth = image.getWidth();
         int frameHeight = image.getHeight();
         int colored = 0;
+        int animatedPbrGreen = 0;
         int normalFallbackRed = 0;
         int opposite = 0;
         int skyMoonGreen = 0;
@@ -614,6 +628,8 @@ public final class GraphicsSmoke {
                     : shadowColorMrtFixture && stage == 2 ? "shadow-mrt-reenabled.png"
                     : shadowColorMrtLifecycleFixture && stage == 3 ? "shadow-mrt-resized.png"
                     : shadowColorMrtLifecycleFixture && stage == 6 ? "shadow-mrt-dimension-return.png"
+                    : normalAtlasAnimatedFixture && stage == 0 ? "animated-pbr-first.png"
+                    : normalAtlasAnimatedFixture && stage == 2 ? "animated-pbr-second.png"
                     : skyTexturedStageFixture
                     ? active && stage == 2 ? "skytextured-moon-active.png"
                             : active ? "skytextured-sun-active.png" : "skytextured-disabled.png"
@@ -645,6 +661,7 @@ public final class GraphicsSmoke {
                     if (!colors[bucket]) { colors[bucket] = true; colorBuckets++; }
                 }
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
+                if (normalAtlasAnimatedFixture && green > 180 && red < 30 && blue < 30) animatedPbrGreen++;
                 if (entityNormalMissingFixture && red > 220 && green < 70 && blue < 70) normalFallbackRed++;
                 if (skyTexturedStageFixture && green > 220 && red < 24 && blue < 24) skyMoonGreen++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
@@ -653,6 +670,7 @@ public final class GraphicsSmoke {
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
+            int animatedPbrGreenCount = animatedPbrGreen;
             int normalFallbackRedCount = normalFallbackRed;
             int oppositeCount = opposite;
             int skyMoonGreenCount = skyMoonGreen;
@@ -778,6 +796,47 @@ public final class GraphicsSmoke {
                         return;
                     }
                     activePixels = count;
+                    if (normalAtlasAnimatedFixture && (stage == 0 || stage == 2)) {
+                        if (stage == 0) {
+                            animatedPbrMagentaFirst = count;
+                            animatedPbrGreenFirst = animatedPbrGreenCount;
+                            boolean firstMagenta = animatedPbrMagentaFirst >= 100 && animatedPbrGreenFirst < 100;
+                            boolean firstGreen = animatedPbrGreenFirst >= 100 && animatedPbrMagentaFirst < 100;
+                            boolean firstMatchesBase = animatedPbrFirstRequestedFrameSlot == 0
+                                    ? firstMagenta : animatedPbrFirstRequestedFrameSlot == 1 && firstGreen;
+                            if (!firstMatchesBase) {
+                                finish(client, new IllegalStateException("The animated PBR fixture did not show a unique first frame: magenta="
+                                        + animatedPbrMagentaFirst + ", green=" + animatedPbrGreenFirst
+                                        + ", requested base frame=" + animatedPbrFirstRequestedFrameSlot), -1);
+                                return;
+                            }
+                            stage = 2;
+                            baselineAt = worldTicks + 1;
+                            pending = false;
+                            return;
+                        }
+                        animatedPbrMagentaSecond = count;
+                        animatedPbrGreenSecond = animatedPbrGreenCount;
+                        boolean secondMagenta = animatedPbrMagentaSecond >= 100 && animatedPbrGreenSecond < 100;
+                        boolean secondGreen = animatedPbrGreenSecond >= 100 && animatedPbrMagentaSecond < 100;
+                        boolean firstMagenta = animatedPbrMagentaFirst >= 100 && animatedPbrGreenFirst < 100;
+                        boolean firstGreen = animatedPbrGreenFirst >= 100 && animatedPbrMagentaFirst < 100;
+                        animatedPbrFramesChanged = firstMagenta ? secondGreen : firstGreen && secondMagenta;
+                        boolean secondMatchesBase = animatedPbrSecondRequestedFrameSlot == 0
+                                ? secondMagenta : animatedPbrSecondRequestedFrameSlot == 1 && secondGreen;
+                        if (!animatedPbrFramesChanged || !secondMatchesBase) {
+                            finish(client, new IllegalStateException("Animated normal and specular maps did not change with their base atlas sprite: first="
+                                    + animatedPbrMagentaFirst + "/" + animatedPbrGreenFirst + ", second="
+                                    + animatedPbrMagentaSecond + "/" + animatedPbrGreenSecond + ", requested base frame="
+                                    + animatedPbrFirstRequestedFrameSlot + " then " + animatedPbrSecondRequestedFrameSlot), -1);
+                            return;
+                        }
+                        VeyraRenderer.disable();
+                        baselineAt = worldTicks + 80;
+                        stage = 1;
+                        pending = false;
+                        return;
+                    }
                     activeEntityNormalFallbackRedPixels = normalFallbackRedCount;
                     activeOppositeMidTexCoordPixels = oppositeCount;
                     activeCurrentRenderedItemGreenPixels = renderedItemGreenCount;
@@ -823,7 +882,19 @@ public final class GraphicsSmoke {
                             || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture || particleVertexFixture
                             || texturedDefaultAttributesFixture ? 100 : 2000;
                     Throwable failure;
-                    if (skyTexturedStageFixture) {
+                    if (normalAtlasAnimatedFixture) {
+                        disabledAnimatedPbrMagenta = count;
+                        disabledAnimatedPbrGreen = animatedPbrGreenCount;
+                        failure = !animatedPbrFramesChanged
+                                || animatedPbrMagentaFirst + animatedPbrMagentaSecond < 100
+                                || animatedPbrGreenFirst + animatedPbrGreenSecond < 100
+                                || disabledAnimatedPbrMagenta * 4 >= animatedPbrMagentaFirst + animatedPbrMagentaSecond
+                                || disabledAnimatedPbrGreen * 4 >= animatedPbrGreenFirst + animatedPbrGreenSecond
+                                ? new IllegalStateException("Animated PBR atlas signals did not alternate or clear after disable: magenta="
+                                + animatedPbrMagentaFirst + "/" + animatedPbrMagentaSecond + "/" + disabledAnimatedPbrMagenta
+                                + ", green=" + animatedPbrGreenFirst + "/" + animatedPbrGreenSecond + "/" + disabledAnimatedPbrGreen)
+                                : null;
+                    } else if (skyTexturedStageFixture) {
                         disabledSkySunPixels = count;
                         disabledSkyMoonPixels = skyMoonGreenCount;
                         failure = disabledSkySunPixels * 4 >= activeSkySunPixels
@@ -955,7 +1026,8 @@ public final class GraphicsSmoke {
             // A pack may already start with the selected profile's effective values. In that case
             // applyOptions reports a no-op; accept it only after verifying every profile entry.
             boolean alreadyActive = applied.equals("Shader options unchanged.") && profileMatches;
-            if ((!applied.isEmpty() && !alreadyActive) || !VeyraRenderer.isRenderingEnabled()
+            boolean appliedSuccessfully = applied.startsWith("Enabled ");
+            if ((!appliedSuccessfully && !alreadyActive) || !VeyraRenderer.isRenderingEnabled()
                     || !VeyraRenderer.getLastError().isEmpty()) {
                 throw new IllegalStateException("Could not apply " + thirdPartyProfile + " profile: " + applied
                         + " (" + VeyraRenderer.getLastError() + ")");
@@ -1168,6 +1240,15 @@ public final class GraphicsSmoke {
         }
     }
 
+    private static int currentAnimatedPbrFrameSlot(Minecraft client) {
+        var texture = client.getTextureManager().getTexture(
+                net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
+        if (!(texture instanceof net.minecraft.client.renderer.texture.TextureAtlas atlas)) return -1;
+        var frame = dev.veyra.shader.PbrAnimationClock.animatedSpriteFrames(atlas).get(
+                net.minecraft.resources.Identifier.withDefaultNamespace("block/grass_block_top"));
+        return frame == null ? -1 : frame.frameSlot();
+    }
+
     private static void finish(Minecraft client, Throwable failure, int baseline) {
         if (finished) return;
         finished = true;
@@ -1182,6 +1263,13 @@ public final class GraphicsSmoke {
                     + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
                     + ",\"activeEntityNormalFallbackRedPixels\":" + activeEntityNormalFallbackRedPixels
                     + ",\"disabledEntityNormalFallbackRedPixels\":" + disabledEntityNormalFallbackRedPixels
+                    + ",\"animatedPbrFramesChanged\":" + animatedPbrFramesChanged
+                    + ",\"animatedPbrFirstRequestedFrameSlot\":" + animatedPbrFirstRequestedFrameSlot
+                    + ",\"animatedPbrSecondRequestedFrameSlot\":" + animatedPbrSecondRequestedFrameSlot
+                    + ",\"animatedPbrMagentaFrames\":" + (animatedPbrMagentaFirst + animatedPbrMagentaSecond)
+                    + ",\"animatedPbrGreenFrames\":" + (animatedPbrGreenFirst + animatedPbrGreenSecond)
+                    + ",\"disabledAnimatedPbrMagenta\":" + disabledAnimatedPbrMagenta
+                    + ",\"disabledAnimatedPbrGreen\":" + disabledAnimatedPbrGreen
                     + ",\"vertexPipelineStoresAndAtomicsEnabled\":"
                     + VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled
                     + ",\"shaderStorageImageExtendedFormatsEnabled\":"

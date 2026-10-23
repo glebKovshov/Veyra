@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (animated PBR batch)
+
+- Support animated resource-pack `_n.png` and `_s.png` maps in block/shadow atlases. Atlas companion maps follow the base sprite's animation frame and sub-frame, including vector-aware normal interpolation and LabPBR/data-channel mip updates; resource-backed entity `SimpleTexture` maps use their own animation clock. Each animated map is capped at four million source pixels, with a 64 MiB per-material animation-data limit. Downloaded player skins are not covered.
+- Add the `normal-atlas-animated` GPU fixture. On RTX 3070, the final diagnostic read back 222,724 magenta pixels and 222,722 green pixels across the two synchronized frame states, then 0 of each after shader disable.
+
 ## 0.2.0-beta.34 (experimental prerelease)
 
 - Bind static Iris `_n.png` maps to resource-backed entity `SimpleTexture` albedo images and expose the `normals` sampler in supported entity fragments.

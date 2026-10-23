@@ -10,6 +10,18 @@ public final class SpecularPixels {
     }
     private SpecularPixels() { }
 
+    /** Blend straight material-data channels without color-space conversion. */
+    public static int interpolate(int from, int to, float amount) {
+        if (!Float.isFinite(amount) || amount < 0.0F || amount > 1.0F)
+            throw new IllegalArgumentException("Specular interpolation amount must be between zero and one.");
+        int result = 0;
+        for (int shift = 0; shift <= 24; shift += 8) {
+            int value = Math.round(channel(from, shift) * (1.0F - amount) + channel(to, shift) * amount);
+            result |= value << shift;
+        }
+        return result;
+    }
+
     public static String path(String base, boolean atlasSprite) {
         if (atlasSprite) return (base.startsWith("optifine/cit/") ? "" : "textures/") + base + "_s.png";
         int extension = base.lastIndexOf('.');
