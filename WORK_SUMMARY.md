@@ -1398,10 +1398,25 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Updated beta.31 changelog and release notes from the earlier 502-test checkpoint to the verified 519-test JDK 21 gate. Preserved the source-audit result and synthetic Complementary/BSL/custom-image limits; full packs remain uncertified.
 - Exact hosted validation is still required on the latest PR head before merge/release.
 
-
 ### Combined beta.31 stack preflight merge - 2026-10-23
 
 - In isolated worktree `veyra-beta31-stack-preflight`, merged current PR #85 code head `8466a47` into PR #86 head `d95e732` to prepare stack synchronization. Code and `COMPATIBILITY.md` merged automatically; reconciled `CHANGELOG.md`, `RELEASE_NOTES.md`, and this journal while preserving both prior histories. Updated the Sildur table to show the focused ambient pass and later finalclass failure, with full-pack/lifecycle unverified. No PR branch or remote ref was changed.
 - Forced JDK 21 gate on the combined code tree passed: **519 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. `git diff --check` passed after documentation reconciliation.
 - Pinned audit passed on the same tree: 4 SHA-512-pinned packs, 12 defaults and 63 profile/dimension cases, 864 geometry programs accepted / 0 rejected, 18 active compute stages compiled / 0 rejected, no errors; all rows remain `visualValidation=false`.
 - The built beta.31 JAR passed `scripts/verify_jar.py`: **993,760 bytes**, SHA-256 `B5AEAF7E2170A8768A797045FC5F225E1D47858F44DCB51B4CB680486DC33912`. The merged preflight is local evidence; hosted exact-head Graphics is still required before merging/publishing.
+
+### Vulkan core features: in-place device-create verification — 2026-10-23
+
+- Replaced the failing `VkPhysicalDeviceFeatures2` chain experiment with an in-place request on the exact `VkPhysicalDeviceFeatures` structure that VulkanMod 0.6.8 passes as `VkDeviceCreateInfo.pEnabledFeatures`. The original `pNext` chain is left untouched; the original feature values are restored after `vkCreateDevice` returns.
+- Targeted `VeyraDeviceFeaturesTest` passed **4/4**. The forced JDK 21 gate `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed **503 tests, 0 failures/errors/skips**, 97 example shaders and 113 direct SPIR-V compilations, smoke compilation, build, and example-pack packaging. The pinned four-pack audit passed with 12 defaults, 63 profile cases, 864 geometry fragments accepted / 0 rejected, and 18 active compute stages compiled / 0 rejected.
+- RTX 3070 `custom-image-compute` smoke passed with **222,038 active / 0 disabled magenta pixels**; both required storage features report enabled and the error field is empty. The Windows host has no Vulkan validation layer, so this confirms device creation and rendering but does not close the hosted Lavapipe VUID.
+- `scripts/verify_jar.py` accepted the beta.31 candidate at **982,599 bytes**, SHA-256 `0C7862646AEADA5CB3B467E5F27B5F0A7594161B3A8B0CF39EB15E83ABFA8702`. This remains a local candidate, not a release artifact.
+- This code commit was pushed to PR #85 as `80f6d9c`; exact-head Build and source audit are running, while Lavapipe Graphics is queued. The PR remains draft pending all three checks.
+
+### Latest beta.31 feature-stack synchronization — 2026-10-23
+
+- Locally merged PR #85 head `80f6d9c948aefeeaea0c941aabcfdd2729c49913` into the PR #86 stack head `18172e6`. Only `WORK_SUMMARY.md` conflicted; kept both histories. This synchronization is committed locally but not yet pushed to PR #86 while the new PR #85 hosted gates are running.
+- Combined JDK 21 gate passed: **519 tests, 0 failures/errors/skips**, 97 shader examples / 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. `git diff --check` passed.
+- Combined pinned audit passed: 4 SHA-512-pinned packs, 12 defaults, 63 profile/dimension cases, 864 geometry fragments accepted / 0 rejected, 18 active compute stages compiled / 0 rejected; records remain `visualValidation=false`.
+- Combined beta.31 JAR passed `scripts/verify_jar.py`: **993,609 bytes**, SHA-256 `CA96362479692429E267ACA86403111A6159BB546F450CD6AAD9FEB199B3FABD`. This local artifact predates a final merged release commit and is not published.
+- PR #85 exact-head Build passed; pinned source audit is still running and Graphics is still running. Do not merge or publish until all required exact-head checks finish green.

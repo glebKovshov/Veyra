@@ -4,18 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceVulkan11Features;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VeyraDeviceFeaturesTest {
-    @Test void requestsCoreFeaturesThroughFeatures2AndPreservesTheExistingFeatureChain() {
+    @Test void requestsCoreFeaturesInTheOriginalCreateInfoAndPreservesTheExistingFeatureChain() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceVulkan11Features vulkan11 = VkPhysicalDeviceVulkan11Features.calloc(stack)
                     .sType$Default()
@@ -32,19 +30,15 @@ class VeyraDeviceFeaturesTest {
 
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
-            VkPhysicalDeviceFeatures2 enabledFeatures = VkPhysicalDeviceFeatures2.create(
-                    enabledCreateInfo.pNext());
-            VkPhysicalDeviceFeatures enabled = enabledFeatures.features();
+            VkPhysicalDeviceFeatures enabled = enabledCreateInfo.pEnabledFeatures();
 
-            assertNotSame(createInfo, enabledCreateInfo);
-            assertNull(enabledCreateInfo.pEnabledFeatures());
-            assertEquals(enabledFeatures.address(), enabledCreateInfo.pNext());
-            assertEquals(vulkan11.address(), enabledFeatures.pNext());
-            assertEquals(requested.address(), createInfo.pEnabledFeatures().address());
+            assertSame(createInfo, enabledCreateInfo);
+            assertEquals(vulkan11.address(), enabledCreateInfo.pNext());
+            assertEquals(requested.address(), enabled.address());
             assertTrue(enabled.vertexPipelineStoresAndAtomics());
             assertTrue(enabled.shaderStorageImageExtendedFormats());
             assertTrue(enabled.samplerAnisotropy());
-            assertTrue(VkPhysicalDeviceVulkan11Features.create(enabledFeatures.pNext()).shaderDrawParameters());
+            assertTrue(VkPhysicalDeviceVulkan11Features.create(enabledCreateInfo.pNext()).shaderDrawParameters());
         }
     }
 
@@ -55,18 +49,17 @@ class VeyraDeviceFeaturesTest {
                     .vertexPipelineStoresAndAtomics(true)
                     .shaderStorageImageExtendedFormats(true);
             VkDeviceCreateInfo createInfo = VkDeviceCreateInfo.calloc(stack).sType$Default();
+            assertNull(createInfo.pEnabledFeatures());
 
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
-            VkPhysicalDeviceFeatures2 enabledFeatures = VkPhysicalDeviceFeatures2.create(
-                    enabledCreateInfo.pNext());
 
-            assertNull(createInfo.pEnabledFeatures());
-            assertNull(enabledCreateInfo.pEnabledFeatures());
-            assertTrue(enabledFeatures.features().independentBlend());
-            assertTrue(enabledFeatures.features().vertexPipelineStoresAndAtomics());
-            assertTrue(enabledFeatures.features().shaderStorageImageExtendedFormats());
-            assertEquals(createInfo.pNext(), enabledFeatures.pNext());
+            assertSame(createInfo, enabledCreateInfo);
+            assertTrue(enabledCreateInfo.pEnabledFeatures() != null);
+            assertTrue(enabledCreateInfo.pEnabledFeatures().independentBlend());
+            assertTrue(enabledCreateInfo.pEnabledFeatures().vertexPipelineStoresAndAtomics());
+            assertTrue(enabledCreateInfo.pEnabledFeatures().shaderStorageImageExtendedFormats());
+            assertEquals(createInfo.pNext(), enabledCreateInfo.pNext());
         }
     }
 
