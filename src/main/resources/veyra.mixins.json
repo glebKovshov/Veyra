@@ -30,6 +30,7 @@
     "VulkanCloudRendererMixin",
     "VkCommandEncoderMixin",
     "VulkanImageBuilderMixin",
+    "VulkanFramebufferMipMixin",
     "SPIRVUtilsMixin",
     "GLSLParserMixin",
     "UniformBlockMixin",
