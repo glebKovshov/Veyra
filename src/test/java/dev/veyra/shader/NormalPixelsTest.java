@@ -1,5 +1,8 @@
 package dev.veyra.shader;
 
+import dev.veyra.vulkan.VeyraNormalTextures;
+import dev.veyra.vulkan.VeyraEntityNormalDescriptor;
+import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -12,6 +15,8 @@ class NormalPixelsTest {
         assertEquals("optifine/cit/armor_n.png", NormalPixels.path("optifine/cit/armor", true));
         assertEquals("textures/entity/cow_n.png", NormalPixels.path("entity/cow", true));
         assertEquals("textures/entity/cow_n.png", NormalPixels.path("textures/entity/cow.png", false));
+        assertEquals("textures/entity/cow/temperate_cow_n.png",
+                NormalPixels.path("textures/entity/cow/temperate_cow.png", false));
     }
 
     @Test void createsIrisFlatNormalFallback() {
@@ -74,6 +79,56 @@ class NormalPixelsTest {
         assertFalse(TerrainShaderAdapter.adaptFragment(unused, false).contains("VeyraNormalSampler"));
         assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(
                 source.replace("sampler2D normals", "samplerCube normals"), false));
+    }
+
+    @Test void entityBridgeBindsNormalsOnlyWhenShaderUsesThem() throws IOException {
+        String source = "uniform sampler2D normals;\nvarying vec2 texcoord;\n"
+                + "void main(){gl_FragColor=texture2D(normals,texcoord);}\n";
+        String entity = EntityShaderAdapter.adaptFragment(source);
+        assertTrue(entity.contains("uniform sampler2D VeyraNormalSampler;"));
+        assertTrue(entity.contains("#define normals VeyraNormalSampler"));
+
+        String unused = "uniform sampler2D normals;\nvoid main(){gl_FragColor=vec4(1.0);}\n";
+        assertFalse(EntityShaderAdapter.adaptFragment(unused).contains("VeyraNormalSampler"));
+    }
+
+    @Test void entityNormalDescriptorUsesFreeVulkanTextureSlot() {
+        int samplerType = org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        var albedo = new ImageDescriptor(0, "sampler2D", "Sampler0", 0, samplerType);
+        var normal = new ImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER, 2, samplerType);
+        var lightmap = new ImageDescriptor(7, "sampler2D", "Sampler2", 3, samplerType);
+
+        var descriptors = EntitySamplerBindings.reserveNormalSamplerSlot(java.util.List.of(albedo, normal, lightmap));
+
+        assertEquals(0, descriptors.get(0).imageIdx);
+        assertEquals(VeyraNormalTextures.IMAGE_SLOT, descriptors.get(1).imageIdx);
+        assertEquals(3, descriptors.get(2).imageIdx);
+        assertEquals(6, descriptors.get(1).getBinding());
+        assertEquals(VeyraNormalTextures.SAMPLER, descriptors.get(1).name);
+        assertInstanceOf(VeyraEntityNormalDescriptor.class, descriptors.get(1));
+    }
+
+    @Test void entityNormalDescriptorAvoidsOccupiedReservedSlot() {
+        int samplerType = org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        var albedo = new ImageDescriptor(0, "sampler2D", "Sampler0", 0, samplerType);
+        var normal = new ImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER, 2, samplerType);
+        var reserved = new ImageDescriptor(8, "sampler2D", "Sampler6", VeyraNormalTextures.IMAGE_SLOT, samplerType);
+
+        var descriptors = EntitySamplerBindings.reserveNormalSamplerSlot(java.util.List.of(albedo, normal, reserved));
+
+        assertEquals(1, descriptors.get(1).imageIdx);
+        assertEquals(VeyraNormalTextures.IMAGE_SLOT, descriptors.get(2).imageIdx);
+    }
+
+    @Test void entityNormalDescriptorUsesDirectImageEvenAtReservedSlot() {
+        int samplerType = org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        var normal = new ImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER,
+                VeyraNormalTextures.IMAGE_SLOT, samplerType);
+
+        var descriptors = EntitySamplerBindings.reserveNormalSamplerSlot(java.util.List.of(normal));
+
+        assertInstanceOf(VeyraEntityNormalDescriptor.class, descriptors.get(0));
+        assertEquals(VeyraNormalTextures.IMAGE_SLOT, descriptors.get(0).imageIdx);
     }
 
     private static void assertUnit(int argb) {

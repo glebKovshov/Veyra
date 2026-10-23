@@ -7,6 +7,7 @@ import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
 import dev.veyra.vulkan.VeyraGeometryTargets;
+import dev.veyra.vulkan.VeyraNormalTextures;
 import dev.veyra.vulkan.VeyraSpecularTextures;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
@@ -73,6 +74,7 @@ public abstract class VkRenderPassMixin {
         if (name.equals("Sampler0") && pass.getPipeline() != null
                 && pass.getPipeline().getFragmentShader().getNamespace().equals("veyra")) {
             VeyraSpecularTextures.bindEntity(pass, view);
+            VeyraNormalTextures.bindEntity(pass, view, sampler);
         }
     }
 

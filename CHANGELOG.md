@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.34 (experimental prerelease)
+
+- Bind static Iris `_n.png` maps to resource-backed entity `SimpleTexture` albedo images and expose the `normals` sampler in supported entity fragments.
+- Keep the entity normal image directly on its Vulkan descriptor so VulkanMod's shared texture-slot cache cannot replace the selected map before descriptor updates.
+- Add authored-map and missing-map cow graphics fixtures with active-versus-disabled Vulkan readback. Dynamic player skins, animated material maps, and full Iris parity remain unsupported.
+
 ## 0.2.0-beta.31 (experimental prerelease)
 
 - Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.

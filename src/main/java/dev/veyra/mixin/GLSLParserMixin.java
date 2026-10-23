@@ -1,6 +1,7 @@
 package dev.veyra.mixin;
 
 import dev.veyra.mixin.accessor.LexerAccessor;
+import dev.veyra.shader.EntitySamplerBindings;
 import dev.veyra.shader.ShaderPackStorageBuffers;
 import dev.veyra.shader.VeyraNativeImageBindings;
 import dev.veyra.shader.VeyraStorageBufferResources;
@@ -125,24 +126,28 @@ public abstract class GLSLParserMixin {
     private void veyra$replaceNativeStorageImageDescriptors(
             CallbackInfoReturnable<List<ImageDescriptor>> callback) {
         VeyraNativeImageBindings bindings = VeyraNativeImageBindings.active();
-        if (bindings == null) return;
-        try {
-            callback.setReturnValue(bindings.replaceSamplerDescriptors(callback.getReturnValue()));
-        } catch (IOException exception) {
-            throw new IllegalStateException("Could not bind shader-pack graphics storage images: "
-                    + exception.getMessage(), exception);
+        List<ImageDescriptor> descriptors = callback.getReturnValue();
+        if (bindings != null) {
+            try {
+                descriptors = bindings.replaceSamplerDescriptors(descriptors);
+            } catch (IOException exception) {
+                throw new IllegalStateException("Could not bind shader-pack graphics storage images: "
+                        + exception.getMessage(), exception);
+            }
         }
+        callback.setReturnValue(EntitySamplerBindings.reserveNormalSamplerSlot(descriptors));
     }
 
     @Inject(method = "getOutput", at = @At("RETURN"), cancellable = true, remap = false)
     private void veyra$restoreNativeStorageImageDeclarations(CallbackInfoReturnable<String> callback) {
         VeyraNativeImageBindings bindings = VeyraNativeImageBindings.active();
-        if (bindings == null) return;
-        try {
-            callback.setReturnValue(bindings.restoreOutput(callback.getReturnValue()));
-        } catch (IOException exception) {
-            throw new IllegalStateException("Could not restore shader-pack graphics storage-image declarations: "
-                    + exception.getMessage(), exception);
+        if (bindings != null) {
+            try {
+                callback.setReturnValue(bindings.restoreOutput(callback.getReturnValue()));
+            } catch (IOException exception) {
+                throw new IllegalStateException("Could not restore shader-pack graphics storage-image declarations: "
+                        + exception.getMessage(), exception);
+            }
         }
     }
 }

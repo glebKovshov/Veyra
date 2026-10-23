@@ -39,7 +39,8 @@ public final class GraphicsSmoke {
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
-            entityMrtFixture, entityColorFeedbackFixture, currentRenderedItemFixture, glintVertexFixture,
+            entityMrtFixture, entityColorFeedbackFixture, entityNormalFixture, entityNormalMissingFixture,
+            currentRenderedItemFixture, glintVertexFixture,
             glintMrtFixture, shadowColorMrtFixture, shadowColorMrtLifecycleFixture, basicVertexFixture, basicCustomImageFixture,
             entityCustomImageFixture, entityCustomTextureFixture,
             compositeCustomImageFixture,
@@ -56,6 +57,7 @@ public final class GraphicsSmoke {
             activeBeaconBeamMrtPixels, disabledBeaconBeamMrtPixels,
             activeEntityCustomImageGreenPixels, disabledEntityCustomImageGreenPixels,
             activeEntityCustomTextureGreenPixels, disabledEntityCustomTextureGreenPixels,
+            activeEntityNormalFallbackRedPixels, disabledEntityNormalFallbackRedPixels,
             activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static String thirdPartyProfile = "";
     private static String skipReason = "";
@@ -130,6 +132,8 @@ public final class GraphicsSmoke {
             waterMaterialFixture = fixture.equals("water-block-id");
             entityMrtFixture = fixture.equals("entity-mrt");
             entityColorFeedbackFixture = fixture.equals("entity-colortex-feedback");
+            entityNormalFixture = fixture.equals("normal-entity");
+            entityNormalMissingFixture = fixture.equals("normal-entity-missing");
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
@@ -186,6 +190,7 @@ public final class GraphicsSmoke {
             boolean itemFixture = currentRenderedItemFixture || glintVertexFixture || glintMrtFixture
                     || handVertexFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
+                    || entityNormalFixture || entityNormalMissingFixture
                     || fixture.equals("shadow-color-entity") || shadowColorMrtFixture
                     || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
@@ -582,6 +587,7 @@ public final class GraphicsSmoke {
         int frameWidth = image.getWidth();
         int frameHeight = image.getHeight();
         int colored = 0;
+        int normalFallbackRed = 0;
         int opposite = 0;
         int skyMoonGreen = 0;
         int renderedItemGreen = 0;
@@ -639,6 +645,7 @@ public final class GraphicsSmoke {
                     if (!colors[bucket]) { colors[bucket] = true; colorBuckets++; }
                 }
                 if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
+                if (entityNormalMissingFixture && red > 220 && green < 70 && blue < 70) normalFallbackRed++;
                 if (skyTexturedStageFixture && green > 220 && red < 24 && blue < 24) skyMoonGreen++;
                 if (geometryMidTexCoordFixture && green > 90 && red < green * 0.6 && blue < green * 0.6) opposite++;
                 if ((currentRenderedItemFixture || glintVertexFixture || glintMrtFixture || basicVertexFixture
@@ -646,6 +653,7 @@ public final class GraphicsSmoke {
                         && green > 220 && red < 24 && blue < 24) renderedItemGreen++;
             }
             int count = colored;
+            int normalFallbackRedCount = normalFallbackRed;
             int oppositeCount = opposite;
             int skyMoonGreenCount = skyMoonGreen;
             int renderedItemGreenCount = renderedItemGreen;
@@ -770,6 +778,7 @@ public final class GraphicsSmoke {
                         return;
                     }
                     activePixels = count;
+                    activeEntityNormalFallbackRedPixels = normalFallbackRedCount;
                     activeOppositeMidTexCoordPixels = oppositeCount;
                     activeCurrentRenderedItemGreenPixels = renderedItemGreenCount;
                     activeGlintGreenPixels = renderedItemGreenCount;
@@ -799,6 +808,7 @@ public final class GraphicsSmoke {
                     pending = false;
                 } else {
                     disabledCurrentRenderedItemGreenPixels = renderedItemGreenCount;
+                    disabledEntityNormalFallbackRedPixels = normalFallbackRedCount;
                     disabledGlintGreenPixels = renderedItemGreenCount;
                     disabledBasicGreenPixels = renderedItemGreenCount;
                     disabledBasicMrtPixels = basicMrtPixelCount;
@@ -840,6 +850,16 @@ public final class GraphicsSmoke {
                                 || disabledEntityCustomTextureGreenPixels * 4 >= activeEntityCustomTextureGreenPixels
                                 ? new IllegalStateException("The entity custom-texture signal was absent or unchanged: scene green active/disabled="
                                         + activeEntityCustomTextureGreenPixels + "/" + disabledEntityCustomTextureGreenPixels) : null;
+                    } else if (entityNormalFixture) {
+                        failure = activePixels < 100 || count * 4 >= activePixels
+                                ? new IllegalStateException("The entity authored normal-map signal was absent or unchanged: active="
+                                        + activePixels + ", disabled=" + count) : null;
+                    } else if (entityNormalMissingFixture) {
+                        failure = activeEntityNormalFallbackRedPixels < 100
+                                || disabledEntityNormalFallbackRedPixels * 4 >= activeEntityNormalFallbackRedPixels
+                                ? new IllegalStateException("The missing entity normal-map fallback was absent or unchanged: active red="
+                                        + activeEntityNormalFallbackRedPixels + ", disabled red="
+                                        + disabledEntityNormalFallbackRedPixels) : null;
                     } else if (storageBufferFixture) {
                         failure = activePixels < 2000 || count * 4 >= activePixels
                                 ? new IllegalStateException("The shadow storage-buffer signal was absent or unchanged: active="
@@ -1160,6 +1180,8 @@ public final class GraphicsSmoke {
             String status = failure != null ? "failed" : skipReason.isEmpty() ? "passed" : "skipped";
             Files.writeString(output.resolve("result.json"), "{\"status\":\"" + status
                     + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
+                    + ",\"activeEntityNormalFallbackRedPixels\":" + activeEntityNormalFallbackRedPixels
+                    + ",\"disabledEntityNormalFallbackRedPixels\":" + disabledEntityNormalFallbackRedPixels
                     + ",\"vertexPipelineStoresAndAtomicsEnabled\":"
                     + VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled
                     + ",\"shaderStorageImageExtendedFormatsEnabled\":"
