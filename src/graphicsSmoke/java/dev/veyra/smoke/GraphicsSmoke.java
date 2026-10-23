@@ -146,7 +146,9 @@ public final class GraphicsSmoke {
             basicCustomImageFixture = fixture.equals("basic-custom-image");
             entityCustomImageFixture = fixture.equals("entity-custom-image");
             entityCustomTextureFixture = fixture.equals("entity-custom-texture");
-            compositeCustomImageFixture = fixture.equals("composite-custom-image");
+            compositeCustomImageFixture = fixture.equals("composite-custom-image")
+                    || fixture.equals("compute-ssbo-only") || fixture.equals("compute-begin-stage")
+                    || fixture.equals("compute-setup-stage") || fixture.equals("begin-fragment-stage");
             basicVertexFixture = fixture.equals("basic-vertex-execution") || basicCustomImageFixture;
             skyBasicVertexFixture = fixture.equals("skybasic-vertex-execution");
             skyTexturedStageFixture = fixture.equals("skytextured-stage-variants");

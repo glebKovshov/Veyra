@@ -127,6 +127,19 @@ public final class ShaderPackStorageBuffers {
     public static PreparedSource prepareForVulkanParser(String source,
                                                  ShaderPackStorageBufferProperties properties,
                                                  int viewWidth, int viewHeight) throws IOException {
+        return prepareForVulkanParser(source, properties, viewWidth, viewHeight, true);
+    }
+
+    /** Validates active SSBO declarations without guessing the runtime viewport for relative allocations. */
+    public static PreparedSource validateForVulkanParser(String source,
+                                                  ShaderPackStorageBufferProperties properties) throws IOException {
+        return prepareForVulkanParser(source, properties, 0, 0, false);
+    }
+
+    private static PreparedSource prepareForVulkanParser(String source,
+                                                  ShaderPackStorageBufferProperties properties,
+                                                  int viewWidth, int viewHeight,
+                                                  boolean resolveAllocationSizes) throws IOException {
         String analysis = ShaderSource.maskBlockAndLineComments(source);
         Matcher blocks = PARSER_BLOCK_START.matcher(analysis);
         List<Replacement> replacements = new ArrayList<>();
@@ -159,7 +172,8 @@ public final class ShaderPackStorageBuffers {
                 throw new IOException("Active storage buffer '" + blockName + "' at binding " + binding
                         + " has no bufferObject." + binding + " allocation in the selected shader-pack profile.");
             }
-            long size = properties.buffers().get(binding).resolveSize(viewWidth, viewHeight);
+            long size = resolveAllocationSizes
+                    ? properties.buffers().get(binding).resolveSize(viewWidth, viewHeight) : 0L;
             String body = source.substring(blocks.end(), closingBrace);
             String signature = blockName + '\n' + binding + '\n' + blocks.group("access") + '\n' + body;
             String placeholder = "VeyraStorageBuffer_" + binding + "_" + shortHash(signature);

@@ -28,6 +28,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
     private final int viewHeight;
     private final Map<Integer, StorageBuffer> buffers = new ConcurrentHashMap<>();
     private final Map<String, ShaderPackStorageBuffers.StorageBlock> blocks = new ConcurrentHashMap<>();
+    private final java.util.Set<Integer> initializedBindings = ConcurrentHashMap.newKeySet();
     private long allocatedBytes;
     private boolean closed;
 
@@ -166,15 +167,17 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
     public record DirectCompilation(String vertexSource, String fragmentSource, String computeSource,
                                     List<UBO> storageDescriptors) { }
 
-    /** Clears pack SSBOs before shadow writers run and makes the transfer writes visible to shader stages. */
-    public void clearForShadowPass() {
+    /** Zero-initializes each newly allocated pack SSBO once; later frames preserve shader-written contents. */
+    public synchronized void clearUninitializedBuffers() {
         ensureOpen();
-        if (buffers.isEmpty()) return;
+        List<StorageBuffer> uninitialized = buffers.values().stream()
+                .filter(storageBuffer -> !initializedBindings.contains(storageBuffer.binding())).toList();
+        if (uninitialized.isEmpty()) return;
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
         if (!Renderer.isRecording() || commandBuffer == null) {
-            throw new IllegalStateException("Shader-pack storage buffers can only be cleared while VulkanMod records a frame.");
+            throw new IllegalStateException("Shader-pack storage buffers can only be initialized while VulkanMod records a frame.");
         }
-        for (StorageBuffer storageBuffer : buffers.values()) {
+        for (StorageBuffer storageBuffer : uninitialized) {
             vkCmdFillBuffer(commandBuffer, storageBuffer.buffer().getId(), 0, storageBuffer.allocationBytes(), 0);
         }
         VeyraComputePipeline.memoryBarrier(commandBuffer,
@@ -182,6 +185,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
                 VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_ACCESS_TRANSFER_WRITE_BIT,
                 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        uninitialized.forEach(storageBuffer -> initializedBindings.add(storageBuffer.binding()));
     }
 
     /** Orders shadow-stage writes before shadow compute and later graphics/post-processing readers. */
@@ -211,6 +215,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
         buffers.values().forEach(storageBuffer -> storageBuffer.buffer().scheduleFree());
         buffers.clear();
         blocks.clear();
+        initializedBindings.clear();
         allocatedBytes = 0;
     }
 

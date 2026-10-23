@@ -36,7 +36,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasDamagedBlockFragment, Set<String> blockPrograms, String issue, ShaderPackConfiguration configuration) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_PASS_SUFFIX = 99;
-    private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
+    private static final List<String> MULTI_PASS_PROGRAMS = List.of("begin", "prepare", "deferred", "composite");
     private static final List<String> SHADOW_PROGRAMS = List.of(
             "shadow", "shadow_solid", "shadow_cutout", "shadow_water", "shadow_entities", "shadow_block");
     private static final List<String> TERRAIN_PROGRAMS = List.of(
@@ -151,7 +151,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection != null && inspection.hasDamagedBlockFragment(),
                     inspection == null ? Set.of() : inspection.blockPrograms(),
                     inspection == null
-                            ? "No supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, prepare, deferred, composite, or final fragment programs were found."
+                            ? "No supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, begin, prepare, deferred, composite, or final fragment programs were found."
                             : "Supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.", configuration);
         } catch (IOException | RuntimeException exception) {
             return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false, false,
@@ -1095,11 +1095,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     private static int computeStageFamilyOrder(String file) {
         return switch (computeStageFamily(file)) {
-            case "shadowcomp" -> 0;
-            case "prepare" -> 1;
-            case "deferred" -> 2;
-            case "composite" -> 3;
-            case "final" -> 4;
+            case "setup" -> 0;
+            case "begin" -> 1;
+            case "shadowcomp" -> 2;
+            case "prepare" -> 3;
+            case "deferred" -> 4;
+            case "composite" -> 5;
+            case "final" -> 6;
             default -> Integer.MAX_VALUE;
         };
     }
@@ -1312,9 +1314,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 if (extension.equals("csh") && configuration.customImages()) continue; // Validated with the complete active sequence above.
                 throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
             }
-            if (program.matches("begin\\d*")) {
-                throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
-            }
         }
     }
 
@@ -1390,17 +1389,25 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             throw new IOException("The Vulkan device cannot run shadow-compute custom images: "
                     + "vertexPipelineStoresAndAtomics and shaderStorageImageExtendedFormats are required.");
         }
-        if (!computeFiles.isEmpty() && !VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled) {
-            throw new IOException("The Vulkan device cannot run compute custom images: "
-                    + "shaderStorageImageExtendedFormats is required.");
-        }
+        ShaderPackStorageBufferProperties storageBufferProperties = readStorageBufferProperties();
+        boolean computeUsesStorageImage = false;
         for (String file : computeFiles) {
             String source = readComputeStage(file).orElseThrow();
             ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
             var shader = ComputeShaderAdapter.adapt(file, source, properties);
-            if (shader.resources().stream().noneMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
-                throw new IOException(file + " has no supported storage-image output.");
+            boolean hasStorageImage = shader.resources().stream()
+                    .anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage);
+            var storageBuffers = ShaderPackStorageBuffers.validateForVulkanParser(
+                    shader.source(), storageBufferProperties);
+            boolean hasStorageBuffer = !storageBuffers.storageBlocks().isEmpty();
+            if (!hasStorageImage && !hasStorageBuffer) {
+                throw new IOException(file + " must use an active storage image or an allocated bufferObject SSBO.");
             }
+            computeUsesStorageImage |= hasStorageImage;
+        }
+        if (computeUsesStorageImage && !VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled) {
+            throw new IOException("The Vulkan device cannot run compute custom images: "
+                    + "shaderStorageImageExtendedFormats is required.");
         }
     }
 
@@ -1682,7 +1689,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public ShaderPack withRuntimeFeatures() throws IOException {
         if (configuration.customImages()) return this;
         ShaderPack candidate = inspect(path, new ShaderPackConfiguration(configuration.options(), configuration.dimension(), true));
-        return candidate.activeComputeStageFiles("shadowcomp").isEmpty() ? this : candidate;
+        return candidate.activeComputeStageFiles().isEmpty() ? this : candidate;
     }
 
     private Map<String, String> featureOptions(Map<String, String> options) {
@@ -2018,6 +2025,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private static boolean isPostProcessingProgramFile(String fileName) {
+        if (fileName.matches("setup(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
+            return true;
+        }
+        if (fileName.matches("begin(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
+            return true;
+        }
         if (fileName.equals("final.fsh") || fileName.equals("final.csh")
                 || fileName.matches("final_[a-z]\\.csh")) {
             return true;

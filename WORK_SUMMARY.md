@@ -1586,4 +1586,15 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Расширил диагностический pack на compute-only `prepare` и `deferred`; вместе с `composite`, `composite_a`, `composite1` и `final` он проверяет значение 43 и одноразовую за кадр очистку custom image.
 - JDK 21 gate завершился успешно: 561 тест без failures/errors/skips; validateShaders обработал 102 shader-примера и 118 direct Vulkan SPIR-V компиляций; build, smoke compilation и example-pack packaging прошли.
 - RTX 3070 Graphics smoke: passed, 230,400 active / 0 disabled magenta pixels; trace подтвердил порядок фаз и compute-only проходов. Khronos validation не включён; в клиентском логе нет VUID/device-loss markers.
-- Следующий этап: проверить/слить #96 и #97 после перезапущенных точечных canceled Graphics jobs, отправить текущий branch и открыть stacked PR поверх #97, получить exact-head CI, затем слить готовую ветку и подготовить beta37 из итогового main. Compute остаётся ограничен custom storage images; `setup`/`begin`, SSBO-only compute и полный third-party-pack parity не подтверждены.
+- Следующий этап на тот момент: проверить #96/#97, открыть PR для post-compute stack, получить exact-head CI и затем подготовить beta37; позднейшие результаты описаны ниже.
+
+### Iris `begin.fsh` pre-shadow pass - local candidate - 2026-10-23
+
+- Продолжил существующий стек в worktree `C:/Users/Gleb/.t3/scratch/veyra-begin-fragment`, branch `feature/begin-fragment-stage`, от точного PR #101 head `7c313f687011bcef17393085dd356a38a53d8201`. Root checkout и пользовательские артефакты не затрагивались.
+- Добавил `begin` и `begin1`–`begin99` как отдельную graphics phase до shadow pass. Графические и соответствующие compute-компоненты проходят в заданном Iris порядке; `prepare` остаётся первой post-shadow phase. Ошибочная preflight-отказ от begin fragment удалён.
+- Буферы `colortexN` очищаются один раз за кадр. Если `begin.fsh` существует, очистка выполняется до него; `prepare` не стирает результат `begin`, а при отсутствии begin graphics очистка остаётся на prepare boundary.
+- Добавлен `examples/begin-fragment-stage`: `begin.fsh` пишет magenta в `colortex1` при стандартном `colortex1Clear=true`, а `final.fsh` отображает magenta только если значение сохранилось. Fixture добавлен в скрипт подготовки и Lavapipe graphics matrix.
+- JDK 21 gate `test validateShaders build compileGraphicsSmokeJava packageExamplePacks --rerun-tasks` passed: **568 tests, 0 failures/errors/skips; 102 example shaders; 118 direct Vulkan SPIR-V compilations; build, smoke compilation, and example packaging passed**. `git diff --check` clean.
+- RTX 3070 graphics smoke passed: **230,400 active magenta pixels / 0 after disabling the pack**. Runtime VUID/validation-error/device-loss marker count in `latest.log`: **0**. Khronos validation was not enabled.
+- `scripts/verify_jar.py` accepted the local beta.36 metadata JAR (1,051,938 bytes, SHA-256 `D946A7FC9AD4AD8C720F0D3351DEF5AB7C0D63220A90AB7DEFE926ED39D5BABB`). It is a local build artifact, not a release candidate or published asset.
+- Hosted exact-head checks and merge are pending; no complete Iris shaderpack parity is claimed. This branch contains the candidate implementation and is not a published artifact.

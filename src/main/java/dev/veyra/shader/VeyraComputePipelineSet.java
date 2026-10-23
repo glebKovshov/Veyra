@@ -17,7 +17,7 @@ import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-/** Owns active shadow and post-processing compute stages and their shared images. */
+/** Owns active setup, begin, shadow, and post-processing compute stages and their shared images. */
 public final class VeyraComputePipelineSet implements AutoCloseable {
     private final VeyraComputeResources resources;
     private final List<Dispatch> stages;
@@ -65,12 +65,6 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             for (int index = 0; index < adapted.size(); index++) {
                 String file = files.get(index);
                 ComputeShaderAdapter.AdaptedStage shader = adapted.get(index);
-                boolean hasStorageImage = shader.resources().stream()
-                        .filter(ComputeShaderAdapter.OpaqueResource::storageImage)
-                        .findAny().isPresent();
-                if (!hasStorageImage) {
-                    throw new IOException(file + " does not declare an active storage image; Veyra compute stages currently require image resources.");
-                }
                 String stageProgram = file.substring(0, file.length() - ".csh".length());
                 String program = computeProgramName(file);
                 ShaderPackStorageBufferProperties.IndirectDispatch indirect = null;
@@ -177,10 +171,47 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         ensureOpen();
         LinkedHashSet<String> names = new LinkedHashSet<>();
         for (Dispatch stage : stages) {
-            if (isShadowComputeFile(stage.programName() + ".csh")) continue;
+            if (isShadowComputeFile(stage.programName() + ".csh")
+                    || isSetupComputeFile(stage.stageProgram() + ".csh")) continue;
             if (ShaderPassPhase.forProgram(stage.programName()) == phase) names.add(stage.programName());
         }
         return List.copyOf(names);
+    }
+
+    /** Returns begin compute programs in pass/component order for dispatch before the shadow map. */
+    public List<String> beginProgramNames() {
+        ensureOpen();
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Dispatch stage : stages) {
+            if (isBeginComputeFile(stage.stageProgram() + ".csh")) names.add(stage.programName());
+        }
+        return List.copyOf(names);
+    }
+
+    /** Dispatches begin compute programs before the world shadow pass. */
+    public void dispatchBeginPrograms(int renderWidth, int renderHeight) {
+        ensureOpen();
+        for (String programName : beginProgramNames()) {
+            dispatchProgram(programName, renderWidth, renderHeight);
+        }
+    }
+
+    /** Returns setup compute programs in pass/component order for one-time pipeline initialization. */
+    public List<String> setupProgramNames() {
+        ensureOpen();
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Dispatch stage : stages) {
+            if (isSetupComputeFile(stage.stageProgram() + ".csh")) names.add(stage.programName());
+        }
+        return List.copyOf(names);
+    }
+
+    /** Dispatches setup programs once after the compute pipeline is installed or resized. */
+    public void dispatchSetupPrograms(int renderWidth, int renderHeight) {
+        ensureOpen();
+        for (String programName : setupProgramNames()) {
+            dispatchProgram(programName, renderWidth, renderHeight);
+        }
     }
 
     public boolean hasShadowComputeStages() {
@@ -285,5 +316,13 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
 
     private static boolean isShadowComputeFile(String file) {
         return file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
+    }
+
+    private static boolean isBeginComputeFile(String file) {
+        return file.matches("begin(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
+    }
+
+    private static boolean isSetupComputeFile(String file) {
+        return file.matches("setup(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
     }
 }
