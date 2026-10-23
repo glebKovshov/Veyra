@@ -26,6 +26,9 @@ jobs:
         with:
           cache-provider: basic
 
+      - name: Test shutdown audit tooling
+        run: python3 -m unittest discover -s scripts/tests -v
+
       - name: Build mod
         run: ./gradlew --no-daemon build validateShaders
 

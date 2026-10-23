@@ -164,9 +164,9 @@ jobs:
           print(json.dumps(result,indent=2))
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
-          # Minecraft/VulkanMod 0.6.8 reports its still-live process-wide Vulkan objects only
-          # after disconnecting the test player and entering vkDestroyDevice. Keep those
-          # teardown diagnostics in the artifact, but gate runtime rendering separately.
+          # Minecraft/VulkanMod 0.6.8 reports process-wide teardown objects after disconnect.
+          # Preserve the full shutdown tail because Object Tracking handle lines follow VUIDs.
+          # Runtime rendering remains separately gated.
           marker='Stopping singleplayer server as player logged out'
           shutdown=text.find(marker)
           assert shutdown >= 0, 'The smoke client did not shut down its validation world cleanly'
@@ -175,6 +175,7 @@ jobs:
           pathlib.Path('build/reports/graphics-smoke/validation-errors.txt').write_text('\n'.join(errors))
           pathlib.Path('build/reports/graphics-smoke/runtime-validation-errors.txt').write_text('\n'.join(runtime_errors))
           pathlib.Path('build/reports/graphics-smoke/teardown-validation-errors.txt').write_text('\n'.join(teardown_errors))
+          pathlib.Path('build/reports/graphics-smoke/teardown-validation-log.txt').write_text(text[shutdown:])
           print(f'Runtime validation errors: {len(runtime_errors)}')
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
@@ -232,6 +233,13 @@ jobs:
               assert snapshot['phase']==phase
               print(f"Shutdown {phase}: buffers={len(snapshot['buffers'])}, images={len(snapshot['images'])}, pipelines={len(snapshot['pipelines'])}")
           PY
+      - name: Map Vulkan teardown objects to registry owners
+        run: |
+          python3 scripts/analyze_vulkan_shutdown.py build/reports/graphics-smoke \
+            --output build/reports/graphics-smoke/vulkan-shutdown-audit.json \
+            --fail-on-unmapped \
+            --fail-on-registry-mismatch
+
       - name: Upload graphics evidence
         if: always()
         uses: actions/upload-artifact@v7
