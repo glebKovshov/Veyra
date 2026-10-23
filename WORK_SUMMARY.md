@@ -1371,3 +1371,8 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - RTX 3070 `custom-image-compute` smoke passed with **222,038 active / 0 disabled magenta pixels**; both required storage features report enabled and the error field is empty. The Windows host has no Vulkan validation layer, so this confirms device creation and rendering but does not close the hosted Lavapipe VUID.
 - `scripts/verify_jar.py` accepted the beta.31 candidate at **982,599 bytes**, SHA-256 `0C7862646AEADA5CB3B467E5F27B5F0A7594161B3A8B0CF39EB15E83ABFA8702`. This remains a local candidate, not a release artifact.
 - Push this implementation to PR #85 and require fresh exact-head Build, pinned source-audit, and Lavapipe Graphics results before merging either PR or publishing beta.31.
+
+### Lavapipe core-feature baseline probe — queued
+
+- Added an isolated C/Vulkan probe and a dedicated GitHub Actions job. The probe enables `vertexPipelineStoresAndAtomics` through legacy `VkDeviceCreateInfo.pEnabledFeatures`, creates a vertex shader module that writes a storage buffer, and attempts a minimal graphics pipeline under Khronos validation on the same Lavapipe runner image.
+- This isolates validation-layer feature tracking from VulkanMod and Veyra's mixin. It has not run yet; use its result to decide whether to revise the feature-injection path or investigate the runner's layer/driver combination. No VUID allowance was added.
