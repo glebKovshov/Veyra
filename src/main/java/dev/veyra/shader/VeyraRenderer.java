@@ -343,6 +343,9 @@ public final class VeyraRenderer {
     private static boolean shaderPackUniformsRegistered;
     private static boolean pipelinesDirty = true;
     private static boolean terrainPipelineDirty = true;
+    private static boolean setupComputePending;
+    private static int setupComputeWidth = -1;
+    private static int setupComputeHeight = -1;
     private static boolean entityPipelineDirty = true;
     private static boolean blockEntityPipelineDirty = true;
     private static boolean handPipelineDirty = true;
@@ -3029,25 +3032,45 @@ public final class VeyraRenderer {
 
     private static int nextPostPhase;
 
-    /** Runs Iris begin compute programs once at the head of each level frame, before shadow rendering. */
+    /** Runs Iris setup and begin compute programs at their pre-shadow frame boundaries. */
     public static void renderBeginCompute(Minecraft minecraft) {
         if (!isRenderingEnabled() || minecraft.level == null || minecraft.player == null) return;
         if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) return;
 
         VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
-        if (compute != null && compute.beginProgramNames().isEmpty()) return;
-        if (compute == null && !terrainPipelineDirty) return;
+        if (compute == null && !terrainPipelineDirty) {
+            if (storageBufferResources != null) {
+                if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+                storageBufferResources.clearUninitializedBuffers();
+            }
+            return;
+        }
 
         try {
             RenderTarget mainTarget = minecraft.getMainRenderTarget();
             if (mainTarget.width <= 0 || mainTarget.height <= 0) return;
             ensurePipelines(mainTarget.width, mainTarget.height);
             compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
-            if (compute == null || compute.beginProgramNames().isEmpty()) return;
+            List<String> setupPrograms = compute == null ? List.of() : compute.setupProgramNames();
+            List<String> beginPrograms = compute == null ? List.of() : compute.beginProgramNames();
+            if (setupPrograms.isEmpty() && beginPrograms.isEmpty()) {
+                if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+                if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
+                return;
+            }
             if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
-            if (storageBufferResources != null) storageBufferResources.clearForFrame(frameCounter);
+            if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
             compute.clearForFrame(frameCounter);
-            compute.dispatchBeginPrograms(mainTarget.width, mainTarget.height);
+            boolean setupNeedsDispatch = !setupPrograms.isEmpty()
+                    && (setupComputePending || setupComputeWidth != mainTarget.width
+                    || setupComputeHeight != mainTarget.height);
+            if (setupNeedsDispatch) {
+                compute.dispatchSetupPrograms(mainTarget.width, mainTarget.height);
+                setupComputePending = false;
+                setupComputeWidth = mainTarget.width;
+                setupComputeHeight = mainTarget.height;
+            }
+            if (!beginPrograms.isEmpty()) compute.dispatchBeginPrograms(mainTarget.width, mainTarget.height);
         } catch (Exception exception) {
             renderingEnabled = false;
             lastError = shortError(exception);
@@ -3098,9 +3121,10 @@ public final class VeyraRenderer {
             FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
             List<String> computePrograms = compute == null ? List.of() : compute.programNames(phase);
             if (framePlan.shaderPasses().isEmpty() && computePrograms.isEmpty()) return;
-            if (compute != null) {
+            if (compute != null || storageBufferResources != null) {
                 if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
-                compute.clearForFrame(frameCounter);
+                if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
+                if (compute != null) compute.clearForFrame(frameCounter);
             }
             ensureInitialDepthSnapshots(framePlan, mainTarget.width, mainTarget.height);
             if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
@@ -4113,7 +4137,7 @@ public final class VeyraRenderer {
         if (compute != null || storageBufferResources != null) {
             Renderer.getInstance().endRenderPass();
             if (compute != null) compute.clearForFrame(frameCounter);
-            if (storageBufferResources != null) storageBufferResources.clearForFrame(frameCounter);
+            if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
         }
     }
 
@@ -8022,6 +8046,8 @@ public final class VeyraRenderer {
     private static void replaceTerrainPipelines(TerrainPipelineSet next) {
         TerrainPipelineSet old = terrainPipelineSet;
         terrainPipelineSet = next;
+        VeyraComputePipelineSet compute = next == null ? null : next.compute();
+        setupComputePending = compute != null && !compute.setupProgramNames().isEmpty();
         if (old != null && old != next) {
             old.close();
         }

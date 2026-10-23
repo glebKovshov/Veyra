@@ -76,4 +76,13 @@ class ShaderPackComputeStagesTest {
         assertEquals(List.of("begin.csh"), pack.activeComputeStageFiles("begin"));
         assertDoesNotThrow(pack::validatePipelineCapabilities);
     }
+
+    @Test
+    void acceptsSetupComputeStagesThatRunWhenThePipelineIsInitialized() throws Exception {
+        var pack = ShaderPack.inspect(Path.of("examples/compute-setup-stage")).withRuntimeFeatures();
+
+        assertEquals(List.of("setup.csh"), pack.activeComputeStageFiles());
+        assertEquals(List.of("setup.csh"), pack.activeComputeStageFiles("setup"));
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+    }
 }
