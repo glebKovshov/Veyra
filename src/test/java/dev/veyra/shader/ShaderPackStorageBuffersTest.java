@@ -123,6 +123,59 @@ class ShaderPackStorageBuffersTest {
     }
 
     @Test
+    void parsesAndValidatesIndirectDispatchBufferAndByteOffset() throws Exception {
+        var properties = ShaderPackStorageBufferProperties.parse("""
+                bufferObject.0 = 16
+                indirect.shadowcomp_a = 0 4
+                """);
+
+        assertEquals(new ShaderPackStorageBufferProperties.IndirectDispatch(0, 4),
+                properties.indirectDispatches().get("shadowcomp_a"));
+        assertEquals(new ShaderPackStorageBufferProperties.IndirectDispatch(0, 4),
+                properties.validateIndirectDispatch("shadowcomp_a", 800, 450));
+    }
+
+    @Test
+    void validatesIndirectDispatchAgainstResolvedRelativeBufferSize() throws Exception {
+        var properties = ShaderPackStorageBufferProperties.parse("""
+                bufferObject.0 = 4 true 0.5 0.5
+                indirect.shadowcomp_a = 0 4
+                """);
+
+        assertEquals(16L, properties.resolveSizes(4, 4).get(0));
+        assertEquals(new ShaderPackStorageBufferProperties.IndirectDispatch(0, 4),
+                properties.validateIndirectDispatch("shadowcomp_a", 4, 4));
+        IOException error = assertThrows(IOException.class,
+                () -> properties.validateIndirectDispatch("shadowcomp_a", 2, 2));
+        assertTrue(error.getMessage().contains("beyond the 4-byte bufferObject.0"), error.getMessage());
+    }
+
+    @Test
+    void rejectsMalformedOrOutOfBoundsIndirectDispatchProperties() throws Exception {
+        assertThrows(IOException.class,
+                () -> ShaderPackStorageBufferProperties.parse("indirect.shadowcomp_a = 0\n"));
+        assertThrows(IOException.class,
+                () -> ShaderPackStorageBufferProperties.parse("indirect.shadowcomp_a = 9 0\n"));
+        assertThrows(IOException.class,
+                () -> ShaderPackStorageBufferProperties.parse("indirect.shadowcomp_a = 0 -4\n"));
+        assertThrows(IOException.class,
+                () -> ShaderPackStorageBufferProperties.parse("indirect.shadowcomp_a = 0 2\n"));
+
+        var missingBuffer = ShaderPackStorageBufferProperties.parse("indirect.shadowcomp_a = 0 0\n");
+        IOException missing = assertThrows(IOException.class,
+                () -> missingBuffer.validateIndirectDispatch("shadowcomp_a", 800, 450));
+        assertTrue(missing.getMessage().contains("without a matching allocation"), missing.getMessage());
+
+        var tooSmall = ShaderPackStorageBufferProperties.parse("""
+                bufferObject.0 = 8
+                indirect.shadowcomp_a = 0 0
+                """);
+        IOException range = assertThrows(IOException.class,
+                () -> tooSmall.validateIndirectDispatch("shadowcomp_a", 800, 450));
+        assertTrue(range.getMessage().contains("reads 12 dispatch bytes"), range.getMessage());
+    }
+
+    @Test
     void bridgesAnActiveStorageBlockThroughAParserCompatibleUniformBlock() throws Exception {
         String source = """
                 #version 450

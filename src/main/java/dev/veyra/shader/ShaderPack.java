@@ -166,7 +166,32 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public boolean hasTerrainFragment() {
-        return !terrainPrograms.isEmpty();
+        return !terrainPrograms.isEmpty() || hasTexturedLitFragment || hasTexturedFragment;
+    }
+
+    /** Resolves Iris' terrain fallback chain to the source program whose stages should execute. */
+    public String terrainFallbackProgram(String requestedProgram) throws IOException {
+        if (!TERRAIN_PROGRAMS.contains(requestedProgram)) return null;
+        if (terrainPrograms.contains(requestedProgram) && hasEnabledProgramFragment(requestedProgram)) {
+            return requestedProgram;
+        }
+        if (!requestedProgram.equals("gbuffers_terrain")
+                && terrainPrograms.contains("gbuffers_terrain")
+                && hasEnabledProgramFragment("gbuffers_terrain")) {
+            return "gbuffers_terrain";
+        }
+        if (hasTexturedLitFragment && hasEnabledProgramFragment(TEXTURED_LIT_PROGRAM)) {
+            return TEXTURED_LIT_PROGRAM;
+        }
+        if (hasTexturedFragment && hasEnabledProgramFragment(TEXTURED_PROGRAM)) {
+            return TEXTURED_PROGRAM;
+        }
+        return null;
+    }
+
+    /** Returns the requested terrain route when any stage is available through Iris' fallback chain. */
+    public String terrainRouteProgram(String requestedProgram) throws IOException {
+        return terrainFallbackProgram(requestedProgram) == null ? null : requestedProgram;
     }
 
     public boolean hasShadowFragment() {
@@ -746,6 +771,33 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return hasHandFragment || hasHandWaterFragment || hasTexturedLitFragment || hasTexturedFragment;
     }
 
+    public boolean hasEnabledHandFragment() throws IOException {
+        return hasHandFragment(HAND_PROGRAM);
+    }
+
+    public boolean hasEnabledHandWaterFragment() throws IOException {
+        return hasHandFragment(HAND_WATER_PROGRAM);
+    }
+
+    /** Returns whether the pack contains an enabled fragment for this Iris program. */
+    public boolean hasEnabledProgramFragment(String programName) throws IOException {
+        return readRawShader(programPath(programName + ".fsh")).isPresent() && isProgramEnabled(programName);
+    }
+
+    /** Returns whether any of the discovered programs has an enabled fragment stage. */
+    public boolean hasEnabledProgramFragment(Set<String> programNames) throws IOException {
+        for (String programName : programNames) {
+            if (hasEnabledProgramFragment(programName)) return true;
+        }
+        return false;
+    }
+
+    private boolean hasHandFragment(String programName) throws IOException {
+        return (HAND_PROGRAM.equals(programName) && hasHandFragment
+                || HAND_WATER_PROGRAM.equals(programName) && hasHandWaterFragment)
+                && hasEnabledProgramFragment(programName);
+    }
+
     public boolean supportsBlockEntityPipeline() {
         return !blockPrograms.isEmpty() || terrainPrograms.contains("gbuffers_terrain")
                 || hasTexturedLitFragment || hasTexturedFragment;
@@ -1107,7 +1159,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         readCustomTextureProperties();
         String required = properties.getProperty("iris.features.required", "").strip();
-        Set<String> supportedFeatures = configuration.customImages() ? Set.of("CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of();
+        Set<String> supportedFeatures = configuration.customImages()
+                ? Set.of("SSBO", "CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of("SSBO");
         List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())
                 .filter(name -> !supportedFeatures.contains(name)).toList();
         if (!unsupportedFeatures.isEmpty()) {
@@ -1317,7 +1370,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String source = readComputeStage(file).orElseThrow();
             ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
             var shader = ComputeShaderAdapter.adapt(file, source, properties);
-            if (!shader.hasFixedWorkGroups()) throw new IOException(file + " requires fixed const ivec3 workGroups.");
             if (shader.resources().stream().noneMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
                 throw new IOException(file + " has no supported storage-image output.");
             }

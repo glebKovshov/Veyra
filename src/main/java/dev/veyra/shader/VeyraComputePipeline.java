@@ -139,6 +139,22 @@ public final class VeyraComputePipeline extends Pipeline {
             throw new IllegalArgumentException("Compute work-group counts for " + name + " exceed device limits.");
         }
 
+        vkCmdDispatch(bindForDispatch(), x, y, z);
+    }
+
+    /** Dispatches using a validated VkDispatchIndirectCommand stored in a shader-pack SSBO. */
+    public void dispatchIndirect(long buffer, int offset) {
+        if (buffer == VK_NULL_HANDLE) {
+            throw new IllegalArgumentException("Compute program " + name + " has no indirect argument buffer.");
+        }
+        if (offset < 0 || (offset & 3) != 0) {
+            throw new IllegalArgumentException("Compute program " + name
+                    + " has an indirect argument offset that is not four-byte aligned.");
+        }
+        vkCmdDispatchIndirect(bindForDispatch(), buffer, Integer.toUnsignedLong(offset));
+    }
+
+    private VkCommandBuffer bindForDispatch() {
         Renderer renderer = Renderer.getInstance();
         if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
             throw new IllegalStateException("Compute program " + name + " can only dispatch while VulkanMod records a frame.");
@@ -152,7 +168,7 @@ public final class VeyraComputePipeline extends Pipeline {
         UniformBuffer globalUniformBuffer = Renderer.getDrawer().getUniformBuffer();
         descriptorSets[frame].bindSets(commandBuffer, globalUniformBuffer, VK_PIPELINE_BIND_POINT_COMPUTE);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-        vkCmdDispatch(commandBuffer, x, y, z);
+        return commandBuffer;
     }
 
     /** Inserts a GENERAL-layout memory dependency between shader/transfer producers and consumers. */

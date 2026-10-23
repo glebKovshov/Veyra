@@ -3,10 +3,15 @@
 ## 0.2.0-beta.31 (experimental prerelease)
 
 - Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.
-- Add selected fixed-workgroup `shadowcomp` compute, 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
+- Add selected `shadowcomp` compute with 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
+- Support Iris `workGroupsRender` and validated `indirect.<pass>` dispatch for the supported `shadowcomp` path, including indirect-read synchronization.
+- Request supported Veyra Vulkan core features through a separate `pEnabledFeatures` block while preserving VulkanMod's Vulkan 1.1 and dynamic-rendering `pNext` chain.
+- Use the selected mip extent for VulkanMod framebuffer rendering, fixing atlas render-area validation errors. Pin a corrected Khronos validation layer and add standalone vertex storage-image probes to the Lavapipe gate.
+- Reuse pruned terrain varying locations before high slots, preserve fixed aliases, and reconcile shadow vertex/fragment interfaces; this clears the observed Sildur water interface-component validation error.
 - Load shader-pack PNG textures on supported terrain, shadow, and entity geometry through global and stage-scoped mappings; resolve scoped entity samplers using the selected entity pipeline and prepare pack textures before first selection, including after restoring a pack. Honor `.mcmeta` blur/clamp settings.
 - Keep shadow-dependent sampling safe across dimension and reload transitions until a completed shadow map is available. Adapt BSL fog uniforms/helpers and preserve shader-pack `texture2DShadow` helpers.
-- Pass the local 519-test JDK 21 gate, 97 shader-source checks, 113 direct Vulkan SPIR-V compilations, pinned audit (864 accepted geometry fragments and 18 compiled compute stages), and selected Complementary Reimagined/Unbound plus BSL HIGH RTX 3070 profile/lifecycle smokes. On the combined candidate, `entity-custom-texture` passed with 18,293 active / 0 disabled pixels and `custom-image-compute` passed with 222,994 active magenta pixels. The Sildur's Vibrant 2.02 Extreme RTX 3070 harness attempt remained black after deferred; the cause is unresolved. The Windows host lacks a Vulkan validation layer; full third-party pack visuals remain unverified.
+- Pass the combined #85+#86 JDK 21 preflight gate: **523 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. The pinned audit accepts 864 geometry fragments and compiles 18 active compute stages across 4 archives / 75 cases; every row remains `visualValidation=false`.
+- Focused RTX 3070 evidence includes selected Complementary Reimagined/Unbound and BSL HIGH lifecycle runs, `entity-custom-texture` (18,293 active / 0 disabled), and exact #85 `basic-custom-image` (466 active) plus `entity-custom-image` (18,410 active / 0 disabled; requested device feature flags true). These runs do not certify whole-pack compatibility or replace Lavapipe validation. A Sildur `VeyraSmoke` ambient frame assertion passed (24,550 non-black pixels / 69 color buckets), while a later `finalclass` probe failed as nearly uniform (230,400 / 23); full-pack Sildur compatibility is unverified.
 
 ## 0.2.0-beta.30 - 2026-10-21 (experimental prerelease)
 

@@ -275,12 +275,22 @@ final class TerrainVertexShaderAdapter {
         StringBuilder declarationsAndMacros = new StringBuilder();
         Map<String, PackVarying> varyings = new java.util.LinkedHashMap<>();
         int copiedThrough = 0;
-        int nextLocation = 20;
+        int nextLocation = 4;
         Set<Integer> occupiedLocations = new HashSet<>();
-        occupiedLocations.add(0);
-        occupiedLocations.add(1);
+        // VulkanMod's terrain vertex base stage always writes its distance outputs at locations 2 and 3.
+        // Unlike the optional Veyra bridge outputs, those locations are never pruned.
+        for (int location = 0; location <= 3; location++) occupiedLocations.add(location);
         for (int location = 4; location <= 19; location++) occupiedLocations.add(location);
         occupiedLocations.removeAll(freeOutputLocations);
+        // Prefer pruned bridge slots to high locations, which also count toward Vulkan's
+        // interface-component limit. Reserve fixed aliases before allocating custom outputs.
+        Matcher fixedMatcher = OUTPUT_DECLARATION.matcher(masked);
+        while (fixedMatcher.find()) {
+            String interpolation = mergeInterpolation(fixedMatcher.group(2), fixedMatcher.group(3),
+                    programName, fixedMatcher.group(5));
+            FixedOutput fixed = fixedOutput(fixedMatcher.group(5), fixedMatcher.group(4), interpolation);
+            if (fixed != null) occupiedLocations.add(fixed.location());
+        }
         while (matcher.find()) {
             String interpolation = mergeInterpolation(matcher.group(2), matcher.group(3),
                     programName, matcher.group(5));

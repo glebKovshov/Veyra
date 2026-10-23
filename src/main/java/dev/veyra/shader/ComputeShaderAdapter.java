@@ -24,6 +24,13 @@ public final class ComputeShaderAdapter {
     private static final Pattern WORK_GROUPS_DECLARATION = Pattern.compile(
             "\\bconst\\s+ivec3\\s+workGroups\\s*=\\s*([^;]+);"
     );
+    private static final String GLSL_FLOAT = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?[fF]?";
+    private static final Pattern RENDER_WORK_GROUPS_DECLARATION = Pattern.compile(
+            "\\bconst\\s+vec2\\s+workGroupsRender\\s*=\\s*([^;]+);"
+    );
+    private static final Pattern RENDER_WORK_GROUPS = Pattern.compile(
+            "vec2\\s*\\(\\s*(" + GLSL_FLOAT + ")(?:\\s*,\\s*(" + GLSL_FLOAT + "))?\\s*\\)"
+    );
     private static final Pattern FIXED_WORK_GROUPS = Pattern.compile(
             "ivec3\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)"
     );
@@ -150,20 +157,37 @@ public final class ComputeShaderAdapter {
                 positiveInt(fileName, "local_size_y", localSizeMatcher.group(2)),
                 positiveInt(fileName, "local_size_z", localSizeMatcher.group(3))
         };
-        Matcher workGroupsMatcher = WORK_GROUPS_DECLARATION.matcher(
-                ShaderSource.maskBlockAndLineComments(uniformStage.source()));
-        int[] workGroups = {0, 0, 0};
-        if (workGroupsMatcher.find()) {
+        String declarationSource = ShaderSource.maskBlockAndLineComments(uniformStage.source());
+        Matcher workGroupsMatcher = WORK_GROUPS_DECLARATION.matcher(declarationSource);
+        Matcher renderWorkGroupsMatcher = RENDER_WORK_GROUPS_DECLARATION.matcher(declarationSource);
+        boolean hasFixedDeclaration = workGroupsMatcher.find();
+        boolean hasRenderDeclaration = renderWorkGroupsMatcher.find();
+        if (hasFixedDeclaration && hasRenderDeclaration) {
+            throw new IOException(fileName + " cannot declare both workGroups and workGroupsRender.");
+        }
+        ComputeWorkGroupDispatch workGroupDispatch;
+        if (hasFixedDeclaration) {
             String declaration = workGroupsMatcher.group(1);
             Matcher fixed = FIXED_WORK_GROUPS.matcher(declaration);
             if (!fixed.matches() || workGroupsMatcher.find()) {
-                throw new IOException(fileName + " must declare at most one fixed literal const ivec3 workGroups.");
+                throw new IOException(fileName + " must declare at most one literal const ivec3 workGroups.");
             }
-            workGroups = new int[] {
-                    positiveInt(fileName, "workGroups.x", fixed.group(1)),
-                    positiveInt(fileName, "workGroups.y", fixed.group(2)),
-                    positiveInt(fileName, "workGroups.z", fixed.group(3))
-            };
+            workGroupDispatch = ComputeWorkGroupDispatch.fixed(
+                    nonNegativeInt(fileName, "workGroups.x", fixed.group(1)),
+                    nonNegativeInt(fileName, "workGroups.y", fixed.group(2)),
+                    nonNegativeInt(fileName, "workGroups.z", fixed.group(3)));
+        } else if (hasRenderDeclaration) {
+            Matcher render = RENDER_WORK_GROUPS.matcher(renderWorkGroupsMatcher.group(1));
+            if (!render.matches() || renderWorkGroupsMatcher.find()) {
+                throw new IOException(fileName + " must declare at most one literal const vec2 workGroupsRender.");
+            }
+            float scaleX = nonNegativeFloat(fileName, "workGroupsRender.x", render.group(1));
+            float scaleY = render.group(2) == null ? scaleX
+                    : nonNegativeFloat(fileName, "workGroupsRender.y", render.group(2));
+            workGroupDispatch = ComputeWorkGroupDispatch.renderRelative(scaleX, scaleY);
+        } else {
+            // Iris defaults to one invocation per render pixel when neither count is declared.
+            workGroupDispatch = ComputeWorkGroupDispatch.renderRelative(1.0f, 1.0f);
         }
 
         StringBuilder block = new StringBuilder();
@@ -186,7 +210,7 @@ public final class ComputeShaderAdapter {
         }
         String adapted = "#version 450\n" + block + fogStage.bridge() + uniformStage.macros() + body;
         return new AdaptedStage(adapted, List.copyOf(uniformFields.values()), List.copyOf(resources),
-                localSize[0], localSize[1], localSize[2], workGroups[0], workGroups[1], workGroups[2]);
+                localSize[0], localSize[1], localSize[2], workGroupDispatch);
     }
 
     private static void addLegacyFogField(Map<String, ShaderPackUniformAdapter.UniformField> fields,
@@ -211,6 +235,32 @@ public final class ComputeShaderAdapter {
         return parsed;
     }
 
+    private static int nonNegativeInt(String file, String field, String value) throws IOException {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            throw new IOException(file + " has invalid " + field + "=" + value + ".", exception);
+        }
+        if (parsed < 0) throw new IOException(file + " has negative " + field + ".");
+        return parsed;
+    }
+
+    private static float nonNegativeFloat(String file, String field, String value) throws IOException {
+        String numeric = value.endsWith("f") || value.endsWith("F")
+                ? value.substring(0, value.length() - 1) : value;
+        float parsed;
+        try {
+            parsed = Float.parseFloat(numeric);
+        } catch (NumberFormatException exception) {
+            throw new IOException(file + " has invalid " + field + "=" + value + ".", exception);
+        }
+        if (!Float.isFinite(parsed) || parsed < 0.0f) {
+            throw new IOException(file + " has invalid " + field + "=" + value + ".");
+        }
+        return parsed;
+    }
+
     private static void appendWhitespacePreservingLines(StringBuilder target, String source, int start, int end) {
         for (int i = start; i < end; i++) {
             char character = source.charAt(i);
@@ -229,14 +279,26 @@ public final class ComputeShaderAdapter {
 
     public record AdaptedStage(String source, List<ShaderPackUniformAdapter.UniformField> uniforms,
                                List<OpaqueResource> resources, int localSizeX, int localSizeY, int localSizeZ,
-                               int workGroupsX, int workGroupsY, int workGroupsZ) {
+                               ComputeWorkGroupDispatch workGroupDispatch) {
         public AdaptedStage {
             uniforms = List.copyOf(uniforms);
             resources = List.copyOf(resources);
         }
 
         public boolean hasFixedWorkGroups() {
-            return workGroupsX > 0 && workGroupsY > 0 && workGroupsZ > 0;
+            return workGroupDispatch.isFixed();
+        }
+
+        public boolean usesRenderRelativeWorkGroups() {
+            return workGroupDispatch.mode() == ComputeWorkGroupDispatch.Mode.RENDER_RELATIVE;
+        }
+
+        public int workGroupsX() { return workGroupDispatch.x(); }
+        public int workGroupsY() { return workGroupDispatch.y(); }
+        public int workGroupsZ() { return workGroupDispatch.z(); }
+
+        public int[] resolveWorkGroups(int renderWidth, int renderHeight) {
+            return workGroupDispatch.resolve(renderWidth, renderHeight, localSizeX, localSizeY);
         }
     }
 }

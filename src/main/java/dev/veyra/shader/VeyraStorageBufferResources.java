@@ -114,8 +114,12 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
                     + " MiB, above Veyra's conservative " + mebibytes(budget) + " MiB device-local buffer budget.");
         }
 
-        Buffer buffer = new Buffer("Veyra bufferObject." + binding,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.GPU_MEM);
+        int usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        if (properties.indirectDispatches().values().stream()
+                .anyMatch(dispatch -> dispatch.bufferBinding() == binding)) {
+            usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+        }
+        Buffer buffer = new Buffer("Veyra bufferObject." + binding, usage, MemoryTypes.GPU_MEM);
         try {
             buffer.createBuffer(allocationBytes);
         } catch (RuntimeException exception) {

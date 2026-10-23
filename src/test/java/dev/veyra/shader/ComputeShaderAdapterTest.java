@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,7 +111,97 @@ class ComputeShaderAdapterTest {
                 """;
         IOException error = assertThrows(IOException.class, () -> ComputeShaderAdapter.adapt("shadowcomp.csh", source,
                 ShaderPackImageProperties.parse(IMAGE_PROPERTIES)));
-        assertTrue(error.getMessage().contains("fixed literal const ivec3 workGroups"));
+        assertTrue(error.getMessage().contains("literal const ivec3 workGroups"));
+    }
+
+    @Test
+    void resolvesRenderRelativeWorkGroupsFromCurrentFramebufferAndLocalSize() throws Exception {
+        String source = """
+                #version 430 compatibility
+                layout(local_size_x = 8, local_size_y = 4, local_size_z = 2) in;
+                const vec2 workGroupsRender = vec2(0.5f, 0.25f);
+                void main() { }
+                """;
+
+        var adapted = ComputeShaderAdapter.adapt("shadowcomp.csh", source,
+                ShaderPackImageProperties.parse(""));
+
+        assertFalse(adapted.hasFixedWorkGroups());
+        assertTrue(adapted.usesRenderRelativeWorkGroups());
+        assertEquals(0.5, adapted.workGroupDispatch().scaleX());
+        assertEquals(0.25, adapted.workGroupDispatch().scaleY());
+        assertArrayEquals(new int[]{120, 68, 1}, adapted.resolveWorkGroups(1920, 1080));
+    }
+
+    @Test
+    void defaultsUndeclaredWorkGroupCountToOneInvocationPerRenderPixel() throws Exception {
+        String source = """
+                #version 430 compatibility
+                layout(local_size_x = 16, local_size_y = 8, local_size_z = 2) in;
+                void main() { }
+                """;
+
+        var adapted = ComputeShaderAdapter.adapt("shadowcomp.csh", source,
+                ShaderPackImageProperties.parse(""));
+
+        assertTrue(adapted.usesRenderRelativeWorkGroups());
+        assertArrayEquals(new int[]{120, 135, 1}, adapted.resolveWorkGroups(1920, 1080));
+    }
+
+    @Test
+    void supportsZeroWorkAndSingleArgumentRenderScale() throws Exception {
+        var noWork = ComputeShaderAdapter.adapt("shadowcomp.csh", """
+                #version 430 compatibility
+                layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+                const vec2 workGroupsRender = vec2(0.0f);
+                void main() { }
+                """, ShaderPackImageProperties.parse(""));
+        var oneScale = ComputeShaderAdapter.adapt("shadowcomp.csh", """
+                #version 430 compatibility
+                layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+                const vec2 workGroupsRender = vec2(0.5);
+                void main() { }
+                """, ShaderPackImageProperties.parse(""));
+
+        assertArrayEquals(new int[]{0, 0, 1}, noWork.resolveWorkGroups(1920, 1080));
+        assertArrayEquals(new int[]{120, 68, 1}, oneScale.resolveWorkGroups(1920, 1080));
+    }
+
+    @Test
+    void preservesIrisFloatRoundingForRenderRelativePixelCounts() throws Exception {
+        var adapted = ComputeShaderAdapter.adapt("shadowcomp.csh", """
+                #version 430 compatibility
+                layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+                const vec2 workGroupsRender = vec2(0.1f);
+                void main() { }
+                """, ShaderPackImageProperties.parse(""));
+
+        // Iris stores this scale as float; 10 * 0.1f rounds to exactly 1.0f before ceil.
+        assertArrayEquals(new int[]{1, 1, 1}, adapted.resolveWorkGroups(10, 10));
+    }
+
+    @Test
+    void rejectsConflictingOrNegativeWorkGroupSizingDeclarations() {
+        String conflicting = """
+                #version 430 compatibility
+                layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+                const ivec3 workGroups = ivec3(1, 1, 1);
+                const vec2 workGroupsRender = vec2(1.0);
+                void main() { }
+                """;
+        String negativeScale = """
+                #version 430 compatibility
+                layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+                const vec2 workGroupsRender = vec2(1.0, -0.5);
+                void main() { }
+                """;
+
+        IOException both = assertThrows(IOException.class, () -> ComputeShaderAdapter.adapt(
+                "shadowcomp.csh", conflicting, ShaderPackImageProperties.parse("")));
+        IOException negative = assertThrows(IOException.class, () -> ComputeShaderAdapter.adapt(
+                "shadowcomp.csh", negativeScale, ShaderPackImageProperties.parse("")));
+        assertTrue(both.getMessage().contains("cannot declare both"));
+        assertTrue(negative.getMessage().contains("invalid workGroupsRender.y"));
     }
 
     @Test

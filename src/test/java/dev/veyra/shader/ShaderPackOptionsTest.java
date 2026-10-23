@@ -82,6 +82,66 @@ class ShaderPackOptionsTest {
         Files.writeString(shader.resolve("shaders.properties"), "");
         assertTrue(ShaderPack.inspect(shader.getParent()).readPrograms().getFirst().source().contains("vec4(0.5)"));
     }
+
+    @Test void disabledHandProgramIsNotAnActiveFragmentDespiteItsFileBeingPresent() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("disabled-hand/shaders"));
+        Files.writeString(shader.resolve("final.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_hand_water.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "program.gbuffers_hand_water.enabled=false\n");
+
+        ShaderPack disabled = ShaderPack.inspect(shader.getParent());
+        assertTrue(disabled.hasHandWaterFragment());
+        assertFalse(disabled.hasEnabledHandWaterFragment());
+        assertTrue(disabled.readHandFragment("gbuffers_hand_water").isEmpty());
+
+        Files.writeString(shader.resolve("shaders.properties"), "");
+        ShaderPack enabled = ShaderPack.inspect(shader.getParent());
+        assertTrue(enabled.hasEnabledHandWaterFragment());
+        assertTrue(enabled.readHandFragment("gbuffers_hand_water").isPresent());
+    }
+
+    @Test void disabledEntityBlockAndParticleProgramsAreExcludedFromActiveRoutes() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("disabled-routes/shaders"));
+        Files.writeString(shader.resolve("gbuffers_entities.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_entities_translucent.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_block_translucent.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_particles_translucent.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("shaders.properties"), """
+                program.gbuffers_entities_translucent.enabled=false
+                program.gbuffers_block_translucent.enabled=false
+                program.gbuffers_particles_translucent.enabled=false
+                """);
+
+        ShaderPack pack = ShaderPack.inspect(shader.getParent());
+        assertFalse(pack.hasEnabledProgramFragment("gbuffers_entities_translucent"));
+        assertFalse(pack.hasEnabledProgramFragment("gbuffers_block_translucent"));
+        assertFalse(pack.hasEnabledProgramFragment("gbuffers_particles_translucent"));
+        assertTrue(pack.hasEnabledProgramFragment(pack.entityPrograms()));
+        assertTrue(pack.readEntityFragment("gbuffers_entities_translucent").isEmpty());
+    }
+
+    @Test void terrainRoutesFollowIrisFallbacksAndSkipDisabledWaterPrograms() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("terrain-fallback/shaders"));
+        Files.writeString(shader.resolve("gbuffers_water.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("gbuffers_textured.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "program.gbuffers_water.enabled=false\n");
+
+        ShaderPack pack = ShaderPack.inspect(shader.getParent());
+        assertTrue(pack.hasTerrainFragment());
+        assertEquals("gbuffers_textured", pack.terrainFallbackProgram("gbuffers_terrain"));
+        assertEquals("gbuffers_textured", pack.terrainFallbackProgram("gbuffers_water"));
+        assertEquals("gbuffers_terrain_solid", pack.terrainRouteProgram("gbuffers_terrain_solid"));
+        assertEquals("gbuffers_water", pack.terrainRouteProgram("gbuffers_water"));
+        assertEquals("gbuffers_terrain_cutout", pack.terrainRouteProgram("gbuffers_terrain_cutout"));
+
+        Files.writeString(shader.resolve("gbuffers_terrain.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "");
+        ShaderPack withTerrain = ShaderPack.inspect(shader.getParent());
+        assertEquals("gbuffers_terrain", withTerrain.terrainFallbackProgram("gbuffers_terrain_solid"));
+        assertEquals("gbuffers_water", withTerrain.terrainFallbackProgram("gbuffers_water"));
+        assertEquals("gbuffers_terrain_solid", withTerrain.terrainRouteProgram("gbuffers_terrain_solid"));
+    }
+
     @Test void optionReplacementPreservesBlockCommentBoundaries() {
         String text = "#define QUALITY 2 /* [1 2 3]\n#define HIDDEN 9\n*/\n";
         String changed = ShaderPackOptions.apply(text, Map.of("QUALITY", "3", "HIDDEN", "0"));
@@ -301,7 +361,15 @@ class ShaderPackOptionsTest {
         Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
         Files.writeString(shader.resolve("shaders.properties"), "iris.features.required=SSBO CUSTOM_IMAGES\n");
         IOException error = assertThrows(IOException.class, () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
-        assertTrue(error.getMessage().contains("SSBO CUSTOM_IMAGES"));
+        assertTrue(error.getMessage().contains("CUSTOM_IMAGES"));
+        assertFalse(error.getMessage().contains("SSBO"));
+    }
+    @Test void requiredSsboFeatureIsRecognized() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("ssbo-required/shaders"));
+        Files.writeString(shader.resolve("final.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "iris.features.required=SSBO\n");
+
+        assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
     }
     @Test void brokenSelectedPackDoesNotHideOtherDiscoveredPacks() throws IOException {
         Path shader = Files.createDirectories(root.resolve("shaderpacks/broken/shaders"));
