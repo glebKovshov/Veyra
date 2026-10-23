@@ -1,6 +1,6 @@
 # Veyra 0.2.0-beta.31+mc1.21.11 - experimental prerelease
 
-Beta.31 batches custom weather and translucent-particle vertex support with selected shadow-compute, shader-pack textures on supported terrain, shadow, and entity geometry, BSL shader-compatibility, and shadow-transition work. It also adds Iris render-relative and indirect `shadowcomp` dispatch, with core Vulkan features enabled through the `VkPhysicalDeviceFeatures2` create-info path. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
+Beta.31 batches custom weather and translucent-particle vertex support with selected shadow-compute, shader-pack textures on supported terrain, shadow, and entity geometry, BSL shader-compatibility, and shadow-transition work. It also adds Iris render-relative `workGroupsRender` and validated `indirect.<pass>` dispatch for `shadowcomp`. Veyra requests supported core Vulkan features through a separate `pEnabledFeatures` block while retaining VulkanMod's Vulkan 1.1 and dynamic-rendering `pNext` chain. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
 
 ## Installation
 
@@ -13,7 +13,7 @@ Beta.31 batches custom weather and translucent-particle vertex support with sele
 - Execute supported custom `gbuffers_weather.vsh` and `gbuffers_particles_translucent.vsh` stages. Add generic defaults for the supported world-border `gbuffers_textured` path and make shader uniform/sampler scans comment-safe.
 - Add selected `shadowcomp` compute execution with fixed workgroups and 3D shader-pack images, shadow color MRT, supported shadow vertex/entity stages, selected-profile storage buffers, and expanded post texture slots.
 - Resolve Iris `workGroupsRender` against the current render target and support `indirect.<pass>` dispatch from validated SSBO command buffers, with shader-write to indirect-read synchronization.
-- Enable supported core Vulkan features through a `VkPhysicalDeviceFeatures2` node while preserving VulkanMod's existing Vulkan 1.1 and dynamic-rendering feature chain.
+- Request supported core Vulkan features through a separate `pEnabledFeatures` block while preserving VulkanMod's Vulkan 1.1 and dynamic-rendering `pNext` chain.
 - Load shader-pack PNGs for configured global `customTexture.*` aliases and stage-scoped `texture.<stage>.<sampler>` mappings on supported terrain, shadow, and entity geometry. Resolve entity samplers against the selected entity program, and prepare pack-local textures before pipeline selection even when the pack was restored from settings. Honor `.mcmeta` blur/clamp settings; this supports the `texture.gbuffers.gaux4` input used by Complementary Unbound.
 - Bind a neutral shadow input until Vulkan records a completed shadow map, and skip dependent post passes during that transition. This prevents early `shadowcolor0` reads from using an incomplete map.
 - Adapt BSL's aliased fog uniforms and `Fog(...)` helper, preserve pack-defined `texture2DShadow(...)` functions, and provide neutral post shadow inputs in dimensions where BSL disables shadow rendering.

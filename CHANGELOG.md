@@ -3,9 +3,9 @@
 ## 0.2.0-beta.31 (experimental prerelease)
 
 - Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.
-- Add selected fixed-workgroup `shadowcomp` compute, 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
+- Add selected `shadowcomp` compute with 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
 - Support Iris `workGroupsRender` and validated `indirect.<pass>` dispatch for the supported `shadowcomp` path, including indirect-read synchronization.
-- Enable supported Vulkan core features through `VkPhysicalDeviceFeatures2` while preserving VulkanMod's existing feature chain.
+- Request supported Veyra Vulkan core features through a separate `pEnabledFeatures` block while preserving VulkanMod's Vulkan 1.1 and dynamic-rendering `pNext` chain.
 - Load shader-pack PNG textures on supported terrain, shadow, and entity geometry through global and stage-scoped mappings; resolve scoped entity samplers using the selected entity pipeline and prepare pack textures before first selection, including after restoring a pack. Honor `.mcmeta` blur/clamp settings.
 - Keep shadow-dependent sampling safe across dimension and reload transitions until a completed shadow map is available. Adapt BSL fog uniforms/helpers and preserve shader-pack `texture2DShadow` helpers.
 - Pass the combined #85+#86 JDK 21 preflight gate: **519 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, graphics-smoke compilation, build, and example-pack packaging. The pinned audit accepts 864 geometry fragments and compiles 18 active compute stages across 4 archives / 75 cases; every row remains `visualValidation=false`.
