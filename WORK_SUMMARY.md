@@ -1536,3 +1536,10 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - #86 Graphics `39909787743` on `3943bdb`: **44/45 jobs passed**. Build and the pinned source audit passed. `textured-default-vertex-attributes` failed with 0 magenta pixels. It had failed the same way on every earlier #86 head (`e15c502`, `9151793`) but passed on #85.
 - Cause: #86 correctly applies Iris' terrain fallback chain (`gbuffers_terrain` → `gbuffers_textured`). The fixture's `gbuffers_textured` therefore also drew terrain, where real `mc_Entity`/`mc_midTexCoord` values trigger its discard. The terrain disappeared, and the additive world-border signal landed on bright sky as pale pink. Reproduced on the RTX 3070.
 - Fix: the fixture now provides a solid `gbuffers_terrain`, so the opaque background remains. No renderer change. Local RTX 3070 rerun passed with **144,348 active magenta pixels**. The local gate passed again.
+
+### #86 merged; beta.31 published — 2026-10-23
+
+- #86 final head `93a1b77`: Build, pinned source audit and Graphics `39911659470` all passed. The paginated job API returned **45/45 successful jobs**. `vanilla-baseline` passed on rerun after a pre-launch network `Connection reset`. There were no comments, reviews or inline threads. Marked ready and merged with a head-SHA guard. Main merge commit: **04e7fae60801c7f83000a503a5d69c4797d6dffd**, with a tree identical to the tested head.
+- Tagged `v0.2.0-beta.31+mc1.21.11` on 04e7fae. Release workflow `39914149377` (source audit, full Graphics matrix, build) and tag Build `39914149288` passed.
+- Published pre-release https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.31%2Bmc1.21.11 with `veyra-0.2.0-beta.31+mc1.21.11.jar` (**997,797 bytes**, SHA-256 `e10fbe9786cc94eb09a3afda43bb689140063346dc6eb097a729b602b5366180`), sources JAR, example packs ZIP and SHA256SUMS.
+- Still open (not claimed fixed): full-pack Sildur v2.02 Extreme renders black after deferred on the original defaults.
