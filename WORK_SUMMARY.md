@@ -1570,3 +1570,20 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Added the Iris normals sampler for terrain and shadow block-atlas fragments. Static resource-pack _n.png sprites are packed into live albedo atlas rectangles, missing sprites use (127,127,255,255), and resampling/mips normalize tangent-space vectors. Descriptor slot 6 is reserved for this atlas and auxiliary geometry texture slots now begin at 7. Atlas/resource reload and pipeline shutdown invalidate the normal texture cache.
 - Entity normal maps and animated normal/specular maps remain unsupported. No full-pack parity claim is made.
 - Full JDK 21 gate passed: 538 tests, 0 failures/errors/skips; validateShaders processed 99 examples and compiled 115 shader stages to Vulkan SPIR-V; build, packageExamplePacks, and compileGraphicsSmokeJava passed. The original normal-atlas RTX 3070 run passed with 223,177 active magenta pixels after reading mip level 2; hosted Graphics is pending.
+
+### Composite compute stages - local implementation candidate - 2026-10-23
+
+- Began the follow-up stack in worktree `C:/Users/Gleb/.t3/scratch/veyra-post-compute-stages`, branch `feature/post-compute-stages`, from PR #97 head `2ec8ae305db2c80257976f27a62a07ddbc0150c4`. Root checkout and the heads of PR #96/#97 remain unchanged.
+- Runtime now compiles active `.csh` files across `shadowcomp`, `prepare`, `deferred`, `composite`, and `final` program families; preflight explicitly leaves `setup`/`begin` unsupported. The renderer inserts dispatches at their matching post-program boundary in the existing FrameGraph and uses frame-graph resource versions to preserve order. Shared custom images initialize once and `clear=true` images clear once per frame, matching Iris semantics.
+- The initial `composite-custom-image` fixture used two sequential post-compute components and was later expanded and validated across all four post phases; final evidence is recorded in the sections below.
+### Дополнение к composite compute fixture - 2026-10-23
+
+Первый RTX 3070 прогон на первоначальной двух-component fixture прошёл: status passed, 230,400 active magenta pixels / 0 после выключения пакета, необходимые storage-image features включены; клиентский лог без VUID/device-loss markers (Khronos validation на Windows не включён). После этого fixture расширена: compute-only `composite1.csh` добавляет 1 после `composite.fsh`, а `final.fsh` проверяет 43. Теперь повторяю локальный и hosted smoke на этой более полной последовательности.
+
+### Все post-compute фазы проверены локально - 2026-10-23
+
+- Исправил случай, обнаруженный расширенным GPU smoke: VulkanMod оставлял graphics render pass открытым перед compute-only `composite1`. `GraphOrder` завершает открытый render pass перед каждым post-compute dispatch.
+- Расширил диагностический pack на compute-only `prepare` и `deferred`; вместе с `composite`, `composite_a`, `composite1` и `final` он проверяет значение 43 и одноразовую за кадр очистку custom image.
+- JDK 21 gate завершился успешно: 561 тест без failures/errors/skips; validateShaders обработал 102 shader-примера и 118 direct Vulkan SPIR-V компиляций; build, smoke compilation и example-pack packaging прошли.
+- RTX 3070 Graphics smoke: passed, 230,400 active / 0 disabled magenta pixels; trace подтвердил порядок фаз и compute-only проходов. Khronos validation не включён; в клиентском логе нет VUID/device-loss markers.
+- Следующий этап: проверить/слить #96 и #97 после перезапущенных точечных canceled Graphics jobs, отправить текущий branch и открыть stacked PR поверх #97, получить exact-head CI, затем слить готовую ветку и подготовить beta37 из итогового main. Compute остаётся ограничен custom storage images; `setup`/`begin`, SSBO-only compute и полный third-party-pack parity не подтверждены.

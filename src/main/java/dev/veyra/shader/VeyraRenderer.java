@@ -405,7 +405,7 @@ public final class VeyraRenderer {
                 .filter(ShaderPack::supportsShaderPrograms)
                 .isPresent();
         terrainPipelineDirty = packRepository.getSelected()
-                .map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment())
+                .map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment() || hasComputeStageFiles(pack))
                 .orElse(false);
         entityPipelineDirty = packRepository.getSelected()
                 .map(ShaderPack::hasEntityFragment)
@@ -2675,7 +2675,7 @@ public final class VeyraRenderer {
             preparedStorageBuffers = VeyraStorageBufferResources.create(
                     pack.readStorageBufferProperties(), mainTarget.width, mainTarget.height);
             VeyraStorageBufferResources.activate(preparedStorageBuffers);
-            if (pack.hasTerrainFragment() || pack.hasShadowFragment()) {
+            if (pack.hasTerrainFragment() || pack.hasShadowFragment() || pack.hasComputeStageFiles()) {
                 preparedTerrain = compileTerrainPipelines(pack);
             }
             VeyraComputePipelineSet preparedCustomImages = preparedTerrain == null ? null : preparedTerrain.compute();
@@ -3008,7 +3008,8 @@ public final class VeyraRenderer {
         replaceBeaconBeamPipelines(null);
         replaceCloudPipeline(null);
         purgeUnusedPipelines();
-        terrainPipelineDirty = selectedPack().map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment()).orElse(false);
+        terrainPipelineDirty = selectedPack().map(pack -> pack.hasTerrainFragment() || pack.hasShadowFragment()
+                || hasComputeStageFiles(pack)).orElse(false);
         entityPipelineDirty = selectedPack().map(ShaderPack::hasEntityFragment).orElse(false);
         blockEntityPipelineDirty = selectedPack().map(ShaderPack::supportsBlockEntityPipeline).orElse(false);
         handPipelineDirty = selectedPack().map(ShaderPack::supportsHandPipeline).orElse(false);
@@ -3057,6 +3058,7 @@ public final class VeyraRenderer {
                 return;
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
+            VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
             if (pipelineSet.usesShadowSampler() && !VeyraShadowRenderer.hasCompletedShadowMap()) return;
             ColorTargetSettings sceneColorSettings = pipelineSet.colorTargetSettings().getOrDefault(
                     0, ColorTargetSettings.defaults(0, mainTarget.width, mainTarget.height));
@@ -3068,7 +3070,12 @@ public final class VeyraRenderer {
                 geometryColorSnapshotSources.clear();
             }
             FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
-            if (framePlan.shaderPasses().isEmpty()) return;
+            List<String> computePrograms = compute == null ? List.of() : compute.programNames(phase);
+            if (framePlan.shaderPasses().isEmpty() && computePrograms.isEmpty()) return;
+            if (compute != null) {
+                if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+                compute.clearForFrame(frameCounter);
+            }
             ensureInitialDepthSnapshots(framePlan, mainTarget.width, mainTarget.height);
             if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
 
@@ -3090,14 +3097,37 @@ public final class VeyraRenderer {
 
             var samplerInfo = projectionBuffer().getBuffer(mainTarget.width, mainTarget.height);
             FrameUniforms frameUniforms = shaderPackFrameUniforms;
-            for (ShaderPass shaderPass : framePlan.shaderPasses()) {
+            GraphOrder graphOrder = new GraphOrder(graph.importExternal(
+                    "veyra:compute-post-order", new Object()));
+            List<String> graphicsPrograms = framePlan.shaderPasses().stream()
+                    .map(ShaderPass::programName).toList();
+            List<ComputeProgramSequence.Event> events = ComputeProgramSequence.interleave(
+                    phase, computePrograms, graphicsPrograms);
+            for (ComputeProgramSequence.Event event : events) {
+                if (event.kind() == ComputeProgramSequence.Kind.COMPUTE) {
+                    if (compute == null) throw new IllegalStateException("A post-compute pass has no compiled pipeline set.");
+                    graphOrder.addComputePass(graph, compute, event.programName(),
+                            mainTarget.width, mainTarget.height);
+                    continue;
+                }
+                ShaderPass shaderPass = framePlan.shaderPasses().get(event.graphicsIndex());
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
                 prepareSampledTargets(graph, targets, shaderPass.sampledTargets());
-                shaderPass.pass().addToFrame(graph, targets, samplerInfo);
+                shaderPass.orderInput().bind(graphOrder);
+                try {
+                    shaderPass.pass().addToFrame(graph, targets, samplerInfo);
+                } finally {
+                    shaderPass.orderInput().unbind();
+                }
             }
             if (framePlan.copyPass() != null) {
                 prepareSampledTargets(graph, targets, Set.of(framePlan.copyInputTarget()));
-                framePlan.copyPass().addToFrame(graph, targets, samplerInfo);
+                framePlan.copyOrderInput().bind(graphOrder);
+                try {
+                    framePlan.copyPass().addToFrame(graph, targets, samplerInfo);
+                } finally {
+                    framePlan.copyOrderInput().unbind();
+                }
             }
             DepthSamplerState depthSamplerState = null;
             if (framePlan.shaderPasses().stream().anyMatch(pass -> pass.program().usesDepthSampler())) {
@@ -3153,6 +3183,11 @@ public final class VeyraRenderer {
         }
         ensureActiveStorageBufferResources(pack, width, height);
         ensureStorageBufferViewport(width, height);
+        if (terrainPipelineDirty && (pack.hasTerrainFragment() || pack.hasShadowFragment()
+                || pack.hasComputeStageFiles())) {
+            replaceTerrainPipelines(compileTerrainPipelines(pack));
+            terrainPipelineDirty = false;
+        }
         if (!pipelinesDirty && pipelineSet != null && pipelineSet.width() == width && pipelineSet.height() == height) {
             return;
         }
@@ -3342,7 +3377,8 @@ public final class VeyraRenderer {
                     colorTargetIndices.add(adapted.outputTarget());
                 }
             }
-            programs.add(new ProgramGroup(ShaderPassPhase.forProgram(source.name()), List.copyOf(outputs)));
+            programs.add(new ProgramGroup(source.name(), ShaderPassPhase.forProgram(source.name()),
+                    List.copyOf(outputs)));
         }
 
         for (int index : colorTargetIndices) {
@@ -3721,7 +3757,8 @@ public final class VeyraRenderer {
     }
 
     private static TerrainPipelineSet compileTerrainPipelines(ShaderPack pack) throws IOException {
-        if (PipelineManager.getTerrainVertexFormat() == null) {
+        if ((pack.hasTerrainFragment() || pack.hasShadowFragment())
+                && PipelineManager.getTerrainVertexFormat() == null) {
             throw new IOException("VulkanMod has not initialized its terrain vertex format yet.");
         }
 
@@ -3734,7 +3771,8 @@ public final class VeyraRenderer {
         VeyraComputePipelineSet compute = null;
         try {
             compute = VeyraComputePipelineSet.compile(pack);
-            if (compute != null && !shadowSamplerAvailable) throw new IOException("shadowcomp requires an active shadow pass.");
+            if (compute != null && compute.hasShadowComputeStages() && !shadowSamplerAvailable)
+                throw new IOException("shadowcomp requires an active shadow pass.");
             ShaderPackImageProperties customImages = compute == null ? null : pack.readImageProperties();
             ShaderPackCustomTextureProperties packTextures = pack.readCustomTextureProperties();
             var noCustomImages = new ShaderPackImageBindings.PreparedStage("", List.of());
@@ -4048,7 +4086,7 @@ public final class VeyraRenderer {
         VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
         if (compute != null || storageBufferResources != null) {
             Renderer.getInstance().endRenderPass();
-            if (compute != null) compute.clearForShadowPass();
+            if (compute != null) compute.clearForFrame(frameCounter);
             if (storageBufferResources != null) storageBufferResources.clearForShadowPass();
         }
     }
@@ -6750,10 +6788,14 @@ public final class VeyraRenderer {
                                     "uniform sampler2D " + VeyraNoiseTexture.SAMPLER_NAME + ";")) {
                         inputs.add(new ExternalTextureInput(NOISE_INPUT_NAME));
                     }
-                    PostPass pass = new PostPass(program.pipeline(),
-                            outputTargets.get(program.outputTarget()),
+                    OrderedPostPassInput orderInput = new OrderedPostPassInput(inputs.getFirst());
+                    // The first sampler already carries the primary color target dependency.
+                    // Wrapping it also links this graphics pass into the compute-order chain.
+                    inputs.set(0, orderInput);
+                    PostPass pass = new PostPass(program.pipeline(), outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
-                    passes.add(new ShaderPass(pass, program, Set.copyOf(sampledTargets)));
+                    passes.add(new ShaderPass(group.programName(), pass, program,
+                            Set.copyOf(sampledTargets), orderInput));
                     if (usesDynamicUniforms(program)) {
                         makeDynamicUniformBuffer(pass, program, width, height);
                     }
@@ -6762,9 +6804,12 @@ public final class VeyraRenderer {
             }
 
             Identifier finalColortex0 = currentTargets.get(0);
+            OrderedPostPassInput copyOrderInput = null;
             if (!PostChain.MAIN_TARGET_ID.equals(finalColortex0)) {
+                copyOrderInput = new OrderedPostPassInput(
+                        new PostPass.TargetInput("In", finalColortex0, false, true));
                 copyPass = new PostPass(copyProgram.pipeline(), PostChain.MAIN_TARGET_ID, Map.of(),
-                        List.of(new PostPass.TargetInput("In", finalColortex0, false, true)));
+                        List.of(copyOrderInput));
             }
             Map<Integer, Identifier> outputColorTargets = new HashMap<>();
             currentTargets.forEach((index, target) -> {
@@ -6773,7 +6818,7 @@ public final class VeyraRenderer {
                 }
             });
             return new FramePlan(List.copyOf(passes), copyPass, copyPass == null ? null : finalColortex0,
-                    Map.copyOf(initialColorTargets), Map.copyOf(outputColorTargets));
+                    copyOrderInput, Map.copyOf(initialColorTargets), Map.copyOf(outputColorTargets));
         } catch (RuntimeException exception) {
             passes.forEach(shaderPass -> shaderPass.pass().close());
             if (copyPass != null) {
@@ -8033,6 +8078,15 @@ public final class VeyraRenderer {
         beaconBeamPipelineSet = next;
     }
 
+    private static boolean hasComputeStageFiles(ShaderPack pack) {
+        try {
+            return pack.hasComputeStageFiles();
+        } catch (IOException exception) {
+            VeyraClient.LOGGER.warn("Could not inspect compute stages for shader pack '{}'.", pack.name(), exception);
+            return false;
+        }
+    }
+
     private static String shortError(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
@@ -8097,7 +8151,7 @@ public final class VeyraRenderer {
     private record BeaconBeamPipelineKey(RenderPipeline original, String sourceHash) {
     }
 
-    private record ProgramGroup(ShaderPassPhase phase, List<PipelineProgram> outputs) {
+    private record ProgramGroup(String programName, ShaderPassPhase phase, List<PipelineProgram> outputs) {
     }
 
     private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {
@@ -8110,7 +8164,9 @@ public final class VeyraRenderer {
     private record OutputMapping(int fragmentOutputIndex, int targetIndex) {
     }
 
-    private record ShaderPass(PostPass pass, PipelineProgram program, Set<Identifier> sampledTargets) {
+    private record ShaderPass(String programName, PostPass pass, PipelineProgram program,
+                              Set<Identifier> sampledTargets,
+                              OrderedPostPassInput orderInput) {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
@@ -8152,6 +8208,7 @@ public final class VeyraRenderer {
     }
 
     private record FramePlan(List<ShaderPass> shaderPasses, PostPass copyPass, Identifier copyInputTarget,
+                             OrderedPostPassInput copyOrderInput,
                              Map<Integer, Identifier> initialColorTargets,
                              Map<Integer, Identifier> outputColorTargets) implements AutoCloseable {
         @Override
@@ -8363,6 +8420,75 @@ public final class VeyraRenderer {
         @Override
         public boolean bilinear() {
             return PostShadowSamplers.bilinear(samplerName);
+        }
+    }
+
+    private static final class OrderedPostPassInput implements PostPass.Input {
+        private final PostPass.Input delegate;
+        private GraphOrder graphOrder;
+
+        private OrderedPostPassInput(PostPass.Input delegate) {
+            this.delegate = delegate;
+        }
+
+        private void bind(GraphOrder graphOrder) {
+            this.graphOrder = graphOrder;
+        }
+
+        private void unbind() {
+            graphOrder = null;
+        }
+
+        @Override
+        public void addToPass(FramePass pass, Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            delegate.addToPass(pass, targets);
+            if (graphOrder != null) graphOrder.order(pass);
+        }
+
+        @Override
+        public void cleanup(Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            delegate.cleanup(targets);
+        }
+
+        @Override
+        public GpuTextureView texture(Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            return delegate.texture(targets);
+        }
+
+        @Override
+        public String samplerName() {
+            return delegate.samplerName();
+        }
+
+        @Override
+        public boolean bilinear() {
+            return delegate.bilinear();
+        }
+    }
+
+    private static final class GraphOrder {
+        private ResourceHandle<Object> tail;
+
+        private GraphOrder(ResourceHandle<Object> tail) {
+            this.tail = tail;
+        }
+
+        private void order(FramePass pass) {
+            tail = pass.readsAndWrites(tail);
+        }
+
+        private void addComputePass(FrameGraphBuilder graph, VeyraComputePipelineSet compute,
+                                    String programName, int width, int height) {
+            FramePass pass = graph.addPass("veyra:compute-" + programName);
+            order(pass);
+            pass.disableCulling();
+            pass.executes(() -> {
+                if (Renderer.getInstance().getBoundRenderPass() != null) {
+                    Renderer.getInstance().endRenderPass();
+                }
+                if (storageBufferResources != null) storageBufferResources.barrierAfterShadowPass();
+                compute.dispatchProgram(programName, width, height);
+            });
         }
     }
 
