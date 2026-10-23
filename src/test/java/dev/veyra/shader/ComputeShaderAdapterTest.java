@@ -3,6 +3,7 @@ package dev.veyra.shader;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,6 +24,28 @@ class ComputeShaderAdapterTest {
         assertEquals(0, stage.resources().getFirst().binding());
         assertFalse(stage.source().contains("VeyraComputeUniforms"));
         assertTrue(stage.source().contains("binding = 0, rgba16f"));
+    }
+
+    @Test
+    void supportsTwoDimensionalCustomStorageImages() throws Exception {
+        var properties = ShaderPackImageProperties.parse("""
+                image.screen_img = screen_sampler red_integer r32ui unsigned_int false false 4 4
+                """);
+        var stage = ComputeShaderAdapter.adapt("shadowcomp.csh", """
+                layout(local_size_x=1,local_size_y=1,local_size_z=1) in;
+                const ivec3 workGroups=ivec3(1,1,1);
+                uniform usampler2D screen_sampler;
+                writeonly uniform uimage2D screen_img;
+                void main(){
+                    uint previous=texelFetch(screen_sampler,ivec2(0),0).r;
+                    imageStore(screen_img,ivec2(0),uvec4(previous+1u));
+                }
+                """, properties);
+
+        assertEquals(List.of("usampler2D", "uimage2D"),
+                stage.resources().stream().map(ComputeShaderAdapter.OpaqueResource::glslType).toList());
+        assertTrue(stage.source().contains("layout(set = 0, binding = 0) uniform usampler2D screen_sampler;"));
+        assertTrue(stage.source().contains("layout(set = 0, binding = 1, r32ui) writeonly uniform uimage2D screen_img;"));
     }
     private static final String IMAGE_PROPERTIES = """
             image.floodfill_img = floodfill_sampler rgba rgba16f half_float false false 32 32 32

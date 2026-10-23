@@ -120,8 +120,8 @@ public final class VeyraComputePipeline extends Pipeline {
                 if (image == null) throw new IOException("Compute sampler " + descriptor.name + " has no image.");
                 boolean integerSampler = descriptor.qualifier.startsWith("usampler")
                         || descriptor.qualifier.startsWith("isampler");
-                boolean linear = !integerSampler && (!(image instanceof dev.veyra.vulkan.VeyraImage3D volume)
-                        || volume.supportsLinearFiltering());
+                boolean linear = !integerSampler && (!(image instanceof dev.veyra.vulkan.VeyraCustomImage customImage)
+                        || customImage.supportsLinearFiltering());
                 image.setSampler(SamplerManager.getSampler(true, linear, 0));
             }
         }

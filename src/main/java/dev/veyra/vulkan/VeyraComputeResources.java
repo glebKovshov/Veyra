@@ -15,7 +15,7 @@ import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
 
-/** Allocates the active 3D image resources shared by a shader-pack compute stage's descriptors. */
+/** Allocates active shader-pack image resources shared by compute and graphics stage descriptors. */
 public final class VeyraComputeResources implements AutoCloseable {
     private static final long MEBIBYTE = 1024L * 1024L;
     private static final int DEVICE_LOCAL_BUDGET_PERCENT = 60;
@@ -62,11 +62,7 @@ public final class VeyraComputeResources implements AutoCloseable {
                         throw new IOException("Compute resource '" + resource.name()
                                 + "' references missing image." + resource.imageName() + ".");
                     }
-                    if (!image.is3d()) {
-                        throw new IOException("Compute resource '" + resource.name()
-                                + "' uses 2D image." + image.name() + "; only 3D compute images are supported.");
-                    }
-                    VeyraImage3D volume = (VeyraImage3D) images.get(image.name());
+                    VulkanImage volume = images.get(image.name());
                     if (volume == null) {
                         int[] dimensions = properties.resolveDimensions(image);
                         long imageBytes = estimateBytes(image, dimensions);
@@ -76,8 +72,7 @@ public final class VeyraComputeResources implements AutoCloseable {
                                     + " MiB, above Veyra's conservative " + mebibytes(budget)
                                     + " MiB device-local image budget.");
                         }
-                        volume = VeyraImage3D.create(image.name(), image.vulkanFormat(),
-                                dimensions[0], dimensions[1], dimensions[2]);
+                        volume = createImage(image, dimensions);
                         images.put(image.name(), volume);
                         clearEveryPass.put(image.name(), image.clear());
                     }
@@ -100,10 +95,7 @@ public final class VeyraComputeResources implements AutoCloseable {
                             + " MiB, above Veyra's conservative " + mebibytes(budget)
                             + " MiB device-local image budget.");
                 }
-                VulkanImage resource = image.is3d()
-                        ? VeyraImage3D.create(image.name(), image.vulkanFormat(),
-                                dimensions[0], dimensions[1], dimensions[2])
-                        : VeyraImage2D.create(image.name(), image.vulkanFormat(), dimensions[0], dimensions[1]);
+                VulkanImage resource = createImage(image, dimensions);
                 images.put(imageName, resource);
                 clearEveryPass.put(imageName, image.clear());
             }
@@ -168,6 +160,14 @@ public final class VeyraComputeResources implements AutoCloseable {
         } catch (ArithmeticException exception) {
             throw new IOException("Custom image." + image.name() + " is too large to estimate safely.", exception);
         }
+    }
+
+    private static VulkanImage createImage(ShaderPackImageProperties.Image image, int[] dimensions) throws IOException {
+        if (image.is3d()) {
+            return VeyraImage3D.create(image.name(), image.vulkanFormat(),
+                    dimensions[0], dimensions[1], dimensions[2]);
+        }
+        return VeyraImage2D.create(image.name(), image.vulkanFormat(), dimensions[0], dimensions[1]);
     }
 
     private static long deviceLocalImageBudget() throws IOException {

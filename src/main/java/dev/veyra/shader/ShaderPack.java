@@ -1375,11 +1375,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (shader.resources().stream().noneMatch(ComputeShaderAdapter.OpaqueResource::storageImage)) {
                 throw new IOException(file + " has no supported storage-image output.");
             }
-            for (var resource : shader.resources()) {
-                if (!properties.images().get(resource.imageName()).is3d()) {
-                    throw new IOException(file + " requires unsupported 2D custom image " + resource.imageName() + ".");
-                }
-            }
         }
     }
 
