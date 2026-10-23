@@ -272,6 +272,21 @@ class TextureColorDistanceShaderAdapterTest {
     }
 
     @Test
+    void worldBorderFallbackDoesNotRequireAnEntityOverlayInput() throws IOException {
+        String source = """
+                #version 120
+                uniform vec4 entityColor;
+                void main() { gl_FragColor = entityColor; }
+                """;
+
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment(
+                source, "gbuffers_textured", false, false, true, false, true, false);
+
+        assertTrue(adapted.contains("const vec4 entityColor = vec4(0.0);"), adapted);
+        assertFalse(adapted.contains("#define entityColor overlayColor"), adapted);
+    }
+
+    @Test
     void rejectsBasicAndLineFragmentSamplersMissingFromTheNativePipeline() {
         Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = Map.of(
                 "lmCoord", new TerrainVertexShaderAdapter.PackVarying(
@@ -291,6 +306,27 @@ class TextureColorDistanceShaderAdapterTest {
                         void main() { gl_FragColor = texture2D(shadowtex0, lmCoord); }
                         """, "gbuffers_line", outputs, false, false));
         assertTrue(shadowError.getMessage().contains("shadowtex0"), shadowError.getMessage());
+    }
+
+    @Test
+    void bridgesLightmapOnLinePipelinesWhenVeyraSuppliesTheSampler() throws IOException {
+        Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = Map.of(
+                "lmCoord", new TerrainVertexShaderAdapter.PackVarying(
+                        "vec2", "flat", 3, "veyraBasicLightmapCoord", true));
+        String source = """
+                uniform sampler2D lightmap;
+                flat in vec2 lmCoord;
+                void main() { gl_FragColor = texture2D(lightmap, lmCoord); }
+                """;
+
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment(
+                source, "gbuffers_line", outputs, false, true);
+        var samplers = TextureColorDistanceShaderAdapter.inspectSamplers(
+                source, "gbuffers_line", false, true);
+
+        assertTrue(adapted.contains("uniform sampler2D Sampler2;"), adapted);
+        assertTrue(adapted.contains("#define lightmap Sampler2"), adapted);
+        assertTrue(samplers.usesLightmapSampler());
     }
 
     @Test

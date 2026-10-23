@@ -854,11 +854,11 @@ public final class EntityShaderAdapter {
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, programName, entityColorAvailable);
         adapted = shaderPackUniforms.source();
-        if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
+        if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted)).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");
         }
 
-        Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
+        Matcher varyingMatcher = VARYING_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted));
         StringBuffer withoutVaryings = new StringBuffer();
         boolean suppliesNormal = false;
         boolean suppliesShadowPosition = false;

@@ -18,6 +18,36 @@ class EntityFragmentOutputsTest {
     }
 
     @Test
+    void ignoresCommentedUniformsInShadowEntityPrograms() throws IOException {
+        String source = """
+                /*
+                uniform sampler2D texture;
+                uniform int blockEntityId;
+                uniform int entityId;
+                */
+                void main() { gl_FragColor = vec4(0.0); }
+                """;
+
+        String adapted = EntityShaderAdapter.adaptFragment(source, "shadow_entities");
+
+        assertTrue(adapted.contains("void main()"), adapted);
+    }
+
+    @Test
+    void ignoresCommentedVaryingDeclarationsInShadowEntityPrograms() throws IOException {
+        String source = """
+                /*
+                varying vec4 texcoord;
+                */
+                void main() { gl_FragColor = vec4(0.0); }
+                """;
+
+        String adapted = EntityShaderAdapter.adaptFragment(source, "shadow_entities");
+
+        assertFalse(adapted.contains("in vec4 texcoord"), adapted);
+    }
+
+    @Test
     void bindsShadowEntityPositionToTheFragmentBridge() throws IOException {
         String source = "in vec4 position;\n"
                 + "void main() { gl_FragColor = vec4(position.xyz, 1.0); }\n";

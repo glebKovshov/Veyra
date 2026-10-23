@@ -94,6 +94,15 @@ public final class TextureColorDistanceShaderAdapter {
     static String adaptFragment(String source, String programName,
                                 boolean hasVertexColor, boolean hasVertexDistances,
                                 boolean allowIrisSamplers, boolean shadowPassAvailable,
+                                boolean lightmapSamplerAvailable, boolean entityColorAvailable) throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                "smooth", "smooth", false, null, allowIrisSamplers,
+                shadowPassAvailable, lightmapSamplerAvailable, null, entityColorAvailable);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                boolean hasVertexColor, boolean hasVertexDistances,
+                                boolean allowIrisSamplers, boolean shadowPassAvailable,
                                 boolean lightmapSamplerAvailable, int renderStage) throws IOException {
         return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
                 "smooth", "smooth", false, null, allowIrisSamplers,
@@ -122,6 +131,15 @@ public final class TextureColorDistanceShaderAdapter {
     static String adaptFragment(String source, String programName,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
                                 boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
+                                boolean entityColorAvailable) throws IOException {
+        return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
+                Map.copyOf(vertexOutputs), true, shadowPassAvailable, lightmapSamplerAvailable, null,
+                entityColorAvailable);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
                                 int renderStage) throws IOException {
         return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
                 Map.copyOf(vertexOutputs), true, shadowPassAvailable, lightmapSamplerAvailable, renderStage);
@@ -135,6 +153,21 @@ public final class TextureColorDistanceShaderAdapter {
                                         boolean allowIrisSamplers,
                                         boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
                                         Integer renderStage)
+            throws IOException {
+        return adaptFragment(source, programName, hasVertexColor, hasVertexDistances,
+                vertexColorInterpolation, texCoordInterpolation, explicitVertexLocations, vertexOutputs,
+                allowIrisSamplers, shadowPassAvailable, lightmapSamplerAvailable, renderStage,
+                ShaderPackUniformAdapter.supportsEntityColorProgram(programName));
+    }
+
+    private static String adaptFragment(String source, String programName,
+                                        boolean hasVertexColor, boolean hasVertexDistances,
+                                        String vertexColorInterpolation, String texCoordInterpolation,
+                                        boolean explicitVertexLocations,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                        boolean allowIrisSamplers,
+                                        boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
+                                        Integer renderStage, boolean entityColorAvailable)
             throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
@@ -181,7 +214,7 @@ public final class TextureColorDistanceShaderAdapter {
         withoutSamplers.append(adapted, samplerCursor, adapted.length());
         adapted = withoutSamplers.toString();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, programName);
+                ShaderPackUniformAdapter.extract(adapted, programName, entityColorAvailable);
         adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted)).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");
