@@ -27,6 +27,7 @@ public abstract class LevelRendererMixin {
                                         CallbackInfo ci) {
         VeyraRenderer.captureFrameMatrices(modelView, projection, camera.position());
         VeyraRenderer.captureFogColor(fogColor);
+        VeyraRenderer.renderBeginCompute(net.minecraft.client.Minecraft.getInstance());
     }
 
     @Inject(method = "renderLevel", at = @At(value = "INVOKE", target =

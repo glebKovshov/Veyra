@@ -67,4 +67,13 @@ class ShaderPackComputeStagesTest {
         assertTrue(pack.activeComputeStageFiles().contains("deferred.csh"));
         assertDoesNotThrow(pack::validatePipelineCapabilities);
     }
+
+    @Test
+    void acceptsBeginComputeStagesThatRunBeforeShadowRendering() throws Exception {
+        var pack = ShaderPack.inspect(Path.of("examples/compute-begin-stage")).withRuntimeFeatures();
+
+        assertEquals(List.of("begin.csh"), pack.activeComputeStageFiles());
+        assertEquals(List.of("begin.csh"), pack.activeComputeStageFiles("begin"));
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+    }
 }
