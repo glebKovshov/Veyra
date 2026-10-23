@@ -814,6 +814,7 @@ public final class EntityShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
+                    && !sampler.equals("normals")
                     && !geometryColorInputs.containsKey(sampler)
                     && !customTextureSamplers.contains(sampler)
                     && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1"))
@@ -1135,6 +1136,9 @@ public final class EntityShaderAdapter {
         bridge = packVaryingBridge + bridge;
         if (TerrainShaderAdapter.usesSpecularSampler(source)) {
             bridge = "uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n" + bridge;
+        }
+        if (TerrainShaderAdapter.usesNormalSampler(source)) {
+            bridge = "uniform sampler2D VeyraNormalSampler;\n#define normals VeyraNormalSampler\n" + bridge;
         }
         if (ShadowDepthSampler.used(source)) {
             bridge = "uniform sampler2D " + ShadowDepthSampler.NAME + ";\n#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;

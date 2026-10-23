@@ -20,12 +20,12 @@ def material_png(path):
                      + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
 
 
-def normal_png(path):
+def normal_png(path, width=16, height=16):
     def chunk(kind, data):
         return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
     path.parent.mkdir(parents=True, exist_ok=True)
-    rows = (b'\0' + bytes([255, 128, 128, 255]) * 16) * 16
-    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 16, 16, 8, 6, 0, 0, 0))
+    rows = (b'\0' + bytes([255, 128, 128, 255]) * width) * height
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
                      + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
 
 
@@ -57,7 +57,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
     parser.add_argument('--shaderpack-name', default='')
@@ -140,6 +140,7 @@ def main():
     elif fixture != 'vanilla-baseline':
         example_name = ('gbuffers-skybasic-vertex-execution' if fixture == 'skybasic-vertex-execution'
                         else 'shadow-color-mrt' if fixture == 'shadow-color-mrt-lifecycle'
+                        else 'normal-entity' if fixture == 'normal-entity-missing'
                         else fixture)
         shutil.copytree(pathlib.Path('examples') / example_name, pack, dirs_exist_ok=True)
     if fixture == 'water-post-shadow-inputs':
@@ -169,6 +170,11 @@ def main():
             properties = resource_pack / 'assets/minecraft/optifine/texture.properties'
             properties.parent.mkdir(parents=True, exist_ok=True)
             properties.write_text('format=lab-pbr/1.3\n', encoding='utf-8')
+        elif fixture == 'normal-entity':
+            for variant in ['temperate_cow', 'cold_cow', 'warm_cow']:
+                normal_png(textures / f'entity/cow/{variant}_n.png', 64, 64)
+        elif fixture == 'normal-entity-missing':
+            pass
         else:
             for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
                 normal_png(textures / f'block/{sprite}_n.png')

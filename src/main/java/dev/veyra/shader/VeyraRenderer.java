@@ -5042,6 +5042,7 @@ public final class VeyraRenderer {
                 || selectedVertexSource != null
                 && selectedVertexSource.contains("uniform sampler2D VeyraNoiseSampler;");
         boolean usesShadowSampler = fragmentSource.contains("uniform sampler2D Sampler3;");
+        boolean usesNormalSampler = TerrainShaderAdapter.usesNormalSampler(fragmentSource);
         String nativeFragmentSource = customImageStage == null ? fragmentSource
                 : ShaderPackImageBindings.decorateNativeSamplers(fragmentSource, customImageStage);
         String parserSafeFragmentSource = nativeFragmentSource;
@@ -5063,6 +5064,7 @@ public final class VeyraRenderer {
         Set<String> extraSamplers = new HashSet<>(customImageStage == null
                 ? Set.of() : customImageSamplerNames(customImageStage));
         extraSamplers.addAll(customTextureSamplers);
+        if (usesNormalSampler) extraSamplers.add(VeyraNormalTextures.SAMPLER);
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
                 fragmentShader, usesNoiseSampler, usesShadowSampler, TerrainShaderAdapter.usesSpecularSampler(fragmentSource),
@@ -5091,6 +5093,14 @@ public final class VeyraRenderer {
         }
         if (customImageStage != null && !customImageStage.resources().isEmpty()) {
             customImages.bindRenderPipelineImages(nativePipeline, customImageStage);
+        }
+        if (usesNormalSampler) {
+            var descriptor = nativePipeline.getImageDescriptor(VeyraNormalTextures.SAMPLER);
+            if (descriptor == null) {
+                throw new IOException("VulkanMod did not expose the entity normal sampler for "
+                        + original.getLocation() + ".");
+            }
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         for (int index : colorInputs) {
             var descriptor = nativePipeline.getImageDescriptor(GeometryColorSamplers.samplerName(index));
