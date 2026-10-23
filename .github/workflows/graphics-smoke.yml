@@ -10,6 +10,7 @@ on:
       - 'scripts/prepare_graphics_smoke.py'
       - 'scripts/lavapipe_feature_probe.c'
       - 'scripts/lavapipe_feature_probe.vert'
+      - 'scripts/lavapipe_feature_probe_image.vert'
       - 'examples/geometry-mid-texcoord/**'
       - 'examples/terrain-block-id/**'
       - 'examples/terrain-vertex-execution/**'
@@ -96,9 +97,10 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y mesa-vulkan-drivers vulkan-validationlayers libvulkan-dev glslang-tools
-      - name: Compile minimal vertex storage-buffer pipeline
+      - name: Compile minimal vertex storage-buffer and storage-image pipelines
         run: |
           glslangValidator -V scripts/lavapipe_feature_probe.vert -o "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
+          glslangValidator -V scripts/lavapipe_feature_probe_image.vert -o "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv"
           cc -std=c11 scripts/lavapipe_feature_probe.c -lvulkan -o "$RUNNER_TEMP/lavapipe_feature_probe"
       - name: Check pEnabledFeatures with Khronos validation
         env:
@@ -108,6 +110,8 @@ jobs:
           test -n "$VK_ICD_FILENAMES"
           "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
           "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv" --vulkanmod-pnext
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv" --storage-image
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv" --storage-image --vulkanmod-pnext
 
   lavapipe-client:
     strategy:

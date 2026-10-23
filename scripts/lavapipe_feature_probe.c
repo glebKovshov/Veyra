@@ -58,9 +58,19 @@ static uint32_t *read_spirv(const char *path, size_t *word_count) {
 }
 
 int main(int argc, char **argv) {
-    int use_vulkanmod_pnext = argc == 3 && strcmp(argv[2], "--vulkanmod-pnext") == 0;
-    if (argc < 2 || argc > 3 || (argc == 3 && !use_vulkanmod_pnext)) {
-        return fail("usage: lavapipe_feature_probe <vertex.spv> [--vulkanmod-pnext]", VK_ERROR_INITIALIZATION_FAILED);
+    int use_vulkanmod_pnext = 0;
+    int use_storage_image = 0;
+    if (argc < 2 || argc > 4) {
+        return fail("usage: lavapipe_feature_probe <vertex.spv> [--vulkanmod-pnext] [--storage-image]", VK_ERROR_INITIALIZATION_FAILED);
+    }
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--vulkanmod-pnext") == 0) {
+            use_vulkanmod_pnext = 1;
+        } else if (strcmp(argv[i], "--storage-image") == 0) {
+            use_storage_image = 1;
+        } else {
+            return fail("unknown probe option", VK_ERROR_INITIALIZATION_FAILED);
+        }
     }
 
     const char *layers[] = {"VK_LAYER_KHRONOS_validation"};
@@ -204,7 +214,9 @@ int main(int argc, char **argv) {
 
     VkDescriptorSetLayoutBinding storage_binding = {
         .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorType = use_storage_image
+                ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
     };
@@ -314,7 +326,8 @@ int main(int argc, char **argv) {
                 validation_error_count, non_writable_vuid_count);
         return 1;
     }
-    fprintf(stdout, "Storage-buffer vertex pipeline created; validation error count=%u\n", validation_error_count);
+    fprintf(stdout, "%s vertex pipeline created; validation error count=%u\n",
+            use_storage_image ? "Storage-image atomic" : "Storage-buffer write", validation_error_count);
 
     vkDestroyPipeline(device, pipeline, NULL);
     vkDestroyRenderPass(device, render_pass, NULL);
