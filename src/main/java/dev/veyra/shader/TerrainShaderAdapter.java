@@ -406,7 +406,7 @@ public final class TerrainShaderAdapter {
             String sampler = samplerMatcher.group(2);
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("lightmap")
                     && !sampler.equals("noisetex")
-                    && !sampler.equals("specular")
+                    && !sampler.equals("specular") && !sampler.equals("normals")
                     && !colorInputs.containsKey(sampler)
                     && !customTextureSamplers.contains(sampler)
                     && !(sampler.equals("depthtex1") && waterInputsAvailable)
@@ -610,6 +610,10 @@ public final class TerrainShaderAdapter {
             bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D VeyraSpecularSampler;\n"
                     + "#define specular VeyraSpecularSampler\n" + bridge;
         }
+        if (usesNormalSampler(source)) {
+            bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D VeyraNormalSampler;\n"
+                    + "#define normals VeyraNormalSampler\n" + bridge;
+        }
         if (ShadowDepthSampler.used(source)) {
             bridge = "layout(binding = " + colorBinding++ + ") uniform sampler2D " + ShadowDepthSampler.NAME + ";\n"
                     + "#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
@@ -753,6 +757,11 @@ public final class TerrainShaderAdapter {
 
     public static boolean usesSpecularSampler(String source) {
         return Pattern.compile("\\bspecular\\b").matcher(UnusedSamplerDeclarations.removeUnused(
+                ShaderSource.maskBlockAndLineComments(source))).find();
+    }
+
+    public static boolean usesNormalSampler(String source) {
+        return Pattern.compile("\\bnormals\\b").matcher(UnusedSamplerDeclarations.removeUnused(
                 ShaderSource.maskBlockAndLineComments(source))).find();
     }
 

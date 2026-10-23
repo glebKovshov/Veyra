@@ -39,6 +39,7 @@ import dev.veyra.vulkan.VeyraColorTextureSnapshot;
 import dev.veyra.vulkan.VeyraCloudTexture;
 import dev.veyra.vulkan.VeyraNoiseTexture;
 import dev.veyra.vulkan.VeyraSpecularTextures;
+import dev.veyra.vulkan.VeyraNormalTextures;
 import dev.veyra.vulkan.VeyraShaderPackTextures;
 import net.vulkanmod.Initializer;
 import net.minecraft.client.Minecraft;
@@ -2594,6 +2595,7 @@ public final class VeyraRenderer {
 
     public static void onClientShutdown() {
         VeyraSpecularTextures.invalidate();
+        VeyraNormalTextures.invalidate();
         restoreUniqueOpaqueLayer();
         replacePipelineSet(null);
         replaceStorageBufferResources(null);
@@ -2913,6 +2915,7 @@ public final class VeyraRenderer {
 
     public static String disable() {
         VeyraSpecularTextures.invalidate();
+        VeyraNormalTextures.invalidate();
         CustomUniforms.activate(CustomUniforms.EMPTY);
         ItemIdMap.activate(ItemIdMap.EMPTY);
         EntityIdMap.activate(EntityIdMap.EMPTY);
@@ -2979,6 +2982,7 @@ public final class VeyraRenderer {
 
     public static void invalidatePipelines() {
         VeyraSpecularTextures.invalidate();
+        VeyraNormalTextures.invalidate();
         nextPostPhase = 0;
         pipelinesDirty = true;
         projectionBuffer = null;
@@ -3767,9 +3771,11 @@ public final class VeyraRenderer {
                 boolean usesNoiseSampler = vertexUsesNoiseSampler
                         || TerrainShaderAdapter.usesNoiseSampler(fragmentSource);
                 boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
+                boolean usesNormalSampler = TerrainShaderAdapter.usesNormalSampler(fragmentSource);
                 Set<Integer> shadowColorInputs = ShadowColorSampler.indices(fragmentSource);
                 boolean usesOpaqueShadow = ShadowDepthSampler.used(fragmentSource);
                 if (usesSpecularSampler) VeyraSpecularTextures.prepareTerrain();
+                if (usesNormalSampler) VeyraNormalTextures.prepareTerrain();
                 boolean usesOpaqueDepthSampler = sourceProgram.equals("gbuffers_water")
                         && TerrainShaderAdapter.usesOpaqueDepthSampler(fragmentSource);
                 Map<String, Integer> colorInputAliases = new java.util.LinkedHashMap<>(sourceProgram.equals("gbuffers_water")
@@ -3817,7 +3823,7 @@ public final class VeyraRenderer {
                 Pipeline.Builder builder = new Pipeline.Builder(
                         PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
                 builder.applyConfig(terrainPipelineConfig(shadowSamplerAvailable, usesNoiseSampler,
-                        usesOpaqueDepthSampler, usesSpecularSampler, shadowColorInputs, usesOpaqueShadow,
+                        usesOpaqueDepthSampler, usesSpecularSampler, usesNormalSampler, shadowColorInputs, usesOpaqueShadow,
                         colorInputs, customTextureSamplers));
                 if (compute != null) {
                     var images = compute.bindGraphicsImages(builder, vertexImages, fragmentImages);
@@ -3839,6 +3845,7 @@ public final class VeyraRenderer {
                 setShadowColorSamplerLayouts(pipeline);
                 setNoiseSamplerLayout(pipeline);
                 if (usesSpecularSampler) pipeline.getImageDescriptor(VeyraSpecularTextures.SAMPLER).setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                if (usesNormalSampler) pipeline.getImageDescriptor(VeyraNormalTextures.SAMPLER).setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 var opaqueDepth = pipeline.getImageDescriptor("VeyraDepthTex1Sampler");
                 if (opaqueDepth != null) {
                     opaqueDepth.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -3881,7 +3888,9 @@ public final class VeyraRenderer {
                         usesNoiseSampler |= TerrainVertexShaderAdapter.usesNoiseSampler(programName, shadowVertex.get());
                     }
                     boolean usesSpecularSampler = TerrainShaderAdapter.usesSpecularSampler(fragmentSource);
+                    boolean usesNormalSampler = TerrainShaderAdapter.usesNormalSampler(fragmentSource);
                     if (usesSpecularSampler) VeyraSpecularTextures.prepareTerrain();
+                    if (usesNormalSampler) VeyraNormalTextures.prepareTerrain();
                     if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     String shadowVertexSource = vertexSource;
                     if (shadowVertex.isPresent()) {
@@ -3912,7 +3921,7 @@ public final class VeyraRenderer {
                     Pipeline.Builder builder = new Pipeline.Builder(
                             PipelineManager.getTerrainVertexFormat(), "veyra_" + programName);
                     builder.applyConfig(terrainPipelineConfig(false, usesNoiseSampler, false,
-                            usesSpecularSampler, Set.of(), false, Set.of(), customTextureSamplers));
+                            usesSpecularSampler, usesNormalSampler, Set.of(), false, Set.of(), customTextureSamplers));
                     if (compute != null) {
                         var images = compute.bindGraphicsImages(builder, vertexImages, fragmentImages);
                         shadowVertexSource = images.decorate(shadowVertexSource, vertexImages);
@@ -3932,6 +3941,7 @@ public final class VeyraRenderer {
                     setNoiseSamplerLayout(shadowPipeline);
                     setShadowColorSamplerLayouts(shadowPipeline);
                     if (usesSpecularSampler) shadowPipeline.getImageDescriptor(VeyraSpecularTextures.SAMPLER).setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    if (usesNormalSampler) shadowPipeline.getImageDescriptor(VeyraNormalTextures.SAMPLER).setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                     for (UBO ubo : shadowPipeline.getBuffers()) {
                         ubo.setUseGlobalBuffer(true);
                     }
@@ -3951,6 +3961,7 @@ public final class VeyraRenderer {
 
     private static PipelineConfig terrainPipelineConfig(boolean shadowSamplerAvailable, boolean noiseSamplerAvailable,
                                                        boolean opaqueDepthSamplerAvailable, boolean specularSamplerAvailable,
+                                                       boolean normalSamplerAvailable,
                                                        Set<Integer> shadowColorInputs, boolean opaqueShadowAvailable,
                                                        Set<Integer> colorInputs,
                                                        Set<String> customTextureSamplers) throws IOException {
@@ -3991,6 +4002,7 @@ public final class VeyraRenderer {
             config.addImageDescriptor(nextBinding++, "sampler2D", "VeyraDepthTex1Sampler", 5);
         }
         if (specularSamplerAvailable) config.addImageDescriptor(nextBinding++, "sampler2D", VeyraSpecularTextures.SAMPLER, 1);
+        if (normalSamplerAvailable) config.addImageDescriptor(nextBinding++, "sampler2D", VeyraNormalTextures.SAMPLER, VeyraNormalTextures.IMAGE_SLOT);
         int imageSlot = GeometryColorSamplers.FIRST_IMAGE_SLOT;
         if (opaqueShadowAvailable)
             config.addImageDescriptor(nextBinding++, "sampler2D", ShadowDepthSampler.NAME, imageSlot++);

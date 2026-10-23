@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 /** Auxiliary color inputs available to supported geometry programs. */
 public final class GeometryColorSamplers {
-    public static final int FIRST_IMAGE_SLOT = 6;
+    public static final int FIRST_IMAGE_SLOT = 7;
     public static final int MAX_INPUTS = 15;
     private static final List<String> LEGACY = List.of(
             "gcolor", "gdepth", "gnormal", "composite", "gaux1", "gaux2", "gaux3", "gaux4");
