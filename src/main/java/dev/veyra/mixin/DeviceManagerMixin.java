@@ -10,7 +10,6 @@ import org.lwjgl.vulkan.VkAllocationCallbacks;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,32 +26,24 @@ public abstract class DeviceManagerMixin {
             VK10.vkGetPhysicalDeviceFeatures(physicalDevice, supported);
             VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
             VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
-            VkPhysicalDeviceFeatures originalFeatures = createInfo.pEnabledFeatures();
-            long originalPNext = createInfo.pNext();
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
-            VkPhysicalDeviceFeatures2 enabledFeatures2 = VkPhysicalDeviceFeatures2.create(enabledCreateInfo.pNext());
-            VkPhysicalDeviceFeatures enabled = enabledFeatures2.features();
+            VkPhysicalDeviceFeatures enabled = enabledCreateInfo.pEnabledFeatures();
             VeyraDeviceFeatures.maxColorAttachments = properties.limits().maxColorAttachments();
             VeyraDeviceFeatures.independentBlendEnabled = enabled.independentBlend();
             VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = enabled.vertexPipelineStoresAndAtomics();
             VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = enabled.shaderStorageImageExtendedFormats();
-            VeyraClient.LOGGER.info("Vulkan core feature request for {} (API {}): independentBlend={}, vertexPipelineStoresAndAtomics={}, shaderStorageImageExtendedFormats={}, pEnabledFeaturesNull={}, features2=0x{}, features2.pNext=0x{}.",
+            VeyraClient.LOGGER.info("Vulkan core feature request for {} (API {}): independentBlend={}, vertexPipelineStoresAndAtomics={}, shaderStorageImageExtendedFormats={}, pEnabledFeaturesNull={}, pEnabledFeatures=0x{}, pNext=0x{}.",
                     properties.deviceNameString(), properties.apiVersion(), enabled.independentBlend(),
                     enabled.vertexPipelineStoresAndAtomics(), enabled.shaderStorageImageExtendedFormats(),
-                    enabledCreateInfo.pEnabledFeatures() == null, Long.toHexString(enabledFeatures2.address()),
-                    Long.toHexString(enabledFeatures2.pNext()));
-            try {
-                int result = VK10.vkCreateDevice(physicalDevice, createInfo, allocator, device);
-                long createdDevice = result == VK10.VK_SUCCESS ? device.get(0) : 0L;
-                VeyraClient.LOGGER.info("vkCreateDevice returned result={} device=0x{}, createInfo=0x{}, pEnabledFeaturesNull={}, pNext=0x{}.",
-                        result, Long.toHexString(createdDevice), Long.toHexString(createInfo.address()),
-                        createInfo.pEnabledFeatures() == null, Long.toHexString(createInfo.pNext()));
-                return result;
-            } finally {
-                createInfo.pEnabledFeatures(originalFeatures);
-                createInfo.pNext(originalPNext);
-            }
+                    enabledCreateInfo.pEnabledFeatures() == null, Long.toHexString(enabled.address()),
+                    Long.toHexString(enabledCreateInfo.pNext()));
+            int result = VK10.vkCreateDevice(physicalDevice, enabledCreateInfo, allocator, device);
+            long createdDevice = result == VK10.VK_SUCCESS ? device.get(0) : 0L;
+            VeyraClient.LOGGER.info("vkCreateDevice returned result={} device=0x{}, createInfo=0x{}, pEnabledFeatures=0x{}, pNext=0x{}.",
+                    result, Long.toHexString(createdDevice), Long.toHexString(enabledCreateInfo.address()),
+                    Long.toHexString(enabled.address()), Long.toHexString(enabledCreateInfo.pNext()));
+            return result;
         }
     }
 }
