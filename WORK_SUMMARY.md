@@ -1420,3 +1420,51 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Combined pinned audit passed: 4 SHA-512-pinned packs, 12 defaults, 63 profile/dimension cases, 864 geometry fragments accepted / 0 rejected, 18 active compute stages compiled / 0 rejected; records remain `visualValidation=false`.
 - Combined beta.31 JAR passed `scripts/verify_jar.py`: **993,609 bytes**, SHA-256 `CA96362479692429E267ACA86403111A6159BB546F450CD6AAD9FEB199B3FABD`. This local artifact predates a final merged release commit and is not published.
 - PR #85 exact-head Build passed; pinned source audit is still running and Graphics is still running. Do not merge or publish until all required exact-head checks finish green.
+
+- Push this implementation to PR #85 and require fresh exact-head Build, pinned source-audit, and Lavapipe Graphics results before merging either PR or publishing beta.31.
+
+### Lavapipe core-feature baseline probe — queued
+
+- Added an isolated C/Vulkan probe and a dedicated GitHub Actions job. The probe enables `vertexPipelineStoresAndAtomics` through legacy `VkDeviceCreateInfo.pEnabledFeatures`, creates a vertex shader module that writes a storage buffer, and attempts a minimal graphics pipeline under Khronos validation on the same Lavapipe runner image.
+- This isolates validation-layer feature tracking from VulkanMod and Veyra's mixin. It has not run yet; use its result to decide whether to revise the feature-injection path or investigate the runner's layer/driver combination. No VUID allowance was added.
+
+- Probe/workflow commit `745b218f530f88775880b91592595ddb21d3bbbe` отправлен в `release-prep/beta31-release-batch`. Exact-head PR checks are running: Graphics run `39890490126`, Build PR run `39890490056`, source audit run `39890490075`; the standalone push Build is `39890486798`. Probe result is pending.
+
+### VulkanMod feature-block allocation correction — pending hosted validation
+
+- The isolated Lavapipe probe passed on the same `llvmpipe` image: standalone `pEnabledFeatures.vertexPipelineStoresAndAtomics=true` plus a vertex storage-buffer pipeline produced **0 validation errors**. This rules out a general Lavapipe/VVL false positive for the feature.
+- Changed the device-create helper to copy VulkanMod's requested core features into a separate `VkPhysicalDeviceFeatures` allocation, add supported Veyra features there, pass that standalone struct to `vkCreateDevice`, and restore the original pointer afterward. VulkanMod's source block and `pNext` chain remain untouched.
+- Updated unit coverage to verify the separate block retains existing requested bits and that VulkanMod's original feature block is unchanged. Hosted Build/Graphics/source-audit must validate this exact new head; no result yet.
+
+- Новый isolated baseline job `39890490126` показал: сам llvmpipe/VVL принимает direct `pEnabledFeatures` и создаёт vertex storage-buffer pipeline с нулём ошибок. Поэтому гипотеза о ложноположительном VUID среды не подтверждается.
+- Изменил #85 device-feature hook: теперь `VkDeviceCreateInfo` получает отдельную plain `VkPhysicalDeviceFeatures` копию, а исходный VulkanMod pointer возвращается после native вызова. Unit test проверяет, что три новые бита не меняют исходный вложенный блок, при этом исходные поддержанные биты и pNext сохраняются.
+- Попытка локального `gradlew test` остановилась до запуска: в текущем shell нет `JAVA_HOME` и команды `java`. Для нового точного head ожидаются hosted Build, source audit и Lavapipe Graphics; до их результатов не считать исправление подтверждённым.
+
+- Standalone-block fix is commit `e3b4fc0e9f9d7ab74c4371e564fd578065e0cfa4`, pushed to #85. Exact-head checks queued: Graphics `39890813226`, source audit `39890813168`, PR Build `39890813178`, plus push Build `39890809180`.
+
+- PR #85 description now accurately documents the standalone feature-block implementation, the red prior exact-head matrix, the passing independent Lavapipe baseline, and the current exact-head check IDs. The PR remains draft.
+
+- Exact-head PR Build `39890813178` passed on `e3b4fc0`; its log shows `:test`, processing 97 shader examples / 113 direct SPIR-V compilations, build success, and `scripts/verify_jar.py` passing for beta.31 metadata. Source audit `39890813168` is still running; Graphics `39890813226` is queued behind the prior matrix.
+
+
+### Hosted exact-head Vulkan feature result ? 2026-10-23
+
+- PR Build `39890813178` and shaderpack source audit `39890813168` passed on `e3b4fc0`. The Build ran Gradle tests, compiled 97 example shaders and 113 direct SPIR-V cases, built the mod, and verified beta.31 metadata.
+- Graphics `39890813226` is still completing its matrix. Three finished application fixtures fail with `VUID-RuntimeSpirv-NonWritable-06341`: `entity-custom-image` (8 errors), `composite-custom-image` (7), and `basic-custom-image` (12). The independent no-`pNext` Lavapipe baseline passes. Preserve the VUID gate.
+- The entity fixture logs `vertexPipelineStoresAndAtomics=true`, a non-null standalone `pEnabledFeatures` pointer immediately before `vkCreateDevice`, and native result 0, then receives the VUID during graphics-pipeline creation. Functional readback is not treated as a validation pass.
+- Updated the isolated C probe to run both the plain legacy `pEnabledFeatures` baseline and the same core-feature request with a `VkPhysicalDeviceVulkan12Features` `pNext` node carrying `hostQueryReset=true`. This diagnostic edit is local and awaits an exact-head run.
+- No PR merge or release has occurred. Keep #85 draft and #86 stacked until the complete Graphics matrix is clean and all required checks pass.
+
+
+- Additional historical evidence: exact Graphics run `39881503165` for Features2-based commit `3d6742b` also failed all five custom-image fixtures. That path logged the core feature booleans as true with `pEnabledFeaturesNull=true`, then produced `VUID-RuntimeSpirv-NonWritable-06341` at pipeline creation. The VUID therefore survived both prior injection shapes; keep the current VulkanMod-`pNext` comparison and device/pipeline identity in the investigation.
+
+### Vulkan feature-state trace from hosted Lavapipe — 2026-10-23
+
+- Retrieved completed entity custom-image job log `120209866935` from Graphics run `39890813226` for #85 head `e3b4fc0`. Veyra logged `vertexPipelineStoresAndAtomics=true`, a non-null `pEnabledFeatures`, and successful `vkCreateDevice` (`result=0`). The validation error occurs in `vkCreateGraphicsPipelines`, with the reported object typed `VK_OBJECT_TYPE_SHADER_MODULE`; the message says the feature was not enabled. The discrepancy remains in the device state seen by pipeline validation.
+- The pinned VulkanMod 0.6.8 JAR bytecode shows the actual device-create chain is `VkPhysicalDeviceVulkan11Features(shaderDrawParameters=...) -> VkPhysicalDeviceDynamicRenderingFeaturesKHR(dynamicRendering=true)`; it uses `VkPhysicalDeviceFeatures2.features()` as the `pEnabledFeatures` source and does not include `VkPhysicalDeviceVulkan12Features`. So the `6c4f62d` probe's V12 `pNext` case is only approximate. I corrected the local probe source to the pinned V11 + dynamic-rendering chain; an exact hosted run is still needed after the current #85 watcher finishes. No merge/release until application validation is clean.
+
+### Exact pinned VulkanMod chain and pipeline-device trace — 2026-10-23
+
+- Disassembled `DeviceManager.createLogicalDevice` from the exact cached VulkanMod 0.6.8 Modrinth JAR. It passes `VkPhysicalDeviceFeatures2.features()` as `pEnabledFeatures`; the enabled `pNext` chain is `VkPhysicalDeviceVulkan11Features(shaderDrawParameters=...) -> VkPhysicalDeviceDynamicRenderingFeaturesKHR(dynamicRendering=true)`. The V12-only probe queued for #85 did not reproduce this pinned chain.
+- Corrected the local Lavapipe C probe to the pinned V11 + dynamic-rendering chain while retaining the no-`pNext` baseline. Added graphics-smoke-only logging to compare the `VkDevice` passed to `vkCreateGraphicsPipelines` with the handle returned from intercepted `vkCreateDevice`. These diagnostics do not change rendering behavior; hosted compile/runtime results are still required.
+- Audited the existing release workflow: branch `release/0.2.0-beta.31+mc1.21.11` runs source audit and the full Graphics matrix, then builds/tests/verifies the JAR and packages example packs plus `SHA256SUMS.txt` before publishing the versioned GitHub Release. No beta.31 tag exists locally. Do not trigger release while the runtime VUID persists.

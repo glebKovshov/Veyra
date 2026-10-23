@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VeyraDeviceFeaturesTest {
-    @Test void requestsCoreFeaturesInTheOriginalCreateInfoAndPreservesTheExistingFeatureChain() {
+    @Test void requestsCoreFeaturesInASeparateBlockAndPreservesTheOriginalFeatureChain() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceVulkan11Features vulkan11 = VkPhysicalDeviceVulkan11Features.calloc(stack)
                     .sType$Default()
@@ -34,10 +34,13 @@ class VeyraDeviceFeaturesTest {
 
             assertSame(createInfo, enabledCreateInfo);
             assertEquals(vulkan11.address(), enabledCreateInfo.pNext());
-            assertEquals(requested.address(), enabled.address());
+            assertTrue(requested.address() != enabled.address());
             assertTrue(enabled.vertexPipelineStoresAndAtomics());
             assertTrue(enabled.shaderStorageImageExtendedFormats());
             assertTrue(enabled.samplerAnisotropy());
+            assertTrue(requested.samplerAnisotropy());
+            assertFalse(requested.vertexPipelineStoresAndAtomics());
+            assertFalse(requested.shaderStorageImageExtendedFormats());
             assertTrue(VkPhysicalDeviceVulkan11Features.create(enabledCreateInfo.pNext()).shaderDrawParameters());
         }
     }

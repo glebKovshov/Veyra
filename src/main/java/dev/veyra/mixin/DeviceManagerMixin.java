@@ -27,8 +27,6 @@ public abstract class DeviceManagerMixin {
             VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
             VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
             VkPhysicalDeviceFeatures originalFeatures = createInfo.pEnabledFeatures();
-            VkPhysicalDeviceFeatures originalFeatureValues = originalFeatures == null
-                    ? null : VkPhysicalDeviceFeatures.calloc(stack).set(originalFeatures);
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
             try {
@@ -44,16 +42,13 @@ public abstract class DeviceManagerMixin {
                         Long.toHexString(enabledCreateInfo.pNext()));
                 int result = VK10.vkCreateDevice(physicalDevice, enabledCreateInfo, allocator, device);
                 long createdDevice = result == VK10.VK_SUCCESS ? device.get(0) : 0L;
+                VeyraDeviceFeatures.createdLogicalDeviceHandle = createdDevice;
                 VeyraClient.LOGGER.info("vkCreateDevice returned result={} device=0x{}, createInfo=0x{}, pEnabledFeatures=0x{}, pNext=0x{}.",
                         result, Long.toHexString(createdDevice), Long.toHexString(enabledCreateInfo.address()),
                         Long.toHexString(enabled.address()), Long.toHexString(enabledCreateInfo.pNext()));
                 return result;
             } finally {
-                if (originalFeatures == null) {
-                    createInfo.pEnabledFeatures((VkPhysicalDeviceFeatures) null);
-                } else {
-                    originalFeatures.set(originalFeatureValues);
-                }
+                createInfo.pEnabledFeatures(originalFeatures);
             }
         }
     }
