@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-beta.37 - 2026-10-23 (experimental prerelease)
+## 0.2.0-beta.37 - 2026-10-24 (experimental prerelease)
 
 - Add SSBO-only Iris compute programs using `bufferObject.N`, pre-shadow `begin.csh`, `setup.csh`, and pre-shadow `begin.fsh` passes. Preserve setup/begin SSBO contents across later passes and frames; clear frame color targets only once so begin-fragment output survives into the rest of the frame.
 - Add focused example packs and hosted Lavapipe graphics-smoke coverage for SSBO-only compute, setup, begin compute, and begin fragment behavior. Separate RTX 3070 runs of the named physical fixtures each reported 230,400 active / 0 disabled marker pixels; setup resize behavior was not separately exercised on the physical GPU.
