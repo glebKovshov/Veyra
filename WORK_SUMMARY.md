@@ -1388,3 +1388,18 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Новый isolated baseline job `39890490126` показал: сам llvmpipe/VVL принимает direct `pEnabledFeatures` и создаёт vertex storage-buffer pipeline с нулём ошибок. Поэтому гипотеза о ложноположительном VUID среды не подтверждается.
 - Изменил #85 device-feature hook: теперь `VkDeviceCreateInfo` получает отдельную plain `VkPhysicalDeviceFeatures` копию, а исходный VulkanMod pointer возвращается после native вызова. Unit test проверяет, что три новые бита не меняют исходный вложенный блок, при этом исходные поддержанные биты и pNext сохраняются.
 - Попытка локального `gradlew test` остановилась до запуска: в текущем shell нет `JAVA_HOME` и команды `java`. Для нового точного head ожидаются hosted Build, source audit и Lavapipe Graphics; до их результатов не считать исправление подтверждённым.
+
+- Standalone-block fix is commit `e3b4fc0e9f9d7ab74c4371e564fd578065e0cfa4`, pushed to #85. Exact-head checks queued: Graphics `39890813226`, source audit `39890813168`, PR Build `39890813178`, plus push Build `39890809180`.
+
+- PR #85 description now accurately documents the standalone feature-block implementation, the red prior exact-head matrix, the passing independent Lavapipe baseline, and the current exact-head check IDs. The PR remains draft.
+
+- Exact-head PR Build `39890813178` passed on `e3b4fc0`; its log shows `:test`, processing 97 shader examples / 113 direct SPIR-V compilations, build success, and `scripts/verify_jar.py` passing for beta.31 metadata. Source audit `39890813168` is still running; Graphics `39890813226` is queued behind the prior matrix.
+
+
+### Hosted exact-head Vulkan feature result ? 2026-10-23
+
+- PR Build `39890813178` and shaderpack source audit `39890813168` passed on `e3b4fc0`. The Build ran Gradle tests, compiled 97 example shaders and 113 direct SPIR-V cases, built the mod, and verified beta.31 metadata.
+- Graphics `39890813226` is still completing its matrix. Three finished application fixtures fail with `VUID-RuntimeSpirv-NonWritable-06341`: `entity-custom-image` (8 errors), `composite-custom-image` (7), and `basic-custom-image` (12). The independent no-`pNext` Lavapipe baseline passes. Preserve the VUID gate.
+- The entity fixture logs `vertexPipelineStoresAndAtomics=true`, a non-null standalone `pEnabledFeatures` pointer immediately before `vkCreateDevice`, and native result 0, then receives the VUID during graphics-pipeline creation. Functional readback is not treated as a validation pass.
+- Updated the isolated C probe to run both the plain legacy `pEnabledFeatures` baseline and the same core-feature request with a `VkPhysicalDeviceVulkan12Features` `pNext` node carrying `hostQueryReset=true`. This diagnostic edit is local and awaits an exact-head run.
+- No PR merge or release has occurred. Keep #85 draft and #86 stacked until the complete Graphics matrix is clean and all required checks pass.

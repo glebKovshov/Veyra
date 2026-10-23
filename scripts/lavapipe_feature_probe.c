@@ -58,7 +58,10 @@ static uint32_t *read_spirv(const char *path, size_t *word_count) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) return fail("usage: lavapipe_feature_probe <vertex.spv>", VK_ERROR_INITIALIZATION_FAILED);
+    int use_vulkanmod_pnext = argc == 3 && strcmp(argv[2], "--vulkanmod-pnext") == 0;
+    if (argc < 2 || argc > 3 || (argc == 3 && !use_vulkanmod_pnext)) {
+        return fail("usage: lavapipe_feature_probe <vertex.spv> [--vulkanmod-pnext]", VK_ERROR_INITIALIZATION_FAILED);
+    }
 
     const char *layers[] = {"VK_LAYER_KHRONOS_validation"};
     const char *extensions[] = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
@@ -74,7 +77,7 @@ int main(int argc, char **argv) {
     VkApplicationInfo application_info = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "Veyra Lavapipe Feature Probe",
-        .apiVersion = VK_API_VERSION_1_0,
+        .apiVersion = VK_API_VERSION_1_2,
     };
     VkInstanceCreateInfo instance_info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -140,8 +143,13 @@ int main(int argc, char **argv) {
     };
     VkPhysicalDeviceFeatures enabled_features = {0};
     enabled_features.vertexPipelineStoresAndAtomics = VK_TRUE;
+    VkPhysicalDeviceVulkan12Features vulkan12_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .hostQueryReset = VK_TRUE,
+    };
     VkDeviceCreateInfo device_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = use_vulkanmod_pnext ? &vulkan12_features : NULL,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queue_info,
         .pEnabledFeatures = &enabled_features,
@@ -150,6 +158,8 @@ int main(int argc, char **argv) {
     CHECK_VK(vkCreateDevice(physical_device, &device_info, NULL, &device), "vkCreateDevice(pEnabledFeatures=true)");
     fprintf(stdout, "pEnabledFeatures.vertexPipelineStoresAndAtomics=%s\n",
             enabled_features.vertexPipelineStoresAndAtomics == VK_TRUE ? "true" : "false");
+    fprintf(stdout, "VkDeviceCreateInfo.pNext=%s\n",
+            use_vulkanmod_pnext ? "VkPhysicalDeviceVulkan12Features(hostQueryReset=true)" : "NULL");
     fprintf(stdout, "Physical device: %s\n", physical_device_properties.deviceName);
 
     size_t spirv_word_count = 0;

@@ -107,6 +107,7 @@ jobs:
           export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
           test -n "$VK_ICD_FILENAMES"
           "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv" --vulkanmod-pnext
 
   lavapipe-client:
     strategy:
