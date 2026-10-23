@@ -1064,13 +1064,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return activeComputeStageFiles(null);
     }
 
+    public boolean hasComputeStageFiles() throws IOException {
+        return stageFiles().stream().anyMatch(name -> name.endsWith(".csh"));
+    }
+
     /** Returns active compute files for one composite pass family, in Iris pass/component order. */
     public List<String> activeComputeStageFiles(String programFamily) throws IOException {
         if (programFamily != null && !programFamily.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException("Invalid compute program family: " + programFamily);
         }
         List<String> active = new ArrayList<>();
-        Comparator<String> order = Comparator.comparing(ShaderPack::computeStageFamily)
+        Comparator<String> order = Comparator.comparingInt((String file) -> computeStageFamilyOrder(file))
                 .thenComparingInt(ShaderPack::computePassIndex)
                 .thenComparingInt(ShaderPack::computeComponentIndex)
                 .thenComparing(Comparator.naturalOrder());
@@ -1087,6 +1091,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String program = computeProgramName(file);
         int suffix = trailingDigitsStart(program);
         return program.substring(0, suffix);
+    }
+
+    private static int computeStageFamilyOrder(String file) {
+        return switch (computeStageFamily(file)) {
+            case "shadowcomp" -> 0;
+            case "prepare" -> 1;
+            case "deferred" -> 2;
+            case "composite" -> 3;
+            case "final" -> 4;
+            default -> Integer.MAX_VALUE;
+        };
     }
 
     private static int computePassIndex(String file) {
@@ -1340,33 +1355,44 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private void validateShadowComputeCapabilities() throws IOException {
-        if (!hasShadowFragment()) throw new IOException("shadowcomp custom images require an active shadow pass.");
         var properties = readImageProperties();
-        for (String program : SHADOW_PROGRAMS) {
-            if (!isProgramEnabled(program)) continue;
-            Optional<String> vertex = readShadowVertex(program, true);
-            if (vertex.isEmpty()) continue;
-            var prepared = ShaderPackImageBindings.prepare(program + ".vsh", vertex.get(), properties);
-            var writableImage = prepared.resources().stream()
-                    .filter(resource -> resource.storageImage()
-                            && !READONLY_QUALIFIER.matcher(resource.qualifier()).find())
-                    .findFirst();
-            if (writableImage.isPresent() && !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) {
-                throw new IOException("The Vulkan device cannot run writable storage image '"
-                        + writableImage.get().name() + "' in shadow vertex stage " + program
-                        + ": vertexPipelineStoresAndAtomics is unavailable.");
+        if (hasShadowFragment()) {
+            for (String program : SHADOW_PROGRAMS) {
+                if (!isProgramEnabled(program)) continue;
+                Optional<String> vertex = readShadowVertex(program, true);
+                if (vertex.isEmpty()) continue;
+                var prepared = ShaderPackImageBindings.prepare(program + ".vsh", vertex.get(), properties);
+                var writableImage = prepared.resources().stream()
+                        .filter(resource -> resource.storageImage()
+                                && !READONLY_QUALIFIER.matcher(resource.qualifier()).find())
+                        .findFirst();
+                if (writableImage.isPresent() && !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) {
+                    throw new IOException("The Vulkan device cannot run writable storage image '"
+                            + writableImage.get().name() + "' in shadow vertex stage " + program
+                            + ": vertexPipelineStoresAndAtomics is unavailable.");
+                }
             }
         }
 
         List<String> computeFiles = activeComputeStageFiles();
+        boolean hasShadowCompute = false;
         for (String file : computeFiles) {
-            if (!file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
+            if (file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
+                hasShadowCompute = true;
+                if (!hasShadowFragment()) {
+                    throw new IOException(file + " requires an active shadow pass.");
+                }
+            } else if (!isPostProcessingProgramFile(file)) {
                 throw new IOException("Compute dispatch timing for " + file + " is not implemented yet.");
             }
         }
-        if (!computeFiles.isEmpty() && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
+        if (hasShadowCompute && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
             throw new IOException("The Vulkan device cannot run shadow-compute custom images: "
                     + "vertexPipelineStoresAndAtomics and shaderStorageImageExtendedFormats are required.");
+        }
+        if (!computeFiles.isEmpty() && !VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled) {
+            throw new IOException("The Vulkan device cannot run compute custom images: "
+                    + "shaderStorageImageExtendedFormats is required.");
         }
         for (String file : computeFiles) {
             String source = readComputeStage(file).orElseThrow();
@@ -1992,15 +2018,19 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private static boolean isPostProcessingProgramFile(String fileName) {
-        if (fileName.equals("final.fsh")) {
+        if (fileName.equals("final.fsh") || fileName.equals("final.csh")
+                || fileName.matches("final_[a-z]\\.csh")) {
             return true;
         }
         for (String prefix : MULTI_PASS_PROGRAMS) {
-            if (fileName.equals(prefix + ".fsh")) {
+            if (fileName.equals(prefix + ".fsh") || fileName.equals(prefix + ".csh")
+                    || fileName.matches(Pattern.quote(prefix) + "_[a-z]\\.csh")) {
                 return true;
             }
             for (int suffix = 1; suffix <= MAX_PASS_SUFFIX; suffix++) {
-                if (fileName.equals(prefix + suffix + ".fsh")) {
+                if (fileName.equals(prefix + suffix + ".fsh")
+                        || fileName.equals(prefix + suffix + ".csh")
+                        || fileName.matches(Pattern.quote(prefix + suffix) + "_[a-z]\\.csh")) {
                     return true;
                 }
             }

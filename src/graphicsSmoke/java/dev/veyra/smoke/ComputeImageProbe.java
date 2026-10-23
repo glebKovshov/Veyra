@@ -44,7 +44,7 @@ final class ComputeImageProbe implements AutoCloseable {
                     """, properties);
             probe.resources = VeyraComputeResources.create(properties, shader);
             probe.pipeline = VeyraComputePipeline.create("veyra_compute_image_probe", shader, probe.resources.descriptors(0));
-            probe.resources.clearForShadowPass();
+            probe.resources.clearForFrame(0);
             probe.pipeline.dispatchWorkGroups(shader.workGroupsX(), shader.workGroupsY(), shader.workGroupsZ());
             probe.readback = new Buffer("Veyra compute volume evidence", VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
             probe.readback.createBuffer(TEXELS * Short.BYTES);

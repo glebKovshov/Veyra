@@ -25,6 +25,7 @@ public final class VeyraComputeResources implements AutoCloseable {
     private final Set<String> initialized = new LinkedHashSet<>();
     private final List<List<VeyraImageDescriptor>> descriptorsByStage;
     private final long estimatedBytes;
+    private int lastClearedFrame = Integer.MIN_VALUE;
     private boolean closed;
 
     private VeyraComputeResources(Map<String, VulkanImage> images, Map<String, Boolean> clearEveryPass,
@@ -109,15 +110,18 @@ public final class VeyraComputeResources implements AutoCloseable {
         }
     }
 
-    /** Clears newly allocated images once and Iris {@code clear=true} images before every shadow pass. */
-    public void clearForShadowPass() {
+    /** Initializes new images and clears Iris {@code clear=true} images once per render frame. */
+    public void clearForFrame(int frameCounter) {
         if (closed) throw new IllegalStateException("Compute image resources have already been released.");
         for (var entry : images.entrySet()) {
             String name = entry.getKey();
-            if (!clearEveryPass.getOrDefault(name, false) && initialized.contains(name)) continue;
+            boolean clear = clearEveryPass.getOrDefault(name, false);
+            if (clear && lastClearedFrame == frameCounter) continue;
+            if (!clear && initialized.contains(name)) continue;
             ((VeyraCustomImage) entry.getValue()).clearZero();
             initialized.add(name);
         }
+        lastClearedFrame = frameCounter;
     }
 
     public List<VeyraImageDescriptor> descriptors(int stageIndex) {

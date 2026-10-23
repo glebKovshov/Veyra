@@ -17,7 +17,7 @@ import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-/** Owns the active shadowcomp compute sequence and its shared images. */
+/** Owns active shadow and post-processing compute stages and their shared images. */
 public final class VeyraComputePipelineSet implements AutoCloseable {
     private final VeyraComputeResources resources;
     private final List<Dispatch> stages;
@@ -29,9 +29,9 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
     }
 
     public static VeyraComputePipelineSet compile(ShaderPack pack) throws IOException {
-        List<String> files = pack.activeComputeStageFiles("shadowcomp");
+        List<String> files = pack.activeComputeStageFiles();
         if (files.isEmpty()) return null;
-        if (files.stream().anyMatch(file -> file.startsWith("shadowcomp"))
+        if (files.stream().anyMatch(file -> isShadowComputeFile(file))
                 && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
             throw new IOException("The Vulkan device cannot enable vertexPipelineStoresAndAtomics and "
                     + "shaderStorageImageExtendedFormats required by shadow voxel lighting.");
@@ -69,23 +69,24 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                         .filter(ComputeShaderAdapter.OpaqueResource::storageImage)
                         .findAny().isPresent();
                 if (!hasStorageImage) {
-                    throw new IOException(file + " does not declare an active storage image; Veyra shadow compute currently requires image resources.");
+                    throw new IOException(file + " does not declare an active storage image; Veyra compute stages currently require image resources.");
                 }
-                String program = file.substring(0, file.length() - ".csh".length());
+                String stageProgram = file.substring(0, file.length() - ".csh".length());
+                String program = computeProgramName(file);
                 ShaderPackStorageBufferProperties.IndirectDispatch indirect = null;
                 VeyraStorageBufferResources.StorageBuffer indirectBuffer = null;
-                if (storageBufferProperties.indirectDispatches().containsKey(program)) {
+                if (storageBufferProperties.indirectDispatches().containsKey(stageProgram)) {
                     if (storageBuffers == null) {
-                        throw new IOException("indirect." + program + " requires active shader-pack storage-buffer resources.");
+                        throw new IOException("indirect." + stageProgram + " requires active shader-pack storage-buffer resources.");
                     }
                     indirect = storageBufferProperties.validateIndirectDispatch(
-                            program, storageBuffers.viewWidth(), storageBuffers.viewHeight());
+                            stageProgram, storageBuffers.viewWidth(), storageBuffers.viewHeight());
                     indirectBuffer = storageBuffers.storageBuffer(indirect.bufferBinding());
                 }
                 VeyraComputePipeline pipeline = VeyraComputePipeline.create(
-                        program,
+                        stageProgram,
                         shader, resources.descriptors(index));
-                compiled.add(new Dispatch(pipeline, shader.workGroupDispatch(),
+                compiled.add(new Dispatch(program, stageProgram, pipeline, shader.workGroupDispatch(),
                         shader.localSizeX(), shader.localSizeY(), indirectBuffer,
                         indirect == null ? 0 : indirect.offsetInBuffer()));
             }
@@ -97,9 +98,9 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         }
     }
 
-    public void clearForShadowPass() {
+    public void clearForFrame(int frameCounter) {
         ensureOpen();
-        resources.clearForShadowPass();
+        resources.clearForFrame(frameCounter);
     }
 
     ShaderPackImageBindings.Plan bindGraphicsImages(Pipeline.Builder builder,
@@ -164,12 +165,40 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         return resources.graphicsDescriptors(List.of(binding)).getFirst();
     }
 
-    /** Dispatches after all shadow stages, matching Iris shadowcomp ordering, then exposes writes to graphics. */
+    /** Dispatches all shadow compute programs after the shadow render pass. */
     public void dispatchAfterShadowPass(int renderWidth, int renderHeight) {
         ensureOpen();
-        if (stages.isEmpty()) return;
-        List<ResolvedDispatch> resolvedStages = new ArrayList<>(stages.size());
-        for (Dispatch dispatch : stages) {
+        dispatch(stages.stream().filter(stage -> isShadowComputeFile(stage.programName() + ".csh")).toList(),
+                renderWidth, renderHeight);
+    }
+
+    /** Returns the active post-compute program names in Iris pass order. */
+    public List<String> programNames(ShaderPassPhase phase) {
+        ensureOpen();
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Dispatch stage : stages) {
+            if (isShadowComputeFile(stage.programName() + ".csh")) continue;
+            if (ShaderPassPhase.forProgram(stage.programName()) == phase) names.add(stage.programName());
+        }
+        return List.copyOf(names);
+    }
+
+    public boolean hasShadowComputeStages() {
+        ensureOpen();
+        return stages.stream().anyMatch(stage -> isShadowComputeFile(stage.programName() + ".csh"));
+    }
+
+    /** Dispatches the component sequence attached to a single Iris post-processing program. */
+    public void dispatchProgram(String programName, int renderWidth, int renderHeight) {
+        ensureOpen();
+        dispatch(stages.stream().filter(stage -> stage.programName().equals(programName)).toList(),
+                renderWidth, renderHeight);
+    }
+
+    private void dispatch(List<Dispatch> selectedStages, int renderWidth, int renderHeight) {
+        if (selectedStages.isEmpty()) return;
+        List<ResolvedDispatch> resolvedStages = new ArrayList<>(selectedStages.size());
+        for (Dispatch dispatch : selectedStages) {
             if (dispatch.indirectBuffer() != null) {
                 resolvedStages.add(new ResolvedDispatch(dispatch.pipeline(), 0, 0, 0,
                         dispatch.indirectBuffer(), dispatch.indirectOffset()));
@@ -189,7 +218,8 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             throw new IllegalStateException("Shader-pack compute stages cannot dispatch inside a render pass.");
         }
         VeyraComputePipeline.memoryBarrier(commandBuffer,
-                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT
+                        | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
                         | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
                 VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -237,12 +267,23 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         if (closed) throw new IllegalStateException("Compute pipeline set has already been released.");
     }
 
-    private record Dispatch(VeyraComputePipeline pipeline, ComputeWorkGroupDispatch workGroups,
+    private record Dispatch(String programName, String stageProgram,
+                            VeyraComputePipeline pipeline,
+                            ComputeWorkGroupDispatch workGroups,
                             int localSizeX, int localSizeY,
                             VeyraStorageBufferResources.StorageBuffer indirectBuffer, int indirectOffset) {
     }
 
     private record ResolvedDispatch(VeyraComputePipeline pipeline, int x, int y, int z,
                                     VeyraStorageBufferResources.StorageBuffer indirectBuffer, int indirectOffset) {
+    }
+
+    private static String computeProgramName(String file) {
+        String program = file.substring(0, file.length() - ".csh".length());
+        return program.replaceFirst("_[a-z]$", "");
+    }
+
+    private static boolean isShadowComputeFile(String file) {
+        return file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
     }
 }
