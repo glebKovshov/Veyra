@@ -13,6 +13,7 @@ Runtime evidence was collected on Windows with Java 21.0.12, Minecraft 1.21.11, 
 - The `entity-custom-texture` fixture passed on the combined candidate with **18,293 active / 0 disabled** green pixels. Runtime descriptor evidence binds `marker` to the pack PNG at binding 6. This is a synthetic fixture, not a third-party pack result.
 - The combined `custom-image-compute` fixture passed on the RTX 3070 with **222,994 active magenta pixels**; both `vertexPipelineStoresAndAtomicsEnabled` and `shaderStorageImageExtendedFormatsEnabled` were true. This GPU has no Vulkan validation layer, so this does not clear the Lavapipe feature-enable VUID.
 - BSL v10.1.8 `HIGH` passed the full selected-profile lifecycle smoke on the RTX 3070: **225,164 non-black pixels / 38 color buckets**. Resize, Nether transition, Overworld return, disable, re-enable, and resource reload all completed. BSL declares no SSBOs; the smoke verified the empty storage manager is recreated on reload. This is one profile and synthetic-world run, not whole-pack parity.
+- Sildur's Vibrant 2.02 Extreme was tried in the RTX 3070 harness, but the final frame remained black after its deferred pass. Instrumented copies show the deferred attachment and `depthtex0` contain data; probes narrowed the failure to the pack's lighting calculation, but did not establish the cause. This is a failed result for that harness/configuration, not proof that the pack fails on every setup; full visual compatibility is not certified.
 
 The refreshed source audit covers four SHA-512-pinned archives, 12 defaults, 63 profile/dimension cases, and 5,178 declared stages. All 75 rows have `errorCount=0`; all retain `visualValidation=false`:
 
@@ -21,7 +22,7 @@ The refreshed source audit covers four SHA-512-pinned archives, 12 defaults, 63 
 | Complementary Reimagined r5.9.3 | 27 | 324 / 0 | 9 / 0 | One `COMPLEMENTARY` profile smoke and lifecycle passed; no whole-pack certification |
 | Complementary Unbound r5.9.3 | 27 | 324 / 0 | 9 / 0 | One `COMPLEMENTARY` profile smoke and lifecycle passed; no whole-pack certification |
 | BSL v10.1.8 | 18 | 198 / 0 | 0 / 0 | `HIGH` selected-profile lifecycle smoke passed; no whole-pack certification |
-| Sildur's Vibrant Shaders v2.02 Extreme | 3 | 18 / 0 | 0 / 0 | Not tested as a complete pack |
+| Sildur's Vibrant Shaders v2.02 Extreme | 3 | 18 / 0 | 0 / 0 | RTX 3070 harness attempt: black final frame after deferred; cause unconfirmed, no compatibility certification |
 
 The offline audit cannot verify the selected Complementary profiles' required `vertexPipelineStoresAndAtomics` device feature. Earlier Lavapipe CI reported `VUID-RuntimeSpirv-NonWritable-06341`; keep this issue open until fresh Graphics checks for the current PR #85 head complete successfully. PR #85 remains draft and T3 is watching it; hosted checks have not been manually polled.
 

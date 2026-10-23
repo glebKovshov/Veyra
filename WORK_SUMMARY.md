@@ -1358,3 +1358,8 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 
 - README previously directed users to GitHub's `/releases/latest` endpoint, while the release workflow intentionally marks beta releases `--prerelease --latest=false`. Updated both download/install links to the releases listing so beta.31 remains discoverable without replacing GitHub's latest non-prerelease selection.
 - This documentation correction is being added to the existing #85 release branch. It changes the PR head, so exact-head hosted checks must be assessed on the new head before merge.
+### Beta.31 compatibility documentation sync — 2026-10-23
+
+- Updated current candidate compatibility documentation to record the RTX 3070 Sildur's Vibrant 2.02 Extreme attempt: the frame stayed black after deferred; probes show attachment/depth data but do not localize the lighting cause. Wording explicitly limits the result to this harness and does not claim universal incompatibility.
+- Updated beta.31 changelog and release notes from the earlier 502-test checkpoint to the verified 519-test JDK 21 gate. Preserved the source-audit result and synthetic Complementary/BSL/custom-image limits; full packs remain uncertified.
+- Exact hosted validation is still required on the latest PR head before merge/release.
