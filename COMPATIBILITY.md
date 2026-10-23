@@ -1,5 +1,11 @@
 # Shaderpack compatibility - beta.36 validation
 
+## Local Iris `begin.fsh` candidate - not published - 2026-10-23
+
+The follow-up adds Iris `begin` and numbered `begin1`-`begin99` fragment passes to the pre-shadow frame phase. Graphics and matching compute components run in program order before shadow rendering, and the example verifies that a value written to `colortex1` remains available to `final.fsh`. The fixture is included in the hosted Lavapipe graphics matrix. This synthetic pass check does not establish full Iris scheduling parity or whole-pack compatibility.
+
+The forced JDK 21 gate passed **568 tests** (0 failures/errors/skips), validated **102 example shaders / 118 direct Vulkan SPIR-V compilations**, built the mod, compiled the graphics-smoke client, and packaged example packs. On an NVIDIA RTX 3070, the new default-clear fixture passed with **230,400 active magenta pixels / 0 after disabling the pack**. Its `begin.fsh` runs before the shadow pass, and `final.fsh` reads its `colortex1` output despite the default per-frame clear setting. The client log had no runtime VUID, validation-error, or device-loss markers; Khronos validation was not enabled. The exact-head hosted checks are pending. This implementation candidate is not a release artifact.
+
 ## Beta.36 results: read-only custom-image samplers in basic and line vertex stages - 2026-10-23
 
 Beta.36 adds read-only custom-image sampler support to `gbuffers_basic.vsh` and `gbuffers_line.vsh`. Their image declarations are removed before native vertex adaptation, and native descriptor layouts merge image samplers declared in vertex and fragment stages. Storage-image writes through these basic/line graphics pipelines remain explicitly unsupported.

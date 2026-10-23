@@ -8,6 +8,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ComputeProgramSequenceTest {
     @Test
+    void beginComputeComponentsRunBeforeTheirMatchingGraphicsPrograms() {
+        assertEquals(ShaderPassPhase.BEGIN, ShaderPassPhase.forProgram("begin"));
+        assertEquals(ShaderPassPhase.BEGIN, ShaderPassPhase.forProgram("begin99"));
+
+        var events = ComputeProgramSequence.interleave(ShaderPassPhase.BEGIN,
+                List.of("begin1", "begin"), List.of("begin", "begin1"));
+
+        assertEquals(List.of(
+                ComputeProgramSequence.Event.compute("begin"),
+                ComputeProgramSequence.Event.graphics("begin", 0),
+                ComputeProgramSequence.Event.compute("begin1"),
+                ComputeProgramSequence.Event.graphics("begin1", 1)), events);
+    }
+
+    @Test
     void computeComponentsRunAtTheirParentPostProgramBoundary() {
         var events = ComputeProgramSequence.interleave(ShaderPassPhase.COMPOSITE,
                 List.of("composite1", "composite", "final"),

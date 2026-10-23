@@ -285,6 +285,7 @@ public final class VeyraRenderer {
     private static final Map<Integer, VeyraColorTextureSnapshot> geometryColorSnapshots = new HashMap<>();
     private static final Map<Integer, GeometryColorSnapshotSource> geometryColorSnapshotSources = new HashMap<>();
     private static final Set<Integer> initializedColorTargets = new java.util.HashSet<>();
+    private static int colorTargetsLastClearedFrame = -1;
     private static CachedOrthoProjectionMatrixBuffer projectionBuffer;
     private static PipelineSet pipelineSet;
     private static VeyraStorageBufferResources storageBufferResources;
@@ -1314,7 +1315,7 @@ public final class VeyraRenderer {
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
         updateFrameClock();
-        nextPostPhase = 0;
+        nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
         Matrix4f currentModelView = new Matrix4f(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
@@ -2791,7 +2792,7 @@ public final class VeyraRenderer {
             damagedBlockPipelineDirty = false;
             beaconBeamPipelineDirty = false;
             cloudPipelineDirty = false;
-            nextPostPhase = 0;
+            nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
             renderingEnabled = pack.supportsShaderPrograms();
             lastError = "";
             boolean hasTerrainPipelines = terrainPipelineSet != null && !terrainPipelineSet.pipelines().isEmpty();
@@ -2986,7 +2987,7 @@ public final class VeyraRenderer {
     public static void invalidatePipelines() {
         VeyraSpecularTextures.invalidate();
         VeyraNormalTextures.invalidate();
-        nextPostPhase = 0;
+        nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
         pipelinesDirty = true;
         projectionBuffer = null;
         resetShadowPipelineState();
@@ -3030,15 +3031,16 @@ public final class VeyraRenderer {
         cloudPipelineDirty = selectedPack().map(ShaderPack::hasCloudFragment).orElse(false);
     }
 
-    private static int nextPostPhase;
+    private static int nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
 
-    /** Runs Iris setup and begin compute programs at their pre-shadow frame boundaries. */
+    /** Runs Iris setup compute and begin graphics/compute programs at their pre-shadow frame boundaries. */
     public static void renderBeginCompute(Minecraft minecraft) {
         if (!isRenderingEnabled() || minecraft.level == null || minecraft.player == null) return;
         if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) return;
 
         VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
-        if (compute == null && !terrainPipelineDirty) {
+        boolean beginGraphics = pipelineSet != null && pipelineSet.hasPhase(ShaderPassPhase.BEGIN);
+        if (compute == null && !terrainPipelineDirty && !pipelinesDirty && !beginGraphics) {
             if (storageBufferResources != null) {
                 if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
                 storageBufferResources.clearUninitializedBuffers();
@@ -3053,14 +3055,15 @@ public final class VeyraRenderer {
             compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
             List<String> setupPrograms = compute == null ? List.of() : compute.setupProgramNames();
             List<String> beginPrograms = compute == null ? List.of() : compute.beginProgramNames();
-            if (setupPrograms.isEmpty() && beginPrograms.isEmpty()) {
+            beginGraphics = pipelineSet != null && pipelineSet.hasPhase(ShaderPassPhase.BEGIN);
+            if (setupPrograms.isEmpty() && beginPrograms.isEmpty() && !beginGraphics) {
                 if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
                 if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
                 return;
             }
             if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
             if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
-            compute.clearForFrame(frameCounter);
+            if (compute != null) compute.clearForFrame(frameCounter);
             boolean setupNeedsDispatch = !setupPrograms.isEmpty()
                     && (setupComputePending || setupComputeWidth != mainTarget.width
                     || setupComputeHeight != mainTarget.height);
@@ -3070,11 +3073,13 @@ public final class VeyraRenderer {
                 setupComputeWidth = mainTarget.width;
                 setupComputeHeight = mainTarget.height;
             }
-            if (!beginPrograms.isEmpty()) compute.dispatchBeginPrograms(mainTarget.width, mainTarget.height);
+            if (!beginPrograms.isEmpty() || beginGraphics) {
+                renderPhase(minecraft, ShaderPassPhase.BEGIN);
+            }
         } catch (Exception exception) {
             renderingEnabled = false;
             lastError = shortError(exception);
-            VeyraClient.LOGGER.error("Disabled shader begin-compute after a rendering failure.", exception);
+            VeyraClient.LOGGER.error("Disabled the shader pre-shadow pass after a rendering failure.", exception);
         }
     }
 
@@ -3108,18 +3113,23 @@ public final class VeyraRenderer {
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
             VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
-            if (pipelineSet.usesShadowSampler() && !VeyraShadowRenderer.hasCompletedShadowMap()) return;
+            if (phase != ShaderPassPhase.BEGIN && pipelineSet.usesShadowSampler()
+                    && !VeyraShadowRenderer.hasCompletedShadowMap()) return;
             ColorTargetSettings sceneColorSettings = pipelineSet.colorTargetSettings().getOrDefault(
                     0, ColorTargetSettings.defaults(0, mainTarget.width, mainTarget.height));
             ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings.format());
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
-            if (phase == ShaderPassPhase.PREPARE) {
-                clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
-                geometryColorSnapshotSources.clear();
-            }
             FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
             List<String> computePrograms = compute == null ? List.of() : compute.programNames(phase);
+            boolean clearAtBegin = phase == ShaderPassPhase.BEGIN && !framePlan.shaderPasses().isEmpty();
+            boolean clearAtPrepare = phase == ShaderPassPhase.PREPARE
+                    && colorTargetsLastClearedFrame != frameCounter;
+            if (clearAtBegin || clearAtPrepare) {
+                clearColorTargetBuffers(pipelineSet.colorTargetIndices(), pipelineSet.colorTargetSettings());
+                colorTargetsLastClearedFrame = frameCounter;
+                geometryColorSnapshotSources.clear();
+            }
             if (framePlan.shaderPasses().isEmpty() && computePrograms.isEmpty()) return;
             if (compute != null || storageBufferResources != null) {
                 if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
@@ -3246,7 +3256,7 @@ public final class VeyraRenderer {
         pipelinesDirty = false;
         renderingEnabled = pack.supportsShaderPrograms();
         lastError = "";
-        VeyraClient.LOGGER.info("Loaded {} post-processing pass(es) from shader pack '{}'.",
+        VeyraClient.LOGGER.info("Loaded {} shader-pack graphics pass(es) from shader pack '{}'.",
                 pipelineSet.passCount(), pack.name());
     }
 
@@ -7760,6 +7770,7 @@ public final class VeyraRenderer {
         });
         colorTargets.clear();
         initializedColorTargets.clear();
+        colorTargetsLastClearedFrame = -1;
         currentColorTargets.clear();
     }
 
@@ -8014,6 +8025,7 @@ public final class VeyraRenderer {
             old.close();
         }
         if (old != next) {
+            colorTargetsLastClearedFrame = -1;
             currentColorTargets.clear();
             if (next != null) {
                 for (int index : next.colorTargetIndices()) {
@@ -8281,6 +8293,9 @@ public final class VeyraRenderer {
             if (a.initialColorTargets().equals(current)) return a;
             if (b.initialColorTargets().equals(current)) return b;
             throw new IllegalStateException("The current colortex buffers do not match " + phase + " frame plans.");
+        }
+        private boolean hasPhase(ShaderPassPhase phase) {
+            return !plansA.get(phase.ordinal()).shaderPasses().isEmpty();
         }
         private int passCount() { return plansA.stream().mapToInt(plan -> plan.shaderPasses().size()).sum(); }
         @Override public void close() {

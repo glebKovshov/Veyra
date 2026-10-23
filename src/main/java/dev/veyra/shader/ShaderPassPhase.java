@@ -1,10 +1,11 @@
 package dev.veyra.shader;
 
-/** Iris pass boundaries; final is part of the last phase after composite. */
+/** Iris pass boundaries; begin runs before shadows, final ends the last phase after composite. */
 public enum ShaderPassPhase {
-    PREPARE, DEFERRED, COMPOSITE;
+    BEGIN, PREPARE, DEFERRED, COMPOSITE;
 
     public static ShaderPassPhase forProgram(String name) {
+        if (name.matches("begin\\d*")) return BEGIN;
         if (name.matches("prepare\\d*")) return PREPARE;
         if (name.matches("deferred\\d*")) return DEFERRED;
         if (name.matches("composite\\d*") || name.equals("final")) return COMPOSITE;
