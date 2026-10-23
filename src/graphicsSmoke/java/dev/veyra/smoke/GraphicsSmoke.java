@@ -1026,7 +1026,8 @@ public final class GraphicsSmoke {
             // A pack may already start with the selected profile's effective values. In that case
             // applyOptions reports a no-op; accept it only after verifying every profile entry.
             boolean alreadyActive = applied.equals("Shader options unchanged.") && profileMatches;
-            if ((!applied.isEmpty() && !alreadyActive) || !VeyraRenderer.isRenderingEnabled()
+            boolean appliedSuccessfully = applied.startsWith("Enabled ");
+            if ((!appliedSuccessfully && !alreadyActive) || !VeyraRenderer.isRenderingEnabled()
                     || !VeyraRenderer.getLastError().isEmpty()) {
                 throw new IllegalStateException("Could not apply " + thirdPartyProfile + " profile: " + applied
                         + " (" + VeyraRenderer.getLastError() + ")");
