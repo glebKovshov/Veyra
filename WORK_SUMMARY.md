@@ -1376,3 +1376,15 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 
 - Added an isolated C/Vulkan probe and a dedicated GitHub Actions job. The probe enables `vertexPipelineStoresAndAtomics` through legacy `VkDeviceCreateInfo.pEnabledFeatures`, creates a vertex shader module that writes a storage buffer, and attempts a minimal graphics pipeline under Khronos validation on the same Lavapipe runner image.
 - This isolates validation-layer feature tracking from VulkanMod and Veyra's mixin. It has not run yet; use its result to decide whether to revise the feature-injection path or investigate the runner's layer/driver combination. No VUID allowance was added.
+
+- Probe/workflow commit `745b218f530f88775880b91592595ddb21d3bbbe` отправлен в `release-prep/beta31-release-batch`. Exact-head PR checks are running: Graphics run `39890490126`, Build PR run `39890490056`, source audit run `39890490075`; the standalone push Build is `39890486798`. Probe result is pending.
+
+### VulkanMod feature-block allocation correction — pending hosted validation
+
+- The isolated Lavapipe probe passed on the same `llvmpipe` image: standalone `pEnabledFeatures.vertexPipelineStoresAndAtomics=true` plus a vertex storage-buffer pipeline produced **0 validation errors**. This rules out a general Lavapipe/VVL false positive for the feature.
+- Changed the device-create helper to copy VulkanMod's requested core features into a separate `VkPhysicalDeviceFeatures` allocation, add supported Veyra features there, pass that standalone struct to `vkCreateDevice`, and restore the original pointer afterward. VulkanMod's source block and `pNext` chain remain untouched.
+- Updated unit coverage to verify the separate block retains existing requested bits and that VulkanMod's original feature block is unchanged. Hosted Build/Graphics/source-audit must validate this exact new head; no result yet.
+
+- Новый isolated baseline job `39890490126` показал: сам llvmpipe/VVL принимает direct `pEnabledFeatures` и создаёт vertex storage-buffer pipeline с нулём ошибок. Поэтому гипотеза о ложноположительном VUID среды не подтверждается.
+- Изменил #85 device-feature hook: теперь `VkDeviceCreateInfo` получает отдельную plain `VkPhysicalDeviceFeatures` копию, а исходный VulkanMod pointer возвращается после native вызова. Unit test проверяет, что три новые бита не меняют исходный вложенный блок, при этом исходные поддержанные биты и pNext сохраняются.
+- Попытка локального `gradlew test` остановилась до запуска: в текущем shell нет `JAVA_HOME` и команды `java`. Для нового точного head ожидаются hosted Build, source audit и Lavapipe Graphics; до их результатов не считать исправление подтверждённым.

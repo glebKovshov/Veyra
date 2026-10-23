@@ -27,8 +27,6 @@ public abstract class DeviceManagerMixin {
             VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.calloc(stack);
             VK10.vkGetPhysicalDeviceProperties(physicalDevice, properties);
             VkPhysicalDeviceFeatures originalFeatures = createInfo.pEnabledFeatures();
-            VkPhysicalDeviceFeatures originalFeatureValues = originalFeatures == null
-                    ? null : VkPhysicalDeviceFeatures.calloc(stack).set(originalFeatures);
             VkDeviceCreateInfo enabledCreateInfo = VeyraDeviceFeatures.withSupportedFeatures(
                     createInfo, supported, stack);
             try {
@@ -49,11 +47,7 @@ public abstract class DeviceManagerMixin {
                         Long.toHexString(enabled.address()), Long.toHexString(enabledCreateInfo.pNext()));
                 return result;
             } finally {
-                if (originalFeatures == null) {
-                    createInfo.pEnabledFeatures((VkPhysicalDeviceFeatures) null);
-                } else {
-                    originalFeatures.set(originalFeatureValues);
-                }
+                createInfo.pEnabledFeatures(originalFeatures);
             }
         }
     }
