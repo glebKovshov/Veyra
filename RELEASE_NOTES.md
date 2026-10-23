@@ -14,4 +14,6 @@ The final local JDK 21 gate passed **554 tests** with no failures, errors, or sk
 
 The hosted `basic-custom-image` Lavapipe fixture sampled the same image in the basic vertex and fragment stages and read **471 active green pixels / 0 after disabling the pack**, with **0 runtime Vulkan validation errors**. Twenty process-teardown diagnostics were retained in the CI artifact. The line-stage example is covered by capability/interface regression checks; it has no line-specific GPU readback. These are named synthetic fixtures, not third-party shaderpack or natural-world visual certification. The release workflow runs the full Lavapipe matrix, source audit, versioned build/tests, and distributable verifier before publishing.
 
+The final PR #94 head passed **52/52 hosted checks**, including the complete 49-job Lavapipe matrix, Build, and pinned source audit. The merged beta.36 candidate also passed the forced local JDK 21 gate and its JAR verifier; the published asset and checksum will be listed in the project work summary.
+
 Veyra remains an experimental Iris-compatible subset. Do not infer complete shaderpack support or stable Iris parity from these results. See `COMPATIBILITY.md` and `ARCHITECTURE.md` for measured evidence and unresolved work.
