@@ -47,6 +47,11 @@ public final class VeyraComputePipeline extends Pipeline {
             shaderSource = direct.computeSource();
             storageBufferDescriptors = direct.storageDescriptors();
         }
+        boolean hasStorageImage = shader.resources().stream()
+                .anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage);
+        if (!hasStorageImage && storageBufferDescriptors.isEmpty()) {
+            throw new IOException(name + " must use an active storage image or an allocated bufferObject SSBO.");
+        }
         requireGraphicsQueueComputeSupport();
         validateLocalSize(name, shader.localSizeX(), shader.localSizeY(), shader.localSizeZ());
         this.localSizeX = shader.localSizeX();

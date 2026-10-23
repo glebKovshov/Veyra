@@ -65,12 +65,6 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             for (int index = 0; index < adapted.size(); index++) {
                 String file = files.get(index);
                 ComputeShaderAdapter.AdaptedStage shader = adapted.get(index);
-                boolean hasStorageImage = shader.resources().stream()
-                        .filter(ComputeShaderAdapter.OpaqueResource::storageImage)
-                        .findAny().isPresent();
-                if (!hasStorageImage) {
-                    throw new IOException(file + " does not declare an active storage image; Veyra compute stages currently require image resources.");
-                }
                 String stageProgram = file.substring(0, file.length() - ".csh".length());
                 String program = computeProgramName(file);
                 ShaderPackStorageBufferProperties.IndirectDispatch indirect = null;
