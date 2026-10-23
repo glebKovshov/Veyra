@@ -10,7 +10,7 @@ Beta.37 adds Iris `setup` and pre-shadow `begin` compute programs, pre-shadow `b
 
 ## Validation and known limits
 
-The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; it validated **102 example shader sources**, compiled **118 stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. Physical RTX 3070 fixtures for SSBO-only compute, setup, begin compute, and begin fragment each produced **230,400 active / 0 disabled marker pixels**. Setup-on-resize was not separately exercised on the physical GPU. Khronos validation was not enabled in these Windows runs; the client logs contained no VUID or device-loss markers.
+The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; it validated **102 example shader sources**, compiled **118 stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. Separate RTX 3070 runs of the SSBO-only compute, setup, begin-compute, and begin-fragment fixtures each produced **230,400 active / 0 disabled marker pixels**. Setup-on-resize was not separately exercised on the physical GPU. Khronos validation was not enabled in these Windows runs; the client logs contained no VUID or device-loss markers.
 
 The release workflow requires a fresh pinned source audit, the full Lavapipe graphics matrix, versioned build/tests, and distributable verification before publishing. These checks validate selected source paths and synthetic render fixtures, not complete third-party shaderpacks or natural-world visuals. Pinned source-audit rows explicitly retain `visualValidation: false`.
 
