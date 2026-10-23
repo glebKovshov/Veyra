@@ -36,7 +36,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasDamagedBlockFragment, Set<String> blockPrograms, String issue, ShaderPackConfiguration configuration) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
     private static final int MAX_PASS_SUFFIX = 99;
-    private static final List<String> MULTI_PASS_PROGRAMS = List.of("prepare", "deferred", "composite");
+    private static final List<String> MULTI_PASS_PROGRAMS = List.of("begin", "prepare", "deferred", "composite");
     private static final List<String> SHADOW_PROGRAMS = List.of(
             "shadow", "shadow_solid", "shadow_cutout", "shadow_water", "shadow_entities", "shadow_block");
     private static final List<String> TERRAIN_PROGRAMS = List.of(
@@ -151,7 +151,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     inspection != null && inspection.hasDamagedBlockFragment(),
                     inspection == null ? Set.of() : inspection.blockPrograms(),
                     inspection == null
-                            ? "No supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, prepare, deferred, composite, or final fragment programs were found."
+                            ? "No supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, begin, prepare, deferred, composite, or final fragment programs were found."
                             : "Supported terrain, clouds, sky, entities, block entities, hand, damaged-block, particles, weather, beacon beam, lightning, basic, line, glint, textured, and/or post-processing fragment programs are available.", configuration);
         } catch (IOException | RuntimeException exception) {
             return new ShaderPack(path, name, null, false, Set.of(), false, Set.of(), Set.of(), Set.of(), false, false,
@@ -1313,9 +1313,6 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (Set.of("csh", "gsh", "tcs", "tes").contains(extension)) {
                 if (extension.equals("csh") && configuration.customImages()) continue; // Validated with the complete active sequence above.
                 throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
-            }
-            if (program.matches("begin\\d*")) {
-                throw new IOException("Cannot execute " + file + ": begin passes are not implemented by Veyra.");
             }
         }
     }

@@ -172,7 +172,6 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         LinkedHashSet<String> names = new LinkedHashSet<>();
         for (Dispatch stage : stages) {
             if (isShadowComputeFile(stage.programName() + ".csh")
-                    || isBeginComputeFile(stage.stageProgram() + ".csh")
                     || isSetupComputeFile(stage.stageProgram() + ".csh")) continue;
             if (ShaderPassPhase.forProgram(stage.programName()) == phase) names.add(stage.programName());
         }

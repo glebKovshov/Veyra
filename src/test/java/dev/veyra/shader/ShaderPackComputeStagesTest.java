@@ -78,6 +78,16 @@ class ShaderPackComputeStagesTest {
     }
 
     @Test
+    void discoversBeginFragmentProgramBeforeTheShadowPass() throws Exception {
+        var pack = ShaderPack.inspect(Path.of("examples/begin-fragment-stage")).withRuntimeFeatures();
+
+        assertEquals(List.of("begin", "final"),
+                pack.readPrograms().stream().map(ShaderPack.Program::name).toList());
+        assertTrue(pack.hasPostProcessing());
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+    }
+
+    @Test
     void acceptsSetupComputeStagesThatRunWhenThePipelineIsInitialized() throws Exception {
         var pack = ShaderPack.inspect(Path.of("examples/compute-setup-stage")).withRuntimeFeatures();
 

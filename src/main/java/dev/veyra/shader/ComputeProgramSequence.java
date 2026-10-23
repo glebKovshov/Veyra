@@ -44,6 +44,7 @@ final class ComputeProgramSequence {
                 if (second.equals("final")) return -1;
             }
             String prefix = switch (phase) {
+                case BEGIN -> "begin";
                 case PREPARE -> "prepare";
                 case DEFERRED -> "deferred";
                 case COMPOSITE -> "composite";
