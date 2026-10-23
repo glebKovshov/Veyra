@@ -2,7 +2,7 @@
 
 ## Beta.32 Sildur lifecycle follow-up - 2026-10-23
 
-Beta.32 is an experimental follow-up to the published beta.31 release and includes the fixes from [PR #88](https://github.com/GlebKovshov/Veyra/pull/88). The release workflow validates the versioned source and publishes the verified distributable JAR with `SHA256SUMS.txt`.
+Beta.32 is an experimental follow-up to the published beta.31 release and includes the Sildur lifecycle fixes from [PR #88](https://github.com/GlebKovshov/Veyra/pull/88) plus the shader-source performance fix from [PR #89](https://github.com/GlebKovshov/Veyra/pull/89). The release workflow validates the versioned source and publishes the verified distributable JAR with `SHA256SUMS.txt`.
 
 Runtime evidence was collected on Windows with Java 21.0.12, Minecraft 1.21.11, Fabric Loader 0.18.4, VulkanMod 0.6.8+1.21.11, and an NVIDIA RTX 3070:
 
