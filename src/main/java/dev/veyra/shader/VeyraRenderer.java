@@ -3029,6 +3029,32 @@ public final class VeyraRenderer {
 
     private static int nextPostPhase;
 
+    /** Runs Iris begin compute programs once at the head of each level frame, before shadow rendering. */
+    public static void renderBeginCompute(Minecraft minecraft) {
+        if (!isRenderingEnabled() || minecraft.level == null || minecraft.player == null) return;
+        if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) return;
+
+        VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
+        if (compute != null && compute.beginProgramNames().isEmpty()) return;
+        if (compute == null && !terrainPipelineDirty) return;
+
+        try {
+            RenderTarget mainTarget = minecraft.getMainRenderTarget();
+            if (mainTarget.width <= 0 || mainTarget.height <= 0) return;
+            ensurePipelines(mainTarget.width, mainTarget.height);
+            compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
+            if (compute == null || compute.beginProgramNames().isEmpty()) return;
+            if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
+            if (storageBufferResources != null) storageBufferResources.clearForFrame(frameCounter);
+            compute.clearForFrame(frameCounter);
+            compute.dispatchBeginPrograms(mainTarget.width, mainTarget.height);
+        } catch (Exception exception) {
+            renderingEnabled = false;
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Disabled shader begin-compute after a rendering failure.", exception);
+        }
+    }
+
     public static void renderPrepare(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.PREPARE); }
     public static void renderDeferred(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.DEFERRED); }
     public static void render(Minecraft minecraft) { renderThroughPhase(minecraft, ShaderPassPhase.COMPOSITE); }
@@ -4087,7 +4113,7 @@ public final class VeyraRenderer {
         if (compute != null || storageBufferResources != null) {
             Renderer.getInstance().endRenderPass();
             if (compute != null) compute.clearForFrame(frameCounter);
-            if (storageBufferResources != null) storageBufferResources.clearForShadowPass();
+            if (storageBufferResources != null) storageBufferResources.clearForFrame(frameCounter);
         }
     }
 

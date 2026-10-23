@@ -29,6 +29,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
     private final Map<Integer, StorageBuffer> buffers = new ConcurrentHashMap<>();
     private final Map<String, ShaderPackStorageBuffers.StorageBlock> blocks = new ConcurrentHashMap<>();
     private long allocatedBytes;
+    private int lastClearedFrame = Integer.MIN_VALUE;
     private boolean closed;
 
     private VeyraStorageBufferResources(ShaderPackStorageBufferProperties properties, int viewWidth, int viewHeight) {
@@ -166,10 +167,10 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
     public record DirectCompilation(String vertexSource, String fragmentSource, String computeSource,
                                     List<UBO> storageDescriptors) { }
 
-    /** Clears pack SSBOs before shadow writers run and makes the transfer writes visible to shader stages. */
-    public void clearForShadowPass() {
+    /** Clears pack SSBOs once before this frame's first writer and makes the transfer writes visible. */
+    public void clearForFrame(int frameCounter) {
         ensureOpen();
-        if (buffers.isEmpty()) return;
+        if (buffers.isEmpty() || lastClearedFrame == frameCounter) return;
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
         if (!Renderer.isRecording() || commandBuffer == null) {
             throw new IllegalStateException("Shader-pack storage buffers can only be cleared while VulkanMod records a frame.");
@@ -182,6 +183,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
                 VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_ACCESS_TRANSFER_WRITE_BIT,
                 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        lastClearedFrame = frameCounter;
     }
 
     /** Orders shadow-stage writes before shadow compute and later graphics/post-processing readers. */

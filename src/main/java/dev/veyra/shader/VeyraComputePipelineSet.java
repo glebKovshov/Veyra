@@ -17,7 +17,7 @@ import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-/** Owns active shadow and post-processing compute stages and their shared images. */
+/** Owns active begin, shadow, and post-processing compute stages and their shared images. */
 public final class VeyraComputePipelineSet implements AutoCloseable {
     private final VeyraComputeResources resources;
     private final List<Dispatch> stages;
@@ -171,10 +171,29 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         ensureOpen();
         LinkedHashSet<String> names = new LinkedHashSet<>();
         for (Dispatch stage : stages) {
-            if (isShadowComputeFile(stage.programName() + ".csh")) continue;
+            if (isShadowComputeFile(stage.programName() + ".csh")
+                    || isBeginComputeFile(stage.stageProgram() + ".csh")) continue;
             if (ShaderPassPhase.forProgram(stage.programName()) == phase) names.add(stage.programName());
         }
         return List.copyOf(names);
+    }
+
+    /** Returns begin compute programs in pass/component order for dispatch before the shadow map. */
+    public List<String> beginProgramNames() {
+        ensureOpen();
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Dispatch stage : stages) {
+            if (isBeginComputeFile(stage.stageProgram() + ".csh")) names.add(stage.programName());
+        }
+        return List.copyOf(names);
+    }
+
+    /** Dispatches begin compute programs before the world shadow pass. */
+    public void dispatchBeginPrograms(int renderWidth, int renderHeight) {
+        ensureOpen();
+        for (String programName : beginProgramNames()) {
+            dispatchProgram(programName, renderWidth, renderHeight);
+        }
     }
 
     public boolean hasShadowComputeStages() {
@@ -279,5 +298,9 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
 
     private static boolean isShadowComputeFile(String file) {
         return file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
+    }
+
+    private static boolean isBeginComputeFile(String file) {
+        return file.matches("begin(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
     }
 }
