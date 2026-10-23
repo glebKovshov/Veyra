@@ -518,6 +518,15 @@ public final class VeyraRenderer {
             String name = uniform.name();
             if (CustomUniforms.PACK_OVERRIDABLE.contains(name)) {
                 // The built-in supplier resolves the pack override itself and must survive pack switches.
+                // Iris' framemod helpers are floats by default, but packs can declare an int/bool override;
+                // VulkanMod needs the integer map entry too, and this supplier preserves the built-in fallback.
+                if (uniform.type() != CustomUniforms.Type.FLOAT) {
+                    Uniforms.vec1i_uniformMap.put(name, () -> shaderPackIntUniform(name));
+                    if (uniform.type() == CustomUniforms.Type.BOOL) {
+                        Uniforms.vec1i_uniformMap.put("veyra_" + name,
+                                () -> shaderPackIntUniform(name));
+                    }
+                }
                 continue;
             }
             if (uniform.type() == CustomUniforms.Type.FLOAT) {
@@ -1699,8 +1708,8 @@ public final class VeyraRenderer {
                     EntityIdMap.UNMAPPED, currentBlockEntityIdentifier(), itemId, false);
             if (replacement == null) return originalType;
             if (!blockEntityPipelineRoutingLogged) {
-                VeyraClient.LOGGER.info("Routing block entity pipeline {} through {} from shader pack '{}'.",
-                        original.getLocation(), resolveBlockEntityProgram(pack, original), pack.name());
+                VeyraClient.LOGGER.info("Routing block entity pipeline {} through shader pack '{}'.",
+                        original.getLocation(), pack.name());
                 blockEntityPipelineRoutingLogged = true;
             }
             return replaceRenderTypePipeline(originalType, replacement, "_veyra_block");
@@ -1728,8 +1737,7 @@ public final class VeyraRenderer {
         EntityPipelineSet pipelines = getBlockEntityPipelineSet(pack);
         RenderPipeline replacement = pipelines == null ? null : pipelines.pipelines().get(original);
         if (replacement != null && !signTextPipelineRoutingLogged) {
-            VeyraClient.LOGGER.info("Routing sign text through {} from shader pack '{}'.",
-                    resolveBlockTextProgram(pack), pack.name());
+            VeyraClient.LOGGER.info("Routing sign text through shader pack '{}'.", pack.name());
             signTextPipelineRoutingLogged = true;
         }
         return replacement;
@@ -1806,7 +1814,14 @@ public final class VeyraRenderer {
             return null;
         }
         updateTerrainLayerMode(pack);
-        String programName = resolveTerrainProgram(pack, terrainRenderType);
+        String programName;
+        try {
+            programName = resolveTerrainProgram(pack, terrainRenderType);
+        } catch (IOException exception) {
+            lastError = shortError(exception);
+            VeyraClient.LOGGER.error("Could not resolve terrain shader fallback for shader pack '{}'.", pack.name(), exception);
+            return null;
+        }
         if (programName == null) {
             return null;
         }
@@ -2133,8 +2148,14 @@ public final class VeyraRenderer {
         EntityPipelineSet pipelines = getHandPipelineSet(pack);
         RenderPipeline replacement = pipelines == null ? null : pipelines.pipelines().get(original);
         if (replacement != null && !handPipelineRoutingLogged) {
+            String programName = "unresolved";
+            try {
+                programName = resolveHandProgram(pack, original);
+            } catch (IOException exception) {
+                VeyraClient.LOGGER.warn("Could not resolve the active first-person hand shader program.", exception);
+            }
             VeyraClient.LOGGER.info("Routing first-person hand pipeline {} through {} from shader pack '{}'.",
-                    original.getLocation(), resolveHandProgram(pack, original), pack.name());
+                    original.getLocation(), programName, pack.name());
             handPipelineRoutingLogged = true;
         }
         return replacement;
@@ -3552,15 +3573,19 @@ public final class VeyraRenderer {
         if (BOOLEAN_UNIFORMS.contains(uniform)) {
             return true;
         }
-        CustomUniforms.Uniform custom = SUPPORTED_UNIFORMS.contains(uniform) ? null
-                : CustomUniforms.active().uniform(uniform);
-        return custom != null && custom.type() == CustomUniforms.Type.BOOL;
+        CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
+        return custom != null && custom.type() == CustomUniforms.Type.BOOL
+                && (!SUPPORTED_UNIFORMS.contains(uniform) || CustomUniforms.PACK_OVERRIDABLE.contains(uniform));
     }
 
     private static String shaderPackUniformType(String uniform) {
+        CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
+        if (custom != null && (!SUPPORTED_UNIFORMS.contains(uniform)
+                || CustomUniforms.PACK_OVERRIDABLE.contains(uniform))) {
+            return custom.type() == CustomUniforms.Type.FLOAT ? "float" : "int";
+        }
         if (!SUPPORTED_UNIFORMS.contains(uniform)) {
-            CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
-            return custom == null ? null : custom.type() == CustomUniforms.Type.FLOAT ? "float" : "int";
+            return null;
         }
         if (MATRIX_UNIFORMS.contains(uniform)) {
             return "mat4";
@@ -3583,7 +3608,7 @@ public final class VeyraRenderer {
         return SUPPORTED_UNIFORMS.contains(uniform) ? "float" : null;
     }
 
-    private static String appendShaderPackUniformBlock(StringBuilder source, List<String> uniforms, String shaderSource) {
+    static String appendShaderPackUniformBlock(StringBuilder source, List<String> uniforms, String shaderSource) {
         return appendShaderPackUniformBlock(source, uniforms, shaderSource, Set.of());
     }
 
@@ -3711,31 +3736,30 @@ public final class VeyraRenderer {
             var noCustomImages = new ShaderPackImageBindings.PreparedStage("", List.of());
             for (String programName : List.of(
                     "gbuffers_terrain", "gbuffers_terrain_solid", "gbuffers_terrain_cutout", "gbuffers_water")) {
-                if (!pack.terrainPrograms().contains(programName)) {
-                    continue;
-                }
-                Set<String> configuredCustomTextureSamplers = packTextures.samplersForProgram(programName);
-                var shaderPackVertex = compute == null ? pack.readStage(programName + ".vsh")
-                        : pack.readCustomImageStage(programName + ".vsh");
+                String sourceProgram = pack.terrainFallbackProgram(programName);
+                if (sourceProgram == null) continue;
+                Set<String> configuredCustomTextureSamplers = packTextures.samplersForProgram(sourceProgram);
+                var shaderPackVertex = compute == null ? pack.readStage(sourceProgram + ".vsh")
+                        : pack.readCustomImageStage(sourceProgram + ".vsh");
                 var vertexImages = noCustomImages;
                 if (compute != null && shaderPackVertex.isPresent()) {
-                    vertexImages = ShaderPackImageBindings.prepare(programName + ".vsh", shaderPackVertex.get(), customImages);
+                    vertexImages = ShaderPackImageBindings.prepare(sourceProgram + ".vsh", shaderPackVertex.get(), customImages);
                     shaderPackVertex = java.util.Optional.of(vertexImages.source());
                 }
                 boolean vertexUsesNoiseSampler = false;
                 Map<String, TerrainVertexShaderAdapter.PackVarying> outputDescriptions = Map.of();
                 if (shaderPackVertex.isPresent()) {
                     vertexUsesNoiseSampler = TerrainVertexShaderAdapter.usesNoiseSampler(
-                            programName, shaderPackVertex.get());
+                            sourceProgram, shaderPackVertex.get());
                     outputDescriptions = TerrainVertexShaderAdapter.describeVaryings(
-                            programName, shaderPackVertex.get());
+                            sourceProgram, shaderPackVertex.get());
                 }
-                String fragmentSource = pack.readTerrainFragment(programName)
-                        .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
+                String fragmentSource = pack.readBlockFragment(sourceProgram)
+                        .orElseThrow(() -> new IOException("The pack no longer contains " + sourceProgram + ".fsh."));
                 var fragmentImages = noCustomImages;
                 if (compute != null) {
-                    fragmentImages = ShaderPackImageBindings.prepare(programName + ".fsh",
-                            pack.readCustomImageStage(programName + ".fsh").orElseThrow(), customImages);
+                    fragmentImages = ShaderPackImageBindings.prepare(sourceProgram + ".fsh",
+                            pack.readCustomImageStage(sourceProgram + ".fsh").orElseThrow(), customImages);
                     fragmentSource = fragmentImages.source();
                 }
                 Set<String> customTextureSamplers = TerrainShaderAdapter.usedCustomTextureSamplers(
@@ -3746,9 +3770,9 @@ public final class VeyraRenderer {
                 Set<Integer> shadowColorInputs = ShadowColorSampler.indices(fragmentSource);
                 boolean usesOpaqueShadow = ShadowDepthSampler.used(fragmentSource);
                 if (usesSpecularSampler) VeyraSpecularTextures.prepareTerrain();
-                boolean usesOpaqueDepthSampler = programName.equals("gbuffers_water")
+                boolean usesOpaqueDepthSampler = sourceProgram.equals("gbuffers_water")
                         && TerrainShaderAdapter.usesOpaqueDepthSampler(fragmentSource);
-                Map<String, Integer> colorInputAliases = new java.util.LinkedHashMap<>(programName.equals("gbuffers_water")
+                Map<String, Integer> colorInputAliases = new java.util.LinkedHashMap<>(sourceProgram.equals("gbuffers_water")
                         ? GeometryColorSamplers.read(fragmentSource) : Map.of());
                 customTextureSamplers.forEach(colorInputAliases::remove);
                 Set<Integer> colorInputs = GeometryColorSamplers.indices(colorInputAliases);
@@ -3760,32 +3784,32 @@ public final class VeyraRenderer {
                     unusedOutputLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
                             fragmentSource, outputDescriptions);
                     packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(
-                            programName, shaderPackVertex.get(), unusedOutputLocations);
+                            sourceProgram, shaderPackVertex.get(), unusedOutputLocations);
                 }
                 String adaptedFragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource, shadowSamplerAvailable,
-                        programName.equals("gbuffers_water"), packVaryings, usesNoiseSampler, programName,
+                        sourceProgram.equals("gbuffers_water"), packVaryings, usesNoiseSampler, sourceProgram,
                         customTextureSamplers);
                 String programVertexSource = vertexSource;
                 if (shaderPackVertex.isPresent()) {
                     Set<Integer> reconciledUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
-                            adaptedFragmentSource);
+                            adaptedFragmentSource, packVaryings);
                     if (!reconciledUnusedLocations.equals(unusedOutputLocations)) {
                         unusedOutputLocations = reconciledUnusedLocations;
                         packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(
-                                programName, shaderPackVertex.get(), unusedOutputLocations);
+                                sourceProgram, shaderPackVertex.get(), unusedOutputLocations);
                         adaptedFragmentSource = TerrainShaderAdapter.adaptFragment(fragmentSource,
-                                shadowSamplerAvailable, programName.equals("gbuffers_water"), packVaryings,
-                                usesNoiseSampler, programName, customTextureSamplers);
+                                shadowSamplerAvailable, sourceProgram.equals("gbuffers_water"), packVaryings,
+                                usesNoiseSampler, sourceProgram, customTextureSamplers);
                         reconciledUnusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(
-                                adaptedFragmentSource);
+                                adaptedFragmentSource, packVaryings);
                     }
                     if (!reconciledUnusedLocations.equals(unusedOutputLocations)) {
-                        throw new IOException(programName + ".vsh/.fsh terrain varyings could not reserve a matching interface.");
+                        throw new IOException(sourceProgram + ".vsh/.fsh terrain varyings could not reserve a matching interface.");
                     }
                     String prunedVertexSource = TerrainShaderAdapter.pruneUnusedTerrainVertexOutputs(
                             vertexSource, reconciledUnusedLocations);
                     TerrainVertexShaderAdapter.AdaptedStage adaptedVertex = TerrainVertexShaderAdapter.adaptStage(
-                            prunedVertexSource, shaderPackVertex.get(), programName,
+                            prunedVertexSource, shaderPackVertex.get(), sourceProgram,
                             shadowSamplerAvailable ? 6 : 5, reconciledUnusedLocations);
                     programVertexSource = adaptedVertex.source();
                 }
@@ -3810,7 +3834,7 @@ public final class VeyraRenderer {
                 builder.setShaderSrc(SPIRVUtils.ShaderKind.FRAGMENT_SHADER, adaptedFragmentSource);
                 GraphicsPipeline pipeline = builder.createGraphicsPipeline();
                 pipelines.put(programName, pipeline);
-                VeyraGeometryTargets.register(pipeline, outputLayout, pack.readGeometryBlendSettings(programName));
+                VeyraGeometryTargets.register(pipeline, outputLayout, pack.readGeometryBlendSettings(sourceProgram));
                 setShadowSamplerLayout(pipeline, shadowSamplerAvailable);
                 setShadowColorSamplerLayouts(pipeline);
                 setNoiseSamplerLayout(pipeline);
@@ -4309,8 +4333,8 @@ public final class VeyraRenderer {
                 continue;
             }
             boolean fallback = hand
-                    ? !(HAND_PROGRAM.equals(programName) && pack.hasHandFragment()
-                    || HAND_WATER_PROGRAM.equals(programName) && pack.hasHandWaterFragment())
+                    ? !(HAND_PROGRAM.equals(programName) && pack.hasEnabledHandFragment()
+                    || HAND_WATER_PROGRAM.equals(programName) && pack.hasEnabledHandWaterFragment())
                     : !pack.entityPrograms().contains(programName);
             String rawFragmentSource;
             String fragmentSource;
@@ -4399,8 +4423,8 @@ public final class VeyraRenderer {
                     customImageStage, null));
         }
         if (pipelines.isEmpty() && (hand
-                ? pack.hasHandFragment() || pack.hasHandWaterFragment()
-                : !pack.entityPrograms().isEmpty())) {
+                ? pack.hasEnabledHandFragment() || pack.hasEnabledHandWaterFragment()
+                : pack.hasEnabledProgramFragment(pack.entityPrograms()))) {
             throw new IOException(hand
                     ? "VulkanMod's Minecraft first-person hand render pipelines were not found."
                     : "VulkanMod's Minecraft entity render pipelines were not found.");
@@ -4693,7 +4717,7 @@ public final class VeyraRenderer {
                     customImageStage, null));
         }
         compileSignTextPipelines(pack, customImages, pipelines, variantSources);
-        if (pipelines.isEmpty() && !pack.blockPrograms().isEmpty()) {
+        if (pipelines.isEmpty() && pack.hasEnabledProgramFragment(pack.blockPrograms())) {
             throw new IOException("Minecraft's block entity render pipelines were not found or do not support this shader interface.");
         }
         return new EntityPipelineSet(pipelines, variantSources);
@@ -4702,7 +4726,7 @@ public final class VeyraRenderer {
     private static void compileSignTextPipelines(ShaderPack pack,
                                                  VeyraComputePipelineSet customImages,
                                                  Map<RenderPipeline, RenderPipeline> pipelines,
-                                                 Map<RenderPipeline, EntityPipelineSpec> variantSources) {
+                                                 Map<RenderPipeline, EntityPipelineSpec> variantSources) throws IOException {
         String programName = resolveBlockTextProgram(pack);
         if (programName == null) {
             return;
@@ -4771,17 +4795,20 @@ public final class VeyraRenderer {
         }
     }
 
-    private static String resolveBlockTextProgram(ShaderPack pack) {
-        if (pack.blockPrograms().contains("gbuffers_block")) {
+    private static String resolveBlockTextProgram(ShaderPack pack) throws IOException {
+        if (pack.blockPrograms().contains("gbuffers_block")
+                && pack.hasEnabledProgramFragment("gbuffers_block")) {
             return "gbuffers_block";
         }
-        if (pack.terrainPrograms().contains("gbuffers_terrain")) {
+        if (pack.terrainPrograms().contains("gbuffers_terrain")
+                && pack.hasEnabledProgramFragment("gbuffers_terrain")) {
             return "gbuffers_terrain";
         }
-        if (pack.hasTexturedLitFragment()) {
+        if (pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")) {
             return "gbuffers_textured_lit";
         }
-        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
+        return pack.hasTexturedFragment() && pack.hasEnabledProgramFragment("gbuffers_textured")
+                ? "gbuffers_textured" : null;
     }
 
     private static boolean isSignTextPipeline(RenderPipeline pipeline) {
@@ -4799,21 +4826,25 @@ public final class VeyraRenderer {
         };
     }
 
-    private static String resolveBlockEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
+    private static String resolveBlockEntityProgram(ShaderPack pack, RenderPipeline pipeline) throws IOException {
         if (pipeline.getBlendFunction().isPresent()
-                && pack.blockPrograms().contains("gbuffers_block_translucent")) {
+                && pack.blockPrograms().contains("gbuffers_block_translucent")
+                && pack.hasEnabledProgramFragment("gbuffers_block_translucent")) {
             return "gbuffers_block_translucent";
         }
-        if (pack.blockPrograms().contains("gbuffers_block")) {
+        if (pack.blockPrograms().contains("gbuffers_block")
+                && pack.hasEnabledProgramFragment("gbuffers_block")) {
             return "gbuffers_block";
         }
-        if (pack.terrainPrograms().contains("gbuffers_terrain")) {
+        if (pack.terrainPrograms().contains("gbuffers_terrain")
+                && pack.hasEnabledProgramFragment("gbuffers_terrain")) {
             return "gbuffers_terrain";
         }
-        if (pack.hasTexturedLitFragment()) {
+        if (pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")) {
             return "gbuffers_textured_lit";
         }
-        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
+        return pack.hasTexturedFragment() && pack.hasEnabledProgramFragment("gbuffers_textured")
+                ? "gbuffers_textured" : null;
     }
 
     private static boolean isEntityRenderPipeline(RenderPipeline pipeline) {
@@ -4840,42 +4871,47 @@ public final class VeyraRenderer {
                 && pipeline.getLocation().getPath().equals("pipeline/item_entity_translucent_cull");
     }
 
-    private static String resolveEntityProgram(ShaderPack pack, RenderPipeline pipeline) {
+    private static String resolveEntityProgram(ShaderPack pack, RenderPipeline pipeline) throws IOException {
         boolean eyes = pipeline.getLocation().getPath().equals("pipeline/eyes");
         if (eyes
-                && pack.entityPrograms().contains("gbuffers_spidereyes")) {
+                && pack.entityPrograms().contains("gbuffers_spidereyes")
+                && pack.hasEnabledProgramFragment("gbuffers_spidereyes")) {
             return "gbuffers_spidereyes";
         }
         if (pipeline.getBlendFunction().isPresent()
-                && pack.entityPrograms().contains("gbuffers_entities_translucent")) {
+                && pack.entityPrograms().contains("gbuffers_entities_translucent")
+                && pack.hasEnabledProgramFragment("gbuffers_entities_translucent")) {
             return "gbuffers_entities_translucent";
         }
-        if (pack.entityPrograms().contains("gbuffers_entities")) {
+        if (pack.entityPrograms().contains("gbuffers_entities")
+                && pack.hasEnabledProgramFragment("gbuffers_entities")) {
             return "gbuffers_entities";
         }
         if (eyes) {
             return null;
         }
-        if (pack.hasTexturedLitFragment()) {
+        if (pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")) {
             return "gbuffers_textured_lit";
         }
-        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
+        return pack.hasTexturedFragment() && pack.hasEnabledProgramFragment("gbuffers_textured")
+                ? "gbuffers_textured" : null;
     }
 
-    private static String resolveHandProgram(ShaderPack pack, RenderPipeline pipeline) {
+    private static String resolveHandProgram(ShaderPack pack, RenderPipeline pipeline) throws IOException {
         if (pipeline.getLocation().getPath().equals("pipeline/eyes")) {
             return null;
         }
-        if (pipeline.getBlendFunction().isPresent() && pack.hasHandWaterFragment()) {
+        if (pipeline.getBlendFunction().isPresent() && pack.hasEnabledHandWaterFragment()) {
             return HAND_WATER_PROGRAM;
         }
-        if (pack.hasHandFragment()) {
+        if (pack.hasEnabledHandFragment()) {
             return HAND_PROGRAM;
         }
-        if (pack.hasTexturedLitFragment()) {
+        if (pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")) {
             return "gbuffers_textured_lit";
         }
-        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
+        return pack.hasTexturedFragment() && pack.hasEnabledProgramFragment("gbuffers_textured")
+                ? "gbuffers_textured" : null;
     }
 
     private static RenderPipeline compileEntityPipeline(
@@ -5256,7 +5292,7 @@ public final class VeyraRenderer {
             }
             pipelines.put(original, particlePipeline);
         }
-        if (pipelines.isEmpty() && !pack.particlePrograms().isEmpty()) {
+        if (pipelines.isEmpty() && pack.hasEnabledProgramFragment(pack.particlePrograms())) {
             throw new IOException("VulkanMod's Minecraft particle render pipelines were not found.");
         }
         return new ParticlePipelineSet(pipelines);
@@ -5272,18 +5308,21 @@ public final class VeyraRenderer {
                 || location.equals("pipeline/translucent_particle");
     }
 
-    private static String resolveParticleProgram(ShaderPack pack, RenderPipeline pipeline) {
+    private static String resolveParticleProgram(ShaderPack pack, RenderPipeline pipeline) throws IOException {
         if (pipeline.getBlendFunction().isPresent()
-                && pack.particlePrograms().contains("gbuffers_particles_translucent")) {
+                && pack.particlePrograms().contains("gbuffers_particles_translucent")
+                && pack.hasEnabledProgramFragment("gbuffers_particles_translucent")) {
             return "gbuffers_particles_translucent";
         }
-        if (pack.particlePrograms().contains("gbuffers_particles")) {
+        if (pack.particlePrograms().contains("gbuffers_particles")
+                && pack.hasEnabledProgramFragment("gbuffers_particles")) {
             return "gbuffers_particles";
         }
-        if (pack.hasTexturedLitFragment()) {
+        if (pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")) {
             return "gbuffers_textured_lit";
         }
-        return pack.hasTexturedFragment() ? "gbuffers_textured" : null;
+        return pack.hasTexturedFragment() && pack.hasEnabledProgramFragment("gbuffers_textured")
+                ? "gbuffers_textured" : null;
     }
 
     private static RenderPipeline compileParticlePipeline(
@@ -5337,8 +5376,12 @@ public final class VeyraRenderer {
         for (RenderPipeline original : candidates) {
             String vertexProgram = "gbuffers_weather";
             String fragmentProgram = pack.weatherPrograms().contains(vertexProgram)
+                    && pack.hasEnabledProgramFragment(vertexProgram)
                     ? "gbuffers_weather"
-                    : pack.hasTexturedLitFragment() ? "gbuffers_textured_lit" : "gbuffers_textured";
+                    : pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")
+                            ? "gbuffers_textured_lit" : pack.hasEnabledProgramFragment("gbuffers_textured")
+                                    ? "gbuffers_textured" : null;
+            if (fragmentProgram == null) continue;
             boolean fallback = !pack.weatherPrograms().contains(fragmentProgram);
             Optional<String> packVertex = pack.readStage(vertexProgram + ".vsh");
             String vertexSource = null;
@@ -5415,7 +5458,7 @@ public final class VeyraRenderer {
             }
             pipelines.put(original, weatherPipeline);
         }
-        if (pipelines.isEmpty() && !pack.weatherPrograms().isEmpty()) {
+        if (pipelines.isEmpty() && pack.hasEnabledProgramFragment(pack.weatherPrograms())) {
             throw new IOException("VulkanMod's Minecraft weather render pipelines were not found.");
         }
         return new WeatherPipelineSet(pipelines);
@@ -6538,16 +6581,13 @@ public final class VeyraRenderer {
         return builder.build();
     }
 
-    private static String resolveTerrainProgram(ShaderPack pack, TerrainRenderType terrainRenderType) {
+    private static String resolveTerrainProgram(ShaderPack pack, TerrainRenderType terrainRenderType) throws IOException {
         String specializedProgram = switch (terrainRenderType) {
             case SOLID -> "gbuffers_terrain_solid";
             case CUTOUT, TRIPWIRE -> "gbuffers_terrain_cutout";
             case TRANSLUCENT -> "gbuffers_water";
         };
-        if (pack.terrainPrograms().contains(specializedProgram)) {
-            return specializedProgram;
-        }
-        return pack.terrainPrograms().contains("gbuffers_terrain") ? "gbuffers_terrain" : null;
+        return pack.terrainRouteProgram(specializedProgram);
     }
 
     private static boolean updateTerrainLayerMode(ShaderPack pack) {
@@ -6713,7 +6753,11 @@ public final class VeyraRenderer {
     private static PipelineProgram pipelineProgram(String name, AdaptedShader shader, String vertexSource,
                                                    VeyraComputePipelineSet customImageResources,
                                                    List<String> customSamplers) {
-        String hash = sha256(name + '\n' + (vertexSource == null ? "" : vertexSource) + '\n' + shader.source());
+        String fragmentSource = VulkanModGlslCompatibility.stripExplicitInputParameterQualifiers(shader.source());
+        String compatibleVertexSource = vertexSource == null ? null
+                : VulkanModGlslCompatibility.stripExplicitInputParameterQualifiers(vertexSource);
+        String hash = sha256(name + '\n' + (compatibleVertexSource == null ? "" : compatibleVertexSource)
+                + '\n' + fragmentSource);
         PipelineProgramKey cacheKey = new PipelineProgramKey(name, hash, customImageResources);
         return PIPELINE_CACHE.computeIfAbsent(cacheKey, ignored -> {
             String suffix = name + '_' + hash;
@@ -6722,13 +6766,13 @@ public final class VeyraRenderer {
                     ? BLIT_VERTEX_ID
                     : Identifier.fromNamespaceAndPath("veyra", "shaderpack_vertex/" + suffix);
             Identifier pipelineId = Identifier.fromNamespaceAndPath("veyra", "pipeline/shaderpack/" + suffix);
-            boolean usesNoiseSampler = shader.source().contains("uniform sampler2D "
+            boolean usesNoiseSampler = fragmentSource.contains("uniform sampler2D "
                     + VeyraNoiseTexture.SAMPLER_NAME + ";")
-                    || vertexSource != null && vertexSource.contains(
+                    || compatibleVertexSource != null && compatibleVertexSource.contains(
                             "uniform sampler2D " + VeyraNoiseTexture.SAMPLER_NAME + ";");
-            boolean usesFogUniforms = shader.source().contains("uniform Fog {")
-                    || vertexSource != null && vertexSource.contains("uniform Fog {");
-            return new PipelineProgram(shaderId, shader.source(), vertexShaderId, vertexSource, shader.uniforms(),
+            boolean usesFogUniforms = fragmentSource.contains("uniform Fog {")
+                    || compatibleVertexSource != null && compatibleVertexSource.contains("uniform Fog {");
+            return new PipelineProgram(shaderId, fragmentSource, vertexShaderId, compatibleVertexSource, shader.uniforms(),
                     shader.usesDepthSampler(), shader.usesDepth1Sampler(), shader.usesDepth2Sampler(),
                     shader.usesShadowSampler(), shader.shadowInputs(),
                     shader.colorSamplers(), shader.outputTarget(),

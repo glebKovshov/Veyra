@@ -492,20 +492,39 @@ class ShaderAdapterTest {
     @Test
     void allocatesCustomTerrainVaryingsAcrossAllUnoccupiedLocations() throws IOException {
         StringBuilder source = new StringBuilder("#version 130\n");
-        for (int index = 0; index < 14; index++) source.append("out float extra").append(index).append(";\n");
+        for (int index = 0; index < 12; index++) source.append("out float extra").append(index).append(";\n");
         source.append("void main() {}\n");
         Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
                 TerrainVertexShaderAdapter.validateAndGetVaryings("gbuffers_terrain", source.toString());
 
         assertEquals(20, varyings.get("extra0").location());
         assertEquals(31, varyings.get("extra11").location());
-        assertEquals(2, varyings.get("extra12").location());
-        assertEquals(3, varyings.get("extra13").location());
 
         source.append("out float overflow;\n");
         IOException error = assertThrows(IOException.class, () ->
                 TerrainVertexShaderAdapter.validate("gbuffers_terrain", source.toString()));
         assertTrue(error.getMessage().contains("too many vertex outputs"));
+    }
+
+    @Test
+    void terrainPackVaryingsNeverReuseLiveDistanceLocations() throws IOException {
+        StringBuilder source = new StringBuilder("#version 130\n");
+        for (int index = 0; index < 12; index++) source.append("out float extra").append(index).append(";\n");
+        source.append("out mat3 reflectionData;\nvoid main() {}\n");
+
+        Map<String, TerrainVertexShaderAdapter.PackVarying> varyings =
+                TerrainVertexShaderAdapter.validateAndGetVaryings("gbuffers_water", source.toString(),
+                        Set.of(4, 5, 6));
+
+        assertEquals(4, varyings.get("reflectionData").location(),
+                "reuse only a contiguous bridge range proven unused by the fragment stage");
+
+        String fragment = TerrainShaderAdapter.adaptFragment("""
+                varying mat3 reflectionData;
+                void main() { gl_FragColor = vec4(reflectionData[0], 1.0); }
+                """, false, false, varyings);
+        assertTrue(TerrainShaderAdapter.unusedTerrainVertexOutputs(fragment, varyings).contains(4),
+                "a pack varying at location 4 must not reserve Veyra's optional bridge output at location 4");
     }
 
     @Test

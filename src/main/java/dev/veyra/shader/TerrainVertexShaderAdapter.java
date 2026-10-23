@@ -277,8 +277,9 @@ final class TerrainVertexShaderAdapter {
         int copiedThrough = 0;
         int nextLocation = 20;
         Set<Integer> occupiedLocations = new HashSet<>();
-        occupiedLocations.add(0);
-        occupiedLocations.add(1);
+        // VulkanMod's terrain vertex base stage always writes its distance outputs at locations 2 and 3.
+        // Unlike the optional Veyra bridge outputs, those locations are never pruned.
+        for (int location = 0; location <= 3; location++) occupiedLocations.add(location);
         for (int location = 4; location <= 19; location++) occupiedLocations.add(location);
         occupiedLocations.removeAll(freeOutputLocations);
         while (matcher.find()) {

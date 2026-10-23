@@ -25,7 +25,7 @@ class CustomUniformsTest {
             uniform.float.isDesert=smooth(2, if(in(biome, 2, 17, 130), 1, 0), 10, 10)
             uniform.float.isCold=smooth(1, if(in(biome, 10, 11), 1, 0), 10, 10) + \\
                 0.5
-            uniform.int.framemod8 = frameCounter % 8
+            uniform.int.framemod8 = fmod(frameCounter, 8)
             uniform.bool.underwater=isEyeInWater == 1 && !is_sneaking
             uniform.vec3.skyTint=vec3(1.0, 0.5, 0.25)
             """;
@@ -117,6 +117,24 @@ class CustomUniformsTest {
         assertEquals(1, uniforms.uniforms().size());
         assertEquals(List.of("sunAngle", "shadowFade"), ShaderPackUniformAdapter.mergeUniformNames(
                 List.of("sunAngle", "shadowFade"), uniforms.uniforms()));
+    }
+
+    @Test
+    void scalarOverridesKeepTheirDeclaredTypeInPostUniformBlocks() {
+        CustomUniforms.activate(CustomUniforms.parse("uniform.int.framemod8=fmod(frameCounter, 8)\n"));
+        StringBuilder integerBlock = new StringBuilder();
+        VeyraRenderer.appendShaderPackUniformBlock(integerBlock, List.of("framemod8"), "void main() {}\n");
+        assertTrue(integerBlock.toString().contains("int framemod8;"), integerBlock.toString());
+        assertTrue(integerBlock.toString().contains("#define framemod8 veyraParameters.framemod8"),
+                integerBlock.toString());
+        assertFalse(integerBlock.toString().contains("float framemod8;"), integerBlock.toString());
+
+        CustomUniforms.activate(CustomUniforms.parse("uniform.bool.framemod8=frameCounter % 2 == 0\n"));
+        StringBuilder booleanBlock = new StringBuilder();
+        VeyraRenderer.appendShaderPackUniformBlock(booleanBlock, List.of("framemod8"), "void main() {}\n");
+        assertTrue(booleanBlock.toString().contains("int veyra_framemod8;"), booleanBlock.toString());
+        assertTrue(booleanBlock.toString().contains(
+                "#define framemod8 (veyraParameters.veyra_framemod8 != 0)"), booleanBlock.toString());
     }
 
     @Test
