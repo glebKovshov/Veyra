@@ -1530,3 +1530,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Shader-pack `vec3`/`ivec3` built-ins (camera/eye positions, skyColor, fogColor, playerLookVector, Iris extra vec3) now use `ShaderPackVec3Uniform`/`ShaderPackIVec3Uniform`, so a following scalar packs into the vec3's fourth component as std140 requires. A unit test checks the offsets against real shaderc SPIR-V reflection (`lwjgl-shaderc` test dependency).
 - The custom-uniforms example now checks a vec3 followed by scalars and compares GPU `worldTime` with a CPU custom uniform. The old fixed `worldTime=6000` assumption was wrong because time keeps advancing. RTX 3070 graphics smoke `vec3-uniform-regression-final-20261023` passed with **222,757 active magenta pixels**.
 - JDK 21 gate passed: **524 tests**, shader validation, example packaging, graphics-smoke compilation.
+
+### #86 hosted Graphics: textured-default fixture after terrain fallback — 2026-10-23
+
+- #86 Graphics `39909787743` on `3943bdb`: **44/45 jobs passed**. Build and the pinned source audit passed. `textured-default-vertex-attributes` failed with 0 magenta pixels. It had failed the same way on every earlier #86 head (`e15c502`, `9151793`) but passed on #85.
+- Cause: #86 correctly applies Iris' terrain fallback chain (`gbuffers_terrain` → `gbuffers_textured`). The fixture's `gbuffers_textured` therefore also drew terrain, where real `mc_Entity`/`mc_midTexCoord` values trigger its discard. The terrain disappeared, and the additive world-border signal landed on bright sky as pale pink. Reproduced on the RTX 3070.
+- Fix: the fixture now provides a solid `gbuffers_terrain`, so the opaque background remains. No renderer change. Local RTX 3070 rerun passed with **144,348 active magenta pixels**. The local gate passed again.
