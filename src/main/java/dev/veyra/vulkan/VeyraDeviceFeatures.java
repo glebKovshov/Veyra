@@ -9,6 +9,7 @@ public final class VeyraDeviceFeatures {
     public static boolean independentBlendEnabled;
     public static boolean vertexPipelineStoresAndAtomicsEnabled;
     public static boolean shaderStorageImageExtendedFormatsEnabled;
+    public static volatile long createdLogicalDeviceHandle;
     public static int maxColorAttachments = 1;
     public static int swapchainUsage;
 

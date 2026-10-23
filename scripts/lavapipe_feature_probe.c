@@ -118,6 +118,23 @@ int main(int argc, char **argv) {
     if (supported_features.vertexPipelineStoresAndAtomics != VK_TRUE) {
         return fail("Lavapipe does not support vertexPipelineStoresAndAtomics", VK_ERROR_FEATURE_NOT_PRESENT);
     }
+    VkPhysicalDeviceVulkan11Features supported_vulkan11 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+    };
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR supported_dynamic_rendering = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+    };
+    VkPhysicalDeviceFeatures2 supported_features2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &supported_vulkan11,
+    };
+    if (use_vulkanmod_pnext) {
+        supported_vulkan11.pNext = &supported_dynamic_rendering;
+        vkGetPhysicalDeviceFeatures2(physical_device, &supported_features2);
+        if (supported_dynamic_rendering.dynamicRendering != VK_TRUE) {
+            return fail("Lavapipe does not support dynamicRendering", VK_ERROR_FEATURE_NOT_PRESENT);
+        }
+    }
 
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, NULL);
@@ -143,15 +160,23 @@ int main(int argc, char **argv) {
     };
     VkPhysicalDeviceFeatures enabled_features = {0};
     enabled_features.vertexPipelineStoresAndAtomics = VK_TRUE;
-    VkPhysicalDeviceVulkan12Features vulkan12_features = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-        .hostQueryReset = VK_TRUE,
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+        .dynamicRendering = VK_TRUE,
     };
+    VkPhysicalDeviceVulkan11Features vulkan11_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .pNext = &dynamic_rendering_features,
+        .shaderDrawParameters = supported_vulkan11.shaderDrawParameters,
+    };
+    const char *device_extensions[] = {VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
     VkDeviceCreateInfo device_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = use_vulkanmod_pnext ? &vulkan12_features : NULL,
+        .pNext = use_vulkanmod_pnext ? &vulkan11_features : NULL,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queue_info,
+        .enabledExtensionCount = use_vulkanmod_pnext ? 1 : 0,
+        .ppEnabledExtensionNames = use_vulkanmod_pnext ? device_extensions : NULL,
         .pEnabledFeatures = &enabled_features,
     };
     VkDevice device = VK_NULL_HANDLE;
@@ -159,7 +184,9 @@ int main(int argc, char **argv) {
     fprintf(stdout, "pEnabledFeatures.vertexPipelineStoresAndAtomics=%s\n",
             enabled_features.vertexPipelineStoresAndAtomics == VK_TRUE ? "true" : "false");
     fprintf(stdout, "VkDeviceCreateInfo.pNext=%s\n",
-            use_vulkanmod_pnext ? "VkPhysicalDeviceVulkan12Features(hostQueryReset=true)" : "NULL");
+            use_vulkanmod_pnext
+                    ? "VkPhysicalDeviceVulkan11Features(shaderDrawParameters=supported) -> VkPhysicalDeviceDynamicRenderingFeaturesKHR(dynamicRendering=true)"
+                    : "NULL");
     fprintf(stdout, "Physical device: %s\n", physical_device_properties.deviceName);
 
     size_t spirv_word_count = 0;
