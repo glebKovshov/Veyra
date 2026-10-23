@@ -10,6 +10,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TextureColorDistanceShaderAdapterTest {
     @Test
+    void mergesCustomImageSamplersDeclaredInBothGraphicsStages() {
+        var inputs = TextureColorDistanceShaderAdapter.SamplerInputs.empty()
+                .withCustomImageSamplers(Set.of("vertexImage"))
+                .withCustomImageSamplers(Set.of("fragmentImage"));
+
+        assertEquals(Set.of("vertexImage", "fragmentImage"), inputs.customImageSamplers());
+    }
+
+    @Test
     void removesUnreachableSharedSamplerAndUniformDeclarations() throws IOException {
         String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
                 uniform sampler2D colortex0;

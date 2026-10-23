@@ -5645,9 +5645,11 @@ public final class VeyraRenderer {
         String sourceProgram = programName.equals("gbuffers_line") && !pack.hasLineFragment()
                 ? "gbuffers_basic" : programName;
         String source = switch (sourceProgram) {
-            case "gbuffers_basic" -> pack.readBasicFragment().orElseThrow(
+            case "gbuffers_basic" -> (customImages == null ? pack.readBasicFragment()
+                    : pack.readCustomImageStage("gbuffers_basic.fsh")).orElseThrow(
                     () -> new IOException("The pack no longer contains gbuffers_basic.fsh."));
-            case "gbuffers_line" -> pack.readLineFragment().orElseThrow(
+            case "gbuffers_line" -> (customImages == null ? pack.readLineFragment()
+                    : pack.readCustomImageStage("gbuffers_line.fsh")).orElseThrow(
                     () -> new IOException("The pack no longer contains gbuffers_line.fsh."));
             default -> throw new IOException("Unsupported color-distance program '" + programName + "'.");
         };
@@ -5658,7 +5660,13 @@ public final class VeyraRenderer {
         }
         FragmentOutputs outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
         GeometryBlendSettings blendSettings = pack.readGeometryBlendSettings(programName);
-        Optional<String> packVertex = pack.readStage(vertexFile);
+        Optional<String> packVertex = customImages == null
+                ? pack.readStage(vertexFile) : pack.readCustomImageStage(vertexFile);
+        String vertexProgram = vertexFile.substring(0, vertexFile.lastIndexOf('.'));
+        ShaderPackImageBindings.PreparedStage customVertexImageStage = packVertex.isPresent()
+                ? prepareNativeImageSamplers(pack, vertexProgram, "vsh", packVertex.get(), customImages)
+                : new ShaderPackImageBindings.PreparedStage("", List.of());
+        packVertex = packVertex.map(ignored -> customVertexImageStage.source());
         Map<RenderPipeline, RenderPipeline> pipelines = new IdentityHashMap<>();
         for (RenderPipeline original : candidates) {
             String fragmentSource;
@@ -5686,20 +5694,25 @@ public final class VeyraRenderer {
                 fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
                         source, programName, isLeashPipeline(original));
             }
-            samplerInputs = samplerInputs.withCustomImageSamplers(customImageSamplerNames(customImageStage));
+            Set<String> imageSamplers = new HashSet<>(customImageSamplerNames(customVertexImageStage));
+            imageSamplers.addAll(customImageSamplerNames(customImageStage));
+            samplerInputs = samplerInputs.withCustomImageSamplers(imageSamplers);
             validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
             String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
                     + '\n' + fragmentSource + '\n' + outputLayout + '\n' + blendSettings
+                    + '\n' + customVertexImageStage.resources()
                     + '\n' + (customImageStage == null ? "" : customImageStage.resources()));
-            VeyraComputePipelineSet imageResourceIdentity = customImageStage != null
-                    && !customImageStage.resources().isEmpty() ? customImages : null;
+            boolean hasCustomImageResources = !customVertexImageStage.resources().isEmpty()
+                    || customImageStage != null && !customImageStage.resources().isEmpty();
+            VeyraComputePipelineSet imageResourceIdentity = hasCustomImageResources ? customImages : null;
             ColorDistancePipelineKey cacheKey = new ColorDistancePipelineKey(
                     original, sourceHash, imageResourceIdentity);
             RenderPipeline replacement = COLOR_DISTANCE_PIPELINE_CACHE.get(cacheKey);
             if (replacement == null) {
                 replacement = compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
                         vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs,
-                        imageResourceIdentity == null ? null : customImages, customImageStage);
+                        imageResourceIdentity == null ? null : customImages, customImageStage,
+                        customVertexImageStage);
                 COLOR_DISTANCE_PIPELINE_CACHE.put(cacheKey, replacement);
             }
             pipelines.put(original, replacement);
@@ -5825,21 +5838,39 @@ public final class VeyraRenderer {
             TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs,
             VeyraComputePipelineSet customImages,
             ShaderPackImageBindings.PreparedStage customImageStage) throws IOException {
+        return compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
+                customVertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs,
+                customImages, customImageStage, null);
+    }
+
+    private static RenderPipeline compileColorDistancePipeline(
+            RenderPipeline original, String programName, String fragmentSource, String sourceHash,
+            String customVertexSource, boolean usesNoiseSampler,
+            FragmentOutputs outputLayout, GeometryBlendSettings blendSettings,
+            TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs,
+            VeyraComputePipelineSet customImages,
+            ShaderPackImageBindings.PreparedStage customImageStage,
+            ShaderPackImageBindings.PreparedStage customVertexImageStage) throws IOException {
         String nativeFragmentSource = customImageStage == null ? fragmentSource
                 : ShaderPackImageBindings.decorateNativeSamplers(fragmentSource, customImageStage);
-        if (customVertexSource != null) {
+        String nativeVertexSource = customVertexSource == null || customVertexImageStage == null
+                ? customVertexSource
+                : ShaderPackImageBindings.decorateNativeSamplers(customVertexSource, customVertexImageStage);
+        if (nativeVertexSource != null) {
             nativeFragmentSource = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
-                    customVertexSource, nativeFragmentSource, programName);
+                    nativeVertexSource, nativeFragmentSource, programName);
         }
         String fragmentSourceForParser = nativeFragmentSource;
         String debugPipelineName = original.getLocation().getPath().replace('/', '-');
         dumpShaderSource("color-distance-" + programName + "-" + debugPipelineName + ".fsh",
                 fragmentSourceForParser);
-        if (customVertexSource != null) {
+        if (nativeVertexSource != null) {
             dumpShaderSource("color-distance-" + programName + "-" + debugPipelineName + ".vsh",
-                    customVertexSource);
+                    nativeVertexSource);
         }
-        if (customImageStage != null && !customImageStage.resources().isEmpty() && customImages == null) {
+        boolean hasCustomImageResources = customImageStage != null && !customImageStage.resources().isEmpty()
+                || customVertexImageStage != null && !customVertexImageStage.resources().isEmpty();
+        if (hasCustomImageResources && customImages == null) {
             throw new IOException(programName + " has custom image samplers but no shared image resource set.");
         }
         Identifier fragmentShader = Identifier.fromNamespaceAndPath(
@@ -5859,7 +5890,7 @@ public final class VeyraRenderer {
                 return fragmentSourceForParser;
             }
             if (customVertexShader != null && identifier.equals(customVertexShader) && type == ShaderType.VERTEX) {
-                return customVertexSource;
+                return nativeVertexSource;
             }
             return shaderManager.getShader(identifier, type);
         };
@@ -5873,12 +5904,16 @@ public final class VeyraRenderer {
         if (nativePipeline == null && (usesNoiseSampler || samplerInputs.usesSpecularSampler())) {
             throw new IOException("VulkanMod did not create a native pipeline for " + original.getLocation() + ".");
         }
-        if (customImageStage != null && !customImageStage.resources().isEmpty()) {
+        if (hasCustomImageResources) {
             if (nativePipeline == null) {
                 throw new IOException("VulkanMod did not create a native pipeline for custom-image consumer "
                         + original.getLocation() + ".");
             }
-            customImages.bindRenderPipelineImages(nativePipeline, customImageStage);
+            customImages.bindRenderPipelineImages(nativePipeline,
+                    customVertexImageStage == null
+                            ? new ShaderPackImageBindings.PreparedStage("", List.of()) : customVertexImageStage,
+                    customImageStage == null
+                            ? new ShaderPackImageBindings.PreparedStage("", List.of()) : customImageStage);
         }
         if (usesNoiseSampler) {
             var descriptor = nativePipeline == null ? null
