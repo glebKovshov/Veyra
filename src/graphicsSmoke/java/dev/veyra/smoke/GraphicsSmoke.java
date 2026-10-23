@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 /** Exercise a real client/world and measure the fixture's shader output against a baseline. */
@@ -30,6 +31,9 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
+    private static final Set<String> capturedTargetStages = new java.util.HashSet<>();
+    private static final java.util.Map<String, List<ShaderPackTargetCapture.Capture>> intermediateTargetCaptures =
+            new java.util.LinkedHashMap<>();
     private static boolean entityFixtureStarted, vanillaBaseline, thirdPartyShaderpackFixture, thirdPartyScenePrepared,
             thirdPartyLifecycleFixture, thirdPartyProfileApplied, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
@@ -67,6 +71,25 @@ public final class GraphicsSmoke {
             thirdPartyStorageBufferManagerRecreated;
     private static volatile Throwable entityFixtureFailure;
     private GraphicsSmoke() { }
+
+    public static void captureShaderTargetsAtStage(String stageName) {
+        if (!thirdPartyShaderpackFixture || !thirdPartyScenePrepared || worldTicks < 160
+                || !Boolean.getBoolean("veyra.graphicsSmoke.captureColorTargets")
+                || !capturedTargetStages.add(stageName)) return;
+        try {
+            Renderer renderer = Renderer.getInstance();
+            if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
+                throw new IllegalStateException("Shader-pack capture requires an active Vulkan frame.");
+            }
+            if (renderer.getBoundRenderPass() != null) renderer.endRenderPass();
+            intermediateTargetCaptures.put(stageName, ShaderPackTargetCapture.record());
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Recorded shader-pack targets at stage {}.", stageName);
+        } catch (Throwable failure) {
+            LoggerFactory.getLogger("veyra-graphics-smoke").error(
+                    "Could not capture shader-pack targets at stage {}.", stageName, failure);
+        }
+    }
 
     public static void tick(Minecraft client) {
         if (!Boolean.getBoolean("veyra.graphicsSmoke") || finished) return;
@@ -380,6 +403,7 @@ public final class GraphicsSmoke {
         Buffer basicMrtReadback = null;
         ComputeImageProbe computeProbe = null;
         java.util.List<ShaderPackTargetCapture.Capture> targetCaptures = java.util.List.of();
+        java.util.Map<String, java.util.List<ShaderPackTargetCapture.Capture>> phaseCaptures = java.util.Map.of();
         try {
             Renderer renderer = Renderer.getInstance();
             renderer.endRenderPass();
@@ -387,6 +411,8 @@ public final class GraphicsSmoke {
                     && Boolean.getBoolean("veyra.graphicsSmoke.captureColorTargets")) {
                 targetCaptures = ShaderPackTargetCapture.record();
             }
+            phaseCaptures = new java.util.LinkedHashMap<>(intermediateTargetCaptures);
+            intermediateTargetCaptures.clear();
             if (captureActive && Boolean.getBoolean("veyra.graphicsSmoke.computeProbe")) {
                 computeProbe = ComputeImageProbe.record();
             }
@@ -479,12 +505,19 @@ public final class GraphicsSmoke {
             Buffer completedBasicMrt = basicMrtReadback;
             ComputeImageProbe completedComputeProbe = computeProbe;
             java.util.List<ShaderPackTargetCapture.Capture> completedTargets = java.util.List.copyOf(targetCaptures);
+            java.util.Map<String, java.util.List<ShaderPackTargetCapture.Capture>> completedPhaseTargets =
+                    java.util.Map.copyOf(phaseCaptures);
             boolean active = captureActive;
             MemoryManager.getInstance().addFrameOp(() -> {
                 try {
                     if (completedComputeProbe != null) completedComputeProbe.verify();
                     for (ShaderPackTargetCapture.Capture target : completedTargets) {
                         target.write(output.resolve("shaderpack-targets"));
+                    }
+                    for (var phaseCapture : completedPhaseTargets.entrySet()) {
+                        for (ShaderPackTargetCapture.Capture target : phaseCapture.getValue()) {
+                            target.write(output.resolve("shaderpack-targets-" + phaseCapture.getKey()));
+                        }
                     }
                     var bytes = MemoryUtil.memByteBuffer(completed.getDataPtr(), width * height * 4);
                     NativeImage image = new NativeImage(width, height, false);
@@ -525,6 +558,8 @@ public final class GraphicsSmoke {
                 finally {
                     if (completedComputeProbe != null) completedComputeProbe.close();
                     completedTargets.forEach(ShaderPackTargetCapture.Capture::close);
+                    completedPhaseTargets.values().forEach(captures ->
+                            captures.forEach(ShaderPackTargetCapture.Capture::close));
                     completed.scheduleFree();
                     if (completedGlintMrt != null) completedGlintMrt.scheduleFree();
                     if (completedBasicMrt != null) completedBasicMrt.scheduleFree();
@@ -533,6 +568,8 @@ public final class GraphicsSmoke {
         } catch (Throwable failure) {
             if (computeProbe != null) computeProbe.close();
             targetCaptures.forEach(ShaderPackTargetCapture.Capture::close);
+            phaseCaptures.values().forEach(captures ->
+                    captures.forEach(ShaderPackTargetCapture.Capture::close));
             if (readback != null) readback.scheduleFree();
             if (glintMrtReadback != null) glintMrtReadback.scheduleFree();
             if (basicMrtReadback != null) basicMrtReadback.scheduleFree();
@@ -868,21 +905,32 @@ public final class GraphicsSmoke {
 
     private static void applyThirdPartyProfile(ShaderPack pack) {
         try {
-            var profile = pack.readOptions().profiles().get(thirdPartyProfile);
+            var definitions = pack.readOptions();
+            var profile = definitions.profiles().get(thirdPartyProfile);
             if (profile == null || profile.isEmpty()) {
                 throw new IllegalStateException("Shaderpack profile was not found or has no options: " + thirdPartyProfile);
             }
             String applied = VeyraRenderer.applyOptions(pack, profile);
-            if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty()) {
+            ShaderPack configured = VeyraRenderer.selectedPack().orElseThrow();
+            var effective = configured.readOptions().effective(configured.configuration().options());
+            boolean profileMatches = true;
+            for (var option : profile.entrySet()) {
+                if (!option.getValue().equals(effective.get(option.getKey()))) {
+                    profileMatches = false;
+                    break;
+                }
+            }
+            // A pack may already start with the selected profile's effective values. In that case
+            // applyOptions reports a no-op; accept it only after verifying every profile entry.
+            boolean alreadyActive = applied.equals("Shader options unchanged.") && profileMatches;
+            if ((!applied.isEmpty() && !alreadyActive) || !VeyraRenderer.isRenderingEnabled()
+                    || !VeyraRenderer.getLastError().isEmpty()) {
                 throw new IllegalStateException("Could not apply " + thirdPartyProfile + " profile: " + applied
                         + " (" + VeyraRenderer.getLastError() + ")");
             }
-            ShaderPack configured = VeyraRenderer.selectedPack().orElseThrow();
-            var effective = configured.readOptions().effective(configured.configuration().options());
-            for (var option : profile.entrySet()) {
-                if (!option.getValue().equals(effective.get(option.getKey()))) {
-                    throw new IllegalStateException("Profile option did not take effect: " + option.getKey());
-                }
+            if (!profileMatches) {
+                throw new IllegalStateException("One or more options from profile " + thirdPartyProfile
+                        + " did not take effect.");
             }
             // applyOptions replaces the configured pack instance; retain that selected snapshot so
             // a later disable/re-enable restores this profile rather than the pre-profile object.

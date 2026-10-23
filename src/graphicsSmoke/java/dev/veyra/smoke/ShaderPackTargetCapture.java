@@ -82,6 +82,13 @@ final class ShaderPackTargetCapture {
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryTypes.HOST_MEM);
         readback.createBuffer(size);
         int layout = image.getCurrentLayout();
+        if (layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+            MemoryUtil.memSet(readback.getDataPtr(), 0, size);
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Shader-pack target evidence: target={} is uninitialized; recording black diagnostic image",
+                    targetName);
+            return new Capture(targetName, image.width, image.height, image.format, readback, current);
+        }
         image.transitionImageLayout(stack, commands, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
         var regions = VkBufferImageCopy.calloc(1, stack);
         var region = regions.get(0).bufferOffset(0);
