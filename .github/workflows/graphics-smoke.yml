@@ -10,6 +10,7 @@ on:
       - 'scripts/prepare_graphics_smoke.py'
       - 'scripts/lavapipe_feature_probe.c'
       - 'scripts/lavapipe_feature_probe.vert'
+      - 'scripts/install_vulkan_validation_layer.sh'
       - 'scripts/lavapipe_feature_probe_image.vert'
       - 'examples/geometry-mid-texcoord/**'
       - 'examples/terrain-block-id/**'
@@ -79,6 +80,7 @@ on:
       - 'examples/cloud-model-view/**'
       - 'scripts/prepare_graphics_smoke.py'
       - 'examples/specular-*/**'
+      - 'scripts/install_vulkan_validation_layer.sh'
       - 'examples/shadow-color-*/**'
       - 'examples/water-shadow-depth-*/**'
       - 'examples/water-post-shadow-inputs/**'
@@ -96,7 +98,8 @@ jobs:
       - name: Install Lavapipe validation probe dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-validationlayers libvulkan-dev glslang-tools
+          sudo apt-get install -y mesa-vulkan-drivers libvulkan-dev glslang-tools
+          bash scripts/install_vulkan_validation_layer.sh
       - name: Compile minimal vertex storage-buffer and storage-image pipelines
         run: |
           glslangValidator -V scripts/lavapipe_feature_probe.vert -o "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
@@ -132,7 +135,8 @@ jobs:
       - name: Install software Vulkan and validation layers
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools vulkan-validationlayers xvfb libglfw3 libflite1
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools xvfb libglfw3 libflite1
+          bash scripts/install_vulkan_validation_layer.sh
       - name: Prepare original validation world
         run: python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
       - name: Launch Minecraft with software Vulkan
