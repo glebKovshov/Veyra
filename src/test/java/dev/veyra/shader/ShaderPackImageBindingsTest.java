@@ -37,6 +37,36 @@ class ShaderPackImageBindingsTest {
         assertTrue(runtime.readStage("gbuffers_terrain.fsh").orElseThrow().contains("floodfill_sampler"));
     }
 
+    @Test void basicVertexStageCanSampleTheSharedCustomImage() throws Exception {
+        var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/basic-custom-image")).withRuntimeFeatures();
+        String source = runtime.readCustomImageStage("gbuffers_basic.vsh").orElseThrow();
+        var prepared = ShaderPackImageBindings.prepare(
+                "gbuffers_basic.vsh", source, runtime.readImageProperties());
+
+        assertEquals(java.util.Set.of("voxel_sampler"),
+                prepared.resources().stream().map(ComputeShaderAdapter.OpaqueResource::name)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertFalse(prepared.source().contains("uniform usampler3D voxel_sampler;"));
+        assertDoesNotThrow(() -> BasicVertexShaderAdapter.validate(
+                "gbuffers_basic", prepared.source(), BasicVertexShaderAdapter.Format.LEASH));
+        assertDoesNotThrow(runtime::validatePipelineCapabilities);
+    }
+
+    @Test void lineVertexStageCanSampleTheSharedCustomImage() throws Exception {
+        var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/basic-custom-image")).withRuntimeFeatures();
+        String source = runtime.readCustomImageStage("gbuffers_line.vsh").orElseThrow();
+        var prepared = ShaderPackImageBindings.prepare(
+                "gbuffers_line.vsh", source, runtime.readImageProperties());
+
+        assertEquals(java.util.Set.of("voxel_sampler"),
+                prepared.resources().stream().map(ComputeShaderAdapter.OpaqueResource::name)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertFalse(prepared.source().contains("uniform usampler3D voxel_sampler;"));
+        assertDoesNotThrow(() -> BasicVertexShaderAdapter.validate(
+                "gbuffers_line", prepared.source(), BasicVertexShaderAdapter.Format.LINE));
+        assertDoesNotThrow(runtime::validatePipelineCapabilities);
+    }
+
     @Test void rejectsShadowStorageImageWritesBeforePipelineCreationWhenVertexStoresAreUnavailable() throws Exception {
         var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/basic-custom-image")).withRuntimeFeatures();
         VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = false;
