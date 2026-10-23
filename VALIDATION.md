@@ -1,6 +1,13 @@
 # Veyra 0.2 validation status
 
-## Current unpublished shadow/compute candidate — 2026-10-22
+## Beta.32 Sildur follow-up - 2026-10-23
+
+Beta.32 contains the default-profile lifecycle fixes from PR #88. The JDK 21 gate passed 531 tests with no failures, errors, or skips; 98 shader examples and 114 direct SPIR-V compilations passed. The pinned audit reports 75 cases, 864 geometry fragments accepted / 0 rejected, 18 compute stages compiled / 0 rejected, and no audit errors. A local RTX 3070 smoke on the unmodified Sildur v2.02 Extreme `__DEFAULT__` profile passed resize, Nether/Overworld transitions, disable/re-enable, and resource reload with 360,000 non-black pixels / 48 color buckets. That GPU smoke did not enable Khronos VVL and is one profile/fixture, not whole-pack compatibility proof.
+
+The hosted release workflow runs the current source audit and Lavapipe Graphics matrix, then the JDK 21 build/tests and JAR verification. The verified JAR and `SHA256SUMS.txt` are attached to the GitHub Release. No full Iris parity or stable release is claimed.
+
+
+## Previous beta.30 candidate (historical) - 2026-10-22
 
 The current candidate is the working tree for draft PR [#84](https://github.com/glebKovshov/Veyra/pull/84). On JDK 21.0.12, `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed: **479 tests, 0 failures/errors/skips**, 96 example shaders preprocessed, 112 direct Vulkan SPIR-V compilations, four conditional-include checks, graphics-smoke Java compilation, and example-pack packaging. The unpublished beta.30-metadata JAR passed `scripts/verify_jar.py`: **945,047 bytes**, SHA-256 `493d59dd08c21dd60a9e1c128f4eeec93ff7c5a219c15f7e5b40d0627e6a4e33`.
 

@@ -1,31 +1,22 @@
-# Veyra 0.2.0-beta.31+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.32+mc1.21.11 - experimental prerelease
 
-Beta.31 batches custom weather and translucent-particle vertex support with selected shadow-compute, shader-pack textures on supported terrain, shadow, and entity geometry, BSL shader-compatibility, and shadow-transition work. It also adds Iris render-relative `workGroupsRender` and validated `indirect.<pass>` dispatch for `shadowcomp`. Veyra requests supported core Vulkan features through a separate `pEnabledFeatures` block while retaining VulkanMod's Vulkan 1.1 and dynamic-rendering `pNext` chain. It remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
+Beta.32 includes a post-beta.31 compatibility follow-up for the unmodified Sildur's Vibrant Shaders v2.02 Extreme `__DEFAULT__` profile. The fixes cover comment-aware varying and entity capability scans, VulkanMod's handling of `in`/`out` function parameters, lightmap sampling on the line pipeline, and the world-border entity-color fallback. Veyra remains an experimental compatibility subset; it does not provide full Iris parity or establish that complete third-party shaderpacks are playable.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.31+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.32+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
-## Changes since beta.30
+## Changes since beta.31
 
-- Execute supported custom `gbuffers_weather.vsh` and `gbuffers_particles_translucent.vsh` stages. Add generic defaults for the supported world-border `gbuffers_textured` path and make shader uniform/sampler scans comment-safe.
-- Add selected `shadowcomp` compute execution with fixed workgroups and 3D shader-pack images, shadow color MRT, supported shadow vertex/entity stages, selected-profile storage buffers, and expanded post texture slots.
-- Resolve Iris `workGroupsRender` against the current render target and support `indirect.<pass>` dispatch from validated SSBO command buffers, with shader-write to indirect-read synchronization.
-- Request supported core Vulkan features through a separate `pEnabledFeatures` block while preserving VulkanMod's Vulkan 1.1 and dynamic-rendering `pNext` chain.
-- Match VulkanMod framebuffer render dimensions to the selected mip view, fixing block-atlas render-area validation errors.
-- Reuse freed terrain bridge slots for custom varyings and preserve fixed aliases across shadow interface reconciliation, avoiding the observed high-location component-limit error.
-- Load shader-pack PNGs for configured global `customTexture.*` aliases and stage-scoped `texture.<stage>.<sampler>` mappings on supported terrain, shadow, and entity geometry. Resolve entity samplers against the selected entity program, and prepare pack-local textures before pipeline selection even when the pack was restored from settings. Honor `.mcmeta` blur/clamp settings; this supports the `texture.gbuffers.gaux4` input used by Complementary Unbound.
-- Bind a neutral shadow input until Vulkan records a completed shadow map, and skip dependent post passes during that transition. This prevents early `shadowcolor0` reads from using an incomplete map.
-- Adapt BSL's aliased fog uniforms and `Fog(...)` helper, preserve pack-defined `texture2DShadow(...)` functions, and provide neutral post shadow inputs in dimensions where BSL disables shadow rendering.
+- Ignore GLSL varying, uniform, and capability declarations that occur only inside comments, so inactive shader code does not reserve locations or reject a shaderpack.
+- Preserve GLSL function semantics while bypassing VulkanMod 0.6.8's broken attribute-parser path for `in` and `out` function parameters.
+- Bind the shaderpack lightmap sampler for Veyra's basic line pipeline and world-border pipeline.
+- Supply a transparent entity-color fallback for the world-border pipeline, whose vanilla layout has no overlay-color input.
 
-## Validation and known limits
+## Validation and limits
 
-The combined #85+#86 local JDK 21 preflight gate passed **523 tests** with no failures, errors, or skips; it processed 97 example shaders, compiled 113 stages to Vulkan SPIR-V, compiled graphics-smoke sources, built the mod, and packaged the example packs. The pinned audit covers 4 SHA-512-verified archives, 12 defaults, 63 profile/dimension cases, and 5,178 stages: **864 geometry fragments accepted / 0 rejected** and **18 active compute stages compiled / 0 rejected**. Every audit row has `visualValidation=false`; the audit demonstrates source processing and compilation, not pack visuals.
+The JDK 21 gate passed **531 tests, 0 failures/errors/skips**; 98 shader examples were preprocessed and 114 stages compiled directly to Vulkan SPIR-V. `validateShaders`, `build`, `packageExamplePacks`, and `compileGraphicsSmokeJava` passed. The pinned source audit covers four archives, 12 defaults and 63 profile/dimension cases: 864 geometry fragments accepted / 0 rejected and 18 active compute stages compiled / 0 rejected, with no audit errors. Source audit rows retain `visualValidation=false`.
 
-On an NVIDIA RTX 3070, selected Complementary Reimagined and Unbound r5.9.3 `COMPLEMENTARY` profile lifecycle fixtures and BSL v10.1.8 `HIGH` lifecycle fixture passed. The focused `entity-custom-texture` fixture passed with 18,293 active / 0 disabled green pixels and `marker` bound at descriptor binding 6. On exact #85 head `8466a47`, `basic-custom-image` passed with 466 active green pixels and `entity-custom-image` passed with 18,410 active / 0 disabled green pixels; both reported `vertexPipelineStoresAndAtomics=true` and `shaderStorageImageExtendedFormats=true`. These are selected and synthetic tests, not whole-pack results.
-
-The Sildur's Vibrant 2.02 Extreme harness currently remains incomplete. A full-pack RTX 3070 harness attempt produced a black final frame after deferred; its cause remains unconfirmed. Separately, an instrumented `VeyraSmoke` ambient profile reported `framemod8=6` and passed a focused assertion with 24,550 non-black pixels / 69 color buckets, but it did not run the pack lifecycle. A later `finalclass` probe failed with a nearly uniform frame (230,400 non-black pixels / 23 color buckets). No whole-pack Sildur visual compatibility is claimed. Later RTX runs enabled Khronos validation: the mip fix cleared render-area 06079/06080 errors, while two swapchain-acquire diagnostics and the existing teardown leak remain recorded. Hosted Lavapipe Graphics remains required for the final commit. Focused runs do not establish full Iris parity. Publication still requires the release workflow's pinned audit, Lavapipe graphics smoke, build, tests, and distributable verification.
-
-Custom pack textures are currently wired to supported terrain, shadow, and entity geometry. Compute support remains limited to `shadowcomp` using 3D images with fixed or render-relative workgroups and indirect dispatch; other compute families, arbitrary image formats, and complete third-party pack compatibility remain unsupported. See [COMPATIBILITY.md](COMPATIBILITY.md) for measured results and limits.
+On an NVIDIA RTX 3070, the unmodified pinned Sildur v2.02 Extreme `__DEFAULT__` profile completed resize, Nether transition, Overworld return, disable, re-enable, and resource reload, with 360,000 non-black pixels / 48 color buckets. This GPU smoke did not enable Khronos VVL and covers one profile/fixture. It does not certify the full pack or Iris parity. The release workflow runs the pinned source audit, Lavapipe Graphics matrix, JDK 21 build/tests, and distributable verification.

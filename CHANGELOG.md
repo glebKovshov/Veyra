@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.32 (experimental prerelease)
+
+- Fix default-profile Sildur v2.02 Extreme lifecycle compatibility: ignore inactive GLSL declarations inside comments, handle VulkanMod function-parameter qualifiers safely, and bind the expected lightmap/entity-color inputs on line and world-border pipelines.
+- Validate resize, Overworld-to-Nether transition and return, shader disable/re-enable, and resource reload with the unmodified pinned Sildur pack on an NVIDIA RTX 3070. This is one profile/fixture and does not establish whole-pack Iris parity.
+- Preserve the experimental compatibility scope; unsupported shaderpack features remain unsupported.
+
 ## 0.2.0-beta.31 (experimental prerelease)
 
 - Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.
