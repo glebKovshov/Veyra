@@ -14,6 +14,8 @@ The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; i
 
 The local pinned source-only audit passed for four archives across 12 defaults and 63 declared-profile/dimension cases: **864 geometry fragments accepted / 0 rejected** and **18/18 active compute stages compiled**. All 75 report rows retain `visualValidation: false`; the audit does not establish runtime or visual compatibility.
 
+Eighteen Complementary profile/dimension records report a device capability requirement for writable shadow `voxel_img` in the shadow vertex stage (`vertexPipelineStoresAndAtomics`). The tested RTX 3070 enabled the requested feature, but support on other devices is not implied.
+
 The release workflow requires a fresh pinned source audit, the full Lavapipe graphics matrix, versioned build/tests, and distributable verification before publishing. These checks validate selected source paths and synthetic render fixtures, not complete third-party shaderpacks or natural-world visuals. Pinned source-audit rows explicitly retain `visualValidation: false`.
 
 Veyra remains an experimental Iris-compatible subset. Compute support covers the documented setup, begin, shadow-compute, and post-processing families and selected SSBO/image semantics; other Iris features remain unsupported or unverified. Do not infer complete shaderpack support or stable Iris parity from these results. See `COMPATIBILITY.md` and `ARCHITECTURE.md` for the measured matrix and backend gaps.
