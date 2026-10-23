@@ -20,6 +20,15 @@ def material_png(path):
                      + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
 
 
+def normal_png(path):
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = (b'\0' + bytes([255, 128, 128, 255]) * 16) * 16
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 16, 16, 8, 6, 0, 0, 0))
+                     + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
+
+
 def string(value):
     data = value.encode("utf-8")
     return struct.pack(">H", len(data)) + data
@@ -48,7 +57,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
     parser.add_argument('--shaderpack-name', default='')
@@ -146,19 +155,23 @@ def main():
     if third_party:
         (config / 'shaderpack-profile.txt').write_text(arguments.profile, encoding='utf-8')
     extra_options = ''
-    if fixture.startswith('specular-'):
+    if fixture.startswith(('specular-', 'normal-')):
         resource_pack = root / 'resourcepacks/veyra-material-fixture'
         resource_pack.mkdir(parents=True, exist_ok=True)
         (resource_pack / 'pack.mcmeta').write_text(json.dumps({'pack': {
             'description': 'Original Veyra material data fixture', 'min_format': [75, 0], 'max_format': [75, 0]}}), encoding='utf-8')
         textures = resource_pack / 'assets/minecraft/textures'
-        for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
-            material_png(textures / f'block/{sprite}_s.png')
-        for variant in ['temperate_cow', 'cold_cow', 'warm_cow']:
-            material_png(textures / f'entity/cow/{variant}_s.png')
-        properties = resource_pack / 'assets/minecraft/optifine/texture.properties'
-        properties.parent.mkdir(parents=True, exist_ok=True)
-        properties.write_text('format=lab-pbr/1.3\n', encoding='utf-8')
+        if fixture.startswith('specular-'):
+            for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
+                material_png(textures / f'block/{sprite}_s.png')
+            for variant in ['temperate_cow', 'cold_cow', 'warm_cow']:
+                material_png(textures / f'entity/cow/{variant}_s.png')
+            properties = resource_pack / 'assets/minecraft/optifine/texture.properties'
+            properties.parent.mkdir(parents=True, exist_ok=True)
+            properties.write_text('format=lab-pbr/1.3\n', encoding='utf-8')
+        else:
+            for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
+                normal_png(textures / f'block/{sprite}_n.png')
         extra_options = 'resourcePacks:["vanilla","file/veyra-material-fixture"]\n'
     (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
     print(f"Prepared original Minecraft 1.21.11 flat world and {fixture} fixture")

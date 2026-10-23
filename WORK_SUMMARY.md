@@ -167,6 +167,7 @@
 - Local JDK 21 `test validateShaders build compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon`: **313 tests, 0 failures/errors/skips; 82 shader examples; 86 Vulkan SPIR-V stages**. Integrated pinned audit: 4 archives, 75 profile/dimension cases / 5,178 stages, **781 geometry fragment accepted / 8 rejected**; remaining capability blockers are `entityId` (54), `renderStage` (12), `mc_Entity` (6), `shadowData` (2), and `gbuffers_skytextured.vsh` (1). Every record is `visualValidation=false`.
 - RTX 3070 sky smoke read back **226,624 active magenta pixels / 0 disabled**. Both new fixtures are synthetic pipeline checks; no full third-party shaderpack is visually validated. Stable Iris-compatibility goal remains incomplete.
 - Профиль Modrinth обновлён с beta.26 на официальный beta.27 JAR; beta.26 сохранён резервной копией вне `mods/`. Старый beta.25 crash report вызван неверным `Tesselator.begin` Mixin selector и исправлен в beta.26; beta.27 включает это исправление.
+
 ## Beta.26 опубликована; cloud crash fix доступен в release — 2026-10-21
 
 - PR [#68](https://github.com/glebKovshov/Veyra/pull/68) слит в main commit d9e58ea598555d24a02375f3e6fa2d56d1013bf3; tag v0.2.0-beta.26+mc1.21.11 опубликован. Release workflow [39516955852](https://github.com/glebKovshov/Veyra/actions/runs/39516955852) и tag Build [39516955962](https://github.com/glebKovshov/Veyra/actions/runs/39516955962) завершились успешно. В Release прошли pinned source audit, 31/31 graphics smoke fixtures, build/tests, проверка distributable и публикация.
@@ -199,6 +200,7 @@
 - Полный локальный JDK 21 `test validateShaders build compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon` прошёл: **299 тестов, 0 ошибок; 79 example shaders обработано, 78 напрямую скомпилировано в Vulkan SPIR-V**, включая block/hand и entity-noisetex. `scripts/verify_jar.py` проверил beta.25-metadata candidate для Minecraft 1.21.11 / VulkanMod 0.6.8: **731,626 bytes**, SHA-256 `eb8ba5b486c459c6e307024021bbc8eb912d1f7391c8655294e2d98b7452f318`. Это локальный preview, не опубликованный релиз.
 - Pinned source audit после изменений: 4 SHA-512-pinned архива, 3 измерения, **75 записей / 5,178 stages; 709 geometry fragments accepted / 8 rejected**; во всех строках `visualValidation=false`. Остались whole-pack blockers: Complementary Reimagined/Unbound `gbuffers_damagedblock.vsh` (54 записи), BSL `gbuffers_block.vsh` с отсутствующим `mc_Entity` (18), Sildur `shadowData` в block-translucent (2) и `gbuffers_skybasic.vsh` (1). Все 8 source rejection — Sildur `shadowData` в четырёх geometry programs по двум измерениям. Полная визуальная совместимость с pack authors не подтверждена.
 - Грубая оценка полного stable-release objective обновлена до **около 60% готово / 40% осталось**. Текущая ветка и изменения ещё не прошли GitHub CI/merge; официальный beta.25 Release остаётся неизменённым. Следующий шаг — PR и полный CI, затем работа над недостающими pack interfaces, compute и lifecycle/teardown до следующего крупного prerelease.
+
 # Veyra — передача контекста разработки
 
 ## Beacon vertex/MRT candidate — локальная проверка пройдена (2026-10-21)
@@ -429,6 +431,7 @@
 - Source audit [39381177592](https://github.com/glebKovshov/Veyra/actions/runs/39381177592) passed 75 cases / 5,178 stages across 4 pinned packs: 432 geometry fragments accepted / 285 rejected, with `visualValidation=false` for every record. Current blockers include terrain `absMidCoordPos`/`recolor`, water `absMidCoordPos`/`dist`, translucent entity/block inputs, cloud `texture`, compute, and attachment feedback.
 - Release-prep PR [#28](https://github.com/glebKovshov/Veyra/pull/28) bumped the version, updated install/compatibility/release docs, and merged at `b3b6d0e`. The tag workflow published beta.15; its JAR and checksum are recorded above. Physical-GPU testing, third-party visual validation, and clean Vulkan teardown remain outstanding, so the stable-release goal remains incomplete.
 - Existing untracked screenshots, `assets/`, `logs/`, GPU dumps, `GOAL.md`, `scripts/analyze_vulkan_shutdown.py`, and stash `stash@{0}` remain untouched and unstaged.
+
 ## Beta.10 published prerelease — per-quad terrain midpoint — 2026-10-20
 
 - После исправления format initialization повторена локальная команда `test validateShaders build packageExamplePacks --rerun-tasks`: 199/199 тестов, 43 example stages и 40 прямых Vulkan SPIR-V компиляций. Beta.10 опубликована после успешных CI gates на PR и tag.
@@ -578,6 +581,7 @@
 - Следующие приоритеты: PBR specular atlas/material inputs, отдельная opaque shadowtex1, pack-specific uniforms; определить корректную Iris/Vulkan семантику water same-attachment feedback и расширить color inputs на нужные entity/hand bridges. Затем real-pack end-to-end, физический GPU, ownership/stress проверки, stable integration/release.
 
 Ниже сохранена история предыдущих этапов.
+
 ## История: water depth fix — 2026-10-19
 
 - Последний runtime code commit: `51c5875949259444b465409828ad19cbd6557006`. Build push `39208570869` и PR `39208577331` — success. 96 JUnit tests, 0 failures/errors/skips; shaderc 23 example preprocesses / 20 direct SPIR-V compilations; JAR verifier проходит.
@@ -589,6 +593,7 @@
 - Следующие backend задачи: water `gaux2`/colortex5 и colortex4 с корректными read/write feedback rules; отдельный opaque shadowtex1; PBR specular и pack-specific uniforms. Далее physical GPU/UI и lifecycle stress. Не публиковать stable только на основании этих двух synthetic fixtures.
 
 Сведения ниже до раздела «Продолжение после alpha» сохраняют историю первоначального состояния, а не заменяют этот актуальный срез.
+
 ## Цель и целевая среда
 
 Продолжить существующий Veyra, не переписывая его с нуля. Целевая связка зафиксирована в `gradle.properties`, `fabric.mod.json` и исходниках VulkanMod, на которые рассчитаны mixin’ы:
@@ -1173,6 +1178,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Refreshed pinned audit snapshots: 4 packs / 75 cases (12 defaults + 63 profiles/dimensions), 5,178 declared stages / 5,124 preprocessed stages, **864 geometry fragments accepted / 0 rejected**, **18/18 active compute stages compiled**, and 0 capability/adapter-error rows. All rows retain `visualValidation=false`; this does not prove whole-pack rendering.
 - Retried the real Complementary Reimagined r5.9.3 `COMPLEMENTARY` profile on RTX 3070. It fails before visual validation because `composite_colortex7` actively uses SSBO `blockDataBuffer`, which VulkanMod 0.6.8's native `RenderPipeline` does not support. The new preflight gives a direct unsupported-capability error rather than a native parser crash. The local profile is not compatible yet; the next implementation batch must investigate correct SSBO descriptors, resource lifetime, and compute/graphics synchronization before retrying it.
 - PR #84 remains draft. Local fixes are not yet reflected in GitHub CI; the remote branch head at last check was `ab13e5b`. No merge or release is claimed.
+
 ### PR #84 CI checkpoint after candidate push — 2026-10-22
 
 - Pushed `21522d93eda6456fa22415bba2b20a60d15d70f8` to `feature/shadowcomp-compute`. PR #84 remains linked and draft; the earlier remote-head run (`ab13e5b`) had Build and source audit green but Graphics smoke red, so those results do not validate this push.
@@ -1257,6 +1263,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Проверен удалённый head `b598c4a66754f0d988ba3239f6e8c5a79602deec`; локальная ветка совпадает с `origin/feature/shadowcomp-compute`. PR #84 остаётся draft.
 - На этом head Build run `39746059167` и shaderpack source audit run `39746059527` завершились успешно; Lavapipe Graphics smoke run `39746059275` выполняется. T3 наблюдение за PR активно.
 - Следующий шаг — разобрать итоговые gates именно для `b598c4a`, исправить первопричину при падении и только после зелёных проверок переходить к оставшемуся реальному shaderpack аудиту и пакетной интеграции. Merge и релиз пока не выполнялись.
+
 ### Lavapipe Graphics findings on `b598c4a` — 2026-10-22
 
 - Build run `39746059167` and pinned source audit `39746059527` passed. Graphics run `39746059275` is still finishing its matrix; six jobs have failed so far. Five custom-image jobs report 6–9 `VUID-RuntimeSpirv-NonWritable-06341` errors saying `vertexPipelineStoresAndAtomics` was not enabled, although the smoke result reports the queried capability as available. The device-feature enable path is therefore still unresolved.
@@ -1264,12 +1271,14 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Added a single startup diagnostic immediately before `vkCreateDevice` to report the Vulkan core-feature request, `pEnabledFeatures` null state, and `VkPhysicalDeviceFeatures2` sType. This should distinguish the feature-chain construction from a mismatch later in device creation.
 - After those edits, forced JDK 21 `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed: **481 tests, 0 failures/errors/skips**, 96 example shaders validated, 112 direct Vulkan SPIR-V compilations, example-pack packaging, and graphics-smoke Java compilation. `scripts/verify_jar.py` also passed the local beta.30-metadata candidate (**949,400 bytes**, SHA-256 `F91D0AD5C4E0B0C90721AF894649591D8EC2227F3617CA3CE6AF7973FFC53905`); it remains unpublished.
 - Next: commit/push the diagnostics and corrected binding assertion, then use the next exact-head Lavapipe logs to finish the feature-enable fix. PR #84 stays draft; no merge or release until every exact-head gate passes.
+
 ### Push `a2dcbe8` and fresh CI — 2026-10-22
 
 - Pushed `a2dcbe8` to `feature/shadowcomp-compute` and PR #84. The batch corrects the graphics-smoke assertion for `bufferObject.0` (binding 1024) and logs the enabled core-feature request immediately before `vkCreateDevice`; the Lavapipe feature-enable VUID remains unresolved.
 - New exact-head checks: Build `39749546234` passed; source audit `39749546291` is running; Graphics smoke `39749546258` is queued. PR #84 is still draft and watched again after its watcher had stopped.
 - Local verification on this head passed: **481 tests, 0 failures/errors/skips**, 96 example shaders, 112 direct Vulkan SPIR-V compilations, packaging, graphics-smoke compilation, and `scripts/verify_jar.py`. Local candidate: **949,400 bytes**, SHA-256 `F91D0AD5C4E0B0C90721AF894649591D8EC2227F3617CA3CE6AF7973FFC53905`; unpublished beta.30 metadata.
 - Next: read the exact-head feature diagnostic and Lavapipe results; fix device feature activation before merging or releasing.
+
 ### Current Vulkan feature request checkpoint — 2026-10-22
 
 - Remote PR #84 still points to a2dcbe8463e3a13573e75f67f950cebacaddb19e. Exact-head Build 39749546234 and shaderpack source audit 39749546291 passed. Graphics smoke 39749546258 completed with failure: four custom-image jobs report VUID-RuntimeSpirv-NonWritable-06341, and entity-colortex-feedback hit a transient Maven/Fabric dependency-resolution failure before launching Minecraft.
@@ -1278,6 +1287,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Forced JDK 21 gate test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain passed: 481 tests, 0 failures/errors/skips, 96 example shaders, 112 direct Vulkan SPIR-V compilations, packaging, and smoke compilation.
 - Local beta.30-metadata JAR passed scripts/verify_jar.py: 949,228 bytes, SHA-256 D7E49772BE5DDB7C3FF752E93A7CFBBE3913EAD1CB30D2C74542A2EAA4AF2536. It remains unpublished and is not a release candidate until exact-head Vulkan validation passes.
 - Next: read fresh exact-head CI and Lavapipe evidence, then continue the larger compatibility/release batch. Keep PR #84 draft; do not merge or publish until every exact-head gate passes.
+
 ### Push f3fbb01 and fresh CI — 2026-10-22
 
 - Pushed f3fbb01390266d10d8c83af59adf1b87f2a0dd6c to feature/shadowcomp-compute / PR #84. The batch passes a copied VkDeviceCreateInfo with core features in pEnabledFeatures and preserves VulkanMod's original pNext chain.
@@ -1286,6 +1296,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Updated PR #84 body with the current local evidence and previous a2dcbe8 failures. Checked comments, review submissions, and inline review threads: none present. Restarted T3 PR watching; it is active.
 - No merge or release has been made. Wait for exact-head checks and use their result to decide the next feature fix.
 - Verified the published release baseline from GitHub: latest release is v0.2.0-beta.30+mc1.21.11 (published 2026-10-21); its mod JAR asset is 753,755 bytes and the release also provides a sources JAR, example-packs ZIP, and SHA256SUMS. The local 949,228-byte beta.30-metadata JAR is a newer unpublished candidate, so the eventual batched release must use a new version/tag.
+
 ### f3fbb01 exact-head results and native-device diagnostics — 2026-10-22
 
 - Refreshed `origin/feature/shadowcomp-compute`; local and remote both resolve to `f3fbb01390266d10d8c83af59adf1b87f2a0dd6c`. No other source commit was pushed by the other agent.
@@ -1360,6 +1371,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Pinned source audit passed: 4 packs, 12 defaults, 63 profile cases, 864 geometry fragments accepted / 0 rejected, and 18 active compute stages compiled / 0 rejected. All audited evidence is source-only (`visualValidation=false`).
 - RTX 3070 smoke `run-graphics-smoke-indirect-20261022` passed on the new producer/indirect-consumer fixture: **222,251 active magenta pixels / 0 after disable**, renderer `NVIDIA GeForce RTX 3070`, empty error field. The terrain signal requires computed value 42, so it confirms the indirect consumer stage ran. The Windows host has no Vulkan validation layer; this local run does not replace Lavapipe validation.
 - The local beta.31 JAR passed `scripts/verify_jar.py`: **991,459 bytes**, SHA-256 `5FAC166233520E947ED805936AA1F4CCF504BACFDB18046EA3F557245D967FE8`. This is an unpublished local candidate; exact-head Lavapipe graphics validation remains pending. PR #85/#86 remain under T3 watch; no merge or release has been made.
+
 ### Vulkan core-feature chain correction for beta.31 — 2026-10-22
 
 - PR #85 exact-head `4e017be0f03b70a7c29f176a55bc250aca6c028b` had passing Build and pinned source-audit checks, but Lavapipe Graphics failed five fixtures with `VUID-RuntimeSpirv-NonWritable-06341`; validation treated `vertexPipelineStoresAndAtomics` as disabled.
@@ -1388,10 +1400,12 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - В существующем release worktree подготовлена следующая коррекция: скопированный `VkDeviceCreateInfo` получает `pEnabledFeatures=null`; объединённые supported core features помещаются в `VkPhysicalDeviceFeatures2` в начале `pNext`, а исходная VulkanMod feature-chain сохраняется следом. Тесты проверяют новый head, null legacy pointer, сохранённые requested features и исходный Vulkan 1.1 node.
 - Проверки в этом worktree: targeted `VeyraDeviceFeaturesTest` — **4/4**; полный forced JDK 21 gate — **519 tests, 0 failures/errors/skips**, 97 shader examples, 113 Vulkan SPIR-V compilations, graphics-smoke compilation, `build` и `packageExamplePacks`; `git diff --check` прошёл. `scripts/verify_jar.py` принял beta.31 JAR: **982,750 bytes**, SHA-256 `F0AA677270140FABB5E09DFE2E7D9A120E467B8D8EE3640878CECD815C3C57CB`. Эти локальные проверки не заменяют hosted Lavapipe runtime validation; correction ещё нужно запушить и проверить на новом exact head.
 - #85/#86 остаются открытыми; #85 exact-head Build/source audit зелёные, Graphics старого `cc07513` красный. Следующий шаг — зафиксировать и отправить Features2 correction в #85, затем дождаться complete Build/source-audit/Graphics на exact head, сохраняя порядок стека #85 → #86.
+
 ### Beta.31 prerelease installation links — 2026-10-23
 
 - README previously directed users to GitHub's `/releases/latest` endpoint, while the release workflow intentionally marks beta releases `--prerelease --latest=false`. Updated both download/install links to the releases listing so beta.31 remains discoverable without replacing GitHub's latest non-prerelease selection.
 - This documentation correction is being added to the existing #85 release branch. It changes the PR head, so exact-head hosted checks must be assessed on the new head before merge.
+
 ### Beta.31 compatibility documentation sync — 2026-10-23
 
 - Updated current candidate compatibility documentation to record the RTX 3070 Sildur's Vibrant 2.02 Extreme attempt: the frame stayed black after deferred; probes show attachment/depth data but do not localize the lighting cause. Wording explicitly limits the result to this harness and does not claim universal incompatibility.
@@ -1480,6 +1494,7 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - JDK 21 `build validateShaders packageExamplePacks` passed: **506 tests, 0 failures/errors/skips**, 97 example shaders, 113 direct Vulkan SPIR-V compilations, build, and example-pack packaging. `git diff --check` passed.
 - Local RTX 3070 vanilla-baseline smoke passed (`result.json` status `passed`; empty error field). Captured Khronos validation output has **0** `VUID-VkRenderingInfo-pNext-06079/06080` mip-extent errors. It still reports 2 NVIDIA/Windows swapchain-acquire diagnostics before shutdown and the existing process-wide object leak during `vkDestroyDevice`; this local run does not replace the required hosted Lavapipe matrix.
 - `scripts/verify_jar.py` accepted the local beta.31 candidate: **984,847 bytes**, SHA-256 `3C22F3609B959236D396F384FD7D04375735727E32DDD183405617E17C7AC1FC`. This is not a release artifact. Push the new exact PR head and require green Build, pinned shaderpack source audit, and complete Lavapipe Graphics checks before merge or publication.
+
 ### Pinned validation layer correction for the Lavapipe gate — 2026-10-23
 
 - PR #85 mip-extent fix `d439244` was pushed. Its local JDK 21 build/test gate passed; hosted Build `39903296008`, source audit `39903295838`, and Graphics `39903295840` were started for that head.
@@ -1543,3 +1558,15 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Tagged `v0.2.0-beta.31+mc1.21.11` on 04e7fae. Release workflow `39914149377` (source audit, full Graphics matrix, build) and tag Build `39914149288` passed.
 - Published pre-release https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.31%2Bmc1.21.11 with `veyra-0.2.0-beta.31+mc1.21.11.jar` (**997,797 bytes**, SHA-256 `e10fbe9786cc94eb09a3afda43bb689140063346dc6eb097a729b602b5366180`), sources JAR, example packs ZIP and SHA256SUMS.
 - Still open (not claimed fixed): full-pack Sildur v2.02 Extreme renders black after deferred on the original defaults.
+
+### Beta32 release verification and continuation — 2026-10-23
+
+- Published v0.2.0-beta.32+mc1.21.11 from ee14e9c2f06cf69f454336cd42fcda4ec5ad61a0. Release workflow 39941879837 and tag Build 39941879578 passed. The published JAR is 998,673 bytes with SHA-256 236c8416727c0191f6452b1e539aa3386dd4f045d8ddf07753124f0d93859349; its checksum manifest and distributable verifier agree.
+- The exact beta32 JDK 21 local gate passed 532 tests, 98 shader examples, and 114 Vulkan SPIR-V compilations. A new Sildur v2.02 Extreme default-profile smoke selected the correct SildurOriginal pack and __DEFAULT__ profile, then passed at 230,400 non-black pixels / 55 color buckets. This was an initial-frame run, not full-pack lifecycle certification.
+
+### Static terrain normal map continuation — 2026-10-23
+
+- Kept beta32 release commit/tag ee14e9c2f06cf69f454336cd42fcda4ec5ad61a0 and its user-owned runtime artifacts intact; feature work is isolated in feature/terrain-normal-maps from current origin/main e73023c.
+- Added the Iris normals sampler for terrain and shadow block-atlas fragments. Static resource-pack _n.png sprites are packed into live albedo atlas rectangles, missing sprites use (127,127,255,255), and resampling/mips normalize tangent-space vectors. Descriptor slot 6 is reserved for this atlas and auxiliary geometry texture slots now begin at 7. Atlas/resource reload and pipeline shutdown invalidate the normal texture cache.
+- Entity normal maps and animated normal/specular maps remain unsupported. No full-pack parity claim is made.
+- Full JDK 21 gate passed: 538 tests, 0 failures/errors/skips; validateShaders processed 99 examples and compiled 115 shader stages to Vulkan SPIR-V; build, packageExamplePacks, and compileGraphicsSmokeJava passed. The original normal-atlas RTX 3070 run passed with 223,177 active magenta pixels after reading mip level 2; hosted Graphics is pending.
