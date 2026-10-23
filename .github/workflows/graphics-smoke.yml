@@ -8,10 +8,20 @@ on:
       - 'src/main/**'
       - 'src/graphicsSmoke/**'
       - 'scripts/prepare_graphics_smoke.py'
+      - 'scripts/lavapipe_feature_probe.c'
+      - 'scripts/lavapipe_feature_probe.vert'
+      - 'scripts/install_vulkan_validation_layer.sh'
+      - 'scripts/lavapipe_feature_probe_image.vert'
       - 'examples/geometry-mid-texcoord/**'
       - 'examples/terrain-block-id/**'
       - 'examples/terrain-vertex-execution/**'
       - 'examples/terrain-vertex-varyings/**'
+      - 'examples/custom-image-compute/**'
+      - 'examples/cloud-custom-image/**'
+      - 'examples/basic-custom-image/**'
+      - 'examples/entity-custom-image/**'
+      - 'examples/composite-custom-image/**'
+      - 'examples/storage-buffer-shadow/**'
       - 'examples/water-block-id/**'
       - 'examples/entity-mrt/**'
       - 'examples/entity-colortex-feedback/**'
@@ -49,6 +59,12 @@ on:
       - 'examples/terrain-block-id/**'
       - 'examples/terrain-vertex-execution/**'
       - 'examples/terrain-vertex-varyings/**'
+      - 'examples/custom-image-compute/**'
+      - 'examples/cloud-custom-image/**'
+      - 'examples/basic-custom-image/**'
+      - 'examples/entity-custom-image/**'
+      - 'examples/composite-custom-image/**'
+      - 'examples/storage-buffer-shadow/**'
       - 'examples/water-block-id/**'
       - 'examples/current-rendered-item-id/**'
       - 'examples/glint-vertex-execution/**'
@@ -64,6 +80,7 @@ on:
       - 'examples/cloud-model-view/**'
       - 'scripts/prepare_graphics_smoke.py'
       - 'examples/specular-*/**'
+      - 'scripts/install_vulkan_validation_layer.sh'
       - 'examples/shadow-color-*/**'
       - 'examples/water-shadow-depth-*/**'
       - 'examples/water-post-shadow-inputs/**'
@@ -73,11 +90,37 @@ permissions:
   contents: read
 
 jobs:
+  lavapipe-feature-baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Lavapipe validation probe dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y mesa-vulkan-drivers libvulkan-dev glslang-tools
+          bash scripts/install_vulkan_validation_layer.sh
+      - name: Compile minimal vertex storage-buffer and storage-image pipelines
+        run: |
+          glslangValidator -V scripts/lavapipe_feature_probe.vert -o "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
+          glslangValidator -V scripts/lavapipe_feature_probe_image.vert -o "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv"
+          cc -std=c11 scripts/lavapipe_feature_probe.c -lvulkan -o "$RUNNER_TEMP/lavapipe_feature_probe"
+      - name: Check pEnabledFeatures with Khronos validation
+        env:
+          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+        run: |
+          export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
+          test -n "$VK_ICD_FILENAMES"
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv" --vulkanmod-pnext
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv" --storage-image
+          "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv" --storage-image --vulkanmod-pnext
+
   lavapipe-client:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, storage-buffer-shadow, water-block-id, water-opaque-depth, water-color-inputs, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-mrt, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -92,7 +135,8 @@ jobs:
       - name: Install software Vulkan and validation layers
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools vulkan-validationlayers xvfb libglfw3 libflite1
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools xvfb libglfw3 libflite1
+          bash scripts/install_vulkan_validation_layer.sh
       - name: Prepare original validation world
         run: python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
       - name: Launch Minecraft with software Vulkan
@@ -107,7 +151,11 @@ jobs:
           export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
           test -n "$VK_ICD_FILENAMES"
           vulkaninfo --summary > vulkan-device.txt 2>&1
-          timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke 2>&1 | tee graphics-client.log
+          extra_args=()
+          if [[ '${{ matrix.fixture }}' == 'terrain-vertex-varyings' ]]; then
+            extra_args+=('-PgraphicsSmokeComputeProbe=true')
+          fi
+          timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke "${extra_args[@]}" 2>&1 | tee graphics-client.log
       - name: Verify real frame readback and validation output
         run: |
           python3 - <<'PY'
@@ -130,7 +178,42 @@ jobs:
           print(f'Runtime validation errors: {len(runtime_errors)}')
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
-          assert result['status']=='passed', result
+          fixture='${{ matrix.fixture }}'
+          shadow_voxel_image_fixtures={'custom-image-compute','cloud-custom-image','basic-custom-image','entity-custom-image','composite-custom-image'}
+          if fixture in shadow_voxel_image_fixtures and result['status']=='skipped':
+              assert (not result['vertexPipelineStoresAndAtomicsEnabled']
+                      or not result['shaderStorageImageExtendedFormatsEnabled']), result
+              assert result['skipReason'] in {'vertexPipelineStoresAndAtomics unavailable',
+                                              'shaderStorageImageExtendedFormats unavailable'}, result
+              print('Shadow-voxel custom-image fixture skipped because the Vulkan device lacks a required storage feature')
+          if fixture == 'storage-buffer-shadow' and result['status']=='skipped':
+              assert result['vertexPipelineStoresAndAtomicsEnabled'] is False, result
+              assert result['skipReason']=='vertexPipelineStoresAndAtomics unavailable', result
+              print('Storage-buffer shadow fixture skipped because this Vulkan device lacks vertexPipelineStoresAndAtomics')
+          elif result['status']!='skipped':
+              assert result['status']=='passed', result
+          if fixture in shadow_voxel_image_fixtures and result['status']=='passed':
+              assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
+              assert result['shaderStorageImageExtendedFormatsEnabled'] is True, result
+          if fixture == 'entity-custom-image' and result['status']=='passed':
+              assert result['activeEntityCustomImageGreenPixels'] >= 100, result
+              assert result['disabledEntityCustomImageGreenPixels'] * 4 < result['activeEntityCustomImageGreenPixels'], result
+              assert re.search(r'Descriptor evidence: pipeline=veyra:pipeline/shadow_entities/.*sampler=voxel_img binding=\d+ type=3 image=voxel_img .*layout=1', text), 'Entity shadow storage-image descriptor was not bound'
+          if fixture == 'storage-buffer-shadow' and result['status']=='passed':
+              assert result['vertexPipelineStoresAndAtomicsEnabled'] is True, result
+              assert result['activeMagentaPixels'] >= 2000
+              assert result['disabledMagentaPixels'] * 4 < result['activeMagentaPixels']
+              assert re.search(r'Storage buffer evidence: pipeline=veyra:pipeline/shadow_entities/.*binding=1024 type=9 stages=.*global=false',text), 'Shadow entity SSBO descriptor was not bound'
+              assert re.search(r'Storage buffer evidence: pipeline=veyra:pipeline/shaderpack/composite_.*binding=1024 type=9 stages=.*global=false',text), 'Post-pass SSBO descriptor was not bound'
+          if '${{ matrix.fixture }}' == 'shadow-color-mrt':
+              entity_routes=re.findall(r'Framebuffer evidence: pipeline=veyra:pipeline/shadow_entities.*bound=MRT\[[^\]]*shadowcolor1',text)
+              assert len(entity_routes) >= 2, 'The entity shadow pipeline did not route through the MRT before and after shader-pack re-selection'
+              assert result['shadowMrtReenabledPixels'] >= 2000, result
+              print('Entity shadow MRT routes across re-selection:', len(entity_routes))
+          if '${{ matrix.fixture }}' == 'terrain-vertex-varyings':
+              probe=json.loads(pathlib.Path('build/reports/graphics-smoke/compute-image-probe.json').read_text())
+              assert probe == {'status':'passed','format':'r16ui','texels':64,'expected':42}, probe
+              print('Custom-image compute readback:', probe)
           for phase in ['before-backend-cleanup','before-allocator-destruction']:
               snapshot=json.loads(pathlib.Path(f'build/reports/graphics-smoke/shutdown-{phase}.json').read_text())
               assert snapshot['phase']==phase

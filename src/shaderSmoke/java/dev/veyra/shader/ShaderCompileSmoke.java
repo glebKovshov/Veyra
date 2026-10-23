@@ -23,18 +23,30 @@ public class ShaderCompileSmoke {
                         Path file = path.getParent().resolve(included);
                         return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                     });
-                    source = GlslPreprocessor.process(name, source);
                     String programName = name.substring(0, name.length() - 4);
                     Path vertexPath = path.getParent().resolve(programName + ".vsh");
                     Path properties = path.getParent().resolve("shaders.properties");
+                    String propertySource = Files.exists(properties) ? Files.readString(properties) : "";
+                    var imageProperties = ShaderPackImageProperties.parse(propertySource);
+                    var customTextureProperties = ShaderPackCustomTextureProperties.parse(propertySource);
+                    source = GlslPreprocessor.process(name, source, imageProperties.images().isEmpty()
+                            ? Map.of() : Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
+                    var customImages = imageProperties.images().isEmpty()
+                            ? new ShaderPackImageBindings.PreparedStage(source, List.of())
+                            : ShaderPackImageBindings.prepare(name, source, imageProperties);
+                    source = customImages.source();
+                    Set<String> customTextureSamplers = new HashSet<>(TerrainShaderAdapter.usedCustomTextureSamplers(
+                            source, customTextureProperties.samplersForProgram(programName)));
                     CustomUniforms.activate(Files.exists(properties)
-                            ? CustomUniforms.parse(Files.readString(properties)) : CustomUniforms.EMPTY);
+                            ? CustomUniforms.parse(propertySource) : CustomUniforms.EMPTY);
                     Map<String, TerrainVertexShaderAdapter.PackVarying> packVaryings = Map.of();
                     if (Files.exists(vertexPath)) {
                         String packVertex = ShaderIncludes.expand(programName + ".vsh", Files.readString(vertexPath), included -> {
                             Path file = vertexPath.getParent().resolve(included);
                             return Files.exists(file) ? Optional.of(Files.readString(file)) : Optional.empty();
                         });
+                        customTextureSamplers.addAll(TerrainShaderAdapter.usedCustomTextureSamplers(
+                                packVertex, customTextureProperties.samplersForProgram(programName)));
                         if (EntityVertexShaderAdapter.supportsProgram(programName)) {
                             boolean hand = programName.startsWith("gbuffers_hand");
                             String nativeInput = programName.equals("gbuffers_damagedblock")
@@ -47,7 +59,9 @@ public class ShaderCompileSmoke {
                                     EntityShaderAdapter.requiresViewPositionInput(source),
                                     EntityShaderAdapter.requiresViewNormalInput(source), false);
                             EntityVertexShaderAdapter.AdaptedStage adaptedVertex = EntityVertexShaderAdapter.adaptStage(
-                                    nativeVertex, packVertex, programName, hand);
+                                    nativeVertex, packVertex, programName, hand,
+                                    EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
+                                    customTextureSamplers);
                             compileVertex(compiler, options, adaptedVertex.source(),
                                     path.getParent().getFileName() + "/" + programName + ".vsh", true);
                             packVaryings = adaptedVertex.varyings();
@@ -55,7 +69,10 @@ public class ShaderCompileSmoke {
                             packVaryings = TerrainVertexShaderAdapter.validateAndGetVaryings(programName, packVertex);
                         }
                     }
-                    String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source)
+                    String adapted = name.equals("gbuffers_clouds.fsh") ? CloudShaderAdapter.adaptFragment(source,
+                            List.of(), customImages.resources().stream().filter(resource -> !resource.storageImage())
+                                    .map(ComputeShaderAdapter.OpaqueResource::name)
+                                    .collect(java.util.stream.Collectors.toUnmodifiableSet())).source()
                             : programName.equals("gbuffers_damagedblock")
                             ? Files.exists(vertexPath)
                                     ? DamagedBlockShaderAdapter.adaptFragment(source, programName, packVaryings,
@@ -65,9 +82,10 @@ public class ShaderCompileSmoke {
                             ? EntityShaderAdapter.adaptGeometryFragment(source, name.substring(0, name.length()-4),
                             programName.startsWith("gbuffers_hand"), Files.exists(path.getParent().resolve("shadow.fsh")),
                             -1, -1, ItemIdMap.UNMAPPED, ShaderPackUniformAdapter.supportsEntityColorProgram(
-                                    name.substring(0, name.length()-4)), false, packVaryings)
+                                    name.substring(0, name.length()-4)), false, packVaryings, customTextureSamplers)
                             : TerrainShaderAdapter.adaptFragment(source, true, name.equals("gbuffers_water.fsh"),
-                                    packVaryings);
+                                    packVaryings, false, programName, customTextureSamplers);
+                    adapted = ShaderPackImageBindings.plan(20, customImages).decorate(adapted, customImages);
                     long preprocessed = shaderc_compile_into_preprocessed_text(compiler, adapted, shaderc_fragment_shader,
                             path.toString(), "main", options);
                     try {
@@ -811,9 +829,11 @@ public class ShaderCompileSmoke {
                     attribute vec4 mc_Entity;
                     attribute vec4 mc_midTexCoord;
                     attribute vec4 at_tangent;
+                    attribute vec3 at_midBlock;
                     void main() {
                         vec4 position = gl_Vertex;
                         position.xyz += gl_Normal + at_tangent.xyz + mc_Entity.xyz * 0.0 + mc_midTexCoord.xyz * 0.0;
+                        position.xyz += at_midBlock / 64.0;
                         position.xy += (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy * 0.0;
                         position.xy += (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy * 0.0;
                         position += gl_Color * 0.0;
@@ -821,6 +841,37 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_terrain");
             compileVertex(compiler, options, terrainCustomVertex, "terrain-custom-vertex-main", true);
+            compileVertex(compiler, options, TerrainVertexShaderAdapter.adapt(terrainVertex, """
+                    #version 120
+                    uniform sampler2D texture;
+                    uniform sampler2D tex;
+                    uniform sampler2D gtexture;
+                    uniform sampler2D lightmap;
+                    void main() {
+                        gl_Position = ftransform();
+                        gl_Position += texture2DLod(texture, vec2(0.5), 0.0)
+                            + texture(tex, vec2(0.5)) + texture2D(gtexture, vec2(0.5))
+                            + texture2DLod(lightmap, vec2(0.5), 0.0);
+                    }
+                    """, "shadow_solid"), "shadow-native-vertex-texture-aliases", true);
+            Path imageFixture = Path.of("examples/custom-image-compute/shaders");
+            var imageFixtureProperties = ShaderPackImageProperties.parse(Files.readString(imageFixture.resolve("shaders.properties")));
+            var imageShadowVertex = ShaderPackImageBindings.prepare("shadow.vsh",
+                    Files.readString(imageFixture.resolve("shadow.vsh")), imageFixtureProperties);
+            String adaptedImageShadow = TerrainVertexShaderAdapter.adapt(terrainVertex, imageShadowVertex.source(), "shadow_solid");
+            compileVertex(compiler, options, ShaderPackImageBindings.plan(20, imageShadowVertex).decorate(adaptedImageShadow, imageShadowVertex),
+                    "shadow-custom-image-write", true);
+            compileCompute(ComputeShaderAdapter.adapt("shadowcomp.csh", Files.readString(imageFixture.resolve("shadowcomp.csh")),
+                    imageFixtureProperties).source(), "shadow-custom-image-compute");
+            compileVertex(compiler, options, TerrainVertexShaderAdapter.adapt(terrainVertex, """
+                    #version 120
+                    attribute vec4 at_midBlock;
+                    varying vec4 color;
+                    void main() {
+                        gl_Position = ftransform();
+                        color = vec4(at_midBlock.xyz / 64.0, at_midBlock.w);
+                    }
+                    """, "shadow"), "shadow-custom-vertex-mid-block", true);
             TerrainVertexShaderAdapter.AdaptedStage terrainVaryings = TerrainVertexShaderAdapter.adaptStage(
                     terrainVertex, """
                             #version 130
@@ -957,6 +1008,26 @@ public class ShaderCompileSmoke {
             if (success != expected) throw new AssertionError(name + ": " + shaderc_result_get_error_message(result));
             System.out.println("PASS " + name);
         } finally { shaderc_result_release(result); }
+    }
+
+    /** Compile an adapted compute stage against Vulkan's GLSL environment for the pinned-pack audit. */
+    public static void compileCompute(String source, String name) throws java.io.IOException {
+        long compiler = shaderc_compiler_initialize();
+        long options = shaderc_compile_options_initialize();
+        shaderc_compile_options_set_target_env(options, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
+        try {
+            long result = shaderc_compile_into_spv(compiler, source, shaderc_compute_shader, name, "main", options);
+            try {
+                if (shaderc_result_get_compilation_status(result) != shaderc_compilation_status_success) {
+                    throw new java.io.IOException(name + ": " + shaderc_result_get_error_message(result));
+                }
+            } finally {
+                shaderc_result_release(result);
+            }
+        } finally {
+            shaderc_compile_options_release(options);
+            shaderc_compiler_release(compiler);
+        }
     }
 
     private static String entityNativeVertexSource() {

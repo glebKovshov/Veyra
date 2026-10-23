@@ -24,10 +24,8 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
-    private static final Pattern COMMA_SEPARATED_VARYING_DECLARATION = Pattern.compile(
-            "(?m)^([\\t ]*(?:varying|in)\\s+(?:(?:flat|smooth|noperspective)\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s+)"
-                    + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)+)\\s*;"
-                    + "([\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$))");
+    private static final Pattern LEADING_VARYING_INTERPOLATION = Pattern.compile(
+            "(?m)^([\\t ]*)(flat|smooth|noperspective)([\\t ]+)(varying|in)([\\t ]+)");
     private static final Pattern UNSUPPORTED_INPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:varying|in)\\b[^\\r\\n]*;?");
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
@@ -43,6 +41,9 @@ public final class EntityShaderAdapter {
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
     private static final Pattern SHADOWTEX_REFERENCE = Pattern.compile("\\bshadowtex0\\b");
+    private static final Pattern TEXTURE_2D_SHADOW_DEFINITION = Pattern.compile(
+            "\\b(?:float|vec[234])\\s+texture2DShadow\\s*\\([^)]*\\)\\s*\\{");
+    private static final Pattern GLSL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Pattern NORMAL_VERTEX_ATTRIBUTE = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Normal\\s*;");
     private static final Pattern NORMAL_VERTEX_OUTPUT = Pattern.compile(
@@ -66,6 +67,8 @@ public final class EntityShaderAdapter {
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?in\\s+vec3\\s+Position\\s*;");
     private static final Pattern VIEW_POSITION_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+viewPos\\s*;");
+    private static final Pattern SHADOW_POSITION_VERTEX_OUTPUT = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec4\\s+position\\s*;");
     private static final Pattern VIEW_NORMAL_VERTEX_OUTPUT = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+vec3\\s+viewNormal\\s*;");
     private static final Pattern MAIN_FUNCTION = Pattern.compile("\\bvoid\\s+main\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
@@ -187,9 +190,21 @@ public final class EntityShaderAdapter {
                                         boolean isMainHand,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
             throws IOException {
+        return adaptGeometryFragment(source, programName, handPass, shadowSamplerAvailable, entityId,
+                blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, vertexVaryings, java.util.Set.of());
+    }
+
+    /** Adapts declared custom texture aliases alongside the entity geometry inputs. */
+    static String adaptGeometryFragment(String source, String programName, boolean handPass,
+                                        boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                                        java.util.Set<String> customTextureSamplers)
+            throws IOException {
         return adaptFragment(source, programName, false, handPass, shadowSamplerAvailable,
                 entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand, true,
-                vertexVaryings);
+                vertexVaryings, customTextureSamplers);
     }
 
     public static String adaptTextFragment(String source, String programName) throws IOException {
@@ -218,6 +233,18 @@ public final class EntityShaderAdapter {
                 entityId, blockEntityId, currentRenderedItemId);
     }
 
+    /** Adapts sign text with shader-pack texture aliases declared for its active program. */
+    static String adaptTextFragment(String source, String programName,
+                                    boolean shadowSamplerAvailable,
+                                    int entityId, int blockEntityId,
+                                    int currentRenderedItemId,
+                                    java.util.Set<String> customTextureSamplers) throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId,
+                false, false, false,
+                Map.of(), customTextureSamplers);
+    }
+
     /** Whether the active program declares an Iris-bound entity identifier uniform. */
     public static boolean usesEntityIdentifier(String source, String programName, String name) {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
@@ -232,7 +259,7 @@ public final class EntityShaderAdapter {
     }
 
     public static boolean requiresNormalInput(String source) {
-        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
             if (matcher.group(4).equals("normal")) {
@@ -243,7 +270,7 @@ public final class EntityShaderAdapter {
     }
 
     public static boolean requiresLightmapInput(String source) {
-        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
         while (matcher.find()) {
             if (matcher.group(4).equals("lmcoord") || matcher.group(4).equals("lightMapCoord")
@@ -262,12 +289,16 @@ public final class EntityShaderAdapter {
         return requiresVarying(source, "viewNormal");
     }
 
+    public static boolean requiresPositionInput(String source, String programName) {
+        return programName.startsWith("shadow_") && requiresVarying(source, "position");
+    }
+
     public static boolean requiresMainHandInput(String source) {
         return requiresVarying(source, "isMainHand");
     }
 
     private static boolean requiresVarying(String source, String name) {
-        String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
+        String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
         Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(uncommented));
         while (matcher.find()) {
             if (matcher.group(4).equals(name)) {
@@ -278,22 +309,127 @@ public final class EntityShaderAdapter {
     }
 
     private static String expandCommaSeparatedVaryings(String source) {
-        Matcher matcher = COMMA_SEPARATED_VARYING_DECLARATION.matcher(source);
-        StringBuffer expanded = new StringBuffer();
-        while (matcher.find()) {
-            String prefix = matcher.group(1);
-            String[] names = matcher.group(2).split("\\s*,\\s*");
-            String suffix = matcher.group(3);
-            StringBuilder declarations = new StringBuilder();
-            for (int index = 0; index < names.length; index++) {
-                if (index > 0) declarations.append('\n');
-                declarations.append(prefix).append(names[index]).append(';');
-                if (index == names.length - 1) declarations.append(suffix);
+        StringBuilder expanded = new StringBuilder(source.length());
+        int copiedThrough = 0;
+        int lineStart = 0;
+        while (lineStart < source.length()) {
+            CommaSeparatedVarying declaration = parseCommaSeparatedVarying(source, lineStart);
+            if (declaration != null) {
+                expanded.append(source, copiedThrough, declaration.start());
+                String separator = declaration.lineEnding().isEmpty() ? "\n" : declaration.lineEnding();
+                for (int index = 0; index < declaration.names().size(); index++) {
+                    if (index > 0) expanded.append(separator);
+                    expanded.append(declaration.prefix()).append(declaration.names().get(index)).append(';');
+                }
+                expanded.append(declaration.suffix()).append(declaration.lineEnding());
+                copiedThrough = declaration.end();
+                lineStart = copiedThrough;
+            } else {
+                int newline = source.indexOf('\n', lineStart);
+                if (newline < 0) break;
+                lineStart = newline + 1;
             }
-            matcher.appendReplacement(expanded, Matcher.quoteReplacement(declarations.toString()));
         }
-        matcher.appendTail(expanded);
-        return expanded.toString();
+        return expanded.append(source, copiedThrough, source.length()).toString();
+    }
+
+    private static CommaSeparatedVarying parseCommaSeparatedVarying(String source, int lineStart) {
+        int cursor = skipHorizontalWhitespace(source, lineStart);
+        int storageEnd = tokenEnd(source, cursor, "varying");
+        if (storageEnd < 0) storageEnd = tokenEnd(source, cursor, "in");
+        if (storageEnd < 0) return null;
+
+        cursor = skipWhitespace(source, storageEnd);
+        int interpolationEnd = tokenEnd(source, cursor, "flat");
+        if (interpolationEnd < 0) interpolationEnd = tokenEnd(source, cursor, "smooth");
+        if (interpolationEnd < 0) interpolationEnd = tokenEnd(source, cursor, "noperspective");
+        if (interpolationEnd >= 0) cursor = skipWhitespace(source, interpolationEnd);
+
+        int typeEnd = identifierEnd(source, cursor);
+        if (typeEnd == cursor) return null;
+        int namesStart = skipWhitespace(source, typeEnd);
+        if (namesStart == typeEnd) return null;
+
+        List<String> names = new ArrayList<>();
+        cursor = identifierEnd(source, namesStart);
+        if (cursor == namesStart) return null;
+        names.add(source.substring(namesStart, cursor));
+        while (true) {
+            int afterWhitespace = skipWhitespace(source, cursor);
+            if (afterWhitespace >= source.length() || source.charAt(afterWhitespace) != ',') {
+                cursor = afterWhitespace;
+                break;
+            }
+            int nextName = skipWhitespace(source, afterWhitespace + 1);
+            int nextEnd = identifierEnd(source, nextName);
+            if (nextEnd == nextName) return null;
+            names.add(source.substring(nextName, nextEnd));
+            cursor = nextEnd;
+        }
+        if (names.size() < 2 || cursor >= source.length() || source.charAt(cursor) != ';') return null;
+
+        int semicolon = cursor;
+        int newline = source.indexOf('\n', semicolon + 1);
+        int lineEnd = newline < 0 ? source.length() : newline;
+        int suffixEnd = lineEnd;
+        if (suffixEnd > semicolon + 1 && source.charAt(suffixEnd - 1) == '\r') suffixEnd--;
+        int suffixStart = skipHorizontalWhitespace(source, semicolon + 1);
+        if (suffixStart < suffixEnd && !source.startsWith("//", suffixStart)) return null;
+
+        String lineEnding = newline < 0 ? "" : suffixEnd < lineEnd ? "\r\n" : "\n";
+        return new CommaSeparatedVarying(lineStart, newline < 0 ? source.length() : newline + 1,
+                source.substring(lineStart, namesStart), List.copyOf(names),
+                source.substring(semicolon + 1, suffixEnd), lineEnding);
+    }
+
+    private static int skipHorizontalWhitespace(String source, int cursor) {
+        while (cursor < source.length() && (source.charAt(cursor) == ' ' || source.charAt(cursor) == '\t')) cursor++;
+        return cursor;
+    }
+
+    private static int skipWhitespace(String source, int cursor) {
+        while (cursor < source.length() && Character.isWhitespace(source.charAt(cursor))) cursor++;
+        return cursor;
+    }
+
+    private static int identifierEnd(String source, int cursor) {
+        if (cursor >= source.length() || !isIdentifierStart(source.charAt(cursor))) return cursor;
+        cursor++;
+        while (cursor < source.length() && isIdentifierPart(source.charAt(cursor))) cursor++;
+        return cursor;
+    }
+
+    private static int tokenEnd(String source, int cursor, String token) {
+        int end = cursor + token.length();
+        if (end > source.length() || !source.regionMatches(cursor, token, 0, token.length())) return -1;
+        return end == source.length() || !isIdentifierPart(source.charAt(end)) ? end : -1;
+    }
+
+    private static boolean isIdentifierStart(char character) {
+        return character == '_' || character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z';
+    }
+
+    private static boolean isIdentifierPart(char character) {
+        return isIdentifierStart(character) || character >= '0' && character <= '9';
+    }
+
+    private record CommaSeparatedVarying(int start, int end, String prefix, List<String> names,
+                                         String suffix, String lineEnding) { }
+
+    /** GLSL permits interpolation before the storage qualifier (for example, {@code flat in int id}). */
+    private static String normalizeLeadingVaryingInterpolation(String source) {
+        String input = source == null ? "" : source;
+        Matcher matcher = LEADING_VARYING_INTERPOLATION
+                .matcher(ShaderSource.maskBlockAndLineComments(input));
+        StringBuilder normalized = new StringBuilder(input.length());
+        int cursor = 0;
+        while (matcher.find()) {
+            normalized.append(input, cursor, matcher.start())
+                    .append(matcher.group(1)).append(matcher.group(4)).append(' ')
+                    .append(matcher.group(2)).append(matcher.group(5));
+            cursor = matcher.end();
+        }
+        return normalized.append(input, cursor, input.length()).toString();
     }
 
     private static String ensureUniformDeclaration(String source, String type, String name) {
@@ -385,18 +521,31 @@ public final class EntityShaderAdapter {
                                           boolean requiresNormal, boolean requiresLightmapCoord,
                                           boolean requiresViewPosition, boolean requiresViewNormal,
                                           boolean handPass) throws IOException {
+        return adaptVertexShader(source, shadowPass, programName, requiresNormal, requiresLightmapCoord,
+                requiresViewPosition, requiresViewNormal, handPass, false);
+    }
+
+    public static String adaptVertexShader(String source, boolean shadowPass, String programName,
+                                          boolean requiresNormal, boolean requiresLightmapCoord,
+                                          boolean requiresViewPosition, boolean requiresViewNormal,
+                                          boolean handPass, boolean requiresShadowPosition) throws IOException {
         if (source == null || source.isBlank()) {
             List<String> required = new ArrayList<>();
             if (requiresNormal) required.add("normals");
             if (requiresLightmapCoord) required.add("lightmap coordinates");
             if (requiresViewPosition) required.add("view-space positions");
             if (requiresViewNormal) required.add("view-space normals");
+            if (requiresShadowPosition) required.add("shadow-space world positions");
             if (handPass) required.add("the first-person hand depth transform");
             String requiredInputs = String.join(", ", required);
             throw new IOException(programName + " requires " + requiredInputs
                     + ", but its VulkanMod vertex shader is empty.");
         }
-        if (!requiresNormal && !requiresLightmapCoord && !requiresViewPosition && !requiresViewNormal && !handPass) {
+        if (requiresShadowPosition && !shadowPass) {
+            throw new IOException(programName + " requires shadow-space world positions outside a shadow pass.");
+        }
+        if (!requiresNormal && !requiresLightmapCoord && !requiresViewPosition && !requiresViewNormal
+                && !requiresShadowPosition && !handPass) {
             return source;
         }
         String uncommented = COMMENTS.matcher(source).replaceAll("");
@@ -428,9 +577,14 @@ public final class EntityShaderAdapter {
         if (addViewNormalAssignment && !NORMAL_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
             throw new IOException(programName + " requires viewNormal, but VulkanMod's vertex format does not provide normals.");
         }
+        boolean hasShadowPositionOutput = SHADOW_POSITION_VERTEX_OUTPUT.matcher(uncommented).find();
+        boolean hasShadowPositionAssignment = Pattern.compile("\\bposition\\s*=").matcher(uncommented).find();
+        boolean addShadowPositionOutput = requiresShadowPosition && !hasShadowPositionOutput;
+        boolean addShadowPositionAssignment = requiresShadowPosition && !hasShadowPositionAssignment;
         if (!addNormalOutput && !addNormalAssignment && !addLightmapOutput && !addLightmapAssignment
                 && !addViewPositionOutput && !addViewPositionAssignment
-                && !addViewNormalOutput && !addViewNormalAssignment) {
+                && !addViewNormalOutput && !addViewNormalAssignment
+                && !addShadowPositionOutput && !addShadowPositionAssignment) {
             if (!handPass) {
                 return source;
             }
@@ -445,11 +599,11 @@ public final class EntityShaderAdapter {
         StringBuilder declarations = new StringBuilder();
         String inverseMatrix = shadowPass ? "shadowModelViewInverse" : "gbufferModelViewInverse";
         if (addNormalAssignment) {
-            Pattern inverseMatrixUniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
-                    + Pattern.quote(inverseMatrix) + "\\s*;");
-            if (!inverseMatrixUniform.matcher(uncommented).find()) {
-                declarations.append("uniform mat4 ").append(inverseMatrix).append(";\n");
-            }
+            appendMatrixUniformIfMissing(declarations, uncommented, inverseMatrix);
+        }
+        if (addShadowPositionAssignment) {
+            appendMatrixUniformIfMissing(declarations, uncommented, "shadowModelViewInverse");
+            appendMatrixUniformIfMissing(declarations, uncommented, "shadowProjectionInverse");
         }
         if (addNormalOutput) {
             declarations.append("out vec3 normal;\n");
@@ -462,6 +616,9 @@ public final class EntityShaderAdapter {
         }
         if (addViewNormalOutput) {
             declarations.append("out vec3 viewNormal;\n");
+        }
+        if (addShadowPositionOutput) {
+            declarations.append("out vec4 position;\n");
         }
         String withDeclarations = source.substring(0, main.start()) + declarations + source.substring(main.start());
         Matcher adaptedMain = MAIN_FUNCTION.matcher(withDeclarations);
@@ -484,7 +641,38 @@ public final class EntityShaderAdapter {
         }
         String adapted = withDeclarations.substring(0, adaptedMain.end()) + vertexAssignments
                 + withDeclarations.substring(adaptedMain.end());
+        if (addShadowPositionAssignment) {
+            String adaptedUncommented = maskComments(adapted);
+            Matcher positionMain = MAIN_FUNCTION.matcher(adaptedUncommented);
+            if (!positionMain.find()) {
+                throw new IOException(programName + " requires shadow-space world positions, but its vertex shader has no main function.");
+            }
+            int mainStart = positionMain.end() - 1;
+            int mainEnd = findMainEnd(adaptedUncommented, mainStart, programName);
+            Matcher clipPosition = GL_POSITION_ASSIGNMENT.matcher(adaptedUncommented);
+            boolean assignsClipPosition = false;
+            while (clipPosition.find()) {
+                if (clipPosition.start() > mainStart && clipPosition.start() < mainEnd) {
+                    assignsClipPosition = true;
+                    break;
+                }
+            }
+            if (!assignsClipPosition) {
+                throw new IOException(programName + " requires shadow-space world positions, but VulkanMod's vertex shader does not assign gl_Position.");
+            }
+            adapted = adapted.substring(0, mainEnd)
+                    + "\nposition = shadowModelViewInverse * shadowProjectionInverse * gl_Position;\n"
+                    + adapted.substring(mainEnd);
+        }
         return handPass ? applyHandDepth(adapted, programName) : adapted;
+    }
+
+    private static void appendMatrixUniformIfMissing(StringBuilder declarations, String uncommented, String name) {
+        Pattern uniform = Pattern.compile("(?m)^[\\t ]*uniform\\s+mat4\\s+"
+                + Pattern.quote(name) + "\\s*;");
+        if (!uniform.matcher(uncommented).find()) {
+            declarations.append("uniform mat4 ").append(name).append(";\n");
+        }
     }
 
     private static String applyHandDepth(String source, String programName) throws IOException {
@@ -520,7 +708,7 @@ public final class EntityShaderAdapter {
                 return index;
             }
         }
-        throw new IOException(programName + " cannot apply MC_HAND_DEPTH because VulkanMod's vertex main function has unmatched braces.");
+        throw new IOException(programName + " has unmatched braces in its vertex main function.");
     }
 
     private static String maskComments(String source) {
@@ -571,6 +759,19 @@ public final class EntityShaderAdapter {
                                         boolean isMainHand, boolean geometryColorInputsAvailable,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
             throws IOException {
+        return adaptFragment(source, programName, textPipeline, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand,
+                geometryColorInputsAvailable, vertexVaryings, java.util.Set.of());
+    }
+
+    private static String adaptFragment(String source, String programName, boolean textPipeline,
+                                        boolean handPass, boolean shadowSamplerAvailable,
+                                        int entityId, int blockEntityId,
+                                        int currentRenderedItemId, boolean entityColorAvailable,
+                                        boolean isMainHand, boolean geometryColorInputsAvailable,
+                                        Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                                        java.util.Set<String> customTextureSamplers)
+            throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");
         }
@@ -578,6 +779,8 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " fragment shader exceeds the 1 MiB size limit.");
         }
 
+        source = normalizeLeadingVaryingInterpolation(
+                IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram(programName), programName));
         FragmentOutputs outputLayout = FragmentOutputs.parse(source);
 
         String adapted = bindEntityIdentifiers(source.replace("\uFEFF", ""), programName,
@@ -593,8 +796,9 @@ public final class EntityShaderAdapter {
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
         adapted = ALPHA_TEST_UNIFORM.matcher(adapted).replaceAll("");
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
+        adapted = UnusedUniformDeclarations.removeUnused(adapted);
         Map<String, Integer> geometryColorInputs = geometryColorInputsAvailable
-                ? GeometryColorSamplers.read(source) : Map.of();
+                ? GeometryColorSamplers.read(source, customTextureSamplers) : Map.of();
         boolean usesShadowSampler = usesShadowSampler(adapted);
         int geometryColorInputCount = GeometryColorSamplers.indices(geometryColorInputs).size();
         ShadowColorSampler.validate(source, shadowSamplerAvailable, geometryColorInputCount);
@@ -611,7 +815,9 @@ public final class EntityShaderAdapter {
             if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
                     && !geometryColorInputs.containsKey(sampler)
-                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1")) || (sampler.equals("shadowcolor0") || sampler.equals("shadowcolor"))) && shadowSamplerAvailable)) {
+                    && !customTextureSamplers.contains(sampler)
+                    && !(((sampler.equals("shadowtex0") || sampler.equals("shadowtex1"))
+                    || ShadowColorSampler.isSampler(sampler)) && shadowSamplerAvailable)) {
                 throw new IOException(programName + " uses unsupported sampler '" + sampler + "'.");
             }
             String samplerType = samplerMatcher.group(1);
@@ -655,6 +861,7 @@ public final class EntityShaderAdapter {
         Matcher varyingMatcher = VARYING_DECLARATION.matcher(adapted);
         StringBuffer withoutVaryings = new StringBuffer();
         boolean suppliesNormal = false;
+        boolean suppliesShadowPosition = false;
         boolean suppliesLegacyColor = false;
         boolean suppliesViewPosition = false;
         boolean suppliesViewNormal = false;
@@ -670,7 +877,9 @@ public final class EntityShaderAdapter {
             String interpolation = varyingMatcher.group(2) == null ? "smooth" : varyingMatcher.group(2);
             String type = varyingMatcher.group(3);
             String name = varyingMatcher.group(4);
-            Varying varying = (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
+            Varying varying = programName.startsWith("shadow_") && name.equals("position")
+                    ? new Varying("vec4")
+                    : (textPipeline ? SUPPORTED_TEXT_VARYINGS : SUPPORTED_VARYINGS).get(name);
             TerrainVertexShaderAdapter.PackVarying packVarying = vertexVaryings.get(name);
             if (varying == null && packVarying == null) {
                 throw new IOException(programName + " input '" + name + "' is not provided by Veyra's "
@@ -705,6 +914,9 @@ public final class EntityShaderAdapter {
             if (name.equals("normal")) {
                 suppliesNormal = true;
             }
+            if (name.equals("position") && programName.startsWith("shadow_")) {
+                suppliesShadowPosition = true;
+            }
             if (name.equals("color")) {
                 suppliesLegacyColor = true;
             }
@@ -727,10 +939,7 @@ public final class EntityShaderAdapter {
         }
         varyingMatcher.appendTail(withoutVaryings);
         adapted = withoutVaryings.toString();
-        for (Map.Entry<String, TerrainVertexShaderAdapter.PackVarying> entry : linkedPackVaryings.entrySet()) {
-            adapted = adapted.replaceAll("\\b" + Pattern.quote(entry.getKey()) + "\\b",
-                    Matcher.quoteReplacement("veyraEntityPackInput_" + entry.getValue().location()));
-        }
+        adapted = replaceLinkedPackVaryings(adapted, linkedPackVaryings);
         if (UNSUPPORTED_INPUT_DECLARATION.matcher(adapted).find()) {
             throw new IOException(programName + " declares inputs that are not provided by Veyra's entity bridge yet.");
         }
@@ -770,13 +979,16 @@ public final class EntityShaderAdapter {
         }
 
         String outputName = outputLayout.variables().getOrDefault(0, "veyraEntityFragColor");
+        boolean declaresTexture2DShadow = TEXTURE_2D_SHADOW_DEFINITION
+                .matcher(COMMENTS.matcher(adapted).replaceAll("")).find();
         adapted = adapted
                 .transform(outputLayout::rewriteLegacy)
                 .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btextureLod\\s*\\(", "veyraEntitySampleLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "veyraEntitySampleGrad(")
                 .replaceAll("\\btextureGrad\\s*\\(", "veyraEntitySampleGrad(")
-                .replaceAll("\\btexture2DShadow\\s*\\(", "veyraEntityShadowCompare(")
+                .replaceAll("\\btexture2DShadow\\s*\\(", declaresTexture2DShadow
+                        ? "texture2DShadow(" : "veyraEntityShadowCompare(")
                 .replaceAll("\\bshadow2D\\s*\\(", "veyraEntityShadowSample(")
                 .replaceAll("\\btexture2D\\s*\\(", "veyraEntitySample(")
                 .replaceAll("\\btexture\\s*\\(", "veyraEntitySample(")
@@ -792,6 +1004,7 @@ public final class EntityShaderAdapter {
                 in vec2 texCoord0;
                 __VEYRA_COLOR_ALIAS__
                 __VEYRA_VIEW_POSITION_INPUT__
+                __VEYRA_SHADOW_POSITION_INPUT__
                 __VEYRA_LIGHTMAP_INPUT__
                 __VEYRA_IS_MAIN_HAND_VALUE__
                 __VEYRA_DIRECTIONAL_INPUTS__
@@ -825,6 +1038,7 @@ public final class EntityShaderAdapter {
                 __VEYRA_SPHERICAL_DISTANCE__
                 __VEYRA_CYLINDRICAL_DISTANCE__
                 __VEYRA_VIEW_POSITION_INPUT__
+                __VEYRA_SHADOW_POSITION_INPUT__
                 #ifdef PER_FACE_LIGHTING
                 in vec4 vertexPerFaceColorBack;
                 in vec4 vertexPerFaceColorFront;
@@ -878,6 +1092,7 @@ public final class EntityShaderAdapter {
         bridge = bridge.replace("__VEYRA_NORMAL_INPUT__", suppliesNormal ? "in vec3 normal;\n" : "")
                 .replace("__VEYRA_COLOR_ALIAS__", suppliesLegacyColor ? "#define color veyraEntityColor\n" : "")
                 .replace("__VEYRA_VIEW_POSITION_INPUT__", suppliesViewPosition ? "in vec3 viewPos;\n" : "")
+                .replace("__VEYRA_SHADOW_POSITION_INPUT__", suppliesShadowPosition ? "in vec4 position;\n" : "")
                 .replace("__VEYRA_VIEW_NORMAL_INPUT__", suppliesViewNormal ? "in vec3 viewNormal;\n" : "")
                 .replace("__VEYRA_LIGHTMAP_INPUT__", suppliesLightmapCoord ? "in vec2 lmcoord;\n" : "")
                 .replace("__VEYRA_IS_MAIN_HAND_VALUE__", suppliesMainHand
@@ -924,9 +1139,11 @@ public final class EntityShaderAdapter {
         if (ShadowDepthSampler.used(source)) {
             bridge = "uniform sampler2D " + ShadowDepthSampler.NAME + ";\n#define shadowtex1 " + ShadowDepthSampler.NAME + "\n" + bridge;
         }
-        if (ShadowColorSampler.used(source)) {
-            bridge = "uniform sampler2D " + ShadowColorSampler.NAME + ";\n#define shadowcolor0 " + ShadowColorSampler.NAME + "\n#define shadowcolor " + ShadowColorSampler.NAME + "\n" + bridge;
-        }
+        bridge = ShadowColorSampler.bridge(ShadowColorSampler.indices(source)) + bridge;
+        StringBuilder customTextureBridge = new StringBuilder();
+        customTextureSamplers.stream().sorted().forEach(sampler -> customTextureBridge
+                .append("uniform sampler2D ").append(sampler).append(";\n"));
+        bridge = customTextureBridge + bridge;
         StringBuilder geometryColorBridge = new StringBuilder();
         for (int index : GeometryColorSamplers.indices(geometryColorInputs)) {
             geometryColorBridge.append("uniform sampler2D ")
@@ -948,6 +1165,24 @@ public final class EntityShaderAdapter {
         result.append(shaderPackUniforms.macros());
         result.append(outputLayout.entityPipelineDeclarations());
         return result.append(adapted).toString();
+    }
+
+    private static String replaceLinkedPackVaryings(
+            String source, Map<String, TerrainVertexShaderAdapter.PackVarying> linkedPackVaryings) {
+        if (source.isEmpty() || linkedPackVaryings.isEmpty()) return source;
+        Matcher identifiers = GLSL_IDENTIFIER.matcher(source);
+        StringBuilder rewritten = null;
+        int cursor = 0;
+        while (identifiers.find()) {
+            TerrainVertexShaderAdapter.PackVarying varying = linkedPackVaryings.get(identifiers.group());
+            if (varying == null) continue;
+            if (rewritten == null) rewritten = new StringBuilder(source.length());
+            rewritten.append(source, cursor, identifiers.start())
+                    .append("veyraEntityPackInput_")
+                    .append(varying.location());
+            cursor = identifiers.end();
+        }
+        return rewritten == null ? source : rewritten.append(source, cursor, source.length()).toString();
     }
 
     static String bindEntityIdentifiers(String source, String programName,

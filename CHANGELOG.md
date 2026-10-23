@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0-beta.31 (experimental prerelease)
+
+- Add custom weather and translucent-particle vertex execution plus comment-safe shader interface scans.
+- Add selected fixed-workgroup `shadowcomp` compute, 3D shader-pack images, shadow color MRT, selected-profile storage buffers, and additional post texture slots.
+- Load shader-pack PNG textures on supported terrain, shadow, and entity geometry through global and stage-scoped mappings; resolve scoped entity samplers using the selected entity pipeline and prepare pack textures before first selection, including after restoring a pack. Honor `.mcmeta` blur/clamp settings.
+- Keep shadow-dependent sampling safe across dimension and reload transitions until a completed shadow map is available. Adapt BSL fog uniforms/helpers and preserve shader-pack `texture2DShadow` helpers.
+- Pass the local 519-test JDK 21 gate, 97 shader-source checks, 113 direct Vulkan SPIR-V compilations, pinned audit (864 accepted geometry fragments and 18 compiled compute stages), and selected Complementary Reimagined/Unbound plus BSL HIGH RTX 3070 profile/lifecycle smokes. On the combined candidate, `entity-custom-texture` passed with 18,293 active / 0 disabled pixels and `custom-image-compute` passed with 222,994 active magenta pixels. The Sildur's Vibrant 2.02 Extreme RTX 3070 harness attempt remained black after deferred; the cause is unresolved. The Windows host lacks a Vulkan validation layer; full third-party pack visuals remain unverified.
+
+## 0.2.0-beta.30 - 2026-10-21 (experimental prerelease)
+
+- Fix the Minecraft `CloudRenderer` crash caused by nested `Tesselator.begin` Mixin remapping.
+- Bind the live Minecraft lightmap to supported world-border and sky-textured pipelines, link custom `gbuffers_textured` normals, and remove unused fragment varyings before linking.
+- Pass 334 local tests and the pinned audit; full third-party shaderpack visuals remain unverified.
+
 ## 0.2.0-beta.29 - 2026-10-21 (experimental prerelease)
 
 - Add supported custom `gbuffers_lightning.vsh`, both native `gbuffers_skytextured.vsh` formats, and the `gbuffers_textured.vsh` world-border path, with checked vertex/fragment varying links and explicit capability validation.

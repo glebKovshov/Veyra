@@ -21,6 +21,7 @@ class IrisRenderStagesTest {
         assertEquals("5", macros.get("MC_RENDER_STAGE_MOON"));
         assertEquals("6", macros.get("MC_RENDER_STAGE_STARS"));
         assertEquals("23", macros.get("MC_RENDER_STAGE_HAND_TRANSLUCENT"));
+        assertEquals("20", macros.get("MC_RENDER_STAGE_CLOUDS"));
 
         String processed = GlslPreprocessor.process("render-stage.glsl", """
                 #if MC_RENDER_STAGE_MOON == 5 && MC_RENDER_STAGE_STARS == 6
@@ -42,6 +43,23 @@ class IrisRenderStagesTest {
         assertEquals(2, IrisRenderStages.forSkyPipeline("pipeline/sunrise_sunset"));
         assertNull(IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.LINE));
         assertNull(IrisRenderStages.forSkyPipeline("pipeline/other"));
+    }
+
+    @Test
+    void mapsEntityHandBlockAndDamageProgramsToTheirIrisStages() {
+        assertEquals(8, IrisRenderStages.forProgram("gbuffers_terrain"));
+        assertEquals(11, IrisRenderStages.forProgram("gbuffers_entities_translucent"));
+        assertEquals(11, IrisRenderStages.forProgram("shadow_entities"));
+        assertEquals(11, IrisRenderStages.forProgram("gbuffers_spidereyes"));
+        assertEquals(12, IrisRenderStages.forProgram("gbuffers_block"));
+        assertEquals(12, IrisRenderStages.forProgram("gbuffers_block_translucent"));
+        assertEquals(12, IrisRenderStages.forProgram("shadow_block"));
+        assertEquals(12, IrisRenderStages.forProgram("gbuffers_text"));
+        assertEquals(13, IrisRenderStages.forProgram("gbuffers_damagedblock"));
+        assertEquals(16, IrisRenderStages.forProgram("gbuffers_hand"));
+        assertEquals(23, IrisRenderStages.forProgram("gbuffers_hand_water"));
+        assertEquals(20, IrisRenderStages.forProgram("gbuffers_clouds"));
+        assertNull(IrisRenderStages.forProgram("gbuffers_weather"));
     }
 
     @Test

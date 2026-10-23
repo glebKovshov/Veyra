@@ -33,6 +33,8 @@ final class GlslPreprocessor {
         macros.put("MC_RENDER_QUALITY", "1.0");
         macros.put("MC_SHADOW_QUALITY", "1.0");
         macros.put("MC_HAND_DEPTH", "0.125");
+        // Veyra implements Iris shader-pack compatibility, including Iris-only uniforms/stages.
+        macros.put("IS_IRIS", "1");
         macros.put("VEYRA", "200");
         macros.put("IRIS_TAG_SUPPORT", "2");
         macros.putAll(IrisRenderStages.macros());
@@ -43,12 +45,17 @@ final class GlslPreprocessor {
     }
 
     static String process(String file, String source) throws IOException {
+        return process(file, source, Map.of());
+    }
+
+    static String process(String file, String source, Map<String, String> additionalMacros) throws IOException {
         if (source.contains(MARKER)) throw new IOException(file + ": reserved preprocessor marker in source.");
         List<String> directives = new ArrayList<>();
         Matcher matcher = DIRECTIVE.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuilder encoded = new StringBuilder();
         int end = 0;
         Map<String, String> macros = environment();
+        macros.putAll(additionalMacros);
         while (matcher.find()) {
             encoded.append(source, end, matcher.start());
             String directive = source.substring(matcher.start(), matcher.end()).strip();

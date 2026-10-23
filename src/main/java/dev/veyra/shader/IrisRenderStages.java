@@ -39,13 +39,52 @@ final class IrisRenderStages {
 
     private static final Pattern UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?"
-                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+renderStage\\s*;[\\t ]*(?:\\r?\\n|$)");
+                    + "([A-Za-z_][A-Za-z0-9_]*)\\s+renderStage\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
 
     private IrisRenderStages() { }
 
     static int sunStage() { return Stage.SUN.ordinal(); }
     static int moonStage() { return Stage.MOON.ordinal(); }
     static int voidStage() { return Stage.VOID.ordinal(); }
+
+    static Integer forShadowTerrainProgram(String programName) {
+        return switch (programName) {
+            case "shadow_solid" -> Stage.TERRAIN_SOLID.ordinal();
+            case "shadow_cutout" -> Stage.TERRAIN_CUTOUT.ordinal();
+            case "shadow_water" -> Stage.TERRAIN_TRANSLUCENT.ordinal();
+            case "shadow_tripwire" -> Stage.TRIPWIRE.ordinal();
+            default -> null;
+        };
+    }
+
+    static Integer forProgram(String programName) {
+        Integer shadowStage = forShadowTerrainProgram(programName);
+        if (shadowStage != null) return shadowStage;
+        if (programName.startsWith("gbuffers_entities") || programName.equals("shadow_entities")) {
+            return Stage.ENTITIES.ordinal();
+        }
+        if (programName.startsWith("gbuffers_block") || programName.equals("shadow_block")) {
+            return Stage.BLOCK_ENTITIES.ordinal();
+        }
+        if (programName.equals("gbuffers_damagedblock")) {
+            return Stage.DESTROY.ordinal();
+        }
+        return switch (programName) {
+            case "gbuffers_terrain", "gbuffers_terrain_solid" -> Stage.TERRAIN_SOLID.ordinal();
+            case "gbuffers_terrain_cutout_mip", "gbuffers_terrain_cutout_mipped" -> Stage.TERRAIN_CUTOUT_MIPPED.ordinal();
+            case "gbuffers_terrain_cutout" -> Stage.TERRAIN_CUTOUT.ordinal();
+            case "gbuffers_water", "gbuffers_terrain_translucent" -> Stage.TERRAIN_TRANSLUCENT.ordinal();
+            case "gbuffers_spidereyes" -> Stage.ENTITIES.ordinal();
+            case "gbuffers_text" -> Stage.BLOCK_ENTITIES.ordinal();
+            case "gbuffers_hand" -> Stage.HAND_SOLID.ordinal();
+            case "gbuffers_hand_water" -> Stage.HAND_TRANSLUCENT.ordinal();
+            case "gbuffers_clouds" -> Stage.CLOUDS.ordinal();
+            default -> null;
+        };
+    }
+
+    /** Compute stages have no Iris draw pass; helpers see Iris' NONE stage. */
+    static int computeStage() { return Stage.NONE.ordinal(); }
 
     static List<Integer> skyTexturedStages(String pipelinePath) {
         return switch (pipelinePath) {

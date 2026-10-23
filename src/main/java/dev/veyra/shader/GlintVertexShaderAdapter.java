@@ -129,7 +129,8 @@ final class GlintVertexShaderAdapter {
                 .replaceAll("\\btexture2DProj\\s*\\(", "textureProj(")
                 .replaceAll("\\btexture2D\\s*\\(", "texture(");
         boolean usesNoiseSampler = TerrainShaderAdapter.usesNoiseSampler(packSource);
-        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(packSource, programName, true);
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(packSource, programName,
+                IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource));
         packSource = UnusedSamplerDeclarations.removeUnused(fog.source());
         ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(packSource, programName);
         packSource = uniforms.source();

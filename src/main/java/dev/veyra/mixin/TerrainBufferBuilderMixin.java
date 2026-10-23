@@ -53,6 +53,8 @@ public abstract class TerrainBufferBuilderMixin {
         MemoryUtil.memPutFloat(currentVertex + TerrainMidTexCoord.RENDER_TYPE_OFFSET,
                 TerrainMaterialContext.renderType());
         MemoryUtil.memPutInt(currentVertex + TerrainMidTexCoord.PACKED_NORMAL_OFFSET, packedNormal);
+        MemoryUtil.memPutInt(currentVertex + TerrainMidTexCoord.MID_BLOCK_OFFSET,
+                TerrainMaterialContext.packedMidBlock(x, y, z));
 
         if ((this.vertices & 3) != 0) return;
 

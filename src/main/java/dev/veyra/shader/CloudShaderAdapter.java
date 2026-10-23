@@ -36,7 +36,7 @@ public final class CloudShaderAdapter {
     private static final Pattern LEGACY_TEXTURE_2D = Pattern.compile("\\btexture2D\\b");
     private static final Set<String> SCENE_COLOR_SAMPLERS = Set.of("colortex0", "gcolor", "Sampler0", "InSampler");
     private static final Set<String> SUPPORTED_TEXTURE_FUNCTIONS = Set.of(
-            "texture", "texture2D", "textureLod", "texture2DLod", "textureSize");
+            "texture", "texture2D", "textureLod", "texture2DLod", "textureSize", "texelFetch");
     private static final String CLOUD_SCENE_SAMPLER_NAME = "VeyraCloudSceneSampler";
     private static final String NOISE_SAMPLER = "noisetex";
     private static final int DEFAULT_FIRST_IMAGE_BINDING = 2;
@@ -91,6 +91,12 @@ public final class CloudShaderAdapter {
         return adapt(source).source();
     }
 
+    static AdaptedFragment adaptFragment(String source,
+                                         List<ShaderPackUniformAdapter.UniformField> fields,
+                                         Set<String> customImageSamplers) throws IOException {
+        return adapt(source, fields, DEFAULT_FIRST_IMAGE_BINDING, customImageSamplers);
+    }
+
     public static String adaptVertex(String vulkanModSource, String shaderPackSource) throws IOException {
         return adaptVertexWithMetadata(vulkanModSource, shaderPackSource).source();
     }
@@ -116,6 +122,8 @@ public final class CloudShaderAdapter {
         source = PRECISION_DECLARATION.matcher(source).replaceAll("");
         source = removeUnreachableCloudFunctions(source);
         source = UnusedSamplerDeclarations.removeUnused(source);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forProgram("gbuffers_clouds"),
+                "gbuffers_clouds");
         String uncommented = maskComments(source);
 
         Matcher unsupportedVertexInput = UNSUPPORTED_CLOUD_VERTEX_INPUT.matcher(uncommented);
@@ -339,6 +347,12 @@ public final class CloudShaderAdapter {
     public static AdaptedFragment adapt(String source,
                                         List<ShaderPackUniformAdapter.UniformField> additionalUniformFields,
                                         int firstImageBinding) throws IOException {
+        return adapt(source, additionalUniformFields, firstImageBinding, Set.of());
+    }
+
+    public static AdaptedFragment adapt(String source,
+                                        List<ShaderPackUniformAdapter.UniformField> additionalUniformFields,
+                                        int firstImageBinding, Set<String> customImageSamplers) throws IOException {
         if (firstImageBinding < 0) {
             throw new IllegalArgumentException("The first cloud image binding must not be negative.");
         }
@@ -350,10 +364,12 @@ public final class CloudShaderAdapter {
         }
         adapted = extensionMatcher.replaceAll("");
         adapted = PRECISION_DECLARATION.matcher(adapted).replaceAll("");
+        adapted = IrisRenderStages.bindUniform(adapted, IrisRenderStages.forProgram("gbuffers_clouds"),
+                "gbuffers_clouds");
         IrisFogUniformAdapter.AdaptedShader fogUniforms =
                 IrisFogUniformAdapter.extract(adapted, "gbuffers_clouds", true);
         adapted = fogUniforms.source();
-        SceneColorInput sceneColorInput = sceneColorInput(adapted);
+        SceneColorInput sceneColorInput = sceneColorInput(adapted, customImageSamplers);
         adapted = sceneColorInput.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
                 ShaderPackUniformAdapter.extract(adapted, "gbuffers_clouds");
@@ -377,7 +393,7 @@ public final class CloudShaderAdapter {
         Matcher textureSample = TEXTURE_SAMPLE.matcher(uncommented);
         while (textureSample.find()) {
             if (!SUPPORTED_TEXTURE_FUNCTIONS.contains(textureSample.group(1))) {
-                throw new IOException("gbuffers_clouds supports only texture, texture2D, textureLod, texture2DLod, and textureSize sampling calls.");
+                throw new IOException("gbuffers_clouds uses an unsupported texture sampling function.");
             }
             if (!sceneColorInput.samplers().contains(textureSample.group(2))) {
                 throw new IOException("gbuffers_clouds can sample only completed scene color, the Minecraft cloud texture, or noisetex through Veyra's cloud bridge.");
@@ -520,11 +536,11 @@ public final class CloudShaderAdapter {
         return sample.matcher(source).replaceAll("$1" + replacement + "$2");
     }
 
-    private static SceneColorInput sceneColorInput(String source) throws IOException {
+    private static SceneColorInput sceneColorInput(String source, Set<String> customImageSamplers) throws IOException {
         source = UnusedSamplerDeclarations.removeUnused(source);
         String uncommented = maskComments(source);
         Matcher declarations = SAMPLER_DECLARATION.matcher(uncommented);
-        Set<String> samplers = new LinkedHashSet<>();
+        Set<String> samplers = new LinkedHashSet<>(customImageSamplers);
         Set<String> sceneColorSamplers = new LinkedHashSet<>();
         boolean usesNoiseSampler = false;
         boolean usesCloudTexture = false;
@@ -532,11 +548,12 @@ public final class CloudShaderAdapter {
         while (declarations.find()) {
             String type = declarations.group(1);
             String name = declarations.group(2);
-            if (!SCENE_COLOR_SAMPLERS.contains(name) && !name.equals(NOISE_SAMPLER) && !name.equals("texture")) {
+            if (!SCENE_COLOR_SAMPLERS.contains(name) && !name.equals(NOISE_SAMPLER) && !name.equals("texture")
+                    && !customImageSamplers.contains(name)) {
                 throw new IOException("gbuffers_clouds active sampler '" + name
                         + "' is not supported; cloud shaders can sample scene color, the cloud texture, or noisetex.");
             }
-            if (!type.equals("sampler2D")) {
+            if (!type.equals("sampler2D") && !customImageSamplers.contains(name)) {
                 throw new IOException("gbuffers_clouds sampler '" + name + "' must use sampler2D.");
             }
             if (!samplers.add(name)) {
@@ -553,7 +570,7 @@ public final class CloudShaderAdapter {
         Matcher samples = TEXTURE_SAMPLE.matcher(maskComments(withoutSamplers.toString()));
         while (samples.find()) {
             if (!SUPPORTED_TEXTURE_FUNCTIONS.contains(samples.group(1))) {
-                throw new IOException("gbuffers_clouds supports only texture, texture2D, textureLod, texture2DLod, and textureSize sampling calls.");
+                throw new IOException("gbuffers_clouds uses an unsupported texture sampling function.");
             }
             if (!samplers.contains(samples.group(2))) {
                 throw new IOException("gbuffers_clouds can sample only completed scene color, the Minecraft cloud texture, or noisetex through Veyra's cloud bridge.");

@@ -9,11 +9,34 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import org.lwjgl.vulkan.VK10;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ShaderPackTest {
     @TempDir Path directory;
+
+    @Test
+    void acceptsShadowMrtBeforeAllocationEvenWithoutVertexStage() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("shadow-mrt/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
+        Files.writeString(shaders.resolve("shadow.fsh"),
+                "/* DRAWBUFFERS:01 */\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.0); }\n");
+        ShaderPack pack = ShaderPack.inspect(shaders.getParent());
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+        assertEquals(java.util.Set.of(0, 1), pack.readShadowColorTargetIndices());
+    }
+
+    @Test
+    void rejectsHigherShadowColorTargetsUntilTheIrisFeatureIsAdvertised() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("shadow-higher/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");
+        Files.writeString(shaders.resolve("shadow.fsh"),
+                "/* DRAWBUFFERS:012 */\nvoid main() { gl_FragData[0] = vec4(1.0); gl_FragData[1] = vec4(0.0); gl_FragData[2] = vec4(0.0); }\n");
+        ShaderPack pack = ShaderPack.inspect(shaders.getParent());
+        IOException error = assertThrows(IOException.class, pack::readShadowColorTargetIndices);
+        assertTrue(error.getMessage().contains("HIGHER_SHADOWCOLOR"), error.getMessage());
+    }
 
     @Test
     void readsDirectoryProgramsInNumericOrder() throws IOException {
@@ -52,6 +75,46 @@ class ShaderPackTest {
 
         ShaderPack pack = ShaderPack.inspect(zip);
         assertTrue(pack.readCloudVertex().orElseThrow().contains("varying vec4 color;"));
+    }
+
+    @Test
+    void readsEveryColorTargetFormatFromOneMultilineCommentBlock() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("formats/shaders"));
+        Path lib = Files.createDirectories(shaders.resolve("lib"));
+        Files.writeString(shaders.resolve("final.fsh"), "#include \"/lib/pipelineSettings.glsl\"\nvoid main() {}\n");
+        Files.writeString(lib.resolve("pipelineSettings.glsl"), """
+                /*
+                const int colortex0Format = R11F_G11F_B10F;
+                const int colortex1Format = RGB8_SNORM; // signed normal data
+                const int colortex2Format = RGB16F;
+                const int colortex3Format = RGBA8;
+                const int colortex4Format = RGBA8_SNORM;
+                const int colortex5Format = RGBA16;
+                const int colortex6Format = RGB8;
+                const int colortex7Format = RGBA16F;
+                const int colortex13Format = R8;
+                */
+                """);
+
+        var settings = ShaderPack.inspect(shaders.getParent())
+                .readColorTargetSettings(640, 360, 16_384);
+
+        assertEquals(VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32, settings.get(0).format());
+        assertEquals(VK10.VK_FORMAT_R8G8B8_SNORM, settings.get(1).format());
+        assertEquals(VK10.VK_FORMAT_R16G16B16_SFLOAT, settings.get(2).format());
+        assertEquals(VK10.VK_FORMAT_R8G8B8A8_UNORM, settings.get(3).format());
+        assertEquals(VK10.VK_FORMAT_R8G8B8A8_SNORM, settings.get(4).format());
+        assertEquals(VK10.VK_FORMAT_R16G16B16A16_UNORM, settings.get(5).format());
+        assertEquals(VK10.VK_FORMAT_R8G8B8_UNORM, settings.get(6).format());
+        assertEquals(VK10.VK_FORMAT_R16G16B16A16_SFLOAT, settings.get(7).format());
+        assertEquals(VK10.VK_FORMAT_R8_UNORM, settings.get(13).format());
+        assertEquals(3, ColorTargetSettings.formatSize(settings.get(1).format()));
+        assertEquals(6, ColorTargetSettings.formatSize(settings.get(2).format()));
+        assertEquals(4, ColorTargetSettings.formatSize(settings.get(0).format()));
+        assertEquals(8, ColorTargetSettings.formatSize(settings.get(5).format()));
+        assertEquals("R11F_G11F_B10F", ColorTargetSettings.formatName(settings.get(0).format()));
+        assertEquals("RGBA16", ColorTargetSettings.formatName(settings.get(5).format()));
+        assertEquals("RGBA16F", ColorTargetSettings.formatName(settings.get(7).format()));
     }
 
     @Test

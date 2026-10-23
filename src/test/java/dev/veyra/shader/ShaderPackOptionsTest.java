@@ -104,6 +104,36 @@ class ShaderPackOptionsTest {
         Files.writeString(shader.resolve("shaders.properties"), "program.composite.enabled=false\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
     }
+
+    @Test void activeComputeStagesRespectProgramEnableProperties() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("compute/shaders"));
+        Files.writeString(shader.resolve("shadowcomp.csh"), "void main() {}\n");
+        Files.writeString(shader.resolve("composite.fsh"), "void main() {}\n");
+        Files.writeString(shader.resolve("shaders.properties"), "program.shadowcomp.enabled=false\n");
+
+        ShaderPack pack = ShaderPack.inspect(shader.getParent());
+        assertTrue(pack.activeComputeStageFiles().isEmpty());
+
+        Files.writeString(shader.resolve("shaders.properties"), "");
+        assertEquals(java.util.List.of("shadowcomp.csh"), pack.configured(Map.of(), 0).activeComputeStageFiles());
+    }
+
+    @Test void shadowComputeStagesFollowIrisPassAndComponentOrderAndCanBeScoped() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("ordered-compute/shaders"));
+        for (String file : java.util.List.of("shadowcomp10.csh", "shadowcomp2.csh", "shadowcomp1_a.csh",
+                "shadowcomp_z.csh", "composite.csh", "shadowcomp1.csh", "shadowcomp_a.csh", "shadowcomp.csh",
+                "final.fsh")) {
+            Files.writeString(shader.resolve(file), "void main() {}\n");
+        }
+
+        ShaderPack pack = ShaderPack.inspect(shader.getParent());
+        assertEquals(java.util.List.of("shadowcomp.csh", "shadowcomp_a.csh", "shadowcomp_z.csh",
+                "shadowcomp1.csh", "shadowcomp1_a.csh", "shadowcomp2.csh", "shadowcomp10.csh"),
+                pack.activeComputeStageFiles("shadowcomp"));
+        assertFalse(pack.activeComputeStageFiles("shadowcomp").contains("composite.csh"));
+        assertTrue(pack.activeComputeStageFiles().contains("composite.csh"));
+    }
+
     @Test void terrainVertexStagesExecuteWhenTheirInterfacesAreSupported() throws IOException {
         Path shader = Files.createDirectories(root.resolve("geometry/shaders"));
         Files.writeString(shader.resolve("gbuffers_terrain.fsh"), "void main(){}\n");
@@ -111,10 +141,10 @@ class ShaderPackOptionsTest {
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
 
         Files.writeString(shader.resolve("gbuffers_terrain.vsh"),
-                "#version 120\nattribute vec3 at_midBlock;\nvoid main(){}\n");
+                "#version 120\nattribute vec3 mc_midBlock;\nvoid main(){}\n");
         IOException error = assertThrows(IOException.class,
                 () -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
-        assertTrue(error.getMessage().contains("at_midBlock"));
+        assertTrue(error.getMessage().contains("mc_midBlock"));
 
         Files.writeString(shader.resolve("shaders.properties"), "program.gbuffers_terrain.enabled=false\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(shader.getParent()).validatePipelineCapabilities());
@@ -123,6 +153,24 @@ class ShaderPackOptionsTest {
         Files.writeString(cloud.resolve("gbuffers_clouds.fsh"), "void main(){}\n");
         Files.writeString(cloud.resolve("gbuffers_clouds.vsh"), "void main(){}\n");
         assertDoesNotThrow(() -> ShaderPack.inspect(cloud.getParent()).validatePipelineCapabilities());
+    }
+
+    @Test void shadowVertexUsesTheSameFallbackProgramAsItsFragment() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("shadow-pair/shaders"));
+        Files.writeString(shader.resolve("shadow.fsh"), "void main(){}\n");
+        Files.writeString(shader.resolve("shadow.vsh"), "// base\nvoid main(){}\n");
+        Files.writeString(shader.resolve("shadow_solid.vsh"), "// variant\nvoid main(){}\n");
+        assertTrue(ShaderPack.inspect(shader.getParent()).readShadowVertex("shadow_solid").orElseThrow().contains("// base"));
+        Files.writeString(shader.resolve("shadow_solid.fsh"), "void main(){}\n");
+        assertTrue(ShaderPack.inspect(shader.getParent()).readShadowVertex("shadow_solid").orElseThrow().contains("// variant"));
+    }
+
+    @Test void shadowVertexUnsupportedInputsFailBeforeGpuAllocation() throws IOException {
+        Path shader = Files.createDirectories(root.resolve("shadow-unsupported/shaders"));
+        Files.writeString(shader.resolve("shadow.fsh"), "void main(){gl_FragColor=vec4(1.0);}\n");
+        Files.writeString(shader.resolve("shadow.vsh"), "attribute vec3 missingShadowInput;\nvoid main(){gl_Position=vec4(missingShadowInput,1.0);}\n");
+        IOException error = assertThrows(IOException.class, ShaderPack.inspect(shader.getParent())::validatePipelineCapabilities);
+        assertTrue(error.getMessage().contains("missingShadowInput"));
     }
     @Test void glintVertexStagesExecuteWhenTheirFixedVaryingLinksAreSupported() throws IOException {
         Path shader = Files.createDirectories(root.resolve("glint/shaders"));

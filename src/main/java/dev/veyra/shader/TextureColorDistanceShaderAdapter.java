@@ -36,6 +36,9 @@ public final class TextureColorDistanceShaderAdapter {
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:(?:2D)?(?:Gather|Offset|Proj)|QueryLod)\\w*\\s*\\(");
+    private static final Pattern LIGHTMAP_TEXTURE_SAMPLE = Pattern.compile(
+            "\\b(?:texture|texture2D|textureLod|texture2DLod|textureGrad|texture2DGrad|textureProj|texture2DProj|texelFetch)"
+                    + "\\s*\\(\\s*lightmap\\b");
     private static final Map<String, String> INPUT_TYPES = Map.ofEntries(
             Map.entry("texcoord", "vec2"),
             Map.entry("texCoord", "vec2"),
@@ -373,7 +376,7 @@ public final class TextureColorDistanceShaderAdapter {
                     || name.equals("Sampler0");
             boolean irisSampler = allowIrisSamplers && (name.equals("lightmap") || name.equals("noisetex")
                     || name.equals("specular") || name.equals("shadowtex0") || name.equals("shadowtex1")
-                    || name.equals("shadowcolor") || name.equals("shadowcolor0")
+                    || ShadowColorSampler.isSampler(name)
                     || geometryInputs.containsKey(name));
             if (!recognized && !irisSampler) {
                 throw new IOException(programName + " uses unsupported sampler '" + name + "'.");
@@ -392,7 +395,7 @@ public final class TextureColorDistanceShaderAdapter {
         stripped.append(source, copiedThrough, source.length());
 
         String uncommented = ShaderSource.maskBlockAndLineComments(stripped.toString());
-        usesLightmap |= allowIrisSamplers && Pattern.compile("\\blightmap\\b").matcher(uncommented).find();
+        usesLightmap |= allowIrisSamplers && LIGHTMAP_TEXTURE_SAMPLE.matcher(uncommented).find();
         if (usesLightmap && !lightmapSamplerAvailable) {
             throw new IOException(programName + " requires Minecraft's lightmap sampler, which this pipeline does not provide.");
         }
@@ -400,7 +403,9 @@ public final class TextureColorDistanceShaderAdapter {
         boolean usesSpecular = allowIrisSamplers && TerrainShaderAdapter.usesSpecularSampler(uncommented);
         boolean usesShadow = allowIrisSamplers && EntityShaderAdapter.usesShadowSampler(uncommented);
         boolean usesOpaqueShadow = allowIrisSamplers && ShadowDepthSampler.used(uncommented);
-        boolean usesShadowColor = allowIrisSamplers && ShadowColorSampler.used(uncommented);
+        Set<Integer> shadowColorInputs = allowIrisSamplers
+                ? ShadowColorSampler.indices(uncommented) : Set.of();
+        boolean usesShadowColor = !shadowColorInputs.isEmpty();
         StringBuilder bridge = new StringBuilder();
         if (usesLightmap) bridge.append("uniform sampler2D Sampler2;\n#define lightmap Sampler2\n");
         if (usesNoise) bridge.append("uniform sampler2D VeyraNoiseSampler;\n#define noisetex VeyraNoiseSampler\n");
@@ -408,9 +413,7 @@ public final class TextureColorDistanceShaderAdapter {
         if (usesShadow) bridge.append("uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n");
         if (usesOpaqueShadow) bridge.append("uniform sampler2D ").append(ShadowDepthSampler.NAME)
                 .append(";\n#define shadowtex1 ").append(ShadowDepthSampler.NAME).append('\n');
-        if (usesShadowColor) bridge.append("uniform sampler2D ").append(ShadowColorSampler.NAME)
-                .append(";\n#define shadowcolor0 ").append(ShadowColorSampler.NAME)
-                .append("\n#define shadowcolor ").append(ShadowColorSampler.NAME).append('\n');
+        bridge.append(ShadowColorSampler.bridge(shadowColorInputs));
         for (Map.Entry<String, Integer> input : geometryInputs.entrySet()) {
             bridge.append("uniform sampler2D ").append(GeometryColorSamplers.samplerName(input.getValue()))
                     .append(";\n#define ").append(input.getKey()).append(' ')
@@ -429,12 +432,37 @@ public final class TextureColorDistanceShaderAdapter {
                     }
                     """);
         }
-        String result = stripped.toString().replaceAll("\\bsampler2DShadow\\b", "sampler2D")
+        String result = renamePackShadowComparisonFunction(stripped.toString())
+                .replaceAll("\\bsampler2DShadow\\b", "sampler2D")
                 .replaceAll("\\btexture2DShadow\\s*\\(", "veyraTextureShadowCompare(")
                 .replaceAll("\\bshadow2D\\s*\\(", "veyraTextureShadowSample(");
         return new SamplerBridge(result, bridge.toString(), new SamplerInputs(
                 usesNoise, usesShadow, usesSpecular, usesLightmap, usesShadowColor, usesOpaqueShadow,
-                Set.copyOf(geometryIndices)));
+                Set.copyOf(geometryIndices), Set.of(), Set.copyOf(shadowColorInputs)));
+    }
+
+    private static String renamePackShadowComparisonFunction(String source) {
+        String analysis = ShaderSource.maskBlockAndLineComments(source);
+        Pattern declaration = Pattern.compile(
+                "\\b(?!(?:return|if|while|for|switch|case)\\b)[A-Za-z_][A-Za-z0-9_]*\\s+texture2DShadow\\s*\\(");
+        if (!declaration.matcher(analysis).find()) return source;
+
+        String aliasBase = "veyraShaderPackTexture2DShadow";
+        String alias = aliasBase;
+        int suffix = 2;
+        while (Pattern.compile("\\b" + Pattern.quote(alias) + "\\b").matcher(analysis).find()) {
+            alias = aliasBase + "_" + suffix++;
+        }
+
+        List<Integer> offsets = new ArrayList<>();
+        Matcher references = Pattern.compile("\\btexture2DShadow\\b(?=\\s*\\()").matcher(analysis);
+        while (references.find()) offsets.add(references.start());
+        StringBuilder renamed = new StringBuilder(source);
+        for (int index = offsets.size() - 1; index >= 0; index--) {
+            int start = offsets.get(index);
+            renamed.replace(start, start + "texture2DShadow".length(), alias);
+        }
+        return renamed.toString();
     }
 
     static SamplerInputs inspectSamplers(String source, String programName,
@@ -448,8 +476,17 @@ public final class TextureColorDistanceShaderAdapter {
 
     record SamplerInputs(boolean usesNoiseSampler, boolean usesShadowSampler, boolean usesSpecularSampler,
                          boolean usesLightmapSampler, boolean usesShadowColor, boolean usesOpaqueShadow,
-                         Set<Integer> geometryColorInputs) {
-        static SamplerInputs empty() { return new SamplerInputs(false, false, false, false, false, false, Set.of()); }
+                         Set<Integer> geometryColorInputs, Set<String> customImageSamplers,
+                         Set<Integer> shadowColorInputs) {
+        static SamplerInputs empty() {
+            return new SamplerInputs(false, false, false, false, false, false, Set.of(), Set.of(), Set.of());
+        }
+
+        SamplerInputs withCustomImageSamplers(Set<String> samplers) {
+            return new SamplerInputs(usesNoiseSampler, usesShadowSampler, usesSpecularSampler,
+                    usesLightmapSampler, usesShadowColor, usesOpaqueShadow,
+                    geometryColorInputs, Set.copyOf(samplers), shadowColorInputs);
+        }
     }
 
     private record SamplerBridge(String source, String bridge, SamplerInputs inputs) { }

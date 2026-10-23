@@ -47,6 +47,18 @@ class GeometryColorSamplersTest {
                 + "uniform sampler2D colortex16;\nvoid main(){gl_FragColor=vec4(1.0);}\n").isEmpty());
     }
 
+    @Test void configuredCustomTexturesTakePrecedenceOverLegacyColorAliases() throws IOException {
+        String source = "uniform sampler2D gaux4;\n"
+                + "void main(){gl_FragColor=texture2D(gaux4,vec2(0.5));}\n";
+        assertEquals(Map.of("gaux4", 7), GeometryColorSamplers.read(source));
+        assertTrue(GeometryColorSamplers.read(source, Set.of("gaux4")).isEmpty());
+
+        String sceneAlias = "uniform sampler2D gcolor;\n"
+                + "void main(){gl_FragColor=texture2D(gcolor,vec2(0.5));}\n";
+        assertThrows(IOException.class, () -> GeometryColorSamplers.read(sceneAlias));
+        assertTrue(GeometryColorSamplers.read(sceneAlias, Set.of("gcolor")).isEmpty());
+    }
+
     @Test void rejectsSceneFeedbackInvalidTypesAndOutOfRangeInputs() {
         for (String declaration : new String[]{"sampler2D colortex0", "sampler2D gcolor",
                 "sampler2D colortex16", "samplerCube colortex5"}) {
@@ -56,16 +68,14 @@ class GeometryColorSamplersTest {
         }
     }
 
-    @Test void limitsDistinctImagesRatherThanAliasCount() throws IOException {
+    @Test void acceptsAllFifteenShaderPackColorTargets() throws IOException {
         StringBuilder declarations = new StringBuilder(), sum = new StringBuilder("vec4(0.0)");
-        for (int index = 1; index <= 7; index++) {
+        for (int index = 1; index <= 15; index++) {
             declarations.append("uniform sampler2D colortex").append(index).append(";\n");
             sum.append("+texture2D(colortex").append(index).append(",vec2(0.5))");
-            String source = declarations + "void main(){gl_FragColor=" + sum + ";}\n";
-            if (index <= 6) assertEquals(index, GeometryColorSamplers.read(source).size());
-            else assertTrue(assertThrows(IOException.class, () -> GeometryColorSamplers.read(source))
-                    .getMessage().contains("six auxiliary"));
         }
+        String source = declarations + "void main(){gl_FragColor=" + sum + ";}\n";
+        assertEquals(15, GeometryColorSamplers.read(source).size());
     }
 
     @Test void appendsColorBindingsAfterOptionalDepthNoiseAndShadow() throws IOException {

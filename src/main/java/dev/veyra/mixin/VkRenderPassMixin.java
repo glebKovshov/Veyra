@@ -6,6 +6,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
+import dev.veyra.vulkan.VeyraGeometryTargets;
 import dev.veyra.vulkan.VeyraSpecularTextures;
 import net.minecraft.client.Minecraft;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
@@ -26,6 +27,7 @@ public abstract class VkRenderPassMixin {
         RenderPipeline active = pass.getPipeline();
         if (active == null) return;
         var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
+        if (pipeline != null) VeyraGeometryTargets.beforeBind(pipeline);
         String pipelinePath = active.getLocation().getPath();
         boolean lightmapPipeline = pipelinePath.equals("pipeline/world_border")
                 || pipelinePath.equals("pipeline/celestial") || pipelinePath.equals("pipeline/end_sky");
@@ -48,6 +50,9 @@ public abstract class VkRenderPassMixin {
             { VeyraShadowRenderer.bindEntityShadowColor(pass, pipeline); VeyraShadowRenderer.bindEntityOpaqueDepth(pass, pipeline); }
         if (pipeline != null && pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME) != null) {
             VeyraNoiseTexture.bind(pass);
+        }
+        if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")) {
+            VeyraRenderer.bindShaderPackTextures(pass, pipeline, active.getFragmentShader().getPath());
         }
         if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")
                 && active.getSamplers().contains("Sampler3")) {
@@ -98,6 +103,7 @@ public abstract class VkRenderPassMixin {
 
     @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true, remap = false)
     private RenderPipeline veyra$routeEntityPipeline(RenderPipeline original) {
+        if (!VeyraRenderer.ensureShaderPackTexturesPrepared()) return original;
         RenderPipeline replacement = VeyraRenderer.getHandPipeline(original);
         if (replacement == null) {
             replacement = VeyraRenderer.getSignTextPipeline(original);

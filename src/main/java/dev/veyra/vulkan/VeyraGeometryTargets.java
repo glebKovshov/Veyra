@@ -3,6 +3,7 @@ package dev.veyra.vulkan;
 import dev.veyra.shader.FragmentOutputs;
 import dev.veyra.shader.GeometryBlendSettings;
 import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.mixin.accessor.RendererFramebufferAccessor;
 import dev.veyra.mixin.accessor.NativePipelineRegistryAccessor;
 import org.lwjgl.system.MemoryStack;
@@ -29,9 +30,12 @@ public final class VeyraGeometryTargets {
     private static final Map<GraphicsPipeline, GeometryBlendSettings> blends = new IdentityHashMap<>();
     private static final Set<GraphicsPipeline> terrainInputs = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<GraphicsPipeline> specularInputs = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<GraphicsPipeline> shadowPipelines = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<Key, VeyraMrtFramebuffer> framebuffers = new HashMap<>();
     private static final Map<Framebuffer, RenderPass> resumePasses = new IdentityHashMap<>();
     private static Framebuffer scene;
+    private static boolean shadowRouteActive;
+    private static String lastIncompatibleExtentWarning;
     private VeyraGeometryTargets() { }
 
     public static void register(GraphicsPipeline pipeline, FragmentOutputs layout, GeometryBlendSettings blend) {
@@ -49,29 +53,41 @@ public final class VeyraGeometryTargets {
             throw new IllegalStateException("Per-buffer geometry blend properties require Vulkan independentBlend support.");
         layouts.put(pipeline, layout);
         blends.put(pipeline, blend);
+        shadowPipelines.remove(pipeline);
         if (terrainPipeline) terrainInputs.add(pipeline);
         else terrainInputs.remove(pipeline);
+    }
+    public static void registerShadow(GraphicsPipeline pipeline, FragmentOutputs layout, GeometryBlendSettings blend) {
+        register(pipeline, layout, blend, false);
+        shadowPipelines.add(pipeline);
     }
     public static FragmentOutputs layout(GraphicsPipeline pipeline) { return layouts.get(pipeline); }
     public static GeometryBlendSettings blend(GraphicsPipeline pipeline) { return blends.get(pipeline); }
     public static void registerSpecularInput(GraphicsPipeline pipeline) { specularInputs.add(pipeline); }
     public static void unregister(GraphicsPipeline pipeline) {
-        layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline); specularInputs.remove(pipeline);
+        layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline);
+        specularInputs.remove(pipeline); shadowPipelines.remove(pipeline);
     }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
         FragmentOutputs layout = layouts.get(pipeline);
         boolean terrain = terrainInputs.contains(pipeline);
-        if (layout != null) {
-            dev.veyra.shader.VeyraShadowRenderer.bindTerrainShadowColor(pipeline);
-            dev.veyra.shader.VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline);
-        }
+        VeyraShadowRenderer.bindTerrainShadowColor(pipeline);
+        VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline);
         VeyraNoiseTexture.bind(pipeline);
         if (terrain || specularInputs.contains(pipeline) || pipeline.name.startsWith("veyra_shadow_"))
             VeyraSpecularTextures.bindTerrain(pipeline);
         if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
         Renderer renderer = Renderer.getInstance();
         Framebuffer bound = renderer.getBoundFramebuffer();
+        if (shadowPipelines.contains(pipeline)) {
+            if (VeyraShadowRenderer.isRendering() && layout != null) routeShadow(renderer, layout);
+            return;
+        }
+        if (VeyraShadowRenderer.isRendering()) {
+            if (bound instanceof VeyraMrtFramebuffer) resumeShadow(renderer);
+            return;
+        }
         if (layout == null) {
             if (bound instanceof VeyraMrtFramebuffer) resumeScene(renderer);
             return;
@@ -84,17 +100,78 @@ public final class VeyraGeometryTargets {
         if (!(bound instanceof VeyraMrtFramebuffer)) scene = bound;
         if (scene == null) throw new IllegalStateException("Geometry color targets require an active scene render pass.");
         boolean pipelineChanged = renderer.getBoundPipeline() != pipeline;
-        boolean endedForSampling = VeyraRenderer.prepareGeometryColorSamplers(pipeline, layout, pipelineChanged);
         if (layout.sceneOnly()) {
+            boolean endedForSampling = VeyraRenderer.prepareGeometryColorSamplers(pipeline, layout, pipelineChanged);
             if (bound instanceof VeyraMrtFramebuffer || endedForSampling) resumeScene(renderer);
             return;
         }
         List<VulkanImage> colors = new ArrayList<>();
         for (int target : layout.targets()) colors.add(target == 0 ? scene.getColorAttachment() : VeyraRenderer.geometryColorAttachment(target));
-        Key key = new Key(List.copyOf(colors), scene.getDepthAttachment());
+        VulkanImage depth = scene.getDepthAttachment();
+        if (!hasMatchingDimensions(colors.stream().map(VeyraGeometryTargets::extent).toList(), extent(depth))) {
+            if (bound instanceof VeyraMrtFramebuffer) resumeScene(renderer);
+            boolean endedForSampling = VeyraRenderer.prepareGeometryColorSamplers(pipeline, layout, pipelineChanged);
+            if (endedForSampling) resumeScene(renderer);
+            warnIncompatibleDimensions(layout, colors, depth);
+            return;
+        }
+        VeyraRenderer.prepareGeometryColorSamplers(pipeline, layout, pipelineChanged);
+        Key key = new Key(List.copyOf(colors), depth);
         VeyraMrtFramebuffer framebuffer = framebuffers.computeIfAbsent(key,
                 ignored -> new VeyraMrtFramebuffer(key.colors(), key.depth()));
         beginPreservingDynamicState(renderer, framebuffer.renderPass(), framebuffer);
+        shadowRouteActive = false;
+    }
+
+    private static AttachmentExtent extent(VulkanImage image) {
+        return image == null ? null : new AttachmentExtent(image.width, image.height);
+    }
+
+    static boolean hasMatchingDimensions(List<AttachmentExtent> colors, AttachmentExtent depth) {
+        if (colors.isEmpty() || colors.getFirst() == null) return false;
+        AttachmentExtent expected = colors.getFirst();
+        if (expected.width() <= 0 || expected.height() <= 0) return false;
+        for (AttachmentExtent color : colors) {
+            if (!expected.equals(color)) return false;
+        }
+        return depth == null || expected.equals(depth);
+    }
+
+    private static void warnIncompatibleDimensions(FragmentOutputs layout, List<VulkanImage> colors, VulkanImage depth) {
+        StringBuilder message = new StringBuilder("Skipping geometry MRT for outputs ")
+                .append(layout.targets()).append(" because attachment dimensions differ: ");
+        for (int i = 0; i < colors.size(); i++) {
+            if (i > 0) message.append(", ");
+            VulkanImage image = colors.get(i);
+            message.append("color[").append(i).append("]=").append(image.width).append('x').append(image.height);
+        }
+        if (depth != null) message.append(", depth=").append(depth.width).append('x').append(depth.height);
+        message.append(". Rendering this pipeline against the active scene framebuffer for this frame.");
+        String warning = message.toString();
+        if (!warning.equals(lastIncompatibleExtentWarning)) {
+            dev.veyra.VeyraClient.LOGGER.warn(warning);
+            lastIncompatibleExtentWarning = warning;
+        }
+    }
+
+    private static void routeShadow(Renderer renderer, FragmentOutputs layout) {
+        Framebuffer shadow = VeyraShadowRenderer.shadowFramebuffer();
+        if (shadow == null) throw new IllegalStateException("The shaderpack shadow framebuffer is unavailable.");
+        List<VulkanImage> colors = new ArrayList<>(layout.targets().size());
+        for (int target : layout.targets()) colors.add(VeyraShadowRenderer.shadowColorAttachment(target));
+        Key key = new Key(List.copyOf(colors), shadow.getDepthAttachment());
+        VeyraMrtFramebuffer framebuffer = framebuffers.computeIfAbsent(key,
+                ignored -> new VeyraMrtFramebuffer(key.colors(), key.depth()));
+        beginPreservingDynamicState(renderer, framebuffer.renderPass(), framebuffer);
+        shadowRouteActive = true;
+    }
+
+    private static void resumeShadow(Renderer renderer) {
+        Framebuffer shadow = VeyraShadowRenderer.shadowFramebuffer();
+        RenderPass pass = VeyraShadowRenderer.shadowResumePass();
+        if (shadow == null || pass == null) throw new IllegalStateException("The shaderpack shadow pass was lost while routing shadow MRT.");
+        beginPreservingDynamicState(renderer, pass, shadow);
+        shadowRouteActive = false;
     }
 
     private static void resumeScene(Renderer renderer) {
@@ -108,6 +185,7 @@ public final class VeyraGeometryTargets {
             return builder.build();
         });
         beginPreservingDynamicState(renderer, pass, scene);
+        shadowRouteActive = false;
     }
 
     private static void beginPreservingDynamicState(Renderer renderer, RenderPass pass, Framebuffer target) {
@@ -123,9 +201,17 @@ public final class VeyraGeometryTargets {
     }
 
     public static void releaseTargets() {
-        if (framebuffers.isEmpty() && resumePasses.isEmpty()) return;
+        if (framebuffers.isEmpty() && resumePasses.isEmpty()) {
+            scene = null;
+            shadowRouteActive = false;
+            lastIncompatibleExtentWarning = null;
+            return;
+        }
         Renderer renderer = Renderer.getInstance();
-        if (renderer.getBoundFramebuffer() instanceof VeyraMrtFramebuffer) resumeScene(renderer);
+        if (renderer.getBoundFramebuffer() instanceof VeyraMrtFramebuffer) {
+            if (VeyraShadowRenderer.isRendering() || shadowRouteActive) resumeShadow(renderer);
+            else resumeScene(renderer);
+        }
         Set<RenderPass> retired = Collections.newSetFromMap(new IdentityHashMap<>());
         framebuffers.values().forEach(target -> retired.add(target.renderPass()));
         retired.addAll(resumePasses.values());
@@ -137,8 +223,10 @@ public final class VeyraGeometryTargets {
                 .forEach(pipeline -> {
                     if (pipeline instanceof VeyraPipelinePassCache cache) cache.veyra$retireRenderPasses(retired);
                 }));
-        framebuffers.clear(); resumePasses.clear(); scene = null;
+        framebuffers.clear(); resumePasses.clear(); scene = null; shadowRouteActive = false;
+        lastIncompatibleExtentWarning = null;
     }
 
+    record AttachmentExtent(int width, int height) { }
     private record Key(List<VulkanImage> colors, VulkanImage depth) { }
 }

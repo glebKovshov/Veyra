@@ -93,7 +93,7 @@ public final class ShaderPackRepository {
             if (option != null && option.values().contains(value)) valid.put(name, value);
             else LOGGER.warn("Ignoring stale/invalid saved option {} for {}", name, pack.name());
         });
-        return pack.configured(specification.validate(valid), dimension);
+        return pack.configured(specification.validate(valid), dimension).withRuntimeFeatures();
     }
 
     public void setDimension(int dimension) {

@@ -20,6 +20,11 @@ class GlslPreprocessorTest {
         assertTrue(result.contains("vec4(1.0)"));
         assertFalse(result.contains("#define"));
     }
+    @Test void activeCodeMarkersDistinguishConditionalCommentDirectives() throws IOException {
+        String result = GlslPreprocessor.process("test", "#if 0\nVEYRA_MARKER_INACTIVE\n#else\nVEYRA_MARKER_ACTIVE\n#endif\n");
+        assertFalse(result.contains("VEYRA_MARKER_INACTIVE"));
+        assertTrue(result.contains("VEYRA_MARKER_ACTIVE"));
+    }
     @Test void hoistsOnlyActiveExtensions() throws IOException {
         String result = GlslPreprocessor.process("test", "#version 120\n#if 0\n#extension GL_NOT_REAL : require\n#endif\n#extension GL_ARB_shader_texture_lod : enable\nvoid main(){}\n");
         assertTrue(result.startsWith("#version 120\n#extension GL_ARB_shader_texture_lod : enable"));
@@ -44,6 +49,17 @@ class GlslPreprocessorTest {
     @Test void evaluatesVersionAndMinecraftMacros() throws IOException {
         String result = GlslPreprocessor.process("test", "#version 130\n#if MC_VERSION == 12111 && __VERSION__ == 130\nfloat supported;\n#else\n#error wrong version\n#endif\n");
         assertTrue(result.contains("float supported"));
+    }
+    @Test void enablesIrisShaderPackCompatibilityBranches() throws IOException {
+        String result = GlslPreprocessor.process("test", "#ifdef IS_IRIS\nuniform int renderStage;\n#else\n#error Iris compatibility must be enabled\n#endif\n");
+        String bound = IrisRenderStages.bindUniform(result, IrisRenderStages.forShadowTerrainProgram("shadow_solid"), "shadow_solid");
+        assertTrue(bound.contains("const int renderStage = 8;"));
+        assertFalse(bound.contains("uniform int renderStage;"));
+        String terrainBound = IrisRenderStages.bindUniform(result, IrisRenderStages.forProgram("gbuffers_terrain"), "gbuffers_terrain");
+        assertTrue(terrainBound.contains("const int renderStage = 8;"));
+        String computeBound = IrisRenderStages.bindUniform(result, IrisRenderStages.computeStage(), "shadowcomp.csh");
+        assertTrue(computeBound.contains("const int renderStage = 0;"));
+        assertFalse(result.contains("#error"));
     }
     @Test void commentedDirectivesStayComments() throws IOException {
         String result = GlslPreprocessor.process("test", "/*\n#version 110\n*/\n#version 330\nvoid main(){}\n");

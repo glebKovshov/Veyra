@@ -1,13 +1,13 @@
 package dev.veyra.smoke.mixin;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import dev.veyra.shader.VeyraStorageBufferUBO;
 import dev.veyra.vulkan.VeyraMrtFramebuffer;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
 import net.vulkanmod.render.engine.VkCommandEncoder;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.framebuffer.Framebuffer;
 import net.vulkanmod.vulkan.texture.VulkanImage;
-import net.vulkanmod.vulkan.texture.VTextureSelector;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -29,19 +29,33 @@ public abstract class GraphicsDescriptorsMixin {
         var renderer = Renderer.getInstance();
         var boundFramebuffer = renderer.getBoundFramebuffer();
         var boundRenderPass = renderer.getBoundRenderPass();
-        if (veyra$seen.add("framebuffer:" + pipeline.getLocation())) {
+        boolean shadowMrt = pipeline.getLocation().toString().startsWith("veyra:pipeline/shadow_entities/")
+                && boundFramebuffer instanceof VeyraMrtFramebuffer;
+        String framebufferKey = "framebuffer:" + pipeline.getLocation()
+                + (shadowMrt ? ":" + System.identityHashCode(boundFramebuffer) : "");
+        if (veyra$seen.add(framebufferKey)) {
             LoggerFactory.getLogger("veyra-graphics-smoke").info(
                     "Framebuffer evidence: pipeline={} bound={} renderPassTarget={}",
                     pipeline.getLocation(), veyra$describe(boundFramebuffer),
                     boundRenderPass == null ? "none" : veyra$describe(boundRenderPass.getFramebuffer()));
         }
         for (var descriptor : nativePipeline.getImageDescriptors()) {
-            var image = VTextureSelector.getImage(descriptor.imageIdx);
+            VulkanImage image = descriptor.getImage();
             String key = pipeline.getLocation() + ":" + descriptor.name;
             if (image != null && veyra$seen.add(key)) LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                    "Descriptor evidence: pipeline={} sampler={} index={} image={} handle={} layout={}",
-                    pipeline.getLocation(), descriptor.name, descriptor.imageIdx, image.name,
+                    "Descriptor evidence: pipeline={} sampler={} binding={} type={} image={} handle={} layout={}",
+                    pipeline.getLocation(), descriptor.name, descriptor.getBinding(), descriptor.getType(), image.name,
                     Long.toHexString(image.getId()), image.getCurrentLayout());
+        }
+        for (var buffer : nativePipeline.getBuffers()) {
+            if (!(buffer instanceof VeyraStorageBufferUBO)) continue;
+            String key = pipeline.getLocation() + ":storage:" + buffer.name;
+            if (veyra$seen.add(key)) LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Storage buffer evidence: pipeline={} buffer={} binding={} type={} stages={} global={} handle={} offset={} range={}",
+                    pipeline.getLocation(), buffer.name, buffer.getBinding(), buffer.getType(), buffer.getStages(),
+                    buffer.useGlobalBuffer(),
+                    Long.toHexString(buffer.getBufferSlice().getBuffer().getId()),
+                    buffer.getBufferSlice().getOffset(), buffer.getBufferSlice().getSize());
         }
     }
 

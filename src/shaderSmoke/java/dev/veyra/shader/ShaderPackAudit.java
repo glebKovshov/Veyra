@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -49,11 +50,18 @@ public final class ShaderPackAudit {
                 if (values == null) throw new IllegalArgumentException("Unknown profile '" + profile + "' in " + argument);
                 pack = pack.configured(pack.readOptions().validate(values), dimension);
             }
+            pack = pack.withRuntimeFeatures();
             // Match runtime selection: adapters see the pack's shaders.properties custom uniforms.
             CustomUniforms.activate(pack.readCustomUniforms());
             List<String> errors = new ArrayList<>();
             String capabilityError = "";
-            int options = 0, profiles = 0, stages = 0, preprocessed = 0, accepted = 0, rejected = 0, geometryVertices = 0, compute = 0;
+            int options = 0, profiles = 0, stages = 0, preprocessed = 0, accepted = 0, rejected = 0,
+                    geometryVertices = 0, compute = 0, computeAccepted = 0, computeRejected = 0;
+            List<String> activeComputeStages = new ArrayList<>();
+            if (pack.supportsShaderPrograms()) {
+                try { activeComputeStages.addAll(pack.activeComputeStageFiles()); }
+                catch (Exception exception) { errors.add("compute-stage selection: " + exception.getMessage()); }
+            }
             if (pack.supportsShaderPrograms()) {
                 try { pack.validatePipelineCapabilities(); }
                 catch (Exception exception) { capabilityError = exception.getMessage(); }
@@ -61,15 +69,33 @@ public final class ShaderPackAudit {
                 catch (Exception exception) { errors.add("options: " + exception.getMessage()); }
                 for (String file : pack.stageFiles().stream().sorted().toList()) {
                     stages++;
-                    if (file.endsWith(".csh")) compute++;
+                    if (file.endsWith(".csh")) {
+                        compute++;
+                        if (!activeComputeStages.contains(file)) continue;
+                    }
                     if (file.endsWith(".vsh") && (file.startsWith("gbuffers_") || file.startsWith("shadow"))) geometryVertices++;
                     try {
-                        String source = pack.readStage(file).orElseThrow();
+                        String source = (file.endsWith(".csh")
+                                ? pack.readComputeStage(file) : pack.readStage(file)).orElseThrow();
                         preprocessed++;
+                        if (file.endsWith(".csh")) {
+                            try {
+                                ComputeShaderAdapter.AdaptedStage adapted = ComputeShaderAdapter.adapt(
+                                        file, source, pack.readImageProperties());
+                                ShaderCompileSmoke.compileCompute(adapted.source(),
+                                        pack.path().getFileName() + "/" + profile + "/" + file);
+                                computeAccepted++;
+                            } catch (Exception exception) {
+                                computeRejected++;
+                                errors.add(file + " compute adapter/compiler: " + exception.getMessage());
+                            }
+                            continue;
+                        }
                         if (!file.endsWith(".fsh")) continue;
                         String program = file.substring(0, file.length() - 4);
                         try {
                             if (program.startsWith("gbuffers_terrain") || program.equals("gbuffers_water")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs =
                                         terrainVertexOutputs(pack, program, source);
                                 TerrainShaderAdapter.adaptFragment(source, pack.hasShadowFragment(),
@@ -77,6 +103,7 @@ public final class ShaderPackAudit {
                             }
                             else if (program.startsWith("gbuffers_entities") || program.startsWith("gbuffers_hand")
                                     || program.startsWith("gbuffers_block") || program.equals("gbuffers_spidereyes")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
                                         entityVertexOutputs(pack, program);
                                 EntityShaderAdapter.adaptGeometryFragment(source, program,
@@ -97,6 +124,7 @@ public final class ShaderPackAudit {
                                 pack.readGeometryBlendSettings(program);
                             }
                             else if (program.equals("gbuffers_weather")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
                                         pack.readStage(program + ".vsh").isPresent()
                                                 ? BasicVertexShaderAdapter.describeVaryings(program,
@@ -108,20 +136,31 @@ public final class ShaderPackAudit {
                                 TextureColorDistanceShaderAdapter.adaptFragment(source, program, vertexVaryings,
                                         pack.hasShadowFragment(), true);
                             }
-                            else if (program.equals("gbuffers_clouds")) CloudShaderAdapter.adaptFragment(source);
+                            else if (program.equals("gbuffers_clouds")) {
+                                var prepared = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties());
+                                source = prepared.source();
+                                Set<String> customSamplers = prepared.resources().stream()
+                                        .filter(resource -> !resource.storageImage())
+                                        .map(ComputeShaderAdapter.OpaqueResource::name)
+                                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                                CloudShaderAdapter.adaptFragment(source, List.of(), customSamplers);
+                            }
                             else continue; // Other bridges require pipeline-specific VulkanMod vertex inputs.
                             accepted++;
                         } catch (Exception exception) { rejected++; errors.add(file + " adapter: " + exception.getMessage()); }
                     } catch (Exception exception) { errors.add(file + " preprocess: " + exception.getMessage()); }
                 }
                 try {
-                    pack.readCloudVertex().ifPresent(source -> {
+                    var cloudVertex = pack.readCloudVertex();
+                    if (cloudVertex.isPresent()) {
                         try {
-                            CloudShaderAdapter.adaptVertexWithMetadata(vulkanModCloudVertex, source);
+                            var prepared = ShaderPackImageBindings.prepare("gbuffers_clouds.vsh", cloudVertex.get(),
+                                    pack.readImageProperties());
+                            CloudShaderAdapter.adaptVertexWithMetadata(vulkanModCloudVertex, prepared.source());
                         } catch (IOException exception) {
                             errors.add("gbuffers_clouds.vsh adapter: " + exception.getMessage());
                         }
-                    });
+                    }
                 } catch (Exception exception) {
                     errors.add("gbuffers_clouds.vsh preprocess: " + exception.getMessage());
                 }
@@ -130,7 +169,9 @@ public final class ShaderPackAudit {
                     + ",\"dimension\":" + dimension + ",\"profile\":" + quote(profile) + ",\"capabilityError\":" + quote(capabilityError)
                     + ",\"options\":" + options + ",\"profiles\":" + profiles + ",\"stages\":" + stages + ",\"preprocessed\":" + preprocessed
                     + ",\"geometryFragmentsAccepted\":" + accepted + ",\"geometryFragmentsRejected\":" + rejected + ",\"geometryVertexStages\":" + geometryVertices
-                    + ",\"computeStages\":" + compute + ",\"errorCount\":" + errors.size() + ",\"errors\":["
+                    + ",\"computeStages\":" + compute + ",\"computeStagesActive\":" + activeComputeStages.size()
+                    + ",\"computeStagesAccepted\":" + computeAccepted
+                    + ",\"computeStagesRejected\":" + computeRejected + ",\"errorCount\":" + errors.size() + ",\"errors\":["
                     + String.join(",", errors.stream().limit(16).map(ShaderPackAudit::quote).toList()) + "],\"visualValidation\":false}");
         }
     }
@@ -147,10 +188,12 @@ public final class ShaderPackAudit {
             ShaderPack pack, String program, String fragmentSource) throws IOException {
         var vertex = pack.readStage(program + ".vsh");
         if (vertex.isEmpty()) return Map.of();
+        String vertexSource = ShaderPackImageBindings.prepare(program + ".vsh", vertex.get(),
+                pack.readImageProperties()).source();
         Map<String, TerrainVertexShaderAdapter.PackVarying> descriptions =
-                TerrainVertexShaderAdapter.describeVaryings(program, vertex.get());
+                TerrainVertexShaderAdapter.describeVaryings(program, vertexSource);
         var unusedLocations = TerrainShaderAdapter.unusedTerrainVertexOutputs(fragmentSource, descriptions);
-        return TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertex.get(), unusedLocations);
+        return TerrainVertexShaderAdapter.validateAndGetVaryings(program, vertexSource, unusedLocations);
     }
 
     private static Map<String, TerrainVertexShaderAdapter.PackVarying> entityVertexOutputs(

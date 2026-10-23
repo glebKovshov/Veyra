@@ -75,7 +75,8 @@ final class BeaconBeamVertexShaderAdapter {
         if (minecraftSource == null || minecraftSource.isBlank()) {
             throw new IOException("Minecraft's beacon-beam vertex shader is empty.");
         }
-        PreparedStage pack = prepare(shaderPackSource, programName);
+        PreparedStage pack = prepare(shaderPackSource, programName,
+                IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource));
         Matcher version = VERSION.matcher(minecraftSource);
         if (!version.find()) throw new IOException("Minecraft's beacon-beam vertex shader has no #version directive.");
 
@@ -122,7 +123,7 @@ final class BeaconBeamVertexShaderAdapter {
                 };
                 void main(){gl_Position=ProjMat*ModelViewMat*vec4(Position,1.0);vertexColor=Color;texCoord0=UV0;}
                 """;
-        PreparedStage prepared = prepare(shaderPackSource, programName);
+        PreparedStage prepared = prepare(shaderPackSource, programName, false);
         return new AdaptedStage(base + "\n" + prepared.outputs().declarationsAndMacros()
                 + prepared.uniformBridge() + prepared.source(),
                 effectiveOutputs(prepared.outputs().varyings(), prepared.colorInterpolation(),
@@ -133,7 +134,8 @@ final class BeaconBeamVertexShaderAdapter {
         return effectiveOutputs(Map.of(), "smooth", "smooth");
     }
 
-    private static PreparedStage prepare(String shaderPackSource, String programName) throws IOException {
+    private static PreparedStage prepare(String shaderPackSource, String programName,
+                                         boolean fogValuesAlreadyDeclared) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
 
@@ -185,7 +187,8 @@ final class BeaconBeamVertexShaderAdapter {
         withoutSamplers.append(source, copiedThrough, source.length());
         source = withoutSamplers.toString();
         boolean usesNoise = TerrainShaderAdapter.usesNoiseSampler(source);
-        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(source, programName, true);
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(
+                source, programName, fogValuesAlreadyDeclared);
         ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(fog.source(), programName);
         source = uniforms.source();
         if (UNSUPPORTED_UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {

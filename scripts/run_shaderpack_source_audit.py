@@ -135,10 +135,14 @@ def main() -> int:
     )
     accepted = sum(int(row["geometryFragmentsAccepted"]) for row in records)
     rejected = sum(int(row["geometryFragmentsRejected"]) for row in records)
+    active_compute = sum(int(row.get("computeStagesActive", 0)) for row in records)
+    compute_accepted = sum(int(row.get("computeStagesAccepted", 0)) for row in records)
+    compute_rejected = sum(int(row.get("computeStagesRejected", 0)) for row in records)
     print(
         f"Audited {len(paths)} pinned packs in {len(DIMENSIONS)} dimensions: "
         f"{len(defaults)} defaults and {len(profile_rows)} declared-profile cases; "
-        f"{accepted} geometry fragment programs accepted, {rejected} rejected."
+        f"{accepted} geometry fragment programs accepted, {rejected} rejected; "
+        f"{active_compute} active compute stages ({compute_accepted} compiled, {compute_rejected} rejected)."
     )
     print(f"Reports written under {REPORTS.relative_to(ROOT)}")
     return 0

@@ -26,6 +26,7 @@ public abstract class LevelRendererMixin {
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
         VeyraRenderer.captureFrameMatrices(modelView, projection, camera.position());
+        VeyraRenderer.captureFogColor(fogColor);
     }
 
     @Inject(method = "renderLevel", at = @At(value = "INVOKE", target =
@@ -37,7 +38,7 @@ public abstract class LevelRendererMixin {
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
         LevelRenderState state = ((LevelRendererAccessor) (Object) this).veyra$getLevelRenderState();
-        VeyraShadowRenderer.render(camera, modelView, projection, deltaTracker, state);
+        VeyraShadowRenderer.render(camera, modelView, projection, projectionMatrix, deltaTracker, state);
         VeyraRenderer.renderPrepare(net.minecraft.client.Minecraft.getInstance());
     }
 

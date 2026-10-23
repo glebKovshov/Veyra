@@ -1,5 +1,42 @@
 # Veyra 0.2 validation status
 
+## Current unpublished shadow/compute candidate — 2026-10-22
+
+The current candidate is the working tree for draft PR [#84](https://github.com/glebKovshov/Veyra/pull/84). On JDK 21.0.12, `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed: **479 tests, 0 failures/errors/skips**, 96 example shaders preprocessed, 112 direct Vulkan SPIR-V compilations, four conditional-include checks, graphics-smoke Java compilation, and example-pack packaging. The unpublished beta.30-metadata JAR passed `scripts/verify_jar.py`: **945,047 bytes**, SHA-256 `493d59dd08c21dd60a9e1c128f4eeec93ff7c5a219c15f7e5b40d0627e6a4e33`.
+
+The refreshed pinned audit covers four SHA-512-pinned packs, 12 defaults and 63 profile/dimension rows / 5,178 declared stages. It accepts **864 geometry fragments / rejects 0** and compiles **18/18 active compute stages**. All rows have zero adapter/source errors. Eighteen selected Complementary rows report a `vertexPipelineStoresAndAtomics` device requirement because the offline audit does not create a Vulkan device. Every row retains `visualValidation=false`.
+
+On an NVIDIA RTX 3070, Complementary Reimagined r5.9.3 `COMPLEMENTARY` passed the captured-frame gate with **230,400 non-black pixels / 57 color buckets** and 14 active post passes. Lifecycle run `complementary-lifecycle5-20261022` also passed: resize to 800×450, Nether, Overworld return, disable, re-enable, client resource reload, and shutdown with the **810,549,248-byte** SSBO active. The run reports all lifecycle checks true. Shutdown evidence showed an active storage buffer before client stop and zero shader-pack buffers before allocator destruction.
+
+After correcting Vulkan device-feature activation, the local `entity-custom-image` smoke passed with **18,532 active / 0 disabled** entity-image pixels. The mixin now merges supported storage features into the final `VkDeviceCreateInfo.pEnabledFeatures` immediately before `vkCreateDevice`. The prior PR head's Lavapipe job showed these features as supported while validation reported `vertexPipelineStoresAndAtomics` disabled. Fresh Lavapipe CI for this direct device-create fix is still required. Local Windows GPU logs have no VUID, validation-error, or device-lost markers, but this host has no Vulkan validation layer.
+
+This candidate is unpublished; the beta.30 JAR remains the current installable release. No complete third-party shaderpack compatibility or stable release is claimed.
+
+## Earlier feature candidate verification — 2026-10-22 (superseded)
+
+The JDK 21 run `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon` passed: **432 tests**, 96 example shaders preprocessed, and 112 shader sources compiled directly to Vulkan SPIR-V. The beta.30-metadata candidate JAR passed `scripts/verify_jar.py` for Minecraft 1.21.11 / VulkanMod 0.6.8 (882,797 bytes; SHA-256 `c6df07d2440a27df2c80893ab55914be792d1004b78218130067b60f52f0d7ce`).
+
+RTX 3070 runtime smokes passed for entity custom-image (**18,410 active / 0 disabled**), composite custom-image (**230,400 / 0**), and shadow MRT (**145,682 active / 0 disabled / 145,682 re-enabled**). The shadow entity pipeline bound an MRT containing `shadowcolor1`. No Vulkan VUID, validation-error, or device-lost markers appeared in these fixture logs.
+
+The refreshed pinned audit covers 4 packs / 75 cases (12 defaults + 63 profile/dimension cases), 5,178 declared stages / 5,124 preprocessed stages, 864 geometry fragments accepted / 0 rejected, and 18/18 active compute stages compiled. It reports 0 capability/adapter-error rows. Every row still has `visualValidation=false`; this is source validation, not whole-pack visual proof.
+
+The real Complementary Reimagined `COMPLEMENTARY` GPU smoke is still blocked before visual validation: `composite_colortex7` declares and uses active SSBO `blockDataBuffer`, which VulkanMod 0.6.8's native `RenderPipeline` cannot bind. Veyra now reports this as an explicit unsupported-capability error rather than letting the native parser crash. Commit `21522d93` is pushed to draft PR #84; its Build and source-audit workflows are in progress, and Graphics smoke is queued. The previous head's failures are not results for this candidate.
+
+## Cloud render-stage input and entity midpoint investigation — 2026-10-22
+
+Cloud `renderStage` now binds to Iris `MC_RENDER_STAGE_CLOUDS` (20) in the vertex and fragment adapters. The RTX 3070 `cloud-custom-image` runtime fixture passed with **52,446 active magenta pixels / 0 disabled**. It checks both the shared 3D image read and the cloud render-stage value. No Vulkan VUID, validation-error, or device-lost markers appeared; the fixture log retains the existing capability rejection for native entity shadow storage-image writes.
+
+The fresh four-pack audit covers 12 defaults and 63 profile cases / 5,178 declared stages / 5,124 preprocessed. It accepts **648** and rejects **216** geometry fragments; all **18/18** active compute stages compile. There are **0 cloud `renderStage` errors**, while 54 Complementary cases still reject entity/hand `mc_midTexCoord`. No row claims visual validation.
+
+Minecraft 1.21.11's mapped `NEW_ENTITY` format has Position, Color, UV0, UV1, UV2, Normal, and padding, with no per-quad midpoint. An accurate bridge currently has no isolated Veyra-only buffer contract; expanding the shared format would affect vanilla and third-party entity/item buffers, so the adapter retains its explicit capability error. Full JDK 21 build/tests passed **393/393**; the unpublished candidate JAR is 849,547 bytes (SHA-256 `9d0dfde44538512e445025d5f84f93654c2c7e6e732e8083a374d48c53f40b16`). PR #84 remains draft. The next step is to investigate an isolated entity/hand vertex format and retry the real Complementary profile.
+
+
+## Shadow entity-stage linking follow-up - 2026-10-22
+
+The entity shadow pipeline now composes Minecraft's native vertex stage with the selected pack `shadow.vsh` and links its varyings to the matching fragment stage. The extended `shadow-color-entity` fixture passes on an NVIDIA RTX 3070: the actual entity shadow pipeline consumed `flat mat` from the custom vertex stage and produced **18,764 active readback pixels**. The JDK 21 full local run passed **392 tests**, preprocessed **96** example shaders, directly compiled **112** to Vulkan SPIR-V, built the distributables, and passed `scripts/verify_jar.py`. Its unpublished beta.30-metadata JAR is **849,405 bytes**, SHA-256 `1aa80289549b5511af4558d8be8be4eaac4d74d1083dac8a78b993d937ab6a49`.
+
+The refreshed four-pack audit in `validation/` contains 12 defaults and 63 profile cases across 5,178 declared stages (5,124 preprocessed). It accepts **594** and rejects **270** geometry fragments; **18/18** active compute stages compile. The 54 Complementary rows still report missing entity/hand `mc_midTexCoord` inputs and unsupported cloud `renderStage`; only 21/75 rows have no capability or adapter error. Every row remains `visualValidation=false`. The RTX `COMPLEMENTARY` profile run stops on `gbuffers_entities.vsh`'s active `mc_midTexCoord`, before visual validation. The synthetic fixture fixes and verifies the shadow vertex-to-fragment varying contract but does not certify a real Complementary profile. PR #84 remains draft and the release goal remains incomplete.
+
 ## Weather vertex execution candidate — source validation passed
 
 On `feature/weather-vertex-execution`, the pinned source/profile/dimension audit passed for 4 SHA-512-pinned packs, 12 defaults, 63 declared-profile cases, and 5,178 stages: **864 geometry fragments accepted / 0 rejected / 0 adapter errors**. No audited pack reports a `gbuffers_weather.vsh` capability error. The 21 remaining whole-pack capability errors are 18 selected Complementary `shadowcomp.csh` stages and 3 Sildur `mc_Entity` inputs. All 75 audit rows retain `visualValidation=false`.

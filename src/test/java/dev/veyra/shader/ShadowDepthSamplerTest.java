@@ -27,10 +27,10 @@ class ShadowDepthSamplerTest {
         assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptFragment(SOURCE.replace("sampler2D", "samplerCube"), true));
     }
     @Test void budgetsSharedSlotsWithShadowColor() throws IOException {
-        ShadowDepthSampler.validate(SOURCE, true, 5);
-        assertThrows(IOException.class, () -> ShadowDepthSampler.validate(SOURCE, true, 6));
+        ShadowDepthSampler.validate(SOURCE, true, 14);
+        assertThrows(IOException.class, () -> ShadowDepthSampler.validate(SOURCE, true, 15));
         String both = SOURCE + "uniform sampler2D shadowcolor0;\nvec4 color(){return texture2D(shadowcolor0,vec2(0.5));}\n";
-        ShadowDepthSampler.validate(both, true, 4);
-        assertThrows(IOException.class, () -> ShadowDepthSampler.validate(both, true, 5));
+        ShadowDepthSampler.validate(both, true, 13);
+        assertThrows(IOException.class, () -> ShadowDepthSampler.validate(both, true, 14));
     }
 }

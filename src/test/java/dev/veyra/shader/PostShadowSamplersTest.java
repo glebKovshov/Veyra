@@ -11,14 +11,17 @@ class PostShadowSamplersTest {
                 uniform sampler2D shadowtex0;
                 uniform sampler2D shadowtex1;
                 uniform sampler2D shadowcolor0;
+                uniform sampler2D shadowcolor1;
                 uniform sampler2D shadowcolor;
-                void main(){gl_FragColor=texture2D(shadowtex0,vec2(0))+texture2D(shadowtex1,vec2(0))+texture2D(shadowcolor0,vec2(0))+texture2D(shadowcolor,vec2(0));}
+                void main(){gl_FragColor=texture2D(shadowtex0,vec2(0))+texture2D(shadowtex1,vec2(0))+texture2D(shadowcolor0,vec2(0))+texture2D(shadowcolor1,vec2(0))+texture2D(shadowcolor,vec2(0));}
                 """, true);
-        assertEquals(3, adapted.inputs().size());
+        assertEquals(4, adapted.inputs().size());
         String bridge = PostShadowSamplers.bridge(adapted.inputs());
         assertTrue(bridge.contains("#define shadowtex0 VeyraShadowDepthSampler"));
         assertTrue(bridge.contains("#define shadowtex1 VeyraShadowOpaqueDepthSampler"));
+        assertTrue(bridge.contains("vec4 veyraSample(sampler3D s, vec3 uv)"));
         assertTrue(bridge.contains("#define shadowcolor VeyraShadowColorSampler"));
+        assertTrue(bridge.contains("#define shadowcolor1 VeyraShadowColor1Sampler"));
         assertTrue(PostShadowSamplers.Input.COLOR.bilinear());
         assertFalse(PostShadowSamplers.Input.OPAQUE_DEPTH.bilinear());
         assertTrue(PostShadowSamplers.bilinear("VeyraShadowColor"));
@@ -56,10 +59,18 @@ class PostShadowSamplersTest {
         assertThrows(IOException.class, () -> PostShadowSamplers.adapt("uniform sampler2D shadowtex1;\n"+source, true));
         assertThrows(IOException.class, () -> PostShadowSamplers.adapt(source.replace("sampler2D","sampler2DShadow").replace("shadowtex1","shadowcolor0"), true));
     }
+    @Test void allowsUnavailablePassInputsWhenTheRendererProvidesANeutralFallback() throws IOException {
+        String source="uniform sampler2D shadowtex1;\nvoid main(){gl_FragColor=texture2D(shadowtex1,vec2(0));}\n";
+        var adapted = PostShadowSamplers.adapt(source, false, true);
+        assertEquals(Set.of(PostShadowSamplers.Input.OPAQUE_DEPTH), adapted.inputs());
+        assertTrue(adapted.source().contains("veyraSample(shadowtex1"));
+    }
     @Test void enforcesCombinedNativeDescriptorBudgetAfterAliasDeduplication() throws IOException {
         var inputs = Set.of(PostShadowSamplers.Input.DEPTH,PostShadowSamplers.Input.OPAQUE_DEPTH,PostShadowSamplers.Input.COLOR);
-        PostShadowSamplers.validateBudget(inputs,9);
-        assertThrows(IOException.class, () -> PostShadowSamplers.validateBudget(inputs,10));
+        PostShadowSamplers.validateBudget(inputs,9,"composite_colortex7",12);
+        IOException failure = assertThrows(IOException.class,
+                () -> PostShadowSamplers.validateBudget(inputs,10,"composite_colortex7",12));
+        assertTrue(failure.getMessage().contains("composite_colortex7 needs 13 texture descriptors"));
     }
 
     @Test void handlesExpandedBlankRegionsBeforeSamplerDeclarations() {
