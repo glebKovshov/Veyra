@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0-beta.42 - 2026-10-24 (experimental prerelease)
+
+- Run the shaderpack-owned `gbuffers_textured.vsh` for sign text and link its color, texcoord and normal outputs to the fragment stage. Lit text reads UV2; see-through text without UV2 uses Minecraft full-bright coordinates.
+- Prepare the neutral shadow-sampler fallback before opening the shadow pass, fixing a first-use texture upload inside an active render pass after restoring a saved pack.
+- During shadow-map writes, bind the prepared neutral shadow color/depth inputs until the map is complete instead of rejecting those reads.
+- RTX 3070 Complementary Reimagined default smoke passed after the shadow-input fix (230,400 non-black pixels / 48 color buckets). This generated-scene check does not certify pack-wide visual parity.
+- On NVIDIA RTX 3070, a Sildur lifecycle with a real sign block entity passed resize, Nether/return, disable/re-enable and resource reload. The sign-text pipeline was exercised; glyph readability was not verified.
+- Local JDK 21 gate: 582 tests, 0 failures/errors/skips; 104 shader examples and 122 direct Vulkan SPIR-V compilations, shader validation, build and graphics-smoke compilation passed. This is generated-scene evidence, not whole-pack or natural-world certification.
+
 ## 0.2.0-beta.41 - 2026-10-24 (experimental prerelease)
 
 - Supply OpenGL's default `mc_Entity` `(0,0,0,1)` to entity/block-entity programs and particle vertex stages, matching Iris' unbound attribute.
