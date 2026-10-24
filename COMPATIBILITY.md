@@ -1,4 +1,12 @@
-# Shaderpack compatibility - beta.44 validation
+# Shaderpack compatibility - beta.45 validation
+
+## Beta.45 - 2026-10-24
+
+The pinned source audit covered four packs across three dimensions, with 12 default and 63 declared-profile cases. It accepted 939 geometry fragments with zero rejected and accepted all 18 active compute stages. All rows are source-only with `visualValidation=false`; this verifies preprocessing and adapter acceptance, not whole-pack visuals.
+
+A dedicated RTX 3070 sign-text fixture passed and recorded `VeyraGeometryColor5Sampler` bound to `colortex5` on `pipeline/text_polygon_offset`. It used a synthetic pack. The Complementary Reimagined r5.9.3 HIGH lifecycle smoke also passed resize to 800x450, Nether and Overworld transitions, shaderpack disable/re-enable, and resource reload. Complementary selected `gbuffers_block` for sign text, so that lifecycle run does not exercise its `gbuffers_textured` fallback.
+
+The adapter regression test covers `gbuffers_textured` with `gaux2` and a custom texture alias collision. Full Iris visual parity, natural-world comparison, and whole-pack certification remain unverified.
 
 ## Beta.44 - 2026-10-24
 
