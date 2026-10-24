@@ -21,6 +21,7 @@ on:
       - 'examples/basic-custom-image/**'
       - 'examples/entity-custom-image/**'
       - 'examples/composite-custom-image/**'
+      - 'examples/compute-shadow-stage/**'
       - 'examples/begin-fragment-stage/**'
       - 'examples/storage-buffer-shadow/**'
       - 'examples/water-block-id/**'
@@ -65,6 +66,7 @@ on:
       - 'examples/basic-custom-image/**'
       - 'examples/entity-custom-image/**'
       - 'examples/composite-custom-image/**'
+      - 'examples/compute-shadow-stage/**'
       - 'examples/begin-fragment-stage/**'
       - 'examples/storage-buffer-shadow/**'
       - 'examples/water-block-id/**'
@@ -122,7 +124,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, compute-ssbo-only, compute-begin-stage, compute-setup-stage, begin-fragment-stage, storage-buffer-shadow, water-block-id, water-opaque-depth, water-color-inputs, normal-atlas, normal-atlas-animated, normal-entity, normal-entity-missing, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-mrt, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, compute-ssbo-only, compute-begin-stage, compute-setup-stage, compute-shadow-stage, begin-fragment-stage, storage-buffer-shadow, water-block-id, water-opaque-depth, water-color-inputs, normal-atlas, normal-atlas-animated, normal-entity, normal-entity-missing, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-mrt, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:

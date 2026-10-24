@@ -3054,9 +3054,10 @@ public final class VeyraRenderer {
             ensurePipelines(mainTarget.width, mainTarget.height);
             compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
             List<String> setupPrograms = compute == null ? List.of() : compute.setupProgramNames();
+            List<String> shadowPrograms = compute == null ? List.of() : compute.shadowProgramNames();
             List<String> beginPrograms = compute == null ? List.of() : compute.beginProgramNames();
             beginGraphics = pipelineSet != null && pipelineSet.hasPhase(ShaderPassPhase.BEGIN);
-            if (setupPrograms.isEmpty() && beginPrograms.isEmpty() && !beginGraphics) {
+            if (setupPrograms.isEmpty() && shadowPrograms.isEmpty() && beginPrograms.isEmpty() && !beginGraphics) {
                 if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
                 if (storageBufferResources != null) storageBufferResources.clearUninitializedBuffers();
                 return;
@@ -3073,6 +3074,7 @@ public final class VeyraRenderer {
                 setupComputeWidth = mainTarget.width;
                 setupComputeHeight = mainTarget.height;
             }
+            if (!shadowPrograms.isEmpty()) compute.dispatchBeforeShadowPass();
             if (!beginPrograms.isEmpty() || beginGraphics) {
                 renderPhase(minecraft, ShaderPassPhase.BEGIN);
             }
@@ -3832,7 +3834,7 @@ public final class VeyraRenderer {
         try {
             compute = VeyraComputePipelineSet.compile(pack);
             if (compute != null && compute.hasShadowComputeStages() && !shadowSamplerAvailable)
-                throw new IOException("shadowcomp requires an active shadow pass.");
+                throw new IOException("shadow.csh and shadowcomp.csh require an active shadow pass.");
             ShaderPackImageProperties customImages = compute == null ? null : pack.readImageProperties();
             ShaderPackCustomTextureProperties packTextures = pack.readCustomTextureProperties();
             var noCustomImages = new ShaderPackImageBindings.PreparedStage("", List.of());

@@ -1598,3 +1598,19 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - RTX 3070 graphics smoke passed: **230,400 active magenta pixels / 0 after disabling the pack**. Runtime VUID/validation-error/device-loss marker count in `latest.log`: **0**. Khronos validation was not enabled.
 - `scripts/verify_jar.py` accepted the local beta.36 metadata JAR (1,051,938 bytes, SHA-256 `D946A7FC9AD4AD8C720F0D3351DEF5AB7C0D63220A90AB7DEFE926ED39D5BABB`). It is a local build artifact, not a release candidate or published asset.
 - Hosted exact-head checks and merge are pending; no complete Iris shaderpack parity is claimed. This branch contains the candidate implementation and is not a published artifact.
+
+### Pre-shadow compute continuation - 2026-10-24
+
+- Found and preserved existing uncommitted shadow-compute implementation in C:/Users/Gleb/.t3/scratch/veyra-shadow-compute (feature/shadow-compute, base origin/main=fff0608). It adds shadow.csh and consecutive letter components before begin and shadow rendering, using square shadowMapResolution for render-relative dispatch and existing image/SSBO barriers.
+- Checked Iris 1.21.11 ProgramSet and IrisRenderingPipeline primary sources: the special family has no numbered passes; letter components stop at the first missing letter, and may exist without shadow.csh itself. Added coverage for these boundaries and a valid pack fixture.
+- Local JDK 21 build/test/shader/graphics-source/package gate passed: 573 tests, 0 failures/errors/skips; 102 example shaders / 118 direct SPIR-V compilations. Fresh pinned source audit passed: 4 packs, 12 defaults, 63 profile cases, 864 accepted geometry fragments, 18/18 compute stages compiled. JAR verifier passed (development metadata still beta.36, not a release artifact).
+- The original RTX fixture was green, but an enhanced per-frame shadow -> shadow_a -> begin fixture reports 0 marker pixels. A successful Gradle client exit is insufficient: the JSON result is failed. Debugging GPU state; no PR, merge, or new release until the stronger fixture passes. Windows has no Khronos validation layer; hosted Lavapipe is still required.
+
+- GPU investigation found a race in the enhanced fixture itself: invocation (0,0) read value while invocation (31,31) wrote it in the same dispatch. Removed that concurrent read; ready is only touched by invocation (0,0), and value is checked by shadow_a after the existing dispatch barrier. Error bits now identify the failing stage without clearing earlier errors. The full readback criteria remain enabled.
+
+### Pre-shadow compute local gate finalized - 2026-10-24
+
+- Removed the fixture's intra-dispatch race while keeping all timing/sizing checks. The final isolated RTX 3070 run reports status=passed, 230,400 active / 0 disabled pixels, no VUID/validation/device-loss log markers, and process exit 0. It checks setup -> shadow -> shadow_a -> begin -> composite visibility on repeated frames and 32x32 shadow-relative sizing.
+- The immediately preceding run also passed GPU readback but exited during native teardown with 0xC0000409. Its cause is unproven; the isolated final rerun did not reproduce it. Preserve this limitation and require hosted Lavapipe, rather than claiming blanket shutdown stability. Windows Khronos validation was not enabled.
+- Final local gate after discovery-order alignment: 573 tests with no failures/errors/skips; shader validation, build, graphics-smoke compilation, example-pack packaging passed. Pinned source audit accepted 864 geometry fragments and all 18 compute stages in 75 cases. The JAR remains development beta.36 metadata and is not published as a new release.
+- Next: push the feature as a draft PR, obtain exact-head Build/source-audit/full Lavapipe graphics gates and inspect reviews; merge only after readiness verification. Continue release preparation and remaining stable-parity requirements afterward.
