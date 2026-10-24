@@ -6,6 +6,8 @@ A fresh smoke using the pinned Complementary Reimagined r5.9.3 HIGH profile pass
 
 The shadow-color-terrain fixture also passed after scanning the full shadow map. The Iris near/far projection and sun/moon angle are applied while shadow culling uses VulkanMod-compatible vanilla depth bounds. Full Iris visual parity, natural-world comparison and whole-pack certification remain unverified.
 
+Pinned Complementary Unbound r5.9.3 HIGH also passed on RTX 3070: 358,129 non-black pixels / 91 color buckets. Pinned BSL 10.1.8 HIGH passed with 360,000 / 124, and Sildur's Vibrant v2.02 Extreme default profile passed with 360,000 / 123. Each run passed resize to 800x450, Nether/Overworld transitions, shaderpack disable/re-enable and resource reload. None of these profiles declared storage buffers, so their storage-buffer owner-release checks are not applicable. These generated-scene runs add lifecycle evidence; they do not certify whole packs or natural-world visuals.
+
 ## Beta.45 - 2026-10-24
 
 The pinned source audit covered four packs across three dimensions, with 12 default and 63 declared-profile cases. It accepted 939 geometry fragments with zero rejected and accepted all 18 active compute stages. All rows are source-only with `visualValidation=false`; this verifies preprocessing and adapter acceptance, not whole-pack visuals.
