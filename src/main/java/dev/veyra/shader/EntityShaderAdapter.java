@@ -119,7 +119,10 @@ public final class EntityShaderAdapter {
             Map.entry("lmcoord", new Varying("vec2")),
             Map.entry("lightMapCoord", new Varying("vec2")),
             Map.entry("lmCoord", new Varying("vec2")),
-            Map.entry("viewPos", new Varying("vec3")));
+            Map.entry("viewPos", new Varying("vec3")),
+            Map.entry("sunVec", new Varying("vec3")),
+            Map.entry("upVec", new Varying("vec3")),
+            Map.entry("eastVec", new Varying("vec3")));
 
     private EntityShaderAdapter() {
     }
