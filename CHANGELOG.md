@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.44 - 2026-10-24 (experimental prerelease)
+
+- Resolve active, profile-specific geometry DRAWBUFFERS / RENDERTARGETS mappings so Complementary HIGH routes the third fragment output to colortex4.
+- Add a regression test for the fallback 06 directive and active 064 override, and ignore directive-shaped text in line comments.
+- RTX 3070 pinned Complementary Reimagined HIGH lifecycle smoke passed resize, Nether/Overworld, disable/re-enable and resource reload (359,998 non-black pixels / 109 color buckets).
+- Local JDK 21 gate: 584 tests, 0 failures/errors/skips; 104 shader examples, 122 Vulkan SPIR-V stages, shader validation, build, graphics-smoke compilation and example-pack packaging passed. Five Python CI audit tests passed.
+- The source-only pinned audit accepted 921 geometry fragments and rejected 18 gbuffers_textured fragments for unsupported gaux2; all 18 active compute stages compiled. No visual parity claim.
 ## 0.2.0-beta.43 - 2026-10-24 (experimental prerelease)
 
 - Resolve shader-pack post-process colortex mappings to adapted sampler descriptors, including custom textures such as Complementary's cloud-water map.
