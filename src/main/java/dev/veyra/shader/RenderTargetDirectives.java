@@ -21,7 +21,7 @@ final class RenderTargetDirectives {
     static String keepActiveComments(String file, String source) throws IOException {
         Scan scan = scan(file, source);
         if (scan.active().isEmpty()) return source;
-        Matcher matcher = DIRECTIVE.matcher(source);
+        Matcher matcher = DIRECTIVE.matcher(ShaderSource.maskLineComments(source));
         StringBuilder filtered = new StringBuilder(source.length());
         int cursor = 0;
         int index = 0;
@@ -45,7 +45,7 @@ final class RenderTargetDirectives {
         if (source.contains(MARKER_PREFIX)) {
             throw new IOException("Shader source contains Veyra's reserved render-target marker.");
         }
-        Matcher matcher = DIRECTIVE.matcher(source);
+        Matcher matcher = DIRECTIVE.matcher(ShaderSource.maskLineComments(source));
         if (!matcher.find()) return new Scan(null, List.of());
 
         List<Directive> directives = new ArrayList<>();

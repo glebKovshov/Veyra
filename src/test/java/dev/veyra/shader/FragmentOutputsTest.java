@@ -52,4 +52,25 @@ class FragmentOutputsTest {
         String adapted = TerrainShaderAdapter.adaptFragment(source);
         assertTrue(adapted.contains("veyraFragData0=veyraFragData1"));
     }
+
+    @Test void usesLastActiveProfileSpecificTargetMapping() throws IOException {
+        String source = """
+                #version 120
+                #define BLOCK_REFLECT_QUALITY 3
+                #define RP_MODE 1
+                /* DRAWBUFFERS:06 */
+                #if BLOCK_REFLECT_QUALITY >= 2 && RP_MODE != 0
+                    /* DRAWBUFFERS:064 */
+                #endif
+                void main() {
+                    gl_FragData[0] = vec4(1.0);
+                    gl_FragData[1] = vec4(1.0);
+                    gl_FragData[2] = vec4(1.0);
+                }
+                """;
+
+        FragmentOutputs outputs = FragmentOutputs.parse(source);
+        assertEquals(List.of(0, 6, 4), outputs.targets());
+        assertTrue(outputs.declarations().contains("layout(location = 2) out vec4 veyraFragData2;"));
+    }
 }

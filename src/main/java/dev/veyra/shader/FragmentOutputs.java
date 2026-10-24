@@ -10,8 +10,6 @@ import java.util.regex.Pattern;
 
 /** Fragment output locations are distinct from shaderpack colortex indices. */
 public record FragmentOutputs(List<Integer> targets, Map<Integer, String> variables) {
-    private static final Pattern TARGETS = Pattern.compile("/\\*\\s*RENDERTARGETS\\s*:\\s*([0-9,\\s]+)\\s*\\*/");
-    private static final Pattern LEGACY_TARGETS = Pattern.compile("/\\*\\s*DRAWBUFFERS\\s*:\\s*([0-9]+)\\s*\\*/");
     private static final Pattern OUTPUT = Pattern.compile("(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*");
     private static final Pattern DATA = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*]");
 
@@ -21,14 +19,8 @@ public record FragmentOutputs(List<Integer> targets, Map<Integer, String> variab
     }
 
     public static FragmentOutputs parse(String source) throws IOException {
-        List<Integer> targets = new ArrayList<>();
-        Matcher directive = TARGETS.matcher(source.replaceAll("(?m)//[^\r\n]*", ""));
-        if (directive.find()) {
-            for (String value : directive.group(1).split(",", -1)) targets.add(number(value.strip(), "render target"));
-        } else {
-            directive = LEGACY_TARGETS.matcher(source.replaceAll("(?m)//[^\r\n]*", ""));
-            if (directive.find()) for (char value : directive.group(1).toCharArray()) targets.add(value - '0');
-        }
+        List<Integer> declaredTargets = RenderTargetDirectives.activeTargets(source);
+        List<Integer> targets = new ArrayList<>(declaredTargets == null ? List.of() : declaredTargets);
         if (targets.size() > 8 || targets.stream().anyMatch(index -> index > 15)
                 || targets.stream().distinct().count() != targets.size()) {
             throw new IOException("Geometry draw buffers require at most 8 distinct colortex0..15 targets.");
