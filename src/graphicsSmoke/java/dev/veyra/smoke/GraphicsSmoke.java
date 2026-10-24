@@ -5,7 +5,11 @@ import dev.veyra.shader.ShaderPack;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.shader.VeyraStorageBufferResources;
 import dev.veyra.vulkan.VeyraDeviceFeatures;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.StandingSignBlock;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.device.DeviceManager;
 import net.vulkanmod.vulkan.memory.MemoryManager;
@@ -314,9 +318,20 @@ public final class GraphicsSmoke {
                             net.minecraft.world.level.block.Blocks.GLOWSTONE.defaultBlockState(), 3);
                     world.setBlock(new net.minecraft.core.BlockPos(9, 71, 8),
                             net.minecraft.world.level.block.Blocks.GLOWSTONE.defaultBlockState(), 3);
+                    var signPos = new net.minecraft.core.BlockPos(0, 71, 8);
+                    var signState = net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState()
+                            .setValue(StandingSignBlock.ROTATION, 0);
+                    world.setBlock(signPos, signState, 3);
+                    if (!(world.getBlockEntity(signPos) instanceof SignBlockEntity sign)
+                            || !sign.setText(sign.getFrontText()
+                                    .setMessage(0, Component.literal("VEYRA").withStyle(ChatFormatting.GREEN))
+                                    .setMessage(1, Component.literal("SIGN TEST").withStyle(ChatFormatting.GREEN)), true)) {
+                        throw new IllegalStateException("Could not prepare the real sign-text fixture.");
+                    }
+                    world.sendBlockUpdated(signPos, signState, signState, 3);
                 });
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                        "Prepared the real shaderpack fixture with daylight, a mixed block field and a lit material wall.");
+                        "Prepared the real shaderpack fixture with daylight, a mixed block field, a lit material wall and a sign.");
             }
             if (damagedBlockVertexFixture && damagedBlockPosition != null
                     && client.level.getBlockState(damagedBlockPosition).isSolid()) {

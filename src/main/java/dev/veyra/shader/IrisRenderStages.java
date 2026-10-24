@@ -111,6 +111,7 @@ final class IrisRenderStages {
             case SKY -> Stage.SKY.ordinal();
             case STARS -> Stage.STARS.ordinal();
             case SUNRISE_SUNSET -> Stage.SUNSET.ordinal();
+            case SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> Stage.BLOCK_ENTITIES.ordinal();
             case LEASH, LINE, LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER -> null;
         };
     }

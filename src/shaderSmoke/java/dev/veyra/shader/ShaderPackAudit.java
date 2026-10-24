@@ -136,6 +136,17 @@ public final class ShaderPackAudit {
                                 TextureColorDistanceShaderAdapter.adaptFragment(source, program, vertexVaryings,
                                         pack.hasShadowFragment(), true);
                             }
+                            else if (program.equals("gbuffers_textured")) {
+                                source = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties()).source();
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings =
+                                        signTextVertexOutputs(pack, program);
+                                Set<String> customTextureSamplers = TerrainShaderAdapter.usedCustomTextureSamplers(
+                                        source, pack.readCustomTextureProperties().samplersForProgram(program));
+                                FragmentOutputs.parse(GlslPreprocessor.process(file, source));
+                                pack.readGeometryBlendSettings(program);
+                                EntityShaderAdapter.adaptTextFragment(source, program, pack.hasShadowFragment(),
+                                        -1, -1, ItemIdMap.UNMAPPED, customTextureSamplers, vertexVaryings);
+                            }
                             else if (program.equals("gbuffers_clouds")) {
                                 var prepared = ShaderPackImageBindings.prepare(file, source, pack.readImageProperties());
                                 source = prepared.source();
@@ -201,5 +212,16 @@ public final class ShaderPackAudit {
         var vertex = pack.readStage(program + ".vsh");
         if (vertex.isEmpty()) return Map.of();
         return EntityVertexShaderAdapter.describeVaryings(program, vertex.get());
+    }
+
+    private static Map<String, TerrainVertexShaderAdapter.PackVarying> signTextVertexOutputs(
+            ShaderPack pack, String program) throws IOException {
+        var vertex = pack.readStage(program + ".vsh");
+        if (vertex.isEmpty()) return Map.of();
+        var outputs = BasicVertexShaderAdapter.describeVaryings(
+                program, vertex.get(), BasicVertexShaderAdapter.Format.SIGN_TEXT);
+        BasicVertexShaderAdapter.describeVaryings(
+                program, vertex.get(), BasicVertexShaderAdapter.Format.SIGN_TEXT_FULLBRIGHT);
+        return outputs;
     }
 }
