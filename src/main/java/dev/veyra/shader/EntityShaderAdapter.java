@@ -37,6 +37,8 @@ public final class EntityShaderAdapter {
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|tangent|at_tangent|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
+    private static final Pattern UNSUPPORTED_TEXT_INPUT_WITH_NORMAL = Pattern.compile(
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
@@ -106,7 +108,8 @@ public final class EntityShaderAdapter {
             Map.entry("isMainHand", new Varying("float")),
             Map.entry("sunVec", new Varying("vec3")),
             Map.entry("upVec", new Varying("vec3")),
-            Map.entry("eastVec", new Varying("vec3")));
+            Map.entry("eastVec", new Varying("vec3")),
+            Map.entry("northVec", new Varying("vec3")));
     private static final Map<String, Varying> SUPPORTED_TEXT_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -120,9 +123,11 @@ public final class EntityShaderAdapter {
             Map.entry("lightMapCoord", new Varying("vec2")),
             Map.entry("lmCoord", new Varying("vec2")),
             Map.entry("viewPos", new Varying("vec3")),
+            Map.entry("normal", new Varying("vec3")),
             Map.entry("sunVec", new Varying("vec3")),
             Map.entry("upVec", new Varying("vec3")),
-            Map.entry("eastVec", new Varying("vec3")));
+            Map.entry("eastVec", new Varying("vec3")),
+            Map.entry("northVec", new Varying("vec3")));
 
     private EntityShaderAdapter() {
     }
@@ -286,6 +291,11 @@ public final class EntityShaderAdapter {
 
     public static boolean requiresViewPositionInput(String source) {
         return requiresVarying(source, "viewPos");
+    }
+
+    /** Text vertices carry no normal; the sign-text bridge derives the face normal from viewPos. */
+    public static boolean requiresTextNormalInput(String source) {
+        return requiresVarying(source, "normal");
     }
 
     public static boolean requiresViewNormalInput(String source) {
@@ -847,10 +857,11 @@ public final class EntityShaderAdapter {
         boolean suppliesSunVectorInput = requiresVarying(adapted, "sunVec");
         boolean suppliesUpVectorInput = requiresVarying(adapted, "upVec");
         boolean suppliesEastVectorInput = requiresVarying(adapted, "eastVec");
+        boolean suppliesNorthVectorInput = requiresVarying(adapted, "northVec");
         if (suppliesSunVectorInput) {
             adapted = ensureUniformDeclaration(adapted, "vec3", "sunPosition");
         }
-        if (suppliesUpVectorInput || suppliesEastVectorInput) {
+        if (suppliesUpVectorInput || suppliesEastVectorInput || suppliesNorthVectorInput) {
             adapted = ensureUniformDeclaration(adapted, "mat4", "gbufferModelView");
         }
         IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
@@ -876,6 +887,8 @@ public final class EntityShaderAdapter {
         boolean suppliesSunVector = false;
         boolean suppliesUpVector = false;
         boolean suppliesEastVector = false;
+        boolean suppliesNorthVector = false;
+        boolean suppliesTextNormal = false;
         Map<String, TerrainVertexShaderAdapter.PackVarying> linkedPackVaryings = new LinkedHashMap<>();
         while (varyingMatcher.find()) {
             String interpolation = varyingMatcher.group(2) == null ? "smooth" : varyingMatcher.group(2);
@@ -915,8 +928,14 @@ public final class EntityShaderAdapter {
             if (name.equals("sunVec")) suppliesSunVector = true;
             if (name.equals("upVec")) suppliesUpVector = true;
             if (name.equals("eastVec")) suppliesEastVector = true;
+            if (name.equals("northVec")) suppliesNorthVector = true;
             if (name.equals("normal")) {
-                suppliesNormal = true;
+                if (textPipeline) {
+                    suppliesTextNormal = true;
+                    suppliesViewPosition = true;
+                } else {
+                    suppliesNormal = true;
+                }
             }
             if (name.equals("position") && programName.startsWith("shadow_")) {
                 suppliesShadowPosition = true;
@@ -960,7 +979,9 @@ public final class EntityShaderAdapter {
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
-        if ((textPipeline ? UNSUPPORTED_TEXT_INPUT : UNSUPPORTED_ENTITY_INPUT).matcher(uncommented).find()) {
+        Pattern unsupportedInputs = !textPipeline ? UNSUPPORTED_ENTITY_INPUT
+                : suppliesTextNormal ? UNSUPPORTED_TEXT_INPUT_WITH_NORMAL : UNSUPPORTED_TEXT_INPUT;
+        if (unsupportedInputs.matcher(uncommented).find()) {
             throw new IOException(programName + " uses inputs that Veyra's "
                     + (textPipeline ? "sign-text" : "entity") + " bridge does not provide yet.");
         }
@@ -1104,7 +1125,10 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_DIRECTIONAL_INPUTS__", (suppliesSunVector
                         ? "#define sunVec normalize(sunPosition)\n" : "")
                         + (suppliesUpVector ? "#define upVec normalize(gbufferModelView[1].xyz)\n" : "")
-                        + (suppliesEastVector ? "#define eastVec normalize(gbufferModelView[0].xyz)\n" : ""))
+                        + (suppliesEastVector ? "#define eastVec normalize(gbufferModelView[0].xyz)\n" : "")
+                        + (suppliesNorthVector ? "#define northVec normalize(gbufferModelView[2].xyz)\n" : "")
+                        + (suppliesTextNormal ? "#define normal faceforward(normalize(cross(dFdx(viewPos), "
+                                + "dFdy(viewPos))), viewPos, normalize(cross(dFdx(viewPos), dFdy(viewPos))))\n" : ""))
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler

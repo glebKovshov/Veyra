@@ -118,4 +118,42 @@ class EntityIdentifierUniformTest {
         org.junit.jupiter.api.Assertions.assertTrue(
                 adapted.contains("#define sunVec normalize(sunPosition)"), adapted);
     }
+
+    @Test
+    void signTextSuppliesNorthVector() throws Exception {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                varying vec3 northVec;
+                void main() {
+                    gl_FragData[0] = texture2D(texture, texcoord) * glcolor * max(northVec.z, 0.5);
+                }
+                """;
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block");
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                adapted.contains("#define northVec normalize(gbufferModelView[2].xyz)"), adapted);
+    }
+
+    @Test
+    void signTextDerivesFaceNormal() throws Exception {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                varying vec3 normal;
+                void main() {
+                    gl_FragData[0] = texture2D(texture, texcoord) * glcolor * max(normal.z, 0.5);
+                }
+                """;
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block");
+
+        org.junit.jupiter.api.Assertions.assertTrue(EntityShaderAdapter.requiresTextNormalInput(source));
+        org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("in vec3 viewPos;"), adapted);
+        org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("#define normal faceforward("), adapted);
+        org.junit.jupiter.api.Assertions.assertFalse(adapted.contains("in vec3 normal;"), adapted);
+    }
 }
