@@ -1,9 +1,9 @@
-# Shaderpack compatibility - beta.38 candidate validation
+# Shaderpack compatibility - beta.38 validation
 
 
-## Beta.38 integration candidate - 2026-10-24
+## Published beta.38 - 2026-10-24
 
-This candidate preserves beta.37 and adds the pre-shadow compute implementation plus compute uniform/setup fixes documented below. PR #103 passed exact-head Build, source audit and all 54 hosted Graphics smoke jobs and was merged as 96acd6d. PR #104 also passed its own Build/source audit/all 54 hosted Graphics jobs and merged as d9e0fdc. Its hosted setup fixture reported setupResizePassed=true, 360,000/0 pixels and zero runtime validation errors; 20 process-teardown diagnostics were retained. The final release workflow remains pending. The forced versioned local beta.38 build/test gate passed 573 tests and distributable verification. The local setup resize fixture now verifies the previously untested resize boundary: 640x360 -> 800x450, 360,000 active / 0 disabled pixels and clean exit on RTX 3070. Full third-party visuals and general shutdown stability remain unproven; the historical checkpoints below retain their original scope.
+Beta.38 preserves beta.37 and adds the pre-shadow compute implementation plus compute uniform/setup fixes documented below. PR #103 passed exact-head Build, source audit and all 54 hosted Graphics smoke jobs and was merged as 96acd6d. PR #104 also passed its own Build/source audit/all 54 hosted Graphics jobs and merged as d9e0fdc. Its hosted setup fixture reported setupResizePassed=true, 360,000/0 pixels and zero runtime validation errors; 20 process-teardown diagnostics were retained. Release run 40077147908 passed all 56 jobs and published beta.38 at 9f25b7d. The downloaded JAR passed checksum and distributable verification. The forced versioned local beta.38 build/test gate passed 573 tests and distributable verification. The local setup resize fixture now verifies the previously untested resize boundary: 640x360 -> 800x450, 360,000 active / 0 disabled pixels and clean exit on RTX 3070. Full third-party visuals and general shutdown stability remain unproven; the historical checkpoints below retain their original scope.
 
 ## Historical beta.37 `begin.fsh` local validation - 2026-10-23
 
