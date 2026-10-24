@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.40 - 2026-10-24 (experimental prerelease)
+
+- Run the pack vertex stage for `gbuffers_textured[_lit]` particle fallbacks, retrying fragment-only if it can't be adapted.
+- Sign text: supply `northVec`, legacy `color`, a per-pixel face `normal` from `viewPos`, and full-bright `lmcoord` for see-through text without UV2; detect lightmap inputs in comma-separated varyings.
+- RTX 3070 lifecycles pass with no skipped particle/sign-text overrides for Complementary Reimagined, Unbound and BSL HIGH; Sildur's Vibrant passes with block-entity `mc_Entity` fallbacks still skipped. 580 tests; PR #108 passed 57/57 hosted checks. Not natural-world visual certification.
+
 ## 0.2.0-beta.39 - 2026-10-24 (experimental prerelease)
 
 - Bridge Iris samplers (`gaux2`/`colortexN`, noise, specular, shadow, lightmap) in textured particle fallbacks; previously these Complementary overrides were skipped.

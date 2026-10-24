@@ -1,4 +1,8 @@
-# Shaderpack compatibility - beta.39 validation
+# Shaderpack compatibility - beta.40 validation
+
+## Beta.40 - 2026-10-24
+
+RTX 3070 lifecycle runs (resize, Nether/return, disable/re-enable, reload) on the beta.40 code: Complementary Reimagined r5.9.3 COMPLEMENTARY 328,768 non-black px / 53 buckets, Complementary Unbound 359,671 / 63, BSL HIGH 360,000 / 43, Sildur's Vibrant default 360,000 / 46. All passed with exit 0. Complementary, Unbound and BSL logged no skipped particle or sign-text overrides; the beta.38/39 gaps (`gaux2`, `lmCoord`, `upVec`, `northVec`, `normal`, `color`, see-through `lmcoord`) are closed. Sildur block-entity `gbuffers_textured` fallbacks that read `mc_Entity` remain skipped. These are generated scenes, not natural-world visual certification.
 
 ## Beta.39 - 2026-10-24
 
