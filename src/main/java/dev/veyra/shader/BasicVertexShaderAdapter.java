@@ -16,10 +16,13 @@ final class BasicVertexShaderAdapter {
 
     enum Format {
         LEASH, LINE, SKY, STARS, SUNRISE_SUNSET,
-        LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER
+        LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER,
+        SIGN_TEXT, SIGN_TEXT_FULLBRIGHT
     }
 
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
+    private static final Pattern SIGN_TEXT_LIGHTMAP_INPUT = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^\\r\\n]*\\)\\s*)?in\\s+ivec2\\s+UV2\\s*;");
     private static final Pattern EXTENSION = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern PRECISION = Pattern.compile(
             "(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)");
@@ -50,6 +53,7 @@ final class BasicVertexShaderAdapter {
             "\\b(vaNormal|Normal|UV2|LineWidth)\\b");
     private static final Pattern UNSUPPORTED_WEATHER_INPUT = Pattern.compile(
             "\\b(vaNormal|Normal|LineWidth)\\b");
+    private static final Pattern UNSUPPORTED_SIGN_TEXT_INPUT = Pattern.compile("\\b(LineWidth)\\b");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern FOG_COORD = Pattern.compile("\\bgl_FogFragCoord\\b");
     private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile(
@@ -72,6 +76,11 @@ final class BasicVertexShaderAdapter {
             Map.entry("normal", new FixedOutput("vec3", 4, "veyraBasicNormal")));
 
     private BasicVertexShaderAdapter() { }
+
+    static Format signTextFormat(String minecraftSource) {
+        return SIGN_TEXT_LIGHTMAP_INPUT.matcher(minecraftSource).find()
+                ? Format.SIGN_TEXT : Format.SIGN_TEXT_FULLBRIGHT;
+    }
 
     static AdaptedStage adaptStage(String minecraftSource, String shaderPackSource, String programName, Format format)
             throws IOException {
@@ -108,7 +117,7 @@ final class BasicVertexShaderAdapter {
             case LINE -> lineMain(widenFallbackLines);
             case LEASH -> leashMain();
             case LIGHTNING -> lightningMain();
-            case WEATHER -> weatherMain();
+            case WEATHER, SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> weatherMain();
             default -> skyMain(format);
         };
 
@@ -135,6 +144,10 @@ final class BasicVertexShaderAdapter {
                     + "layout(location=1) in vec2 UV0;\nlayout(location=2) in vec4 Color;\n";
             case WEATHER -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec2 UV0;\n"
                     + "layout(location=2) in vec4 Color;\nlayout(location=3) in ivec2 UV2;\n";
+            case SIGN_TEXT -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
+                    + "layout(location=2) in vec2 UV0;\nlayout(location=3) in ivec2 UV2;\n";
+            case SIGN_TEXT_FULLBRIGHT -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
+                    + "layout(location=2) in vec2 UV0;\n";
         };
         String outputs = switch (format) {
             case LEASH, LINE, SUNRISE_SUNSET -> "layout(location=0) out vec4 vertexColor;\n"
@@ -149,9 +162,12 @@ final class BasicVertexShaderAdapter {
             case SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "out vec2 texCoord0;\nout vec4 vertexColor;\n";
             case WEATHER -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\n"
                     + "out vec2 texCoord0;\nout vec4 vertexColor;\n";
+            case SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\n"
+                    + "out vec2 texCoord0;\nout vec4 vertexColor;\n";
         };
         String textureOutput = switch (format) {
-            case SKY_TEXTURED, TEXTURED, SKY_TEXTURED_COLOR, TEXTURED_COLOR, WEATHER -> "texCoord0 = UV0;";
+            case SKY_TEXTURED, TEXTURED, SKY_TEXTURED_COLOR, TEXTURED_COLOR, WEATHER,
+                    SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> "texCoord0 = UV0;";
             default -> "";
         };
         String colorOutput = switch (format) {
@@ -217,10 +233,13 @@ final class BasicVertexShaderAdapter {
             if (unsupportedSkyInput.find()) throw new IOException(programName + ".vsh input '"
                     + unsupportedSkyInput.group(1) + "' is not present in Minecraft's "
                     + format.name().toLowerCase() + " vertex format.");
-        } else if (format == Format.WEATHER) {
-            Matcher unsupportedWeatherInput = UNSUPPORTED_WEATHER_INPUT.matcher(uncommented);
+        } else if (format == Format.WEATHER || format == Format.SIGN_TEXT
+                || format == Format.SIGN_TEXT_FULLBRIGHT) {
+            Matcher unsupportedWeatherInput = (format == Format.WEATHER
+                    ? UNSUPPORTED_WEATHER_INPUT : UNSUPPORTED_SIGN_TEXT_INPUT).matcher(uncommented);
             if (unsupportedWeatherInput.find()) throw new IOException(programName + ".vsh input '"
-                    + unsupportedWeatherInput.group(1) + "' is not present in Minecraft's particle vertex format.");
+                    + unsupportedWeatherInput.group(1) + "' is not present in Minecraft's "
+                    + format.name().toLowerCase().replace('_', '-') + " vertex format.");
         }
 
         OutputBridge outputs = extractOutputs(source, programName, format);
@@ -297,7 +316,8 @@ final class BasicVertexShaderAdapter {
             if (integerType(type) && !interpolation.equals("flat")) {
                 throw new IOException(programName + ".vsh integer output '" + name + "' must use flat interpolation.");
             }
-            FixedOutput fixed = name.equals("normal") && (format == Format.TEXTURED || format == Format.WEATHER)
+            FixedOutput fixed = name.equals("normal") && (format == Format.TEXTURED || format == Format.WEATHER
+                    || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT)
                     && type.equals("vec4")
                     ? null : FIXED_OUTPUTS.get(name);
             if (fixed != null && !fixed.type().equals(type)) {
@@ -383,7 +403,8 @@ final class BasicVertexShaderAdapter {
     private static String nativeInputBridge(Format format) {
         String lightmap = switch (format) {
             case LEASH -> "vec4(vec2(UV2), 0.0, 1.0)";
-            case WEATHER -> "vec4(vec2(UV2), 0.0, 1.0)";
+            case WEATHER, SIGN_TEXT -> "vec4(vec2(UV2), 0.0, 1.0)";
+            case SIGN_TEXT_FULLBRIGHT -> "vec4(240.0, 240.0, 0.0, 1.0)";
             case LINE -> "vec4(240.0, 240.0, 0.0, 1.0)";
             default -> "vec4(0.0, 0.0, 0.0, 1.0)";
         };
@@ -395,11 +416,11 @@ final class BasicVertexShaderAdapter {
             case SKY_TEXTURED_COLOR -> "Color";
             case TEXTURED -> "vec4(1.0)";
             case TEXTURED_COLOR -> "Color";
-            case WEATHER -> "Color";
+            case WEATHER, SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> "Color";
         };
         String vertex = format == Format.TEXTURED
                 ? "vec4(Position + ModelOffset, 1.0)" : "vec4(Position + veyraVertexOffset, 1.0)";
-        // OpenGL's legacy current normal defaults to +Z when the particle format has no normal array.
+        // Iris' GLYPH serializer computes +Z for each planar text quad; particles use the OpenGL default.
         String normal = format == Format.LINE ? "Normal" : "vec3(0.0, 0.0, 1.0)";
         String texture0 = hasTextureCoordinate(format)
                 ? "vec4(UV0, 0.0, 1.0)"
@@ -407,7 +428,8 @@ final class BasicVertexShaderAdapter {
                         : "vec4(0.5, 0.5, 0.0, 1.0)";
         String coreInputs = (hasTextureCoordinate(format) ? "#define vaUV0 UV0\n" : "")
                 + (hasNormalInput(format) ? "#define vaNormal Normal\n" : "")
-                + (format == Format.LEASH || format == Format.WEATHER ? "#define vaUV2 UV2\n" : "");
+                + (format == Format.LEASH || format == Format.WEATHER || format == Format.SIGN_TEXT
+                ? "#define vaUV2 UV2\n" : "");
         return """
                 vec3 veyraVertexOffset = vec3(0.0);
                 #define gl_Vertex %s
@@ -489,12 +511,14 @@ final class BasicVertexShaderAdapter {
 
     private static boolean isTextureFormat(Format format) {
         return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
-                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR || format == Format.WEATHER;
+                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR
+                || format == Format.WEATHER || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT;
     }
 
     private static boolean hasTextureCoordinate(Format format) {
         return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
-                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR || format == Format.WEATHER;
+                || format == Format.TEXTURED || format == Format.TEXTURED_COLOR
+                || format == Format.WEATHER || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT;
     }
 
     private static boolean hasNormalInput(Format format) {
@@ -632,9 +656,20 @@ final class BasicVertexShaderAdapter {
 
     private static String nativeDefaultAttribute(Format format, String type, String name, String programName)
             throws IOException {
-        if ((format != Format.TEXTURED && format != Format.WEATHER)
-                || !(name.equals("mc_Entity") || name.equals("mc_midTexCoord"))) {
+        if ((format != Format.TEXTURED && format != Format.WEATHER && format != Format.SIGN_TEXT
+                && format != Format.SIGN_TEXT_FULLBRIGHT)
+                || !(name.equals("mc_Entity") || name.equals("mc_midTexCoord")
+                || (format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT)
+                && (name.equals("Normal") || name.equals("vaNormal")))) {
             return null;
+        }
+        if ((format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT)
+                && (name.equals("Normal") || name.equals("vaNormal"))) {
+            if (!type.equals("vec3")) {
+                throw new IOException(programName + ".vsh input '" + name + "' must use vec3.");
+            }
+            // Iris computes the same +Z normal from each planar glyph quad.
+            return "#define " + name + " vec3(0.0, 0.0, 1.0)\n";
         }
         if (!type.equals("vec4")) {
             throw new IOException(programName + ".vsh input '" + name + "' must be declared as vec4.");

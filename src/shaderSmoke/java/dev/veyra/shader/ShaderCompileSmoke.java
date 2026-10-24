@@ -449,6 +449,33 @@ public class ShaderCompileSmoke {
                     "textured-default-vertex-attributes-fragment", true);
             count++;
             compiled += 2;
+
+            String signTextPackVertex = signTextPackVertexSource();
+            String signTextPackFragment = signTextPackFragmentSource();
+            BasicVertexShaderAdapter.AdaptedStage signTextVertex = BasicVertexShaderAdapter.adaptStage(
+                    signTextNativeVertexSource(true), signTextPackVertex, "gbuffers_textured",
+                    BasicVertexShaderAdapter.Format.SIGN_TEXT);
+            String signTextFragment = EntityShaderAdapter.adaptTextFragment(signTextPackFragment,
+                    "gbuffers_textured", false, -1, -1, ItemIdMap.UNMAPPED,
+                    Set.of(), signTextVertex.varyings());
+            compileVertex(compiler, options, signTextVertex.source(), "sign-text-pack-vertex", true);
+            compile(compiler, options, signTextFragment, "sign-text-pack-fragment", true);
+            count++;
+            compiled += 2;
+
+            BasicVertexShaderAdapter.AdaptedStage seeThroughSignTextVertex = BasicVertexShaderAdapter.adaptStage(
+                    signTextNativeVertexSource(false), signTextPackVertex, "gbuffers_textured",
+                    BasicVertexShaderAdapter.Format.SIGN_TEXT_FULLBRIGHT);
+            String seeThroughSignTextFragment = EntityShaderAdapter.adaptTextFragment(signTextPackFragment,
+                    "gbuffers_textured", false, -1, -1, ItemIdMap.UNMAPPED,
+                    Set.of(), seeThroughSignTextVertex.varyings());
+            compileVertex(compiler, options, seeThroughSignTextVertex.source(),
+                    "sign-text-see-through-pack-vertex", true);
+            compile(compiler, options, seeThroughSignTextFragment,
+                    "sign-text-see-through-pack-fragment", true);
+            count++;
+            compiled += 2;
+
             Path beaconFixture = Path.of("examples/beaconbeam-vertex-execution/shaders");
             String beaconPackVertexSource = GlslPreprocessor.process("gbuffers_beaconbeam.vsh",
                     Files.readString(beaconFixture.resolve("gbuffers_beaconbeam.vsh")));
@@ -964,7 +991,7 @@ public class ShaderCompileSmoke {
             compile(compiler, options, TerrainShaderAdapter.adaptFragment("#version 120\n/* DRAWBUFFERS:0 */\n"
                     + "void main(){gl_FragData[1]=vec4(0.5);gl_FragData[0]=gl_FragData[1];}\n"),
                     "unbound-fragment-output-dataflow", true);
-            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather and translucent-particle vertex/lightmap/varyings, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, terrain-sprite-bounds, and shadow-compute indirect-dispatch fixtures passed.");
+            System.out.println("Preprocessed " + count + " example shaders, compiled " + compiled + " directly to Vulkan SPIR-V; 4 conditional-include checks plus entity/item-ID, entity-overlay/lightmap/MRT, entity-shadow, entity vertex/varying execution, damaged-block BLOCK-format lightmap inputs, hand-side/direction, cloud-fog/vertex/texture-normal inputs, armor-glint vertex, basic leash/line vertex, sky-basic vertex inputs/varyings on all three native pipelines, beacon-beam flat varyings/MRT, weather/translucent-particle vertex-lightmap-varyings, sign-text UV2/full-bright vertex stages, fragment MRT/sampler adapters, Iris tex sampler alias and MRT outputs, terrain-view-position, custom terrain vertex main/varyings, terrain-abs-midcoordpos, terrain-sprite-bounds, and shadow-compute indirect-dispatch fixtures passed.");
             System.out.println("Unbound fragment-output dataflow compiled to Vulkan SPIR-V.");
         } finally {
             shaderc_compile_options_release(options);
@@ -998,6 +1025,64 @@ public class ShaderCompileSmoke {
                     vertexColor = Color * texelFetch(Sampler2, UV2 / 16, 0);
                 }
                 """;
+    }
+
+    private static String signTextPackVertexSource() {
+        return """
+                #version 120
+                varying vec4 color;
+                varying vec4 texcoord;
+                varying vec4 normal;
+                void main() {
+                    gl_Position = ftransform();
+                    color = gl_Color;
+                    texcoord = gl_MultiTexCoord0 + gl_MultiTexCoord1;
+                    normal = vec4(normalize(gl_NormalMatrix * gl_Normal), 0.0);
+                }
+                """;
+    }
+
+    private static String signTextPackFragmentSource() {
+        return """
+                #version 120
+                uniform sampler2D texture;
+                varying vec4 color;
+                varying vec4 texcoord;
+                varying vec4 normal;
+                void main() {
+                    gl_FragColor = texture2D(texture, texcoord.xy) * color * (normal.a + normal.z * 0.01);
+                }
+                """;
+    }
+
+    private static String signTextNativeVertexSource(boolean withLightmap) {
+        String uv2Attribute = withLightmap ? "layout(location = 3) in ivec2 UV2;\n" : "";
+        String lightmapSampler = withLightmap ? "uniform sampler2D Sampler2;\n" : "";
+        String vertexColor = withLightmap ? "Color * texelFetch(Sampler2, UV2 / 16, 0)" : "Color";
+        return """
+                #version 460
+                layout(location = 0) in vec3 Position;
+                layout(location = 1) in vec4 Color;
+                layout(location = 2) in vec2 UV0;
+                %s
+                layout(location = 0) out vec4 vertexColor;
+                layout(location = 1) out float sphericalVertexDistance;
+                layout(location = 2) out float cylindricalVertexDistance;
+                layout(location = 3) out vec2 texCoord0;
+                layout(set = 0, binding = 0, std140) uniform NativeTransforms {
+                    mat4 ModelViewMat;
+                    mat4 ProjMat;
+                    mat4 TextureMat;
+                };
+                %s
+                void main() {
+                    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+                    sphericalVertexDistance = length(Position);
+                    cylindricalVertexDistance = length(Position.xz);
+                    vertexColor = %s;
+                    texCoord0 = UV0;
+                }
+                """.formatted(uv2Attribute.stripTrailing(), lightmapSampler.stripTrailing(), vertexColor);
     }
 
     private static void compile(long compiler, long options, String source, String name, boolean expected) {

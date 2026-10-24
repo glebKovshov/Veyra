@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -252,6 +253,18 @@ public final class EntityShaderAdapter {
                 entityId, blockEntityId, currentRenderedItemId,
                 false, false, false,
                 Map.of(), customTextureSamplers);
+    }
+
+    static String adaptTextFragment(String source, String programName,
+                                    boolean shadowSamplerAvailable,
+                                    int entityId, int blockEntityId,
+                                    int currentRenderedItemId,
+                                    java.util.Set<String> customTextureSamplers,
+                                    Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings)
+            throws IOException {
+        return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId,
+                false, false, false, vertexVaryings, customTextureSamplers);
     }
 
     /** Whether the active program declares an Iris-bound entity identifier uniform. */
@@ -919,7 +932,11 @@ public final class EntityShaderAdapter {
                     throw new IOException(programName + " input '" + name + "' uses " + interpolation
                             + " interpolation, but its vertex output uses " + packVarying.interpolation() + ".");
                 }
-                linkedPackVaryings.put(name, packVarying);
+                if (textPipeline || !packVarying.fixedBridge() || !Set.of("vertexColor", "texCoord0",
+                        "sphericalVertexDistance", "cylindricalVertexDistance")
+                        .contains(packVarying.vertexVariable())) {
+                    linkedPackVaryings.put(name, packVarying);
+                }
             }
             if (name.equals("isMainHand")) {
                 if (!handPass) {
@@ -933,8 +950,8 @@ public final class EntityShaderAdapter {
             if (name.equals("northVec")) suppliesNorthVector = true;
             if (name.equals("normal")) {
                 if (textPipeline) {
-                    suppliesTextNormal = true;
-                    suppliesViewPosition = true;
+                    suppliesTextNormal = packVarying == null;
+                    suppliesViewPosition |= packVarying == null;
                 } else {
                     suppliesNormal = true;
                 }
@@ -946,10 +963,10 @@ public final class EntityShaderAdapter {
                 suppliesLegacyColor = true;
             }
             if (name.equals("viewPos")) {
-                suppliesViewPosition = true;
+                suppliesViewPosition |= packVarying == null;
             }
             if (name.equals("viewNormal")) {
-                suppliesViewNormal = true;
+                suppliesViewNormal |= packVarying == null;
             }
             if (name.equals("sphericalVertexDistance")) {
                 suppliesSphericalDistance = true;
@@ -958,7 +975,7 @@ public final class EntityShaderAdapter {
                 suppliesCylindricalDistance = true;
             }
             if (name.equals("lmcoord") || name.equals("lightMapCoord") || name.equals("lmCoord")) {
-                suppliesLightmapCoord = true;
+                suppliesLightmapCoord |= packVarying == null;
             }
             varyingMatcher.appendReplacement(withoutVaryings, "");
         }
