@@ -214,7 +214,6 @@ public final class VeyraShadowRenderer {
             String sampler = ShadowColorSampler.samplerName(index);
             var descriptor = pipeline.getImageDescriptor(sampler);
             if (descriptor == null) continue;
-            if (rendering) throw new IllegalStateException("shadowcolor" + index + " feedback is unsupported.");
             var view = shadowMapCompleted ? shadowColorTextureView(index) : null;
             if (view == null || view.isClosed()) {
                 bindTerrainFallback(descriptor.imageIdx);
@@ -237,7 +236,6 @@ public final class VeyraShadowRenderer {
             String sampler = ShadowColorSampler.samplerName(index);
             var descriptor = pipeline.getImageDescriptor(sampler);
             if (descriptor == null) continue;
-            if (rendering) throw new IllegalStateException("shadowcolor" + index + " feedback is unsupported.");
             var view = shadowMapCompleted ? shadowColorTextureView(index) : null;
             if (view == null || view.isClosed()) {
                 prepareFallbackTexture();
@@ -263,7 +261,6 @@ public final class VeyraShadowRenderer {
     public static void bindTerrainOpaqueDepth(GraphicsPipeline pipeline) {
         var descriptor = pipeline.getImageDescriptor(ShadowDepthSampler.NAME);
         if (descriptor == null) return;
-        if (rendering) throw new IllegalStateException("Shadow depth attachment feedback is unsupported.");
         if (!shadowMapCompleted) {
             bindTerrainFallback(descriptor.imageIdx);
             warnUnavailableShadowMap();
@@ -283,7 +280,6 @@ public final class VeyraShadowRenderer {
     public static void bindEntityOpaqueDepth(VkRenderPass pass, GraphicsPipeline pipeline) {
         var descriptor = pipeline.getImageDescriptor(ShadowDepthSampler.NAME);
         if (descriptor == null) return;
-        if (rendering) throw new IllegalStateException("Shadow depth attachment feedback is unsupported.");
         if (!shadowMapCompleted) {
             prepareFallbackTexture();
             descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
