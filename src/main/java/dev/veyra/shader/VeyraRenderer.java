@@ -4227,6 +4227,25 @@ public final class VeyraRenderer {
         }
     }
 
+    /**
+     * VulkanMod collects loose shader-pack uniforms into the generated "UBO 0" block. RenderPipeline draws only
+     * bind GpuBuffer slices for Minecraft's named blocks, so that block must read the registered suppliers.
+     */
+    private static CompiledRenderPipeline precompileGeometryPipeline(RenderPipeline pipeline, ShaderSource source) {
+        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        if (compiled.isValid()) {
+            GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
+            if (nativePipeline != null) {
+                for (UBO ubo : nativePipeline.getBuffers()) {
+                    if (ubo.name.equals(LOOSE_UNIFORM_BLOCK)) ubo.setUseGlobalBuffer(true);
+                }
+            }
+        }
+        return compiled;
+    }
+
+    private static final String LOOSE_UNIFORM_BLOCK = "UBO 0";
+
     private static GraphicsPipeline compileCloudPipeline(ShaderPack pack) throws IOException {
         return compileCloudPipeline(pack, terrainPipelineSet == null ? null : terrainPipelineSet.compute());
     }
@@ -4713,7 +4732,7 @@ public final class VeyraRenderer {
         CompiledRenderPipeline compiled;
         try (VeyraNativeImageBindings.Scope nativeImageBindings =
                      VeyraNativeImageBindings.install(customImages, vertexImages, fragmentImages)) {
-            compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
+            compiled = precompileGeometryPipeline(shadowPipeline, source);
             nativeImageBindings.verifyComplete();
         }
         if (!compiled.isValid()) {
@@ -5222,7 +5241,7 @@ public final class VeyraRenderer {
             return shaderManager.getShader(identifier, type);
         };
         VeyraPipelineResources.track(pipeline);
-        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        CompiledRenderPipeline compiled = precompileGeometryPipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected entity shader.");
@@ -5344,7 +5363,7 @@ public final class VeyraRenderer {
                                 + original.getLocation().getPath().replace('/', '_'));
                 shadowPipeline = copyShadowPipelineWithFragment(original, location, fragmentShader);
                 VeyraPipelineResources.track(shadowPipeline);
-                CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(shadowPipeline, source);
+                CompiledRenderPipeline compiled = precompileGeometryPipeline(shadowPipeline, source);
                 if (!compiled.isValid()) {
                     throw new IOException("VulkanMod could not compile " + original.getLocation()
                             + " with the shadow_entities shader.");
@@ -5536,7 +5555,7 @@ public final class VeyraRenderer {
             return shaderManager.getShader(identifier, type);
         };
         VeyraPipelineResources.track(pipeline);
-        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        CompiledRenderPipeline compiled = precompileGeometryPipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected particle shader.");
@@ -5681,7 +5700,7 @@ public final class VeyraRenderer {
             return shaderManager.getShader(identifier, type);
         };
         VeyraPipelineResources.track(pipeline);
-        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        CompiledRenderPipeline compiled = precompileGeometryPipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected weather shader.");
@@ -5773,7 +5792,7 @@ public final class VeyraRenderer {
             return shaderManager.getShader(identifier, type);
         };
         VeyraPipelineResources.track(pipeline);
-        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        CompiledRenderPipeline compiled = precompileGeometryPipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected lightning shader.");
@@ -6059,7 +6078,7 @@ public final class VeyraRenderer {
             return shaderManager.getShader(identifier, type);
         };
         VeyraPipelineResources.track(pipeline);
-        CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
+        CompiledRenderPipeline compiled = precompileGeometryPipeline(pipeline, source);
         if (!compiled.isValid()) {
             throw new IOException("VulkanMod could not compile " + original.getLocation()
                     + " with the selected " + programName + " shader.");
