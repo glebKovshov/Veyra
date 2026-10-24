@@ -38,6 +38,7 @@ class IrisRenderStagesTest {
         assertEquals(1, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.SKY));
         assertEquals(6, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.STARS));
         assertEquals(2, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.SUNRISE_SUNSET));
+        assertEquals(12, IrisRenderStages.forSkyFormat(BasicVertexShaderAdapter.Format.SIGN_TEXT));
         assertEquals(1, IrisRenderStages.forSkyPipeline("pipeline/sky"));
         assertEquals(6, IrisRenderStages.forSkyPipeline("pipeline/stars"));
         assertEquals(2, IrisRenderStages.forSkyPipeline("pipeline/sunrise_sunset"));

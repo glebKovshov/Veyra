@@ -2089,7 +2089,7 @@ public final class VeyraRenderer {
             String fragmentSource = spec.textPipeline()
                     ? EntityShaderAdapter.adaptTextFragment(spec.fragmentSource(), spec.programName(),
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
-                            spec.customTextureSamplers())
+                            spec.customTextureSamplers(), spec.vertexVaryings())
                     : EntityShaderAdapter.adaptGeometryFragment(spec.fragmentSource(), spec.programName(), spec.handPass(),
                             spec.shadowSamplerAvailable(), selectedEntityId, selectedBlockId, selectedItemId,
                             !isItemEntityTranslucentCullPipeline(original), selectedMainHand,
@@ -4854,6 +4854,8 @@ public final class VeyraRenderer {
         GeometryBlendSettings blendSettings;
         ShaderPackImageBindings.PreparedStage customImageStage;
         Set<String> customTextureSamplers = Set.of();
+        String packVertexSource = null;
+        Map<String, TerrainVertexShaderAdapter.PackVarying> packVertexVaryings = Map.of();
         try {
             rawFragmentSource = pack.readBlockFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
@@ -4861,18 +4863,32 @@ public final class VeyraRenderer {
             rawFragmentSource = customImageStage.source();
             customTextureSamplers = TerrainShaderAdapter.usedCustomTextureSamplers(
                     rawFragmentSource, pack.readCustomTextureProperties().samplersForProgram(programName));
+            if (programName.equals("gbuffers_textured")) {
+                Optional<String> packVertex = pack.readStage(programName + ".vsh");
+                if (packVertex.isPresent()) {
+                    packVertexSource = packVertex.get();
+                    packVertexVaryings = BasicVertexShaderAdapter.describeVaryings(
+                            programName, packVertexSource, BasicVertexShaderAdapter.Format.SIGN_TEXT);
+                }
+            }
             outputLayout = FragmentOutputs.parse(rawFragmentSource);
             blendSettings = pack.readGeometryBlendSettings(programName);
             fragmentSource = rawFragmentSource;
-            if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)) {
+            if (EntityShaderAdapter.usesNoiseSampler(fragmentSource)
+                    || packVertexSource != null && TerrainShaderAdapter.usesNoiseSampler(packVertexSource)) {
                 VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
             }
-            requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
+            requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource)
+                    && !packVertexVaryings.containsKey("lmcoord")
+                    && !packVertexVaryings.containsKey("lmCoord")
+                    && !packVertexVaryings.containsKey("lightMapCoord");
             requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource)
-                    || EntityShaderAdapter.requiresTextNormalInput(fragmentSource);
+                    && !packVertexVaryings.containsKey("viewPos")
+                    || EntityShaderAdapter.requiresTextNormalInput(fragmentSource)
+                    && !packVertexVaryings.containsKey("normal");
             fragmentSource = EntityShaderAdapter.adaptTextFragment(
                     fragmentSource, programName, pack.hasShadowFragment(), -1, -1,
-                    ItemIdMap.UNMAPPED, customTextureSamplers);
+                    ItemIdMap.UNMAPPED, customTextureSamplers, packVertexVaryings);
         } catch (IOException exception) {
             VeyraClient.LOGGER.warn("Skipping sign text for {} because its inputs are unsupported: {}",
                     programName, exception.getMessage());
@@ -4880,6 +4896,7 @@ public final class VeyraRenderer {
         }
         dumpShaderSource("sign-text-" + programName + ".fsh", fragmentSource);
         String sourceHash = sha256("sign_text_" + programName + '\n' + fragmentSource
+                + '\n' + (packVertexSource == null ? "" : packVertexSource)
                 + '\n' + customImageStage.resources() + '\n' + new java.util.TreeSet<>(customTextureSamplers));
         for (RenderPipeline original : candidates) {
             VeyraComputePipelineSet imageResourceIdentity = customImageStage.resources().isEmpty() ? null : customImages;
@@ -4891,7 +4908,7 @@ public final class VeyraRenderer {
                     textPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, false, requiresLightmap,
                             requiresViewPosition, false, false, false, programName,
-                            outputLayout, blendSettings, Set.of(), null, Map.of(),
+                            outputLayout, blendSettings, Set.of(), packVertexSource, packVertexVaryings,
                             EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
                             imageResourceIdentity, customImageStage, customTextureSamplers);
                 } catch (IOException exception) {
@@ -4904,7 +4921,8 @@ public final class VeyraRenderer {
             pipelines.put(original, textPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     false, requiresLightmap, requiresViewPosition, false,
-                    false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, Set.of(), null, Map.of(),
+                    false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, Set.of(),
+                    packVertexSource, packVertexVaryings,
                     imageResourceIdentity, customTextureSamplers, customImageStage, null));
         }
     }
@@ -5121,11 +5139,18 @@ public final class VeyraRenderer {
             String minecraftVertex = EntityShaderAdapter.adaptVertexShader(
                     vertexSource, shadowPass, programName,
                     requiresNormal, requiresLightmap, requiresViewPosition, requiresViewNormal, false);
-            EntityVertexShaderAdapter.AdaptedStage selectedVertex = EntityVertexShaderAdapter.adaptStage(
-                    minecraftVertex, shaderPackVertexSource, programName, handPass,
-                    entityId, blockEntityId, currentRenderedItemId, customTextureSamplers);
-            adaptedVertex = selectedVertex.source();
-            usesMidTexCoord = selectedVertex.usesMidTexCoord();
+            if (isSignTextPipeline(original)) {
+                BasicVertexShaderAdapter.Format textFormat = BasicVertexShaderAdapter.signTextFormat(vertexSource);
+                adaptedVertex = BasicVertexShaderAdapter.adaptStage(
+                        minecraftVertex, shaderPackVertexSource, programName,
+                        textFormat).source();
+            } else {
+                EntityVertexShaderAdapter.AdaptedStage selectedVertex = EntityVertexShaderAdapter.adaptStage(
+                        minecraftVertex, shaderPackVertexSource, programName, handPass,
+                        entityId, blockEntityId, currentRenderedItemId, customTextureSamplers);
+                adaptedVertex = selectedVertex.source();
+                usesMidTexCoord = selectedVertex.usesMidTexCoord();
+            }
             vertexShader = entityNormalVertexShader(original, sourceHash, shadowPass);
         } else if (requiresNormal || requiresLightmap || requiresViewPosition || requiresViewNormal || handPass
                 || itemEntityPipeline) {
@@ -5154,7 +5179,12 @@ public final class VeyraRenderer {
         }
         String fragmentSourceForParser = parserSafeFragmentSource;
         if (selectedVertexSource != null) {
-            dumpShaderSource("entity-" + programName + ".vsh", selectedVertexSource);
+            if (isSignTextPipeline(original)) {
+                String pipelineName = original.getLocation().getPath().replace('/', '-');
+                dumpShaderSource("sign-text-" + programName + "-" + pipelineName + ".vsh", selectedVertexSource);
+            } else {
+                dumpShaderSource("entity-" + programName + ".vsh", selectedVertexSource);
+            }
         }
         if (customImageStage != null && !customImageStage.resources().isEmpty() && customImages == null) {
             throw new IOException(programName + " has custom image samplers but no shared image resource set.");
