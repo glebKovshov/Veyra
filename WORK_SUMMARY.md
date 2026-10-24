@@ -1753,3 +1753,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Versioned JDK 21 gate прошёл: 584 теста без ошибок/пропусков, 104 shader examples / 122 Vulkan SPIR-V stages, validateShaders, graphics-smoke compilation, build и example packs. Дополнительно прошли 5 Python CI tests.
 - Beta.44 install JAR: 1,055,525 байт, SHA-256 `fa7c568efaffef415a6e731ea5dc014f6a3c4dfdf15e87445f7405374e3278e9`; `scripts/verify_jar.py` подтвердил Minecraft 1.21.11 / VulkanMod 0.6.8.
 - Beta.44 остаётся experimental prerelease: source audit принимает 921 geometry fragments и отклоняет 18 путей с `gaux2`; визуальная Iris-паритетность не подтверждена. Release branch пока не отправлялась: сначала нужны PR #118 merge и hosted checks.
+
+### Beta.44 release branch rebased on merged main
+
+- PR #118 landed as `49e65c2`; release branch was rebased so its sole release-metadata commit `a610e38` is based directly on that main merge.
+- Release metadata diff is limited to `gradle.properties`, README, changelog, compatibility/release notes, and this summary. Beta.44 JAR verifier/hash remain valid because code is unchanged.
+- Ready to push `release/0.2.0-beta.44+mc1.21.11`; its workflow will publish the prerelease only after source audit, graphics-smoke and build gates pass.
