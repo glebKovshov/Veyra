@@ -86,10 +86,14 @@ public final class VeyraShaderPackTextures {
         ShaderPackCustomTextureProperties properties = pack.readCustomTextureProperties();
         for (Map.Entry<String, String> mapping : properties.texturesForProgram(programName).entrySet()) {
             String samplerName = mapping.getKey();
-            if (pipeline.getImageDescriptor(samplerName) == null) continue;
+            String bindingName = samplerName;
+            if (pipeline.getImageDescriptor(bindingName) == null) {
+                bindingName = adaptedSamplerName(programName, samplerName);
+            }
+            if (pipeline.getImageDescriptor(bindingName) == null) continue;
             String resourcePath = mapping.getValue();
             if (ShaderPackCustomTextureProperties.isMinecraftBlockAtlas(resourcePath)) {
-                VeyraBlockAtlasSampler.bind(pass, pipeline, samplerName);
+                VeyraBlockAtlasSampler.bind(pass, pipeline, bindingName);
                 continue;
             }
             if (resourcePath.startsWith("minecraft:")) {
@@ -102,8 +106,26 @@ public final class VeyraShaderPackTextures {
             if (uploaded == null || uploaded.texture().isClosed() || uploaded.view().isClosed()) {
                 throw new IOException("Shader-pack texture '" + normalizedPath + "' was not prepared.");
             }
-            pass.bindTexture(samplerName, uploaded.view(), uploaded.sampler());
+            pass.bindTexture(bindingName, uploaded.view(), uploaded.sampler());
         }
+    }
+
+    static String adaptedSamplerName(String programName, String samplerName) {
+        if (!isPostProcessingProgram(programName)) return samplerName;
+        if (samplerName.equals("colortex0")) return "InSampler";
+        if (!samplerName.matches("colortex(?:[1-9]|1[0-5])")) return samplerName;
+        return "Veyra" + Character.toUpperCase(samplerName.charAt(0)) + samplerName.substring(1) + "Sampler";
+    }
+
+    private static boolean isPostProcessingProgram(String programName) {
+        return isProgramInStage(programName, "begin") || isProgramInStage(programName, "prepare")
+                || isProgramInStage(programName, "deferred") || isProgramInStage(programName, "composite")
+                || isProgramInStage(programName, "final");
+    }
+
+    private static boolean isProgramInStage(String programName, String stage) {
+        return programName.equals(stage) || programName.startsWith(stage + "_")
+                || programName.matches(stage + "[0-9]+.*");
     }
 
     /** Retire textures from packs that are no longer selected after the replacement pipelines are installed. */
