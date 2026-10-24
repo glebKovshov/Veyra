@@ -1782,3 +1782,11 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Versioned JDK 21 gate passed: 585 tests, 0 failures/errors/skips; 104 shader examples and 122 Vulkan SPIR-V stages validated; `build validateShaders packageExamplePacks` succeeded. `scripts/verify_jar.py` passed.
 - Candidate install JAR: 1,055,573 bytes, SHA-256 `141044977CEC28938713CFCA0C3B52BB2B4A1C838D2FFED3202398C3980C77A5`. Example-packs ZIP: 132,837 bytes, SHA-256 `0054B2725C7391EC19726598C8A736A10C2AFCB4D95523560AA6A8DC070E816B`.
 - Beta.45 remains an experimental prerelease. The 939 accepted source fragments and synthetic sign-text sampler smoke do not establish natural-world or full Iris visual parity.
+
+### Beta.45 опубликован и проверен — 2026-10-24
+
+- PR #122 со release metadata слит в `main` как `cbc56da`; tag `v0.2.0-beta.45+mc1.21.11` указывает на этот commit.
+- [GitHub Release beta.45](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.45%2Bmc1.21.11) опубликован как experimental prerelease. Release workflow #50 завершился успешно: 54 graphics-smoke jobs, source audit и release job (56/56 jobs).
+- Опубликованный install JAR: 1,055,544 байта, SHA-256 `00551BC00E4A22730577075CF49132D4594DC3992158A0CBBC75C539C785C1A6`; скачанный asset прошёл `scripts/verify_jar.py` для Minecraft 1.21.11 / VulkanMod 0.6.8.
+- Sources JAR: 397,182 байта, SHA-256 `DD826937E604DC76629BC5847B5A444489D8CD5BBE316AD4E36020DFFB14019C`. Example-packs ZIP: 131,484 байта, SHA-256 `9FCA0033E9D74D827DCF430EF5DDEBA2EB080D20266E2E8C395EF64F0F2EC2F8`. Все три скачанных assets совпали с `SHA256SUMS.txt`.
+- Полная Iris-паритетность и natural-world validation остаются неподтверждёнными; beta.45 — experimental prerelease.
