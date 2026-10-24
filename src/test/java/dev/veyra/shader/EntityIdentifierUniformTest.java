@@ -96,4 +96,26 @@ class EntityIdentifierUniformTest {
         String text = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_text");
         assertTrue(text.contains("const vec4 entityColor = vec4(0.0);"), text);
     }
+
+    @Test
+    void signTextSuppliesDirectionalVectors() throws Exception {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                varying vec3 upVec;
+                varying vec3 sunVec;
+                void main() {
+                    float light = max(dot(upVec, sunVec), 0.0);
+                    gl_FragData[0] = texture2D(texture, texcoord) * glcolor * light;
+                }
+                """;
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block");
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                adapted.contains("#define upVec normalize(gbufferModelView[1].xyz)"), adapted);
+        org.junit.jupiter.api.Assertions.assertTrue(
+                adapted.contains("#define sunVec normalize(sunPosition)"), adapted);
+    }
 }
