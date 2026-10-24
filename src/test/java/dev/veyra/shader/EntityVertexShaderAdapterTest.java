@@ -599,17 +599,16 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
-    void rejectsBlockVertexProgramThatReadsMcEntity() {
+    void blockVertexProgramReadsDefaultMcEntityLikeIris() throws Exception {
         String pack = """
                 #version 120
                 attribute vec4 mc_Entity;
                 void main(){gl_Position=ftransform()+vec4(mc_Entity.x);}
                 """;
 
-        IOException error = assertThrows(IOException.class,
-                () -> EntityVertexShaderAdapter.validate("gbuffers_block", pack, false));
+        String adapted = EntityVertexShaderAdapter.validate("gbuffers_block", pack, false).source();
 
-        assertTrue(error.getMessage().contains("mc_Entity"));
-        assertTrue(error.getMessage().contains("NEW_ENTITY vertex format"));
+        assertFalse(adapted.contains("mc_Entity"), adapted);
+        assertTrue(adapted.contains("vec4(vec4(0.0, 0.0, 0.0, 1.0).x)"), adapted);
     }
 }
