@@ -108,6 +108,25 @@ class SignTextVertexShaderAdapterTest {
     }
 
     @Test
+    void adaptsGaux2AsASignTextGeometryColorInputUnlessItIsACustomTexture() throws IOException {
+        String source = """
+                #version 120
+                uniform sampler2D gaux2;
+                varying vec2 texcoord;
+                void main() { gl_FragColor = texture2D(gaux2, texcoord); }
+                """;
+
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_textured",
+                false, -1, -1, ItemIdMap.UNMAPPED, Set.of(), java.util.Map.of());
+        String customTexture = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_textured",
+                false, -1, -1, ItemIdMap.UNMAPPED, Set.of("gaux2"), java.util.Map.of());
+
+        assertTrue(adapted.contains("uniform sampler2D VeyraGeometryColor5Sampler;"), adapted);
+        assertTrue(adapted.contains("#define gaux2 VeyraGeometryColor5Sampler"), adapted);
+        assertFalse(customTexture.contains("#define gaux2 VeyraGeometryColor5Sampler"), customTexture);
+    }
+
+    @Test
     void adaptsSeeThroughTextWithoutUv2AsFullBright() throws IOException {
         assertEquals(BasicVertexShaderAdapter.Format.SIGN_TEXT,
                 BasicVertexShaderAdapter.signTextFormat(NATIVE_TEXT_VERTEX));
