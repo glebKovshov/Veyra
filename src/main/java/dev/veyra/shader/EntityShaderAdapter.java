@@ -264,7 +264,7 @@ public final class EntityShaderAdapter {
             throws IOException {
         return adaptFragment(source, programName, true, false, shadowSamplerAvailable,
                 entityId, blockEntityId, currentRenderedItemId,
-                false, false, false, vertexVaryings, customTextureSamplers);
+                false, false, true, vertexVaryings, customTextureSamplers);
     }
 
     /** Whether the active program declares an Iris-bound entity identifier uniform. */

@@ -4854,6 +4854,7 @@ public final class VeyraRenderer {
         GeometryBlendSettings blendSettings;
         ShaderPackImageBindings.PreparedStage customImageStage;
         Set<String> customTextureSamplers = Set.of();
+        Set<Integer> colorInputs = Set.of();
         String packVertexSource = null;
         Map<String, TerrainVertexShaderAdapter.PackVarying> packVertexVaryings = Map.of();
         try {
@@ -4863,6 +4864,8 @@ public final class VeyraRenderer {
             rawFragmentSource = customImageStage.source();
             customTextureSamplers = TerrainShaderAdapter.usedCustomTextureSamplers(
                     rawFragmentSource, pack.readCustomTextureProperties().samplersForProgram(programName));
+            colorInputs = GeometryColorSamplers.indices(
+                    GeometryColorSamplers.read(rawFragmentSource, customTextureSamplers));
             if (programName.equals("gbuffers_textured")) {
                 Optional<String> packVertex = pack.readStage(programName + ".vsh");
                 if (packVertex.isPresent()) {
@@ -4908,7 +4911,7 @@ public final class VeyraRenderer {
                     textPipeline = compileEntityPipeline(
                             original, fragmentSource, sourceHash, false, requiresLightmap,
                             requiresViewPosition, false, false, false, programName,
-                            outputLayout, blendSettings, Set.of(), packVertexSource, packVertexVaryings,
+                            outputLayout, blendSettings, colorInputs, packVertexSource, packVertexVaryings,
                             EntityIdMap.UNMAPPED, BlockIdMap.UNMAPPED, ItemIdMap.UNMAPPED,
                             imageResourceIdentity, customImageStage, customTextureSamplers);
                 } catch (IOException exception) {
@@ -4921,7 +4924,7 @@ public final class VeyraRenderer {
             pipelines.put(original, textPipeline);
             variantSources.put(original, new EntityPipelineSpec(programName, rawFragmentSource,
                     false, requiresLightmap, requiresViewPosition, false,
-                    false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, Set.of(),
+                    false, false, true, pack.hasShadowFragment(), outputLayout, blendSettings, colorInputs,
                     packVertexSource, packVertexVaryings,
                     imageResourceIdentity, customTextureSamplers, customImageStage, null));
         }

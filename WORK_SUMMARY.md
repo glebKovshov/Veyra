@@ -1766,3 +1766,11 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - [GitHub Release beta.44](https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.44%2Bmc1.21.11) опубликован как experimental prerelease. Workflow #49 прошёл source audit, 29/29 graphics-smoke jobs, release build/tests и JAR verifier.
 - Все скачанные assets совпали с `SHA256SUMS.txt`. Установочный JAR: 1,055,496 байт, SHA-256 `006afcefbfddd500afe605be346580e38325b58ac4c8c6f992b5f94ac3d2e67c`; verifier подтвердил Minecraft 1.21.11 / VulkanMod 0.6.8. Примерный ZIP прошёл проверку 499 записей. В сравнении Linux release JAR с локальным Windows JAR все 382 записи совпали после нормализации CRLF в трёх текстовых/license entries.
 - Итоговые ограничения остаются явными: source audit отклонил 18 `gbuffers_textured` путей с `gaux2`, визуальная Iris-паритетность не доказана. Это prerelease, не stable release.
+
+### Агентские ветки и проверка `gaux2` — 2026-10-24
+
+- Проверены локальные ветки и worktree других агентов: активных дочерних задач и открытых PR нет. Исправление cloud-refmap и оптимизация unused-varyings уже есть в `main`; ветки beta31/beta37 и старые release-prep содержат устаревшее состояние и целиком не сливаются.
+- В отдельном worktree от `origin/main` исправлен sign-text путь для `gaux2`: адаптер разрешает geometry color inputs; `compileSignTextPipelines` теперь передаёт индексы цветовых входов в существующие pipeline resources/spec. Добавлен тест на `gaux2` и на его приоритет как custom texture alias.
+- JDK 21: 585 тестов прошли; `build validateShaders` завершились успешно. Валидация охватила 104 example shaders, 122 Vulkan SPIR-V компиляции. Source audit 4 pinned packs × 3 dimensions: 12 default и 63 declared-profile cases, 939 geometry fragments приняты, 0 отклонено; 18/18 активных compute stages приняты.
+- RTX 3070 graphics smoke с Complementary Reimagined HIGH завершился успешно: resize, переход Nether/Overworld, disable/re-enable и resource reload; `result.json` — `passed`. Отдельная временная GPU-проба подтвердила descriptor `VeyraGeometryColor5Sampler` на `pipeline/text_polygon_offset`, image — `colortex5`; smoke — `passed`.
+- Это ещё не подтверждение полной Iris-паритетности. PR и следующий prerelease пока не созданы; финальное решение о выпуске ожидает hosted checks после отправки готового PR.
