@@ -10,6 +10,7 @@ import net.vulkanmod.vulkan.shader.SPIRVUtils;
 import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import net.vulkanmod.vulkan.shader.layout.AlignedStruct;
+import net.vulkanmod.vulkan.shader.layout.Uniform;
 import net.vulkanmod.vulkan.texture.SamplerManager;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.lwjgl.system.MemoryStack;
@@ -60,7 +61,9 @@ public final class VeyraComputePipeline extends Pipeline {
 
         AlignedStruct.Builder uniformBuilder = AlignedStruct.builder();
         for (ShaderPackUniformAdapter.UniformField field : shader.uniforms()) {
-            uniformBuilder.addUniform(field.type(), field.name());
+            Uniform.Info info = Uniform.createUniformInfo(field.type(), field.name());
+            info.setupSupplier();
+            uniformBuilder.addUniform(info);
         }
         List<UBO> pipelineBuffers = new ArrayList<>();
         if (!shader.uniforms().isEmpty()) {

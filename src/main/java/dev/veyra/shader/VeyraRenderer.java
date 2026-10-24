@@ -3069,7 +3069,7 @@ public final class VeyraRenderer {
                     && (setupComputePending || setupComputeWidth != mainTarget.width
                     || setupComputeHeight != mainTarget.height);
             if (setupNeedsDispatch) {
-                compute.dispatchSetupPrograms(mainTarget.width, mainTarget.height);
+                compute.dispatchSetupPrograms();
                 setupComputePending = false;
                 setupComputeWidth = mainTarget.width;
                 setupComputeHeight = mainTarget.height;

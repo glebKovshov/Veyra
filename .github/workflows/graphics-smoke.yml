@@ -22,6 +22,7 @@ on:
       - 'examples/entity-custom-image/**'
       - 'examples/composite-custom-image/**'
       - 'examples/compute-shadow-stage/**'
+      - 'examples/compute-setup-stage/**'
       - 'examples/begin-fragment-stage/**'
       - 'examples/storage-buffer-shadow/**'
       - 'examples/water-block-id/**'
@@ -67,6 +68,7 @@ on:
       - 'examples/entity-custom-image/**'
       - 'examples/composite-custom-image/**'
       - 'examples/compute-shadow-stage/**'
+      - 'examples/compute-setup-stage/**'
       - 'examples/begin-fragment-stage/**'
       - 'examples/storage-buffer-shadow/**'
       - 'examples/water-block-id/**'
@@ -204,6 +206,8 @@ jobs:
               assert result['activeEntityNormalFallbackRedPixels'] >= 100, result
               assert (result['disabledEntityNormalFallbackRedPixels'] * 4
                       < result['activeEntityNormalFallbackRedPixels']), result
+          if fixture == 'compute-setup-stage' and result['status']=='passed':
+              assert result['setupResizePassed'] is True, result
           if fixture == 'normal-atlas-animated' and result['status']=='passed':
               assert result['animatedPbrFramesChanged'] is True, result
               assert result['animatedPbrFirstRequestedFrameSlot'] in (0, 1), result
