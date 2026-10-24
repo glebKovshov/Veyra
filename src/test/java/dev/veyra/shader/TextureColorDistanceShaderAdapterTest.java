@@ -370,4 +370,24 @@ class TextureColorDistanceShaderAdapterTest {
         assertTrue(adapted.contains("float shadow = veyraShaderPackTexture2DShadow(shadowtex0, vec3(0.5));"), adapted);
         assertFalse(adapted.contains("float texture2DShadow("), adapted);
     }
+
+    @Test
+    void texturedParticleFallbackBindsGaux2ColorInput() throws Exception {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                uniform sampler2D gaux2;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                void main() {
+                    gl_FragData[0] = texture2D(texture, texcoord) * glcolor + texture2D(gaux2, texcoord) * 0.1;
+                }
+                """;
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment(
+                source, "gbuffers_textured", true, true, true, true, true);
+        var samplers = TextureColorDistanceShaderAdapter.inspectSamplers(source, "gbuffers_textured", true, true);
+
+        assertTrue(adapted.contains("#define gaux2 VeyraGeometryColor5Sampler"), adapted);
+        assertEquals(Set.of(5), samplers.geometryColorInputs());
+    }
 }

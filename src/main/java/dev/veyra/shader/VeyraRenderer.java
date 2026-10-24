@@ -5375,8 +5375,15 @@ public final class VeyraRenderer {
                             original.getSamplers().contains("Sampler2"));
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
                 } else {
+                    boolean lightmapAvailable = original.getSamplers().contains("Sampler2");
+                    samplerInputs = TextureColorDistanceShaderAdapter.inspectSamplers(packFragment, programName,
+                            pack.hasShadowFragment(), lightmapAvailable);
                     samplerInputs = samplerInputs.withCustomImageSamplers(customImageSamplerNames(customImageStage));
-                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, programName, true);
+                    usesNoiseSampler = samplerInputs.usesNoiseSampler();
+                    if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
+                    if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, programName,
+                            true, true, true, pack.hasShadowFragment(), lightmapAvailable);
                 }
                 validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
             } catch (IOException exception) {
