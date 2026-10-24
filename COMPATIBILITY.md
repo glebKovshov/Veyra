@@ -1,4 +1,8 @@
-# Shaderpack compatibility - beta.38 validation
+# Shaderpack compatibility - beta.39 validation
+
+## Beta.39 - 2026-10-24
+
+The beta.38 Complementary log gaps are addressed in code: the gbuffers_textured particle fallback now binds `gaux2`, and gbuffers_block sign text receives `upVec`. Both are covered by adapter unit tests and hosted Lavapipe compilation (PR #106, 57/57 checks). A natural-world Complementary rerun confirming the overrides are no longer skipped is still pending; no visual certification is claimed.
 
 
 ## Published beta.38 - 2026-10-24

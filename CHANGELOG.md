@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.39 - 2026-10-24 (experimental prerelease)
+
+- Bridge Iris samplers (`gaux2`/`colortexN`, noise, specular, shadow, lightmap) in textured particle fallbacks; previously these Complementary overrides were skipped.
+- Supply `upVec`/`sunVec`/`eastVec` to sign-text fragments.
+- Local gate: 575 tests, 0 failures. PR #106 passed all 57 hosted checks. Not visually certified on natural worlds.
+
 ## 0.2.0-beta.38 - 2026-10-24 (experimental prerelease)
 
 - Add Iris pre-shadow `shadow.csh` and consecutive letter components, with shadow-map-relative sizing, shared image/SSBO bindings, and dispatch barriers. Reject unsupported numbered shadow compute programs explicitly.
