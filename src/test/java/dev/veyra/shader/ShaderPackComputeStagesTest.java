@@ -124,6 +124,28 @@ class ShaderPackComputeStagesTest {
     }
 
     @Test
+    void readsIrisShadowClipPlanesAndTheirDefaults(@TempDir Path root) throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        Files.writeString(shaders.resolve("shadow.fsh"), """
+                #version 120
+                const float shadowNearPlane = -32.0;
+                const float shadowFarPlane = 256.0;
+                void main() {}
+                """);
+        Path defaultRoot = Files.createDirectories(root.resolve("defaults"));
+        Path defaultShaders = Files.createDirectories(defaultRoot.resolve("shaders"));
+        Files.writeString(defaultShaders.resolve("shadow.fsh"), "void main() {}\n");
+
+        var configured = ShaderPack.inspect(root).readShadowSettings();
+        var defaults = ShaderPack.inspect(defaultRoot).readShadowSettings();
+
+        assertEquals(-32.0F, configured.nearPlane(), 0.0F);
+        assertEquals(256.0F, configured.farPlane(), 0.0F);
+        assertEquals(ShadowSettings.DEFAULT_NEAR_PLANE, defaults.nearPlane(), 0.0F);
+        assertEquals(ShadowSettings.DEFAULT_FAR_PLANE, defaults.farPlane(), 0.0F);
+    }
+
+    @Test
     void loadsShadowLetterComponentsWithoutSuffixlessComputeAndStopsAtFirstGap(@TempDir Path root)
             throws Exception {
         Path shaders = Files.createDirectories(root.resolve("shaders"));

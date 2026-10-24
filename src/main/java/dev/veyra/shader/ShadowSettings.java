@@ -2,16 +2,20 @@ package dev.veyra.shader;
 
 /** Iris shadow directives that affect Veyra's shadow passes. */
 public record ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation,
+                             float nearPlane, float farPlane,
                              float distanceRenderMultiplier, float entityShadowDistanceMultiplier,
                              boolean shadowTranslucent) {
     public static final int DEFAULT_RESOLUTION = 1024;
     public static final float DEFAULT_DISTANCE = 128.0F;
+    public static final float DEFAULT_NEAR_PLANE = -100.05F;
+    public static final float DEFAULT_FAR_PLANE = 156.0F;
     public static final float DEFAULT_INTERVAL_SIZE = 2.0F;
     public static final float DEFAULT_SUN_PATH_ROTATION = 0.0F;
     public static final float DEFAULT_DISTANCE_RENDER_MULTIPLIER = -1.0F;
     public static final float DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER = 1.0F;
     public static final ShadowSettings DEFAULT = new ShadowSettings(
             DEFAULT_RESOLUTION, DEFAULT_DISTANCE, DEFAULT_INTERVAL_SIZE, DEFAULT_SUN_PATH_ROTATION,
+            DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE,
             DEFAULT_DISTANCE_RENDER_MULTIPLIER, DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER, false);
 
     public ShadowSettings {
@@ -26,6 +30,9 @@ public record ShadowSettings(int resolution, float distance, float intervalSize,
         }
         if (!Float.isFinite(sunPathRotation)) {
             throw new IllegalArgumentException("sunPathRotation must be finite.");
+        }
+        if (!Float.isFinite(nearPlane) || !Float.isFinite(farPlane) || nearPlane == farPlane) {
+            throw new IllegalArgumentException("shadowNearPlane and shadowFarPlane must be finite and different.");
         }
         if (!Float.isFinite(distanceRenderMultiplier)) {
             throw new IllegalArgumentException("shadowDistanceRenderMul must be finite.");

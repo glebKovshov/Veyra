@@ -88,7 +88,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
     private static final Pattern SHADOW_SETTING = Pattern.compile(
-            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
+            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowNearPlane|shadowFarPlane|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
     private static final Pattern NOISE_TEXTURE_RESOLUTION = Pattern.compile(
             "\\bconst\\s+int\\s+noiseTextureResolution\\s*=\\s*([+-]?\\d+)\\s*;");
     private static final Pattern EYE_BRIGHTNESS_HALF_LIFE = Pattern.compile(
@@ -405,6 +405,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 ? parseShadowResolution(values.get("shadowMapResolution"))
                 : ShadowSettings.DEFAULT_RESOLUTION;
         float distance = parseShadowFloat(values, "shadowDistance", ShadowSettings.DEFAULT_DISTANCE);
+        float nearPlane = parseShadowFloat(values, "shadowNearPlane", ShadowSettings.DEFAULT_NEAR_PLANE);
+        float farPlane = parseShadowFloat(values, "shadowFarPlane", ShadowSettings.DEFAULT_FAR_PLANE);
         float intervalSize = parseShadowFloat(values, "shadowIntervalSize", ShadowSettings.DEFAULT_INTERVAL_SIZE);
         float sunPathRotation = parseShadowFloat(values, "sunPathRotation", ShadowSettings.DEFAULT_SUN_PATH_ROTATION);
         float distanceRenderMultiplier = parseShadowFloat(values, "shadowDistanceRenderMul",
@@ -413,8 +415,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 ShadowSettings.DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER);
         boolean shadowTranslucent = readBooleanProperty("shadowTranslucent", false);
         try {
-            return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation, distanceRenderMultiplier,
-                    entityShadowDistanceMultiplier, shadowTranslucent);
+            return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation, nearPlane, farPlane,
+                    distanceRenderMultiplier, entityShadowDistanceMultiplier, shadowTranslucent);
         } catch (IllegalArgumentException exception) {
             throw new IOException("Invalid Iris shadow setting: " + exception.getMessage(), exception);
         }

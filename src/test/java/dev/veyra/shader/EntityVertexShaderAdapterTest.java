@@ -611,4 +611,36 @@ class EntityVertexShaderAdapterTest {
         assertFalse(adapted.contains("mc_Entity"), adapted);
         assertTrue(adapted.contains("vec4(vec4(0.0, 0.0, 0.0, 1.0).x)"), adapted);
     }
+
+    @Test
+    void rejectsUnsupportedMultilineMcEntityAttributeLayout() {
+        String pack = """
+                #version 120
+                layout(location = 12)
+                    in vec4
+                    mc_Entity;
+                void main() { gl_Position = ftransform(); }
+                """;
+
+        IOException error = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.validate("gbuffers_entities", pack, false));
+        assertTrue(error.getMessage().contains("unsupported vertex attribute layout"), error.getMessage());
+    }
+
+    @Test
+    void ignoresMcEntityInMultilineFunctionInputParameter() throws Exception {
+        String pack = """
+                #version 120
+                vec4 helper(
+                    in vec4 inputValue
+                ) {
+                    return mc_Entity + inputValue;
+                }
+                void main() { gl_Position = ftransform() + helper(vec4(0.0)); }
+                """;
+
+        String adapted = EntityVertexShaderAdapter.validate("gbuffers_entities", pack, false).source();
+
+        assertTrue(adapted.contains("return vec4(0.0, 0.0, 0.0, 1.0) + inputValue;"), adapted);
+    }
 }

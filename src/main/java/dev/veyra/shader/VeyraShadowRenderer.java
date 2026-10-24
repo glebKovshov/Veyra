@@ -346,10 +346,11 @@ public final class VeyraShadowRenderer {
             release();
         }
         if (!shadowSettings.equals(settings)) {
-            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}, entityShadowDistanceMul={}, shadowTranslucent={}.",
-                    settings.resolution(), settings.resolution(), settings.distance(),
-                    settings.intervalSize(), settings.sunPathRotation(), settings.distanceRenderMultiplier(),
-                    settings.entityShadowDistanceMultiplier(), settings.shadowTranslucent());
+            VeyraClient.LOGGER.info("Using Iris shadow settings: map={}x{}, distance={}, near={}, far={}, interval={}, sunPathRotation={}, shadowDistanceRenderMul={}, entityShadowDistanceMul={}, shadowTranslucent={}.",
+                    settings.resolution(), settings.resolution(), settings.distance(), settings.nearPlane(),
+                    settings.farPlane(), settings.intervalSize(), settings.sunPathRotation(),
+                    settings.distanceRenderMultiplier(), settings.entityShadowDistanceMultiplier(),
+                    settings.shadowTranslucent());
         }
         shadowSettings = settings;
         shadowColorTargetIndices = requestedColors;
@@ -400,26 +401,37 @@ public final class VeyraShadowRenderer {
         mainFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
         try {
             ensureResources();
-            float sunAngle = (minecraft.level.getDayTime() % 24000L) / 24000.0F * (float) (Math.PI * 2.0);
+            float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
+            float sunAttribute = camera.attributeProbe()
+                    .getValue(net.minecraft.world.attribute.EnvironmentAttributes.SUN_ANGLE, partialTick);
+            float moonAttribute = camera.attributeProbe()
+                    .getValue(net.minecraft.world.attribute.EnvironmentAttributes.MOON_ANGLE, partialTick);
+            float sunAngle = VeyraRenderer.irisShadowAngle(sunAttribute, moonAttribute)
+                    * (float) (Math.PI * 2.0);
             ShadowView shadowView = createShadowView(sunAngle, cameraPosition);
             Matrix4f shadowModelView = shadowView.modelView();
             float shadowDistance = shadowSettings.distance();
-            Matrix4f shadowProjection = new Matrix4f().setOrthoSymmetric(
-                    shadowDistance * 2.0F, shadowDistance * 2.0F, 0.1F, shadowDistance * 2.0F, true);
+            Matrix4f shaderPackShadowProjection = IrisShadowMatrices.createProjection(
+                    shadowDistance, shadowSettings.nearPlane(), shadowSettings.farPlane());
+            Matrix4f shadowCullProjection = IrisShadowMatrices.createProjection(
+                    shadowDistance, 0.1F, shadowDistance * 2.0F);
+            Matrix4f shadowProjection = IrisShadowMatrices.createVulkanProjection(
+                    shadowDistance, shadowSettings.nearPlane(), shadowSettings.farPlane());
             VeyraShadowRenderer.shadowModelView.set(shadowModelView);
-            VeyraShadowRenderer.shadowProjection.set(shadowProjection);
+            VeyraShadowRenderer.shadowProjection.set(shaderPackShadowProjection);
             updateShadowMatrixUniformBuffers();
             // Resources must exist and be cleared before the first shadow draw, including a lazy pack load.
             VeyraRenderer.prepareShadowTerrainPipelines();
             clearAdditionalShadowColors();
 
+            // VulkanMod expands the culling frustum in vanilla clip space; reserve ZO depth for drawing.
             Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
-                    ? new DistanceLimitedFrustum(shadowModelView, shadowProjection, cameraPosition,
+                    ? new DistanceLimitedFrustum(shadowModelView, shadowCullProjection, cameraPosition,
                             shadowSettings.distanceRenderLimit())
-                    : new Frustum(shadowModelView, shadowProjection);
+                    : new Frustum(shadowModelView, shadowCullProjection);
             shadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             Frustum entityShadowFrustum = createEntityShadowFrustum(
-                    shadowFrustum, shadowModelView, shadowProjection, cameraPosition);
+                    shadowFrustum, shadowModelView, shadowCullProjection, cameraPosition);
             entityShadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             ((CameraAccessor) (Object) camera).veyra$setRotation(shadowView.yaw(), shadowView.pitch());
             cameraRotationChanged = true;
@@ -719,23 +731,15 @@ public final class VeyraShadowRenderer {
     private static ShadowView createShadowView(float sunAngle, Vec3 cameraPosition) {
         Vector3f lightDirection = new Vector3f((float) Math.cos(sunAngle), (float) Math.sin(sunAngle), 0.25F);
         lightDirection.rotateX((float) Math.toRadians(shadowSettings.sunPathRotation()));
-        if (lightDirection.y < 0.0F) {
-            lightDirection.negate();
-        }
+        if (lightDirection.y < 0.0F) lightDirection.negate();
         lightDirection.normalize();
-
-        float shadowDistance = shadowSettings.distance();
         Matrix4f modelView = new Matrix4f().setLookAt(
-                lightDirection.x * shadowDistance,
-                lightDirection.y * shadowDistance,
-                lightDirection.z * shadowDistance,
-                0.0F, 0.0F, 0.0F,
-                0.0F, 0.0F, 1.0F);
+                lightDirection.x * shadowSettings.distance(), lightDirection.y * shadowSettings.distance(),
+                lightDirection.z * shadowSettings.distance(), 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
         float intervalSize = shadowSettings.intervalSize();
         if (intervalSize > 0.0F) {
             float halfInterval = intervalSize / 2.0F;
-            modelView.translate(
-                    (float) cameraPosition.x % intervalSize - halfInterval,
+            modelView.translate((float) cameraPosition.x % intervalSize - halfInterval,
                     (float) cameraPosition.y % intervalSize - halfInterval,
                     (float) cameraPosition.z % intervalSize - halfInterval);
         }
@@ -808,6 +812,5 @@ public final class VeyraShadowRenderer {
         writeMatrix(shadowProjectionInverse, SHADOW_PROJECTION_INVERSE_BUFFER.buffer);
     }
 
-    private record ShadowView(Matrix4f modelView, float yaw, float pitch) {
-    }
+    private record ShadowView(Matrix4f modelView, float yaw, float pitch) { }
 }
