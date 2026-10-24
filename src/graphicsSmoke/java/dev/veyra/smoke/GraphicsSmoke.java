@@ -280,13 +280,14 @@ public final class GraphicsSmoke {
                     && client.getSingleplayerServer() != null) {
                 thirdPartyScenePrepared = true;
                 var server = client.getSingleplayerServer();
-                client.getConnection().sendCommand("tp @s 0 72 0");
+
                 server.execute(() -> {
                     var world = server.overworld();
                     world.setDayTime(1000L);
+                    world.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.ADVANCE_TIME, false, server);
                     for (int x = -12; x <= 12; x++) for (int z = -12; z <= 12; z++) {
                         var block = Math.floorMod(x * 3 + z, 7) == 0
-                                ? net.minecraft.world.level.block.Blocks.SAND.defaultBlockState()
+                                ? net.minecraft.world.level.block.Blocks.SANDSTONE.defaultBlockState()
                                 : Math.floorMod(x + z * 2, 9) == 0
                                 ? net.minecraft.world.level.block.Blocks.STONE.defaultBlockState()
                                 : net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState();
@@ -320,7 +321,7 @@ public final class GraphicsSmoke {
                             net.minecraft.world.level.block.Blocks.GLOWSTONE.defaultBlockState(), 3);
                     var signPos = new net.minecraft.core.BlockPos(0, 71, 8);
                     var signState = net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState()
-                            .setValue(StandingSignBlock.ROTATION, 0);
+                            .setValue(StandingSignBlock.ROTATION, 8);
                     world.setBlock(signPos, signState, 3);
                     if (!(world.getBlockEntity(signPos) instanceof SignBlockEntity sign)
                             || !sign.setText(sign.getFrontText()
@@ -329,6 +330,11 @@ public final class GraphicsSmoke {
                         throw new IllegalStateException("Could not prepare the real sign-text fixture.");
                     }
                     world.sendBlockUpdated(signPos, signState, signState, 3);
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                            "Server fixture states: floor={} wall={} dayTime={}",
+                            world.getBlockState(new net.minecraft.core.BlockPos(0, 70, 0)),
+                            world.getBlockState(signPos), world.getDayTime());
+                    client.execute(() -> client.getConnection().sendCommand("tp @s 0 72 0"));
                 });
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(
                         "Prepared the real shaderpack fixture with daylight, a mixed block field, a lit material wall and a sign.");
@@ -349,6 +355,26 @@ public final class GraphicsSmoke {
                 pending = true; requested = true; captureActive = false;
             } else if (!vanillaBaseline && thirdPartyShaderpackFixture && stage == 0 && worldTicks >= 160) {
                 if (thirdPartyLifecycleFixture) requireThirdPartyActive("initial profile capture");
+                var fixtureFloor = new net.minecraft.core.BlockPos(0, 70, 0);
+                var fixtureFloorState = client.level.getBlockState(fixtureFloor);
+                var fixtureWall = new net.minecraft.core.BlockPos(0, 71, 8);
+                var fixtureWallState = client.level.getBlockState(fixtureWall);
+                if (Math.abs(client.player.getX() - 0.5) > 0.25
+                        || client.player.getY() < 70.9 || client.player.getY() > 72.25
+                        || Math.abs(client.player.getZ() - 0.5) > 0.25 || client.level.getDayTime() != 1000L
+                        || fixtureFloorState.isAir() || !fixtureWallState.is(net.minecraft.world.level.block.Blocks.OAK_SIGN)) {
+                    if (worldTicks >= 400) {
+                        throw new IllegalStateException("The real shaderpack capture scene is not ready: pos="
+                                + client.player.position() + ", dayTime=" + client.level.getDayTime()
+                                + ", floor=" + fixtureFloorState + ", wall=" + fixtureWallState);
+                    }
+                    return;
+                }
+                LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                        "Capture request: tick={} pos=({}, {}, {}) rotation=({}, {}) dayTime={} floor={} wall={}",
+                        worldTicks, client.player.getX(), client.player.getY(), client.player.getZ(),
+                        client.player.getXRot(), client.player.getYRot(), client.level.getDayTime(),
+                        fixtureFloorState, fixtureWallState);
                 pending = true;
                 requested = true;
                 captureActive = true;
