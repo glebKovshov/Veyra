@@ -4,7 +4,7 @@
 
 - Resolve shader-pack post-process colortex mappings to adapted sampler descriptors, including custom textures such as Complementary's cloud-water map.
 - Bind pack-owned post-process textures after native render-pass inputs are installed, preventing target setup from overwriting the custom sampler.
-- RTX 3070 Complementary HIGH generated-scene smoke passed with cloud-water bound to VeyraColortex3Sampler and volumetric clouds visible (230,400 non-black pixels / 124 color buckets). This is a targeted smoke, not whole-pack parity.
+- Pinned stock Complementary Reimagined HIGH smoke passed on RTX 3070 with cloud-water bound to VeyraColortex3Sampler and volumetric clouds visible (230,400 non-black pixels / 111 color buckets). A matched Iris HIGH capture used the same archive and fixture; it shows a darker Veyra scene and different sign appearance. This synthetic comparison is not whole-pack parity.
 - Local JDK 21 gate: 583 tests, 0 failures/errors/skips; 104 example shaders and 122 direct Vulkan SPIR-V compilations; shader validation, build, graphics-smoke compilation and example-pack packaging passed.
 
 ## 0.2.0-beta.42 - 2026-10-24 (experimental prerelease)

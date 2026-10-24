@@ -1,6 +1,6 @@
 # Veyra 0.2.0-beta.43+mc1.21.11 - experimental prerelease
 
-Beta.43 fixes shader-pack custom texture bindings for post-processing colortex targets. A Complementary Reimagined HIGH smoke confirms its cloud-water texture reaches the adapted deferred sampler and volumetric clouds are visible in the generated scene.
+Beta.43 fixes shader-pack custom texture bindings for post-processing colortex targets. A fresh RTX 3070 run from the pinned stock Complementary Reimagined r5.9.3 archive confirms that the HIGH profile's cloud-water texture reaches the adapted deferred sampler and volumetric clouds are visible.
 
 ## Changes
 
@@ -17,6 +17,6 @@ Beta.43 fixes shader-pack custom texture bindings for post-processing colortex t
 
 The local JDK 21 gate passed 583 tests without failures, errors or skips; it validated 104 example shaders and compiled 122 direct Vulkan SPIR-V stages, and passed shader validation, build, graphics-smoke compilation and example-pack packaging.
 
-The RTX 3070 Complementary HIGH generated-scene smoke passed with 230,400 non-black pixels and 124 color buckets. Runtime evidence confirms VeyraColortex3Sampler was bound to lib/textures/cloud-water.png; volumetric clouds are visible again. The controlled scene still differs from Iris in sky/light colors and sign appearance. This targeted capture does not establish natural-world parity or full-pack certification. The historical Windows shutdown exit 0xC0000409 remains unexplained. A local VulkanMod profile also crashed in Reflex 1.1.2's direct OpenGL query call before Veyra loaded; see COMPATIBILITY.md for scope.
+The fresh stock-shader Veyra HIGH smoke passed with 230,400 non-black pixels and 111 color buckets. Runtime evidence confirms `VeyraColortex3Sampler` was bound to `lib/textures/cloud-water.png`; volumetric clouds are visible. A matched Iris `ReferenceCapture` used the same pinned archive, HIGH profile with zero user overrides, and validated fixture. The synthetic frames show Veyra darker overall and a different sign appearance; Iris also logged unresolved `BIOME_SULFUR_CAVES` and ignored legacy `stone_slab.variant` warnings. This is not natural-world parity or full-pack certification. The historical Windows shutdown exit 0xC0000409 remains unexplained. A local VulkanMod profile also crashed in Reflex 1.1.2's direct OpenGL query call before Veyra loaded; see COMPATIBILITY.md for scope.
 
 Veyra remains an experimental Iris-compatible subset, not a stable Iris-parity release. See COMPATIBILITY.md and ARCHITECTURE.md for measured scope and unsupported stages.
