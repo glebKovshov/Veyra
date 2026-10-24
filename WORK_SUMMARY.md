@@ -1631,3 +1631,36 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Fresh pinned source audit is running on the final runtime code. Next: commit/push the setup+uniform fix as a separate PR above #103 and obtain its own hosted checks. No CI bypass or stable compatibility claim.
 
 - Final pinned source audit passed on the setup/uniform runtime code: 4 packs, 12 defaults, 63 declared-profile/dimension cases, 864 geometry fragments accepted / 0 rejected, 18/18 active compute stages compiled. Source-only rows remain visualValidation=false. This and the verified RTX resize fixture complete the local gate; hosted Build/source-audit/Lavapipe and review readiness remain required before merge.
+
+### Beta.38 integration preparation - 2026-10-24
+
+- Created release-prep/beta38 worktree at C:/Users/Gleb/.t3/scratch/veyra-beta38-prep from #104. Merged current origin/main (including merged #103) and the existing beta.37 release branch without conflicts. The beta.37 merge preserves its changelog/release notes, version history and strengthened JAR smoke-harness exclusion checks; no existing runtime implementation was replaced.
+- Prepared beta.38 version, README, changelog, release notes and compatibility checkpoint. Documents distinguish tested synthetic paths, source-only audit and the still-unproven whole-pack/stable goal. #104 remains unmerged pending its own hosted gates, and this release-prep branch has not been pushed or published.
+- Next: versioned local build/test/audit/verifier, finalize #104 gates/reviews, integrate the final main commit, then run the gated release publication and verify downloaded assets.
+
+### Versioned beta.38 local build verified - 2026-10-24
+
+- Forced JDK 21 gate in beta.38 prep passed: 573 tests, 0 failures/errors/skips, 102 example sources / 118 direct Vulkan SPIR-V compilations, build, graphics-smoke compilation and example-pack packaging. Source files under src/ exactly match tested #104 code; the candidate also preserves beta.37's smoke-harness exclusion checks in verify_jar.py.
+- verify_jar.py accepted local veyra-0.2.0-beta.38+mc1.21.11.jar: 1,052,960 bytes, SHA-256 836F8B0273303F32982564D1DAE4349593AD3ED474291DF84F039929227FFE05. This Windows build is not published; download verification after the hosted release remains required.
+- Refreshed ARCHITECTURE.md and VALIDATION.md alongside release docs, correcting stale current-state claims that setup/begin/shadow compute and selected shadow vertex/MRT paths were absent. Historical observations are retained as historical, not promoted to whole-pack validation.
+- A fresh versioned pinned source audit is running. #104 still requires its own hosted gates/review readiness and merge before the prepared release can be published.
+
+- The versioned beta.38 pinned audit passed: four packs / 12 defaults / 63 profile-dimension cases, 864 geometry fragments accepted with none rejected, and all 18 active compute stages compiled. Every row remains source-only (visualValidation=false).
+- Started a fresh RTX 3070 Complementary Reimagined r5.9.3 COMPLEMENTARY lifecycle run on beta.38 code because compute-uniform behavior changed. It will verify resize, Nether/return, disable/re-enable and resource reload, with JSON/exit/log assertions. This generated scene is not whole-pack/natural-world certification.
+
+- The real Complementary run logs unsupported sign-text upVec and gaux2 in textured particle fallbacks. Recorded these concrete skipped override paths in compatibility/release notes; an eventual green lifecycle/readback result is not evidence that those routes work. They remain explicit follow-up compatibility work for the stable goal.
+
+### Setup/uniform #104 merged; beta.38 integration finalized - 2026-10-24
+
+- #104 exact head 0fb7490 passed Build 40075525512, source audit 40075525534 and Graphics 40075525531. All 54 graphics jobs succeeded. Hosted setup job 120817914340 recorded passed, setupResizePassed=true, 360,000 active / 0 disabled pixels, 0 runtime VVL errors and 20 retained process-teardown diagnostics. Reviews, inline threads and comments were empty; head/base readiness were rechecked before marking ready and merging with expected-head protection.
+- Main merge commit is d9e0fdcbd26f660c760ef29831ad7a8eede08159. Fetched and merged it into beta.38 prep as 6588088. src/ remains byte-identical to tested #104; the release candidate's .github/workflows tree matches final origin/main, preserving the existing release-token workflow permissions.
+- Fresh versioned Complementary Reimagined r5.9.3 COMPLEMENTARY RTX lifecycle passed all six flags with 326,462 non-black pixels / 55 color buckets, SSBO 810,549,248 bytes, owner released/recreated and process exit 0. Native shutdown evidence before allocator destruction contains no shader-pack buffers, no active storage owner and zero owner bytes. Captures are generated-scene evidence; sign-text/particle gaps remain documented.
+- Beta.38 is ready for its own full hosted release workflow, not a stable-parity claim. No publication yet; verify tag/ref availability, push the versioned release branch, then download and verify the actual released assets.
+
+### Beta.38 published and downloaded assets verified - 2026-10-24
+
+- Published prerelease: https://github.com/glebKovshov/Veyra/releases/tag/v0.2.0-beta.38%2Bmc1.21.11 at 2026-10-24T08:20:11Z. Tag v0.2.0-beta.38+mc1.21.11 resolves to 9f25b7d1ec46f950576d53a24e097bae6b66cf70. Build run 40077147889 succeeded; Release run 40077147908 succeeded on attempt 1 with all 56 jobs successful (source audit, full Lavapipe prerequisite matrix and release build/test/verification/publication).
+- Downloaded all four assets and checked their sizes. Install JAR veyra-0.2.0-beta.38+mc1.21.11.jar: 1,052,931 bytes, SHA-256 e1a1cbd6a77ecd8e80931a2634df7ce53fe6c6f83c499028bcfe308e601fd7d9. Sources JAR: 395,645 bytes, SHA-256 a7a906aa252233a74e9986d22eb5fd1791004ae9b823c36a3da3af794e8821b2. Example ZIP: 131,484 bytes, SHA-256 9fca0033e9d74d827dcf430ef5ddeba2eb080d20266e2e8c395ef64f0f2ec2f8.
+- All three archive SHA-256 values match the downloaded SHA256SUMS.txt; zip integrity checks passed. scripts/verify_jar.py accepted the downloaded install JAR for Minecraft 1.21.11, VulkanMod 0.6.8 and mod 0.2.0-beta.38+mc1.21.11. Verification report and downloaded assets are in build/reports/release-verification-beta38/.
+- The Windows build is 29 bytes larger with a different checksum. Compared every ZIP entry: only LICENSE_veyra, THIRD_PARTY_NOTICES.md and licenses/jcpp-Apache-2.0.txt differ; their normalized line endings match. Class/resource payloads otherwise match exactly. The published checksum above is the installation checksum.
+- #103 and #104 are merged. Preparing a publication-record/metadata sync PR from the release tree to main; no runtime code is added by that sync. The full stable goal remains active: sign-text upVec, particle gaux2 overrides, natural-world/whole-pack visuals and the earlier unexplained Windows native shutdown failure remain unclosed requirements.

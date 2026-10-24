@@ -20,6 +20,10 @@ def verify(path):
         assert "${" not in metadata["version"], "unexpanded version"
         for entry in ("THIRD_PARTY_NOTICES.md", "licenses/jcpp-Apache-2.0.txt", "veyra.refmap.json"):
             assert jar.read(entry), f"empty required entry: {entry}"
+        refmap = json.loads(jar.read("veyra.refmap.json"))
+        cloud_targets = refmap["mappings"].get("dev/veyra/mixin/VulkanCloudRendererMixin", {})
+        assert any("class_289;method_60827" in target for target in cloud_targets.values()), (
+            "cloud Tesselator.begin target is not remapped to intermediary")
         mixins = json.loads(jar.read("veyra.mixins.json"))
         for name in mixins.get("client", []) + mixins.get("mixins", []):
             entry = (mixins["package"] + "." + name).replace(".", "/") + ".class"

@@ -1,6 +1,11 @@
-# Shaderpack compatibility - beta.36 validation
+# Shaderpack compatibility - beta.38 validation
 
-## Local Iris `begin.fsh` candidate - not published - 2026-10-23
+
+## Published beta.38 - 2026-10-24
+
+Beta.38 preserves beta.37 and adds the pre-shadow compute implementation plus compute uniform/setup fixes documented below. PR #103 passed exact-head Build, source audit and all 54 hosted Graphics smoke jobs and was merged as 96acd6d. PR #104 also passed its own Build/source audit/all 54 hosted Graphics jobs and merged as d9e0fdc. Its hosted setup fixture reported setupResizePassed=true, 360,000/0 pixels and zero runtime validation errors; 20 process-teardown diagnostics were retained. Release run 40077147908 passed all 56 jobs and published beta.38 at 9f25b7d. The downloaded JAR passed checksum and distributable verification. The forced versioned local beta.38 build/test gate passed 573 tests and distributable verification. The local setup resize fixture now verifies the previously untested resize boundary: 640x360 -> 800x450, 360,000 active / 0 disabled pixels and clean exit on RTX 3070. Full third-party visuals and general shutdown stability remain unproven; the historical checkpoints below retain their original scope.
+
+## Historical beta.37 `begin.fsh` local validation - 2026-10-23
 
 The follow-up adds Iris `begin` and numbered `begin1`-`begin99` fragment passes to the pre-shadow frame phase. Graphics and matching compute components run in program order before shadow rendering, and the example verifies that a value written to `colortex1` remains available to `final.fsh`. The fixture is included in the hosted Lavapipe graphics matrix. This synthetic pass check does not establish full Iris scheduling parity or whole-pack compatibility.
 
@@ -428,3 +433,7 @@ The existing `compute-setup-stage` fixture now detects excess invocation counts,
 The stronger fixture also exposed that compute UBO fields were created without calling VulkanMod `Uniform.Info.setupSupplier()`: setup executed once but read zero `viewWidth`/`viewHeight`, while the composite reader had correct values. Compute pipeline construction now connects each supported field to the registered VulkanMod supplier before building the UBO. This fixes the shared compute path rather than substituting viewport values in the fixture. The final RTX 3070 run passed: initial 640x360, resized 800x450, `setupResizePassed=true`, **360,000 active / 0 disabled pixels**, process exit 0, and no VUID/validation/device-loss markers in the client log. Khronos validation was not enabled on Windows; hosted Lavapipe remains required. The JDK 21 gate passed 573 tests without failures/errors/skips, shader validation, build, smoke-source compilation and example packaging. The five Python tooling tests passed; the development JAR passed the distributable verifier.
 
 The fresh pinned source audit on this runtime code passed: four packs, 12 defaults and 63 profile/dimension cases, 864 geometry fragments accepted / 0 rejected, and 18/18 active compute stages compiled. Every row retains `visualValidation=false`.
+
+The beta.38 Complementary lifecycle log also identifies concrete unsupported routes: sign text for gbuffers_block requests upVec, and the gbuffers_textured particle fallback requests gaux2. Those shader overrides are skipped with warnings. These gaps remain open even if the generated-scene lifecycle/readback gate passes; source-only acceptance must not be read as complete runtime compatibility.
+
+The versioned beta.38 Complementary Reimagined r5.9.3 COMPLEMENTARY lifecycle run passed on RTX 3070: 326,462 non-black pixels / 55 color buckets, resize, Nether/return, disable/re-enable and resource reload all true, 810,549,248-byte SSBO owner released/recreated, process exit 0. Before allocator destruction, shutdown evidence contains no shader-pack buffers, no active storage owner and zero owner bytes. The captured scene is generated and the sign-text/particle gaps above remain; no whole-pack or natural-world visual certification is claimed.
