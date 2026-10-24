@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0-beta.37 - 2026-10-24 (experimental prerelease)
+
+- Add SSBO-only Iris compute programs using `bufferObject.N`, pre-shadow `begin.csh`, `setup.csh`, and pre-shadow `begin.fsh` passes. Preserve setup/begin SSBO contents across later passes and frames; clear frame color targets only once so begin-fragment output survives into the rest of the frame.
+- Add focused example packs and hosted Lavapipe graphics-smoke coverage for SSBO-only compute, setup, begin compute, and begin fragment behavior. The versioned local beta.37 candidate's begin-fragment fixture passed on RTX 3070 with 230,400 active / 0 disabled marker pixels. Separate RTX 3070 runs of the SSBO-only, setup, and begin-compute fixtures also reported 230,400 / 0; setup resize was not separately exercised on the physical GPU.
+- Pass the local JDK 21 gate with 568 tests (0 failures/errors/skips), 102 example shader sources / 118 direct Vulkan SPIR-V compilations, build, graphics-smoke compilation, and example-pack packaging. The hosted release workflow must pass its fresh source audit and full Lavapipe graphics matrix before it can publish.
+- Pass the local pinned source-only audit for four archives / 12 default and 63 declared-profile/dimension cases: 864 geometry fragments accepted / 0 rejected, 18/18 active compute stages compiled. All 75 records retain `visualValidation: false`; this is not whole-pack visual certification.
+- Keep writable shadow `voxel_img` conditional on Vulkan `vertexPipelineStoresAndAtomics`; 18 Complementary profile/dimension audit rows report that capability requirement. The tested RTX 3070 enabled it; availability on other devices is not established by the source audit.
+- This remains an experimental Iris-compatible subset. These fixtures do not establish full-pack or natural-world visual compatibility; see `COMPATIBILITY.md` for specific evidence and unsupported stages.
+
 ## 0.2.0-beta.36 - 2026-10-23 (experimental prerelease)
 
 - Support read-only custom-image sampling from `gbuffers_basic.vsh` and `gbuffers_line.vsh`. Prepare image samplers before native vertex adaptation and merge their descriptor bindings with fragment-stage samplers. Storage-image writes through these basic/line graphics pipelines remain unsupported.

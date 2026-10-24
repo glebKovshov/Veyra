@@ -1,19 +1,21 @@
-# Veyra 0.2.0-beta.36+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.37+mc1.21.11 - experimental prerelease
 
-Beta.36 adds read-only custom-image sampling to the vertex stages of `gbuffers_basic` and `gbuffers_line`. The shared sampler declarations are prepared before native vertex adaptation, and the native descriptor layout includes the image samplers used by both vertex and fragment stages. Storage-image writes through these basic/line render pipelines remain explicitly unsupported.
+Beta.37 adds Iris `setup` and pre-shadow `begin` compute programs, pre-shadow `begin.fsh` passes, and compute programs that use `bufferObject.N` without a custom storage image. Setup and begin writers preserve their SSBO contents for later passes and frames. Begin fragment color targets are cleared once per frame, before the begin pass, so its output can feed later shader programs.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.36+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.37+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
 ## Validation and known limits
 
-The final local JDK 21 gate passed **554 tests** with no failures, errors, or skips; it validated **102 example shaders**, compiled **118 shader stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. The pinned source-only audit passed four archives across 12 default and 63 declared-profile cases: **864 geometry-fragment programs accepted / 0 rejected** and **18/18 active compute stages compiled**. Each source-audit row retains `visualValidation: false`.
+The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; it validated **102 example shader sources**, compiled **118 stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. The versioned local beta.37 candidate's `begin-fragment-stage` fixture passed on an RTX 3070 with **230,400 active / 0 disabled marker pixels**. Separate RTX 3070 runs of the SSBO-only compute, setup, and begin-compute fixtures also produced **230,400 / 0**. Setup-on-resize was not separately exercised on the physical GPU. Khronos validation was not enabled in these Windows runs; the candidate client log contained no VUID or device-loss markers.
 
-The hosted `basic-custom-image` Lavapipe fixture sampled the same image in the basic vertex and fragment stages and read **471 active green pixels / 0 after disabling the pack**, with **0 runtime Vulkan validation errors**. Twenty process-teardown diagnostics were retained in the CI artifact. The line-stage example is covered by capability/interface regression checks; it has no line-specific GPU readback. These are named synthetic fixtures, not third-party shaderpack or natural-world visual certification. The release workflow runs the full Lavapipe matrix, source audit, versioned build/tests, and distributable verifier before publishing.
+The local pinned source-only audit passed for four archives across 12 defaults and 63 declared-profile/dimension cases: **864 geometry fragments accepted / 0 rejected** and **18/18 active compute stages compiled**. All 75 report rows retain `visualValidation: false`; the audit does not establish runtime or visual compatibility.
 
-The final PR #94 head passed **52/52 hosted checks**, including the complete 49-job Lavapipe matrix, Build, and pinned source audit. The merged beta.36 candidate also passed the forced local JDK 21 gate and its JAR verifier; the published asset and checksum will be listed in the project work summary.
+Eighteen Complementary profile/dimension records report a device capability requirement for writable shadow `voxel_img` in the shadow vertex stage (`vertexPipelineStoresAndAtomics`). The tested RTX 3070 enabled the requested feature, but support on other devices is not implied.
 
-Veyra remains an experimental Iris-compatible subset. Do not infer complete shaderpack support or stable Iris parity from these results. See `COMPATIBILITY.md` and `ARCHITECTURE.md` for measured evidence and unresolved work.
+The release workflow requires a fresh pinned source audit, the full Lavapipe graphics matrix, versioned build/tests, and distributable verification before publishing. These checks validate selected source paths and synthetic render fixtures, not complete third-party shaderpacks or natural-world visuals. Pinned source-audit rows explicitly retain `visualValidation: false`.
+
+Veyra remains an experimental Iris-compatible subset. Compute support covers the documented setup, begin, shadow-compute, and post-processing families and selected SSBO/image semantics; other Iris features remain unsupported or unverified. Do not infer complete shaderpack support or stable Iris parity from these results. See `COMPATIBILITY.md` and `ARCHITECTURE.md` for the measured matrix and backend gaps.
