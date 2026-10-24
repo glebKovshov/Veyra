@@ -1,5 +1,12 @@
-# Shaderpack compatibility - beta.43 validation
+# Shaderpack compatibility - beta.44 validation
 
+## Beta.44 - 2026-10-24
+
+A fresh RTX 3070 run used the pinned Complementary Reimagined r5.9.3 HIGH profile. The active terrain fragment mapping selected DRAWBUFFERS:064 after the unconditional DRAWBUFFERS:06 fallback. Geometry output location 2 therefore targets colortex4, and the deferred pipeline binds VeyraColortex4Sampler. The lifecycle report records status=passed, 359,998 non-black pixels / 109 color buckets, resize to 800x450, Nether and Overworld profile transitions, shaderpack disable/re-enable, and a real client resource reload. The run used a generated validation scene, not a natural world.
+
+The pinned source audit covered four packs, 12 defaults and 63 profile cases. It accepted 921 geometry fragments, rejected 18 gbuffers_textured fragments because that adapter does not support the gaux2 sampler, and compiled 18 active compute stages. Every audit row remains visualValidation=false. Some source-only profile rows also record writable vertex-stage storage-image capability errors because the audit has no Vulkan device; the RTX 3070 smoke reported vertexPipelineStoresAndAtomics enabled. These results do not establish full pack support.
+
+The matched Iris HIGH capture from beta.43 still showed Veyra darker overall with a different sign appearance. Beta.44 fixes the active geometry target mapping only; full Iris visual parity and the remaining gaux2 route are unverified.
 ## Beta.43 - 2026-10-24
 
 The fresh RTX 3070 run `run-cmp-post-colortex-binding-pinned-high-20261024` used Complementary Reimagined r5.9.3 freshly extracted from the pinned archive (SHA-256 `FED6C879E732CF7FC7BC6570EBB1DEF43235AA7E96F62859FBDBDBFA0B484B38`). Its stock `program/gbuffers_skybasic.glsl` is SHA-256 `D8C23923E629C89A8858DB1D3B518437459434E8F745346D6E526486065F0751` and ends with the stock `color` output. Veyra applied the `HIGH` profile (14 options), passed the RTX 3070 smoke with 230,400 non-black pixels / 111 color buckets, bound `lib/textures/cloud-water.png` to `VeyraColortex3Sampler`, and displayed volumetric clouds. Evidence: `run-cmp-post-colortex-binding-pinned-high-20261024/logs/latest.log`, `build/reports/agent-review-post-colortex-binding-pinned-high-20261024/result.json`, and `build/reports/agent-review-post-colortex-binding-pinned-high-20261024/third-party-pack-active.png`.

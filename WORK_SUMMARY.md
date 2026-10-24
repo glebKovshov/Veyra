@@ -1746,3 +1746,10 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Complementary Reimagined r5.9.3, профиль HIGH, прошёл smoke на NVIDIA GeForce RTX 3070. Итог `result.json`: `status=passed`, 359,998 non-black pixels, 109 цветовых групп; подтверждены resize, Nether/возврат в Overworld, disable/re-enable и реальная перезагрузка ресурсов (`thirdPartyLifecycleCompleted=true`, ошибок нет). Deferred pass загружал colortex4 через `VeyraColortex4Sampler`.
 - Локальный graphics-smoke завершился `BUILD SUCCESSFUL` за 8m 7s. Отчёт и кадры сохранены в `build/reports/active-render-targets-20261024/`; исходные логи остались в `run-cmp-active-render-targets/`.
 - PR #118 открыт и привязан к треду; локальные проверки зелёные. GitHub Build завершился успешно; remote source audit и graphics-smoke пока выполняются. Известные ограничения source audit (18 отклонённых geometry fragments из-за `gaux2`, capabilityError на некоторых профилях) остаются; это экспериментальный фикс, не заявление о полной совместимости.
+
+### Beta.44 release candidate — локальная подготовка
+
+- Создан отдельный worktree `veyra-beta44-release` от PR head `ed0c0d6`; версия повышена до `0.2.0-beta.44+mc1.21.11`. Обновлены текущие release notes, changelog, README и compatibility summary; исторические записи beta.43 и ниже сохранены.
+- Versioned JDK 21 gate прошёл: 584 теста без ошибок/пропусков, 104 shader examples / 122 Vulkan SPIR-V stages, validateShaders, graphics-smoke compilation, build и example packs. Дополнительно прошли 5 Python CI tests.
+- Beta.44 install JAR: 1,055,525 байт, SHA-256 `fa7c568efaffef415a6e731ea5dc014f6a3c4dfdf15e87445f7405374e3278e9`; `scripts/verify_jar.py` подтвердил Minecraft 1.21.11 / VulkanMod 0.6.8.
+- Beta.44 остаётся experimental prerelease: source audit принимает 921 geometry fragments и отклоняет 18 путей с `gaux2`; визуальная Iris-паритетность не подтверждена. Release branch пока не отправлялась: сначала нужны PR #118 merge и hosted checks.
