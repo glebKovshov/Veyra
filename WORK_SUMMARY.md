@@ -1664,3 +1664,46 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - All three archive SHA-256 values match the downloaded SHA256SUMS.txt; zip integrity checks passed. scripts/verify_jar.py accepted the downloaded install JAR for Minecraft 1.21.11, VulkanMod 0.6.8 and mod 0.2.0-beta.38+mc1.21.11. Verification report and downloaded assets are in build/reports/release-verification-beta38/.
 - The Windows build is 29 bytes larger with a different checksum. Compared every ZIP entry: only LICENSE_veyra, THIRD_PARTY_NOTICES.md and licenses/jcpp-Apache-2.0.txt differ; their normalized line endings match. Class/resource payloads otherwise match exactly. The published checksum above is the installation checksum.
 - #103 and #104 are merged. Preparing a publication-record/metadata sync PR from the release tree to main; no runtime code is added by that sync. The full stable goal remains active: sign-text upVec, particle gaux2 overrides, natural-world/whole-pack visuals and the earlier unexplained Windows native shutdown failure remain unclosed requirements.
+
+### Beta.42 local release candidate - 2026-10-24
+
+- Created isolated local worktree `veyra-beta42-release-prep` on `release/0.2.0-beta.42+mc1.21.11`, based on PR #112 head `4384320`. Updated version, README, changelog, release notes and compatibility record; runtime source was not changed in the release batch.
+- Versioned JDK 21 gate `test build validateShaders compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon --console=plain` passed: 582 tests, 0 failures/errors/skips; 104 shader examples, 122 direct Vulkan SPIR-V compilations, shader validation, package, build and graphics-smoke compilation.
+- Local beta.42 install JAR passed `scripts/verify_jar.py`: 1,054,716 bytes, SHA-256 `D4C36FC80D51C5373E3BEFF77DB4B36C27058489C73FAC171E7F2FB9FA137B94`; Minecraft 1.21.11 / VulkanMod 0.6.8 / mod 0.2.0-beta.42+mc1.21.11.
+- This is an unpublished local candidate; do not push the `release/**` branch until PR #112 merges, because that ref triggers the actual Release workflow. The source-equivalent RTX Sildur lifecycle passed before the version-only release bump; the versioned build itself has compile/readback gate evidence, not a new physical-GPU run.
+- Sign-glyph readability, natural-world Iris side-by-side and the historical Windows `0xC0000409` remain unverified.
+
+### Результаты проверки других агентов и повторная проверка beta.42 — 2026-10-24
+
+- В этой T3-сессии дочерних агентов нет. GitHub search нашёл только один открытый PR: #112; прежние PR #103–#111 уже слиты. Предыдущий Veyra thread помечен failed из-за лимита Claude и ошибки передачи контекста, а не из-за провала сборки или PR.
+- Предыдущий агент подготовил Iris 1.10.8 + Sodium 0.8.14 на Fabric 1.21.11 и загрузил тот же сгенерированный мир VeyraValidation и профиль Complementary Reimagined. Кадры beta.41: `veyra-beta41-release/build/gs-cmp-default/third-party-pack-active.png` и `iris-reference/build/reference-cmp/iris-reference-initial.png`. На паре кадров 640x360 Veyra заметно темнее, облака отсутствуют; Iris показывает яркую сцену с облаками. Это значимый сгенерированный side-by-side сигнал, но не natural-world parity. Агент не установил причину; временный uniform probe её не доказывает.
+- Перепроверка beta.42 на RTX 3070 загрузила 14 Complementary-проходов, но `result.json` завершился со `status=failed`: при shadow-map draw `VeyraShadowRenderer.bindTerrainShadowColor` выбросил `shadowcolor0 feedback is unsupported` через `VeyraGeometryTargets.beforeBind`, после чего Veyra отключил pack. Хотя Gradle-команда вернула exit 0, smoke JSON — провальный; созданный кадр после отключения не годится для сравнения. Этот путь нужно отдельно triage-проверить перед решением о публикации beta.42.
+- PR #112 остаётся открытым и watched. Hosted checks вручную не опрашивал; при последней зафиксированной проверке Build был green, source audit и Graphics smoke ещё выполнялись/ожидались. Локальные 582 теста и Sildur lifecycle, записанные выше, не покрывают Complementary shadowcolor0 path.
+
+### Исправление shadow-прохода и повторный GPU smoke — 2026-10-24
+
+- Удалены четыре безусловных исключения при привязке shadow color/depth во время записи shadow map. При `shadowMapCompleted=false` binder-ы используют уже подготовленный neutral fallback; вызовы и владельцы ресурсов не менялись. Изменение зафиксировано в `0eee746` и отправлено в PR #112.
+- Полный JDK 21 gate на исходниках PR #112: 582 теста, 0 failures/errors/skips; build, shader validation (104 примера / 122 direct Vulkan SPIR-V), graphics-smoke compilation и упаковка example packs прошли.
+- RTX 3070, Complementary Reimagined default: smoke `passed`, 230 400 активных пикселей, 48 color buckets, ошибка пустая. Sildur Vibrant lifecycle: `passed`, 360 000 пикселей / 58 buckets; resize, Nether, возврат, disable, re-enable и reload подтверждены.
+- Эти результаты подтверждают работу smoke-сцен и lifecycle, но не визуальный parity: контролируемая синтетическая сцена показывает значительный visual parity-дефект: Veyra темнее, без облаков, а стена визуально расходится с Iris; natural-world проверка остаётся открытой. Причина не установлена; natural-world сравнение и стабильная совместимость не подтверждены.
+- Исправление ещё не перенесено в локальную beta.42 release-prep ветку, основанную на прежнем head PR #112. Перед выпуском обновить её после merge и повторить версионированный gate/JAR verifier. Hosted checks нового PR head ожидаются через T3 watcher; вручную их не опрашивали.
+
+### Проверка контролируемой Veyra/Iris capture-сцены — 2026-10-24
+
+- Исходники `GraphicsSmoke` и `ReferenceCapture` выставляют одинаковые условия: teleport в `(0,72,0)`, `dayTime=1000`, одна и та же сетка пола и 17×7 material wall, pitch `-2°`, yaw `0°`, окно 640×360; Veyra добавляет тестовый знак в центр стены.
+- Свежие кадры: `veyra-signtext-vertex/build/reports/agent-review-cmp-shadow-fallback-20261024/third-party-pack-active.png` и `iris-reference/build/reference-probe/iris-reference-initial.png`. Здесь Veyra заметно темнее, облака отсутствуют, а стена визуально расходится с Iris. Это реальный parity-дефект на контролируемой синтетической сцене; его причина ещё не установлена.
+- Ранее использованный `reference-cmp/iris-reference-initial.png` старше и был снят до последнего запуска. Новый `reference-probe` соответствует текущему `ReferenceCapture`; в release notes должна ссылаться на этот кадр.
+- Контролируемая сцена не заменяет natural-world и full-pack проверки. Следующий шаг для stable parity — найти источник отличий по sky/cloud/terrain, исправить его и повторить эту пару и lifecycle.
+
+### PR #112 merged; beta.42 candidate refreshed — 2026-10-24
+
+- Rechecked PR #112 at exact head `0eee746da8edcdfa26cea9e1875cb0cac8083917`: all 57 hosted checks succeeded (Build, source audit and the full Lavapipe matrix); reviews and comments were empty. Merged with expected-head protection as `de62eab14e0ac3bfd7a82e3a65f1df2be89cd813`.
+- Fast-forwarded isolated `release/0.2.0-beta.42+mc1.21.11` worktree from `4384320` to final `main` merge `de62eab`, so it now contains the checked shadow-pass fallback fix. The beta.42 remote release branch and version tag do not exist yet; release workflow has not been triggered.
+- Preserved the root `feature/block-entity-hand-vertex` checkout and its user-owned untracked artifacts. In the beta.42 worktree, existing release-doc/version edits are still uncommitted; generated `logs/` and `run-cmp-beta42-agent-audit-20261024/` are untracked and untouched.
+- The refreshed beta.42 candidate still documents the controlled Veyra/Iris visual mismatch (darker scene, missing clouds, different wall) and the unexplained historical Windows shutdown. Re-run the full versioned gate and JAR verifier on `de62eab` before considering publication; no release claim is made yet.
+
+### Beta.42 refreshed versioned gate — 2026-10-24
+
+- With `JAVA_HOME` set only for this shell to the existing cached Temurin 21.0.12.1, ran `test build validateShaders compileGraphicsSmokeJava packageExamplePacks --rerun-tasks --no-daemon --console=plain` on the refreshed beta.42 source. Build succeeded; JUnit XML reports 582 tests, 0 failures, 0 errors and 0 skipped. Shader validation passed 104 examples / 122 direct Vulkan SPIR-V compilations; graphics-smoke compilation and example-pack packaging passed.
+- `scripts/verify_jar.py` accepted `build/libs/veyra-0.2.0-beta.42+mc1.21.11.jar` for Minecraft 1.21.11, VulkanMod 0.6.8 and mod 0.2.0-beta.42+mc1.21.11. Windows artifact: 1,054,630 bytes; SHA-256 `AABD69007AD509348523EC2C6D073DC87932ED41D341A37A5694FBF769F71C68`.
+- `git diff --check` passed. The versioned candidate is local only; hosted release gates and downloaded-asset verification remain before publication. The prior failed Complementary smoke is superseded by the passing RTX 3070 run documented above after the exact shadow fallback change.

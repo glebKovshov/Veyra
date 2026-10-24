@@ -1,4 +1,14 @@
-# Shaderpack compatibility - beta.41 validation
+# Shaderpack compatibility - beta.42 validation
+
+## Beta.42 - 2026-10-24
+
+The beta.42 RTX 3070 Sildur generated-scene lifecycle passed (360,000 non-black pixels) with resize, Nether/return, disable/re-enable and reload. A real `SignBlockEntity` exercised the sign-text pipeline; glyph readability was not verified. The pinned Sildur audit found 42 stages, with 0 preprocessing/adaptation errors and `visualValidation=false`.
+
+Complementary Reimagined default smoke passed on runtime commit `0eee746` after shadow color/depth binders began using the prepared neutral fallback while the shadow map is incomplete (230,400 non-black pixels / 48 color buckets; empty smoke error). This was a smoke run, not a full lifecycle.
+
+The Veyra `GraphicsSmoke` and Iris `ReferenceCapture` sources both teleport to (0,72,0), set dayTime=1000, create the same 25×25 floor and 17×7 material wall, set pitch -2° / yaw 0°, and capture at 640x360; Veyra adds a sign at the center of the wall. With Complementary default and Iris 1.10.8 + Sodium 0.8.14, the fresh captures show Veyra substantially darker, without clouds, and with a visibly different wall image. This is a controlled synthetic-scene parity failure; its cause is unresolved and it is not natural-world/full-pack certification. Complementary Unbound and BSL lifecycle results remain from beta.41.
+
+A separate local 1.21.11 Fabric profile produced three JVM `0xc0000005` reports in Reflex 1.1.2's `GL15C.nglGenQueries` call while VulkanMod 0.6.8 was loaded; its latest log did not list Veyra. This is an observed third-party profile conflict, not a Veyra crash report. The historical Windows `0xC0000409` shutdown remains unexplained.
 
 ## Beta.41 - 2026-10-24
 
