@@ -1773,4 +1773,12 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - В отдельном worktree от `origin/main` исправлен sign-text путь для `gaux2`: адаптер разрешает geometry color inputs; `compileSignTextPipelines` теперь передаёт индексы цветовых входов в существующие pipeline resources/spec. Добавлен тест на `gaux2` и на его приоритет как custom texture alias.
 - JDK 21: 585 тестов прошли; `build validateShaders` завершились успешно. Валидация охватила 104 example shaders, 122 Vulkan SPIR-V компиляции. Source audit 4 pinned packs × 3 dimensions: 12 default и 63 declared-profile cases, 939 geometry fragments приняты, 0 отклонено; 18/18 активных compute stages приняты.
 - RTX 3070 graphics smoke с Complementary Reimagined HIGH завершился успешно: resize, переход Nether/Overworld, disable/re-enable и resource reload; `result.json` — `passed`. Отдельная временная GPU-проба подтвердила descriptor `VeyraGeometryColor5Sampler` на `pipeline/text_polygon_offset`, image — `colortex5`; smoke — `passed`.
-- Это ещё не подтверждение полной Iris-паритетности. PR и следующий prerelease пока не созданы; финальное решение о выпуске ожидает hosted checks после отправки готового PR.
+- Это ещё не подтверждение полной Iris-паритетности. PR #121 слит после успеха Build, source audit и 57/57 hosted check runs; beta.45 пока подготовлена локально и ждёт versioned build gate перед публикацией.
+
+### Beta.45 release candidate — 2026-10-24
+
+- PR #121 (`7dfc2f4`) merged to `main` as `e85789d`. Hosted Build #932 and source audit #265 passed; all 54 jobs in Graphics smoke #308 passed, and all 57 commit check runs are green.
+- Prepared `0.2.0-beta.45+mc1.21.11` metadata in isolated worktree `veyra-beta45-release-prep-20261024`, based on the merged main. The `release/**` ref has not been pushed; its push runs the publication workflow.
+- Versioned JDK 21 gate passed: 585 tests, 0 failures/errors/skips; 104 shader examples and 122 Vulkan SPIR-V stages validated; `build validateShaders packageExamplePacks` succeeded. `scripts/verify_jar.py` passed.
+- Candidate install JAR: 1,055,573 bytes, SHA-256 `141044977CEC28938713CFCA0C3B52BB2B4A1C838D2FFED3202398C3980C77A5`. Example-packs ZIP: 132,837 bytes, SHA-256 `0054B2725C7391EC19726598C8A736A10C2AFCB4D95523560AA6A8DC070E816B`.
+- Beta.45 remains an experimental prerelease. The 939 accepted source fragments and synthetic sign-text sampler smoke do not establish natural-world or full Iris visual parity.

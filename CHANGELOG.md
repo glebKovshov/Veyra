@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-beta.45 - 2026-10-24 (experimental prerelease)
+
+- Bind shader-pack `gaux2` to the geometry color sampler for sign text pipelines and pass its colortex index into Vulkan descriptors.
+- Preserve custom texture aliases, including a pack-owned texture named `gaux2`.
+- JDK 21 gate: 585 tests passed; 104 shader examples and 122 Vulkan SPIR-V stages validated.
+- Source audit accepted 939 geometry fragments across four pinned packs, three dimensions, and 12 defaults / 63 declared-profile cases; 18 active compute stages passed. No visual parity claim.
+- RTX 3070 Complementary Reimagined HIGH lifecycle and a dedicated sign-text sampler smoke both passed.
+
 ## 0.2.0-beta.44 - 2026-10-24 (experimental prerelease)
 
 - Resolve active, profile-specific geometry DRAWBUFFERS / RENDERTARGETS mappings so Complementary HIGH routes the third fragment output to colortex4.
