@@ -124,6 +124,7 @@ public final class EntityShaderAdapter {
             Map.entry("lmCoord", new Varying("vec2")),
             Map.entry("viewPos", new Varying("vec3")),
             Map.entry("normal", new Varying("vec3")),
+            Map.entry("color", new Varying("vec4")),
             Map.entry("sunVec", new Varying("vec3")),
             Map.entry("upVec", new Varying("vec3")),
             Map.entry("eastVec", new Varying("vec3")),
@@ -279,7 +280,7 @@ public final class EntityShaderAdapter {
 
     public static boolean requiresLightmapInput(String source) {
         String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
-        Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
+        Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(uncommented));
         while (matcher.find()) {
             if (matcher.group(4).equals("lmcoord") || matcher.group(4).equals("lightMapCoord")
                     || matcher.group(4).equals("lmCoord")) {
@@ -573,9 +574,8 @@ public final class EntityShaderAdapter {
         boolean hasLightmapAssignment = LIGHTMAP_ASSIGNMENT.matcher(uncommented).find();
         boolean addLightmapOutput = requiresLightmapCoord && !hasLightmapOutput;
         boolean addLightmapAssignment = requiresLightmapCoord && !hasLightmapAssignment;
-        if (addLightmapAssignment && !LIGHTMAP_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
-            throw new IOException(programName + " requires lmcoord, but VulkanMod's vertex format does not provide UV2.");
-        }
+        // Formats without UV2 (see-through text) are drawn full-bright by Minecraft.
+        boolean fullBrightLightmap = addLightmapAssignment && !LIGHTMAP_VERTEX_ATTRIBUTE.matcher(uncommented).find();
         boolean hasViewPositionOutput = VIEW_POSITION_VERTEX_OUTPUT.matcher(uncommented).find();
         boolean hasViewPositionAssignment = VIEW_POSITION_ASSIGNMENT.matcher(uncommented).find();
         boolean addViewPositionOutput = requiresViewPosition && !hasViewPositionOutput;
@@ -643,7 +643,9 @@ public final class EntityShaderAdapter {
             vertexAssignments.append("normal = normalize(mat3(").append(inverseMatrix)
                     .append(") * transpose(inverse(mat3(ModelViewMat))) * Normal);\n");
         }
-        if (addLightmapAssignment) {
+        if (fullBrightLightmap) {
+            vertexAssignments.append("lmcoord = vec2(240.0 / 256.0 + 0.03125);\n");
+        } else if (addLightmapAssignment) {
             vertexAssignments.append("lmcoord = (vec2(UV2) / 256.0) + vec2(0.03125);\n");
         }
         if (addViewPositionAssignment) {
@@ -1127,8 +1129,7 @@ public final class EntityShaderAdapter {
                         + (suppliesUpVector ? "#define upVec normalize(gbufferModelView[1].xyz)\n" : "")
                         + (suppliesEastVector ? "#define eastVec normalize(gbufferModelView[0].xyz)\n" : "")
                         + (suppliesNorthVector ? "#define northVec normalize(gbufferModelView[2].xyz)\n" : "")
-                        + (suppliesTextNormal ? "#define normal faceforward(normalize(cross(dFdx(viewPos), "
-                                + "dFdy(viewPos))), viewPos, normalize(cross(dFdx(viewPos), dFdy(viewPos))))\n" : ""))
+                        + (suppliesTextNormal ? "vec3 normal;\n" : ""))
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler
@@ -1195,6 +1196,15 @@ public final class EntityShaderAdapter {
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
         result.append(outputLayout.entityPipelineDeclarations());
+        if (suppliesTextNormal) {
+            // A global rather than a macro keeps pack functions with a 'normal' parameter valid.
+            Matcher fragmentMain = MAIN_FUNCTION.matcher(adapted);
+            if (!fragmentMain.find()) throw new IOException(programName + " has no fragment main function.");
+            adapted = adapted.substring(0, fragmentMain.end())
+                    + "\n    normal = normalize(cross(dFdx(viewPos), dFdy(viewPos)));"
+                    + "\n    normal = faceforward(normal, viewPos, normal);"
+                    + adapted.substring(fragmentMain.end());
+        }
         return result.append(adapted).toString();
     }
 

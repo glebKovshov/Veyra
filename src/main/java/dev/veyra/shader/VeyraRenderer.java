@@ -4878,6 +4878,7 @@ public final class VeyraRenderer {
                     programName, exception.getMessage());
             return;
         }
+        dumpShaderSource("sign-text-" + programName + ".fsh", fragmentSource);
         String sourceHash = sha256("sign_text_" + programName + '\n' + fragmentSource
                 + '\n' + customImageStage.resources() + '\n' + new java.util.TreeSet<>(customTextureSamplers));
         for (RenderPipeline original : candidates) {

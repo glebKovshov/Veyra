@@ -153,7 +153,49 @@ class EntityIdentifierUniformTest {
 
         org.junit.jupiter.api.Assertions.assertTrue(EntityShaderAdapter.requiresTextNormalInput(source));
         org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("in vec3 viewPos;"), adapted);
-        org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("#define normal faceforward("), adapted);
+        org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("normal = faceforward(normal, viewPos, normal);"), adapted);
         org.junit.jupiter.api.Assertions.assertFalse(adapted.contains("in vec3 normal;"), adapted);
+    }
+
+    @Test
+    void signTextAcceptsLegacyColorInput() throws Exception {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texCoord;
+                varying vec4 color;
+                void main() {
+                    gl_FragData[0] = texture2D(texture, texCoord) * color;
+                }
+                """;
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block");
+
+        org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("#define color veyraEntityColor"), adapted);
+    }
+
+    @Test
+    void signTextNormalKeepsNormalParametersValid() throws Exception {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                varying vec4 glcolor;
+                varying vec3 normal;
+                float shade(vec3 normal) { return max(normal.z, 0.5); }
+                void main() {
+                    gl_FragData[0] = texture2D(texture, texcoord) * glcolor * shade(normal);
+                }
+                """;
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block");
+
+        org.junit.jupiter.api.Assertions.assertTrue(adapted.contains("float shade(vec3 normal)"), adapted);
+        org.junit.jupiter.api.Assertions.assertFalse(adapted.contains("#define normal"), adapted);
+    }
+
+    @Test
+    void lightmapInputDetectedInCommaSeparatedVaryings() {
+        org.junit.jupiter.api.Assertions.assertTrue(EntityShaderAdapter.requiresLightmapInput(
+                "varying vec2 texCoord, lmCoord;\n"
+                        + "void main() { gl_FragData[0] = vec4(lmCoord, 0.0, 1.0); }\n"));
     }
 }
