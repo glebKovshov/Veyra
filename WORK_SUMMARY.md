@@ -1740,3 +1740,9 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Целевые parser-тесты прошли. Полный локальный JDK 21 gate прошёл: 584 теста без ошибок и пропусков, 104 shader-примера / 122 Vulkan SPIR-V, сборка, graphics-smoke compilation и упаковка example packs.
 - Повторный pinned source audit проверил 4 shaderpack, 12 default-наборов и 63 профиля: 921 geometry fragment принят, 18 отклонены из-за неподдерживаемого sampler `gaux2`; 18 активных compute stages скомпилированы. Некоторые профили также отмечают недоступный `vertexPipelineStoresAndAtomics`. Это ограничения совместимости, а не доказательство полной Iris-паритетности.
 - RTX 3070 smoke с Complementary Reimagined r5.9.3 HIGH проходит resize и Nether/Overworld lifecycle. Логи показывают загрузку deferred-прохода с `VeyraColortex4Sampler`; итоговый отчёт smoke ещё ожидается.
+
+### Active target fix — RTX 3070 lifecycle smoke завершён
+
+- Complementary Reimagined r5.9.3, профиль HIGH, прошёл smoke на NVIDIA GeForce RTX 3070. Итог `result.json`: `status=passed`, 359,998 non-black pixels, 109 цветовых групп; подтверждены resize, Nether/возврат в Overworld, disable/re-enable и реальная перезагрузка ресурсов (`thirdPartyLifecycleCompleted=true`, ошибок нет). Deferred pass загружал colortex4 через `VeyraColortex4Sampler`.
+- Локальный graphics-smoke завершился `BUILD SUCCESSFUL` за 8m 7s. Отчёт и кадры сохранены в `build/reports/active-render-targets-20261024/`; исходные логи остались в `run-cmp-active-render-targets/`.
+- PR #118 открыт и привязан к треду; локальные проверки зелёные. GitHub Build завершился успешно; remote source audit и graphics-smoke пока выполняются. Известные ограничения source audit (18 отклонённых geometry fragments из-за `gaux2`, capabilityError на некоторых профилях) остаются; это экспериментальный фикс, не заявление о полной совместимости.
