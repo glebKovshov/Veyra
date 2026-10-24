@@ -1,4 +1,10 @@
-# Shaderpack compatibility - beta.45 validation
+# Shaderpack compatibility - beta.46 validation
+
+## Beta.46 - 2026-10-25
+
+A fresh smoke using the pinned Complementary Reimagined r5.9.3 HIGH profile passed on RTX 3070: 360,000 non-black pixels / 108 color buckets, resize to 800x450, Nether/Overworld transitions, shaderpack disable/re-enable and real resource reload. The profile declares no storage buffers, so storage-buffer owner release is not applicable to this run. This generated validation scene is runtime evidence for one profile, not whole-pack certification.
+
+The shadow-color-terrain fixture also passed after scanning the full shadow map. The Iris near/far projection and sun/moon angle are applied while shadow culling uses VulkanMod-compatible vanilla depth bounds. Full Iris visual parity, natural-world comparison and whole-pack certification remain unverified.
 
 ## Beta.45 - 2026-10-24
 

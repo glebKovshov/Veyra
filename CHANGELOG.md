@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-beta.46 - 2026-10-25 (experimental prerelease)
+
+- Match Iris shadow near/far projection settings and sun/moon angle while keeping Vulkan shadow drawing and culling in their required depth spaces.
+- Bound the mc_Entity declaration check to individual declarations, avoiding runaway regex scans on large shaderpack entity sources.
+- JDK 21 gate: 589 tests passed; 104 shader examples and 122 direct Vulkan SPIR-V stages validated.
+- Pinned Complementary Reimagined r5.9.3 HIGH lifecycle smoke passed on RTX 3070: 360,000 non-black pixels, 108 color buckets, resize, Nether/Overworld, disable/re-enable and resource reload.
+- Shadow color is checked over the full map; exact Iris visual parity and natural-world parity remain unverified.
+
 ## 0.2.0-beta.45 - 2026-10-24 (experimental prerelease)
 
 - Bind shader-pack `gaux2` to the geometry color sampler for sign text pipelines and pass its colortex index into Vulkan descriptors.
