@@ -37,6 +37,8 @@ public final class EntityShaderAdapter {
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|tangent|at_tangent|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXT_INPUT = Pattern.compile(
             "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|normal|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
+    private static final Pattern UNSUPPORTED_TEXT_INPUT_WITH_NORMAL = Pattern.compile(
+            "\\b(?:mc_Entity|mc_midTexCoord|midTexCoord|viewNormal|tangent|at_tangent|lightMapColor|overlayColor|gl_Fog\\w*)\\b");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:Gather|Offset|Proj|QueryLod)\\w*\\s*\\(");
     private static final Pattern NOISETEX_REFERENCE = Pattern.compile("\\bnoisetex\\b");
@@ -106,7 +108,8 @@ public final class EntityShaderAdapter {
             Map.entry("isMainHand", new Varying("float")),
             Map.entry("sunVec", new Varying("vec3")),
             Map.entry("upVec", new Varying("vec3")),
-            Map.entry("eastVec", new Varying("vec3")));
+            Map.entry("eastVec", new Varying("vec3")),
+            Map.entry("northVec", new Varying("vec3")));
     private static final Map<String, Varying> SUPPORTED_TEXT_VARYINGS = Map.ofEntries(
             Map.entry("texcoord", new Varying("vec2")),
             Map.entry("texCoord", new Varying("vec2")),
@@ -120,9 +123,12 @@ public final class EntityShaderAdapter {
             Map.entry("lightMapCoord", new Varying("vec2")),
             Map.entry("lmCoord", new Varying("vec2")),
             Map.entry("viewPos", new Varying("vec3")),
+            Map.entry("normal", new Varying("vec3")),
+            Map.entry("color", new Varying("vec4")),
             Map.entry("sunVec", new Varying("vec3")),
             Map.entry("upVec", new Varying("vec3")),
-            Map.entry("eastVec", new Varying("vec3")));
+            Map.entry("eastVec", new Varying("vec3")),
+            Map.entry("northVec", new Varying("vec3")));
 
     private EntityShaderAdapter() {
     }
@@ -274,7 +280,7 @@ public final class EntityShaderAdapter {
 
     public static boolean requiresLightmapInput(String source) {
         String uncommented = COMMENTS.matcher(normalizeLeadingVaryingInterpolation(source)).replaceAll("");
-        Matcher matcher = VARYING_DECLARATION.matcher(uncommented);
+        Matcher matcher = VARYING_DECLARATION.matcher(expandCommaSeparatedVaryings(uncommented));
         while (matcher.find()) {
             if (matcher.group(4).equals("lmcoord") || matcher.group(4).equals("lightMapCoord")
                     || matcher.group(4).equals("lmCoord")) {
@@ -286,6 +292,11 @@ public final class EntityShaderAdapter {
 
     public static boolean requiresViewPositionInput(String source) {
         return requiresVarying(source, "viewPos");
+    }
+
+    /** Text vertices carry no normal; the sign-text bridge derives the face normal from viewPos. */
+    public static boolean requiresTextNormalInput(String source) {
+        return requiresVarying(source, "normal");
     }
 
     public static boolean requiresViewNormalInput(String source) {
@@ -563,9 +574,8 @@ public final class EntityShaderAdapter {
         boolean hasLightmapAssignment = LIGHTMAP_ASSIGNMENT.matcher(uncommented).find();
         boolean addLightmapOutput = requiresLightmapCoord && !hasLightmapOutput;
         boolean addLightmapAssignment = requiresLightmapCoord && !hasLightmapAssignment;
-        if (addLightmapAssignment && !LIGHTMAP_VERTEX_ATTRIBUTE.matcher(uncommented).find()) {
-            throw new IOException(programName + " requires lmcoord, but VulkanMod's vertex format does not provide UV2.");
-        }
+        // Formats without UV2 (see-through text) are drawn full-bright by Minecraft.
+        boolean fullBrightLightmap = addLightmapAssignment && !LIGHTMAP_VERTEX_ATTRIBUTE.matcher(uncommented).find();
         boolean hasViewPositionOutput = VIEW_POSITION_VERTEX_OUTPUT.matcher(uncommented).find();
         boolean hasViewPositionAssignment = VIEW_POSITION_ASSIGNMENT.matcher(uncommented).find();
         boolean addViewPositionOutput = requiresViewPosition && !hasViewPositionOutput;
@@ -633,7 +643,9 @@ public final class EntityShaderAdapter {
             vertexAssignments.append("normal = normalize(mat3(").append(inverseMatrix)
                     .append(") * transpose(inverse(mat3(ModelViewMat))) * Normal);\n");
         }
-        if (addLightmapAssignment) {
+        if (fullBrightLightmap) {
+            vertexAssignments.append("lmcoord = vec2(240.0 / 256.0 + 0.03125);\n");
+        } else if (addLightmapAssignment) {
             vertexAssignments.append("lmcoord = (vec2(UV2) / 256.0) + vec2(0.03125);\n");
         }
         if (addViewPositionAssignment) {
@@ -847,10 +859,11 @@ public final class EntityShaderAdapter {
         boolean suppliesSunVectorInput = requiresVarying(adapted, "sunVec");
         boolean suppliesUpVectorInput = requiresVarying(adapted, "upVec");
         boolean suppliesEastVectorInput = requiresVarying(adapted, "eastVec");
+        boolean suppliesNorthVectorInput = requiresVarying(adapted, "northVec");
         if (suppliesSunVectorInput) {
             adapted = ensureUniformDeclaration(adapted, "vec3", "sunPosition");
         }
-        if (suppliesUpVectorInput || suppliesEastVectorInput) {
+        if (suppliesUpVectorInput || suppliesEastVectorInput || suppliesNorthVectorInput) {
             adapted = ensureUniformDeclaration(adapted, "mat4", "gbufferModelView");
         }
         IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
@@ -876,6 +889,8 @@ public final class EntityShaderAdapter {
         boolean suppliesSunVector = false;
         boolean suppliesUpVector = false;
         boolean suppliesEastVector = false;
+        boolean suppliesNorthVector = false;
+        boolean suppliesTextNormal = false;
         Map<String, TerrainVertexShaderAdapter.PackVarying> linkedPackVaryings = new LinkedHashMap<>();
         while (varyingMatcher.find()) {
             String interpolation = varyingMatcher.group(2) == null ? "smooth" : varyingMatcher.group(2);
@@ -915,8 +930,14 @@ public final class EntityShaderAdapter {
             if (name.equals("sunVec")) suppliesSunVector = true;
             if (name.equals("upVec")) suppliesUpVector = true;
             if (name.equals("eastVec")) suppliesEastVector = true;
+            if (name.equals("northVec")) suppliesNorthVector = true;
             if (name.equals("normal")) {
-                suppliesNormal = true;
+                if (textPipeline) {
+                    suppliesTextNormal = true;
+                    suppliesViewPosition = true;
+                } else {
+                    suppliesNormal = true;
+                }
             }
             if (name.equals("position") && programName.startsWith("shadow_")) {
                 suppliesShadowPosition = true;
@@ -960,7 +981,9 @@ public final class EntityShaderAdapter {
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
-        if ((textPipeline ? UNSUPPORTED_TEXT_INPUT : UNSUPPORTED_ENTITY_INPUT).matcher(uncommented).find()) {
+        Pattern unsupportedInputs = !textPipeline ? UNSUPPORTED_ENTITY_INPUT
+                : suppliesTextNormal ? UNSUPPORTED_TEXT_INPUT_WITH_NORMAL : UNSUPPORTED_TEXT_INPUT;
+        if (unsupportedInputs.matcher(uncommented).find()) {
             throw new IOException(programName + " uses inputs that Veyra's "
                     + (textPipeline ? "sign-text" : "entity") + " bridge does not provide yet.");
         }
@@ -1104,7 +1127,9 @@ public final class EntityShaderAdapter {
                 .replace("__VEYRA_DIRECTIONAL_INPUTS__", (suppliesSunVector
                         ? "#define sunVec normalize(sunPosition)\n" : "")
                         + (suppliesUpVector ? "#define upVec normalize(gbufferModelView[1].xyz)\n" : "")
-                        + (suppliesEastVector ? "#define eastVec normalize(gbufferModelView[0].xyz)\n" : ""))
+                        + (suppliesEastVector ? "#define eastVec normalize(gbufferModelView[0].xyz)\n" : "")
+                        + (suppliesNorthVector ? "#define northVec normalize(gbufferModelView[2].xyz)\n" : "")
+                        + (suppliesTextNormal ? "vec3 normal;\n" : ""))
                 .replace("__VEYRA_LIGHTMAP_SAMPLER__", usesLightmapSampler
                         ? "uniform sampler2D Sampler2;\n#define lightmap Sampler2\n" : "")
                 .replace("__VEYRA_NOISE_SAMPLER__", usesNoiseSampler
@@ -1171,6 +1196,15 @@ public final class EntityShaderAdapter {
         result.append(shaderPackUniforms.declarations());
         result.append(shaderPackUniforms.macros());
         result.append(outputLayout.entityPipelineDeclarations());
+        if (suppliesTextNormal) {
+            // A global rather than a macro keeps pack functions with a 'normal' parameter valid.
+            Matcher fragmentMain = MAIN_FUNCTION.matcher(adapted);
+            if (!fragmentMain.find()) throw new IOException(programName + " has no fragment main function.");
+            adapted = adapted.substring(0, fragmentMain.end())
+                    + "\n    normal = normalize(cross(dFdx(viewPos), dFdy(viewPos)));"
+                    + "\n    normal = faceforward(normal, viewPos, normal);"
+                    + adapted.substring(fragmentMain.end());
+        }
         return result.append(adapted).toString();
     }
 

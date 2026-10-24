@@ -4868,7 +4868,8 @@ public final class VeyraRenderer {
                 VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
             }
             requiresLightmap = EntityShaderAdapter.requiresLightmapInput(fragmentSource);
-            requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource);
+            requiresViewPosition = EntityShaderAdapter.requiresViewPositionInput(fragmentSource)
+                    || EntityShaderAdapter.requiresTextNormalInput(fragmentSource);
             fragmentSource = EntityShaderAdapter.adaptTextFragment(
                     fragmentSource, programName, pack.hasShadowFragment(), -1, -1,
                     ItemIdMap.UNMAPPED, customTextureSamplers);
@@ -4877,6 +4878,7 @@ public final class VeyraRenderer {
                     programName, exception.getMessage());
             return;
         }
+        dumpShaderSource("sign-text-" + programName + ".fsh", fragmentSource);
         String sourceHash = sha256("sign_text_" + programName + '\n' + fragmentSource
                 + '\n' + customImageStage.resources() + '\n' + new java.util.TreeSet<>(customTextureSamplers));
         for (RenderPipeline original : candidates) {
@@ -5341,7 +5343,11 @@ public final class VeyraRenderer {
                 continue;
             }
             boolean fallback = !pack.particlePrograms().contains(programName);
-            Optional<String> packVertex = fallback ? Optional.empty() : pack.readStage(programName + ".vsh");
+            Optional<String> fallbackVertex = fallback ? pack.readStage(programName + ".vsh") : Optional.empty();
+            for (int attempt = fallbackVertex.isPresent() ? 0 : 1; attempt < 2; attempt++) {
+            Optional<String> packVertex = fallback
+                    ? (attempt == 0 ? fallbackVertex : Optional.empty())
+                    : pack.readStage(programName + ".vsh");
             String vertexSource = null;
             boolean usesNoiseSampler = false;
             TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs =
@@ -5387,12 +5393,17 @@ public final class VeyraRenderer {
                 }
                 validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
             } catch (IOException exception) {
-                if (!fallback || packVertex.isPresent()) {
+                if (!fallback) {
                     throw exception;
+                }
+                if (packVertex.isPresent()) {
+                    VeyraClient.LOGGER.warn("Retrying {} fallback for {} without its vertex stage: {}",
+                            programName, original.getLocation(), exception.getMessage());
+                    continue;
                 }
                 VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
                         programName, original.getLocation(), exception.getMessage());
-                continue;
+                break;
             }
             String sourceHash = sha256(programName + '\n' + (vertexSource == null ? "" : vertexSource)
                     + '\n' + fragmentSource + '\n' + (outputLayout == null ? "" : outputLayout)
@@ -5410,16 +5421,23 @@ public final class VeyraRenderer {
                                     vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs,
                                     imageResourceIdentity, customImageStage);
                 } catch (IOException exception) {
-                    if (!fallback || packVertex.isPresent()) {
+                    if (!fallback) {
                         throw exception;
+                    }
+                    if (packVertex.isPresent()) {
+                        VeyraClient.LOGGER.warn("Retrying {} fallback for {} without its vertex stage: {}",
+                                programName, original.getLocation(), exception.getMessage());
+                        continue;
                     }
                     VeyraClient.LOGGER.warn("Skipping incompatible {} fallback for {}: {}",
                             programName, original.getLocation(), exception.getMessage());
-                    continue;
+                    break;
                 }
                 PARTICLE_PIPELINE_CACHE.put(cacheKey, particlePipeline);
             }
             pipelines.put(original, particlePipeline);
+            break;
+            }
         }
         if (pipelines.isEmpty() && pack.hasEnabledProgramFragment(pack.particlePrograms())) {
             throw new IOException("VulkanMod's Minecraft particle render pipelines were not found.");
