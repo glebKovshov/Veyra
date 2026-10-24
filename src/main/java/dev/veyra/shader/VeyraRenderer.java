@@ -996,6 +996,11 @@ public final class VeyraRenderer {
         return angle;
     }
 
+    static float irisShadowAngle(float sunAttribute, float moonAttribute) {
+        boolean day = irisCelestialAngle(sunAttribute) < 180.0F;
+        return irisCelestialAngle(day ? sunAttribute : moonAttribute) / 360.0F;
+    }
+
     // Iris HardcodedCustomUniforms smoothing state; like Iris' per-pipeline SmoothedFloats it restarts
     // with the world and with each shader pack selection.
     private static final IrisSmoothedFloat IRIS_EYE_IN_CAVE = new IrisSmoothedFloat(6, 12);
@@ -1116,7 +1121,7 @@ public final class VeyraRenderer {
         float moonAttribute = minecraft.gameRenderer.getMainCamera().attributeProbe()
                 .getValue(EnvironmentAttributes.MOON_ANGLE, partialTick);
         boolean day = irisCelestialAngle(sunAttribute) < 180.0F;
-        scalars.put("shadowAngle", (double) (irisCelestialAngle(day ? sunAttribute : moonAttribute) / 360.0F));
+        scalars.put("shadowAngle", (double) irisShadowAngle(sunAttribute, moonAttribute));
         Matrix4f modelView = frame.matrices().gbufferModelView();
         float sunPathRotation = VeyraShadowRenderer.sunPathRotation();
         float[] sunPosition = celestialPosition(modelView, sunPathRotation, sunAttribute);
