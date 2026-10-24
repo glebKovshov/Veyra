@@ -386,6 +386,7 @@ public final class VeyraShadowRenderer {
             return;
         }
         warnedAboutNonRecordingFrame = false;
+        prepareFallbackTexture();
         shadowMapCompleted = false;
 
         Vec3 cameraPosition = camera.position();
