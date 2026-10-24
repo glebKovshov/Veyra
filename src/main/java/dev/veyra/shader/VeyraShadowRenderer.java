@@ -413,6 +413,8 @@ public final class VeyraShadowRenderer {
             float shadowDistance = shadowSettings.distance();
             Matrix4f shaderPackShadowProjection = IrisShadowMatrices.createProjection(
                     shadowDistance, shadowSettings.nearPlane(), shadowSettings.farPlane());
+            Matrix4f shadowCullProjection = IrisShadowMatrices.createProjection(
+                    shadowDistance, 0.1F, shadowDistance * 2.0F);
             Matrix4f shadowProjection = IrisShadowMatrices.createVulkanProjection(
                     shadowDistance, shadowSettings.nearPlane(), shadowSettings.farPlane());
             VeyraShadowRenderer.shadowModelView.set(shadowModelView);
@@ -422,13 +424,14 @@ public final class VeyraShadowRenderer {
             VeyraRenderer.prepareShadowTerrainPipelines();
             clearAdditionalShadowColors();
 
+            // VulkanMod expands the culling frustum in vanilla clip space; reserve ZO depth for drawing.
             Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
-                    ? new DistanceLimitedFrustum(shadowModelView, shadowProjection, cameraPosition,
+                    ? new DistanceLimitedFrustum(shadowModelView, shadowCullProjection, cameraPosition,
                             shadowSettings.distanceRenderLimit())
-                    : new Frustum(shadowModelView, shadowProjection);
+                    : new Frustum(shadowModelView, shadowCullProjection);
             shadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             Frustum entityShadowFrustum = createEntityShadowFrustum(
-                    shadowFrustum, shadowModelView, shadowProjection, cameraPosition);
+                    shadowFrustum, shadowModelView, shadowCullProjection, cameraPosition);
             entityShadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             ((CameraAccessor) (Object) camera).veyra$setRotation(shadowView.yaw(), shadowView.pitch());
             cameraRotationChanged = true;

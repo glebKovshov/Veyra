@@ -53,6 +53,11 @@ final class EntityVertexShaderAdapter {
             "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
                     + "(?:attribute|in)\\s+vec4\\s+mc_Entity\\s*;"
                     + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern MC_ENTITY_ATTRIBUTE_START = Pattern.compile(
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*+\\)\\s*)?"
+                    + "(?:(?:flat|smooth|noperspective|centroid|sample|invariant|highp|mediump|lowp)\\s+)*"
+                    + "(?:attribute|in)\\b");
+    private static final Pattern MC_ENTITY_REFERENCE = Pattern.compile("\\bmc_Entity\\b");
     private static final Pattern ENTITY_MID_BLOCK_ATTRIBUTE_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
                     + "(?:attribute|in)\\s+vec[34]\\s+at_midBlock\\s*;"
@@ -277,6 +282,9 @@ final class EntityVertexShaderAdapter {
     private static String replaceEntityMaterialInput(String source, String programName, String value)
             throws IOException {
         String masked = ShaderSource.maskBlockAndLineComments(source);
+        if (hasUnsupportedMcEntityAttribute(masked)) {
+            throw new IOException(programName + ".vsh declares mc_Entity with an unsupported vertex attribute layout.");
+        }
         Matcher declarations = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(masked);
         StringBuilder withoutDeclarations = new StringBuilder(source.length());
         int cursor = 0;
@@ -287,11 +295,7 @@ final class EntityVertexShaderAdapter {
         withoutDeclarations.append(source, cursor, source.length());
         String clean = withoutDeclarations.toString();
         String cleanMasked = ShaderSource.maskBlockAndLineComments(clean);
-        if (Pattern.compile("(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:attribute|in)\\s+[^;]*\\bmc_Entity\\b[^;]*;")
-                .matcher(cleanMasked).find()) {
-            throw new IOException(programName + ".vsh declares mc_Entity with an unsupported vertex attribute layout.");
-        }
-        Matcher references = Pattern.compile("\\bmc_Entity\\b").matcher(cleanMasked);
+        Matcher references = MC_ENTITY_REFERENCE.matcher(cleanMasked);
         StringBuilder replaced = new StringBuilder(clean.length());
         cursor = 0;
         while (references.find()) {
@@ -299,6 +303,44 @@ final class EntityVertexShaderAdapter {
             cursor = references.end();
         }
         return replaced.append(clean, cursor, clean.length()).toString();
+    }
+
+    private static boolean hasUnsupportedMcEntityAttribute(String maskedSource) {
+        Matcher starts = MC_ENTITY_ATTRIBUTE_START.matcher(maskedSource);
+        int searchFrom = 0;
+        int scannedTo = 0;
+        int braceDepth = 0;
+        int parenthesisDepth = 0;
+        while (starts.find(searchFrom)) {
+            for (int index = scannedTo; index < starts.start(); index++) {
+                switch (maskedSource.charAt(index)) {
+                    case '{' -> braceDepth++;
+                    case '}' -> braceDepth--;
+                    case '(' -> parenthesisDepth++;
+                    case ')' -> parenthesisDepth--;
+                }
+            }
+            if (braceDepth == 0 && parenthesisDepth == 0) {
+                int declarationEnd = maskedSource.indexOf(';', starts.end());
+                if (declarationEnd < 0) {
+                    return false;
+                }
+                Matcher references = MC_ENTITY_REFERENCE.matcher(maskedSource);
+                references.region(starts.end(), declarationEnd);
+                if (references.find()) {
+                    Matcher supported = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(maskedSource);
+                    supported.region(starts.start(), declarationEnd + 1);
+                    if (!supported.lookingAt()) {
+                        return true;
+                    }
+                }
+                searchFrom = declarationEnd + 1;
+            } else {
+                searchFrom = starts.start() + 1;
+            }
+            scannedTo = searchFrom;
+        }
+        return false;
     }
 
     private static String replaceShadowEntityMidBlockInput(String source) {
