@@ -1,6 +1,12 @@
 # Veyra 0.2 validation status
 
-## Current unpublished shadow/compute candidate — 2026-10-22
+## Beta.38 integration candidate - 2026-10-24
+
+The forced versioned JDK 21 gate passed **573 tests, 0 failures/errors/skips**, **102 example sources / 118 direct Vulkan SPIR-V compilations**, build, graphics-smoke compilation and example packaging. verify_jar.py accepted local veyra-0.2.0-beta.38+mc1.21.11.jar for Minecraft 1.21.11 / VulkanMod 0.6.8: **1,052,960 bytes**, SHA-256 `836F8B0273303F32982564D1DAE4349593AD3ED474291DF84F039929227FFE05`. This Windows build is not a published asset. The fresh pinned source audit accepted 864 geometry fragments and compiled all 18 active compute stages across four packs / 75 cases; all rows retain visualValidation=false.
+
+The underlying feature code passed RTX 3070 pre-shadow ordering (230,400 active / 0 disabled pixels) and setup/compute-uniform resize (640x360 -> 800x450, 360,000 / 0, setupResizePassed=true) with clean isolated final exits. One preceding run exited during native shutdown with 0xC0000409; its cause is unproven. Windows Khronos validation was unavailable. PR #103 passed Build, source audit and all 54 hosted Graphics jobs and merged as 96acd6d. PR #104 passed its own Build/source audit and all 54 hosted Graphics jobs and merged as d9e0fdc. The final release workflow is still pending. Whole-pack/natural-world visuals are not certified.
+
+## Historical unpublished shadow/compute candidate — 2026-10-22
 
 The current candidate is the working tree for draft PR [#84](https://github.com/glebKovshov/Veyra/pull/84). On JDK 21.0.12, `test validateShaders build packageExamplePacks compileGraphicsSmokeJava --rerun-tasks --no-daemon --console=plain` passed: **479 tests, 0 failures/errors/skips**, 96 example shaders preprocessed, 112 direct Vulkan SPIR-V compilations, four conditional-include checks, graphics-smoke Java compilation, and example-pack packaging. The unpublished beta.30-metadata JAR passed `scripts/verify_jar.py`: **945,047 bytes**, SHA-256 `493d59dd08c21dd60a9e1c128f4eeec93ff7c5a219c15f7e5b40d0627e6a4e33`.
 

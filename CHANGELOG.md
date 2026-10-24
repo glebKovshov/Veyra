@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0-beta.38 - 2026-10-24 (experimental prerelease)
+
+- Add Iris pre-shadow `shadow.csh` and consecutive letter components, with shadow-map-relative sizing, shared image/SSBO bindings, and dispatch barriers. Reject unsupported numbered shadow compute programs explicitly.
+- Connect registered VulkanMod suppliers to compute UBO fields; viewport uniforms previously read zero in compute even when fragment uniforms were correct.
+- Resolve setup `workGroupsRender` against Iris' 1x1 setup extent. Extend the setup fixture to verify once-only execution, a real 640x360 -> 800x450 resize, and current viewport values without excess invocations.
+- The forced versioned local gate passed 573 tests, five Python tooling tests, shader validation, build, packaging and pinned source audit (864 accepted geometry fragments, 18/18 compiled compute stages). RTX fixtures passed pre-shadow ordering at 230,400/0 pixels and setup resize at 360,000/0 pixels. These are synthetic checks, not whole-pack visual certification.
+- Pass a fresh beta.38 Complementary Reimagined COMPLEMENTARY lifecycle run: resize, Nether/return, disable/re-enable and reload; 326,462 non-black pixels / 55 color buckets, clean exit, and no shader-pack buffers before allocator destruction. Sign-text upVec and textured-particle gaux2 overrides remain unsupported.
+- One Windows shadow-compute run passed readback but exited during native shutdown with 0xC0000409; isolated reruns exited cleanly, and the cause remains unproven. Khronos validation was not enabled on Windows. Hosted gates and versioned release validation remain required before publication.
+
 ## 0.2.0-beta.37 - 2026-10-24 (experimental prerelease)
 
 - Add SSBO-only Iris compute programs using `bufferObject.N`, pre-shadow `begin.csh`, `setup.csh`, and pre-shadow `begin.fsh` passes. Preserve setup/begin SSBO contents across later passes and frames; clear frame color targets only once so begin-fragment output survives into the rest of the frame.

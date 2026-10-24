@@ -1,21 +1,23 @@
-# Veyra 0.2.0-beta.37+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.38+mc1.21.11 - experimental prerelease
 
-Beta.37 adds Iris `setup` and pre-shadow `begin` compute programs, pre-shadow `begin.fsh` passes, and compute programs that use `bufferObject.N` without a custom storage image. Setup and begin writers preserve their SSBO contents for later passes and frames. Begin fragment color targets are cleared once per frame, before the begin pass, so its output can feed later shader programs.
+Beta.38 adds pre-shadow `shadow.csh` and consecutive letter components, fixes compute UBO uniform suppliers, and matches Iris' 1x1 extent for setup render-relative dispatch. Setup and pre-shadow compute share the existing custom-image and `bufferObject.N` resources; setup/begin results remain available to later passes and frames.
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.37+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.38+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack and Configure / Apply to edit supported options and profiles.
 
 ## Validation and known limits
 
-The local JDK 21 gate passed **568 tests** with no failures, errors, or skips; it validated **102 example shader sources**, compiled **118 stages to Vulkan SPIR-V**, built the mod, packaged example packs, and compiled graphics-smoke sources. The versioned local beta.37 candidate's `begin-fragment-stage` fixture passed on an RTX 3070 with **230,400 active / 0 disabled marker pixels**. Separate RTX 3070 runs of the SSBO-only compute, setup, and begin-compute fixtures also produced **230,400 / 0**. Setup-on-resize was not separately exercised on the physical GPU. Khronos validation was not enabled in these Windows runs; the candidate client log contained no VUID or device-loss markers.
+The forced versioned local beta.38 JDK 21 gate passed 573 tests without failures, errors, or skips, 102 example shader sources / 118 direct Vulkan SPIR-V compilations, build, graphics-smoke compilation, and example-pack packaging. Five Python tooling tests passed. The source-only audit accepted 864 geometry fragments and compiled 18/18 active compute stages across four archives / 75 default/profile/dimension cases. All audit rows retain `visualValidation=false`.
 
-The local pinned source-only audit passed for four archives across 12 defaults and 63 declared-profile/dimension cases: **864 geometry fragments accepted / 0 rejected** and **18/18 active compute stages compiled**. All 75 report rows retain `visualValidation: false`; the audit does not establish runtime or visual compatibility.
+On RTX 3070, the pre-shadow fixture verified repeated shadow -> letter component -> begin -> composite visibility and 32x32 shadow sizing (230,400 active / 0 disabled marker pixels). The setup fixture verified an actual 640x360 -> 800x450 window resize, one setup execution at each boundary, updated compute viewport uniforms and no excess invocations (360,000 / 0 pixels). The isolated final clients exited cleanly. One preceding Windows run passed readback but exited during native shutdown with 0xC0000409; its cause is unproven. Khronos validation was not enabled on Windows.
 
-Eighteen Complementary profile/dimension records report a device capability requirement for writable shadow `voxel_img` in the shadow vertex stage (`vertexPipelineStoresAndAtomics`). The tested RTX 3070 enabled the requested feature, but support on other devices is not implied.
+A fresh beta.38 RTX 3070 Complementary Reimagined r5.9.3 COMPLEMENTARY run passed resize, Nether/return, disable/re-enable and resource reload (326,462 non-black pixels / 55 color buckets). Its 810,549,248-byte storage-buffer owner was released and recreated; no shader-pack buffers remained before allocator destruction. This generated-scene lifecycle check is not whole-pack visual certification.
 
-The release workflow requires a fresh pinned source audit, the full Lavapipe graphics matrix, versioned build/tests, and distributable verification before publishing. These checks validate selected source paths and synthetic render fixtures, not complete third-party shaderpacks or natural-world visuals. Pinned source-audit rows explicitly retain `visualValidation: false`.
+The release workflow must pass a fresh pinned source audit, full Lavapipe graphics matrix, versioned build/tests and distributable verification before publication. Both feature PRs passed their own Build, source audit and all 54 hosted Graphics jobs before merging. Those results do not replace the versioned release gate. Hosted setup readback had zero runtime validation errors; 20 process-teardown diagnostics were preserved separately. Writable shadow images require the corresponding device features; source audit does not prove support on another GPU.
 
-Veyra remains an experimental Iris-compatible subset. Compute support covers the documented setup, begin, shadow-compute, and post-processing families and selected SSBO/image semantics; other Iris features remain unsupported or unverified. Do not infer complete shaderpack support or stable Iris parity from these results. See `COMPATIBILITY.md` and `ARCHITECTURE.md` for the measured matrix and backend gaps.
+Known Complementary runtime gaps include sign-text `upVec` inputs and `gaux2` sampling in the textured particle fallback; the corresponding shader overrides are skipped with warnings.
+
+Veyra remains an experimental Iris-compatible subset. The pre-shadow family supports declared custom images and allocated SSBOs through the existing compute interface; arbitrary compute sampler inputs, geometry/tessellation families and complete third-party/natural-world visuals remain unsupported or unverified. See COMPATIBILITY.md and ARCHITECTURE.md for the measured scope. This prerelease does not establish stable Iris parity.
