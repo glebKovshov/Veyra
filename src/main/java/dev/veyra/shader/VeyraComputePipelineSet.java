@@ -21,16 +21,20 @@ import static org.lwjgl.vulkan.VK10.*;
 public final class VeyraComputePipelineSet implements AutoCloseable {
     private final VeyraComputeResources resources;
     private final List<Dispatch> stages;
+    private final int shadowMapResolution;
     private boolean closed;
 
-    private VeyraComputePipelineSet(VeyraComputeResources resources, List<Dispatch> stages) {
+    private VeyraComputePipelineSet(VeyraComputeResources resources, List<Dispatch> stages,
+                                    int shadowMapResolution) {
         this.resources = resources;
         this.stages = List.copyOf(stages);
+        this.shadowMapResolution = shadowMapResolution;
     }
 
     public static VeyraComputePipelineSet compile(ShaderPack pack) throws IOException {
         List<String> files = pack.activeComputeStageFiles();
         if (files.isEmpty()) return null;
+        int shadowMapResolution = pack.readShadowSettings().resolution();
         if (files.stream().anyMatch(file -> isShadowComputeFile(file))
                 && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
             throw new IOException("The Vulkan device cannot enable vertexPipelineStoresAndAtomics and "
@@ -84,7 +88,7 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                         shader.localSizeX(), shader.localSizeY(), indirectBuffer,
                         indirect == null ? 0 : indirect.offsetInBuffer()));
             }
-            return new VeyraComputePipelineSet(resources, compiled);
+            return new VeyraComputePipelineSet(resources, compiled, shadowMapResolution);
         } catch (IOException | RuntimeException exception) {
             compiled.forEach(dispatch -> dispatch.pipeline().scheduleCleanUp());
             resources.close();
@@ -171,7 +175,8 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         ensureOpen();
         LinkedHashSet<String> names = new LinkedHashSet<>();
         for (Dispatch stage : stages) {
-            if (isShadowComputeFile(stage.programName() + ".csh")
+            if (isPreShadowComputeFile(stage.stageProgram() + ".csh")
+                    || isShadowComputeFile(stage.programName() + ".csh")
                     || isSetupComputeFile(stage.stageProgram() + ".csh")) continue;
             if (ShaderPassPhase.forProgram(stage.programName()) == phase) names.add(stage.programName());
         }
@@ -186,6 +191,24 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             if (isBeginComputeFile(stage.stageProgram() + ".csh")) names.add(stage.programName());
         }
         return List.copyOf(names);
+    }
+
+    /** Returns Iris' pre-shadow compute family in its original component order. */
+    public List<String> shadowProgramNames() {
+        ensureOpen();
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Dispatch stage : stages) {
+            if (isPreShadowComputeFile(stage.stageProgram() + ".csh")) names.add(stage.programName());
+        }
+        return List.copyOf(names);
+    }
+
+    /** Dispatches shadow compute once per frame using Iris' square shadow-map dimensions. */
+    public void dispatchBeforeShadowPass() {
+        ensureOpen();
+        for (String programName : shadowProgramNames()) {
+            dispatchProgram(programName, shadowMapResolution, shadowMapResolution);
+        }
     }
 
     /** Dispatches begin compute programs before the world shadow pass. */
@@ -216,7 +239,8 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
 
     public boolean hasShadowComputeStages() {
         ensureOpen();
-        return stages.stream().anyMatch(stage -> isShadowComputeFile(stage.programName() + ".csh"));
+        return stages.stream().anyMatch(stage -> isPreShadowComputeFile(stage.stageProgram() + ".csh")
+                || isShadowComputeFile(stage.programName() + ".csh"));
     }
 
     /** Dispatches the component sequence attached to a single Iris post-processing program. */
@@ -316,6 +340,10 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
 
     private static boolean isShadowComputeFile(String file) {
         return file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
+    }
+
+    private static boolean isPreShadowComputeFile(String file) {
+        return file.matches("shadow(?:_[a-z])?\\.csh");
     }
 
     private static boolean isBeginComputeFile(String file) {

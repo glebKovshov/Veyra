@@ -3,6 +3,7 @@ package dev.veyra.shader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -94,5 +95,84 @@ class ShaderPackComputeStagesTest {
         assertEquals(List.of("setup.csh"), pack.activeComputeStageFiles());
         assertEquals(List.of("setup.csh"), pack.activeComputeStageFiles("setup"));
         assertDoesNotThrow(pack::validatePipelineCapabilities);
+    }
+
+    @Test
+    void discoversShadowComputeComponentsInIrisOrderAndKeepsNumberedShadowNamesUnsupported(@TempDir Path root)
+            throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        for (String file : List.of("setup.csh", "begin.csh", "shadow.csh", "shadow_a.csh",
+                "shadow_c.csh", "shadowcomp.csh", "prepare.csh", "shadow1.csh")) {
+            Files.writeString(shaders.resolve(file), "void main() {}\n");
+        }
+        Files.writeString(shaders.resolve("shadow.fsh"), "#version 120\nvoid main() { gl_FragColor=vec4(0.0); }\n");
+
+        ShaderPack pack = ShaderPack.inspect(root).withRuntimeFeatures();
+
+        assertEquals(List.of("setup.csh", "shadow.csh", "shadow_a.csh", "begin.csh",
+                        "shadowcomp.csh", "prepare.csh", "shadow1.csh"), pack.activeComputeStageFiles());
+        assertEquals(List.of("shadow.csh", "shadow_a.csh"), pack.activeComputeStageFiles("shadow"));
+    }
+
+    @Test
+    void acceptsPreShadowComputeFixtureWithOrderedComponents() throws Exception {
+        var pack = ShaderPack.inspect(Path.of("examples/compute-shadow-stage")).withRuntimeFeatures();
+
+        assertEquals(List.of("shadow.csh", "shadow_a.csh"), pack.activeComputeStageFiles("shadow"));
+        assertEquals(32, pack.readShadowSettings().resolution());
+        assertDoesNotThrow(pack::validatePipelineCapabilities);
+    }
+
+    @Test
+    void loadsShadowLetterComponentsWithoutSuffixlessComputeAndStopsAtFirstGap(@TempDir Path root)
+            throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        for (String file : List.of("shadow_a.csh", "shadow_b.csh", "shadow_d.csh")) {
+            Files.writeString(shaders.resolve(file), "void main() {}\n");
+        }
+        Files.writeString(shaders.resolve("shadow.fsh"), "void main() {}\n");
+        var pack = ShaderPack.inspect(root).withRuntimeFeatures();
+
+        assertEquals(List.of("shadow_a.csh", "shadow_b.csh"), pack.activeComputeStageFiles("shadow"));
+    }
+
+    @Test
+    void rejectsPreShadowComputeWithoutAnActiveShadowPass(@TempDir Path root) throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), "iris.features.required=COMPUTE_SHADERS SSBO\nbufferObject.0=16\n");
+        Files.writeString(shaders.resolve("composite.fsh"), "#version 120\nvoid main() { gl_FragColor=vec4(0.0); }\n");
+        Files.writeString(shaders.resolve("shadow.csh"), """
+                #version 430
+                layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+                const ivec3 workGroups=ivec3(1,1,1);
+                layout(std430, binding=0) buffer VeyraState { uint value; } state;
+                void main() { state.value=42u; }
+                """);
+
+        var pack = ShaderPack.inspect(root).withRuntimeFeatures();
+
+        IOException error = assertThrows(IOException.class, pack::validatePipelineCapabilities);
+        assertTrue(error.getMessage().contains("shadow.csh requires an active shadow pass"), error.getMessage());
+    }
+
+    @Test
+    void rejectsNumberedShadowComputeNamesThatIrisDoesNotLoad(@TempDir Path root) throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), "iris.features.required=COMPUTE_SHADERS SSBO\nbufferObject.0=16\n");
+        Files.writeString(shaders.resolve("composite.fsh"), "#version 120\nvoid main() { gl_FragColor=vec4(0.0); }\n");
+        Files.writeString(shaders.resolve("shadow1.csh"), """
+                #version 430
+                layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+                const ivec3 workGroups=ivec3(1,1,1);
+                layout(std430, binding=0) buffer VeyraState { uint value; } state;
+                void main() { state.value=42u; }
+                """);
+
+        var pack = ShaderPack.inspect(root).withRuntimeFeatures();
+
+        assertTrue(pack.activeComputeStageFiles("shadow").isEmpty());
+        IOException error = assertThrows(IOException.class, pack::validatePipelineCapabilities);
+        assertTrue(error.getMessage().contains("Compute dispatch timing for shadow1.csh is not implemented yet"),
+                error.getMessage());
     }
 }

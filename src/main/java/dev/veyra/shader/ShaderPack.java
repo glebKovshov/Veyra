@@ -1078,7 +1078,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 .thenComparingInt(ShaderPack::computePassIndex)
                 .thenComparingInt(ShaderPack::computeComponentIndex)
                 .thenComparing(Comparator.naturalOrder());
-        for (String file : stageFiles().stream().filter(name -> name.endsWith(".csh")).sorted(order).toList()) {
+        Set<String> shaderFiles = stageFiles();
+        for (String file : shaderFiles.stream().filter(name -> name.endsWith(".csh")).sorted(order).toList()) {
+            if (!isReachableShadowComponent(file, shaderFiles)) continue;
             if (programFamily != null && !computeStageFamily(file).equals(programFamily)) continue;
             String program = file.substring(0, file.length() - 4);
             String parent = program.replaceFirst("_[a-z]+$", "");
@@ -1087,8 +1089,19 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return List.copyOf(active);
     }
 
+    private static boolean isReachableShadowComponent(String file, Set<String> shaderFiles) {
+        if (!file.matches("shadow_[a-z]\\.csh")) return true;
+        char component = file.charAt("shadow_".length());
+        for (char previous = 'a'; previous < component; previous++) {
+            if (!shaderFiles.contains("shadow_" + previous + ".csh")) return false;
+        }
+        return true;
+    }
+
     private static String computeStageFamily(String file) {
         String program = computeProgramName(file);
+        // Iris has no numbered pre-shadow compute programs.
+        if (program.matches("shadow[0-9]+")) return program;
         int suffix = trailingDigitsStart(program);
         return program.substring(0, suffix);
     }
@@ -1096,12 +1109,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static int computeStageFamilyOrder(String file) {
         return switch (computeStageFamily(file)) {
             case "setup" -> 0;
-            case "begin" -> 1;
-            case "shadowcomp" -> 2;
-            case "prepare" -> 3;
-            case "deferred" -> 4;
-            case "composite" -> 5;
-            case "final" -> 6;
+            case "shadow" -> 1;
+            case "begin" -> 2;
+            case "shadowcomp" -> 3;
+            case "prepare" -> 4;
+            case "deferred" -> 5;
+            case "composite" -> 6;
+            case "final" -> 7;
             default -> Integer.MAX_VALUE;
         };
     }
@@ -1183,6 +1197,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (!unsupportedFeatures.isEmpty()) {
             throw new IOException("This pack requires Iris features not implemented by Veyra: " + String.join(" ", unsupportedFeatures));
         }
+        validateComputeDispatchTiming();
         if (configuration.customImages()) validateShadowComputeCapabilities();
         validateVertexStorageBufferCapabilities();
         for (String program : TERRAIN_PROGRAMS.stream().sorted().toList()) {
@@ -1374,18 +1389,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         }
 
         List<String> computeFiles = activeComputeStageFiles();
-        boolean hasShadowCompute = false;
+        boolean hasShadowCompositeCompute = false;
         for (String file : computeFiles) {
             if (file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh")) {
-                hasShadowCompute = true;
-                if (!hasShadowFragment()) {
-                    throw new IOException(file + " requires an active shadow pass.");
-                }
-            } else if (!isPostProcessingProgramFile(file)) {
-                throw new IOException("Compute dispatch timing for " + file + " is not implemented yet.");
+                hasShadowCompositeCompute = true;
             }
         }
-        if (hasShadowCompute && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
+        if (hasShadowCompositeCompute && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
             throw new IOException("The Vulkan device cannot run shadow-compute custom images: "
                     + "vertexPipelineStoresAndAtomics and shaderStorageImageExtendedFormats are required.");
         }
@@ -1408,6 +1418,20 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (computeUsesStorageImage && !VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled) {
             throw new IOException("The Vulkan device cannot run compute custom images: "
                     + "shaderStorageImageExtendedFormats is required.");
+        }
+    }
+
+    private void validateComputeDispatchTiming() throws IOException {
+        for (String file : activeComputeStageFiles()) {
+            boolean shadowStage = file.matches("shadow(?:_[a-z])?\\.csh")
+                    || file.matches("shadowcomp(?:[1-9][0-9]?)?(?:_[a-z])?\\.csh");
+            if (shadowStage) {
+                if (!hasShadowFragment()) {
+                    throw new IOException(file + " requires an active shadow pass.");
+                }
+            } else if (!isPostProcessingProgramFile(file)) {
+                throw new IOException("Compute dispatch timing for " + file + " is not implemented yet.");
+            }
         }
     }
 
