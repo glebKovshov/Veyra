@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-beta.41 - 2026-10-24 (experimental prerelease)
+
+- Supply OpenGL's default `mc_Entity` `(0,0,0,1)` to entity/block-entity programs and particle vertex stages, matching Iris' unbound attribute.
+- Accept pack-owned `vec4 normal` in particle vertex stages; keep particle `entityColor` at zero; retry fragment-only when a fallback vertex stage fails to compile.
+- RTX 3070 lifecycles: Sildur's Vibrant now applies particle and block-entity shaders (sign text still skipped); Complementary, Unbound and BSL unchanged with no skipped overrides. 580 tests; PR #110 passed 57/57 hosted checks.
+
 ## 0.2.0-beta.40 - 2026-10-24 (experimental prerelease)
 
 - Run the pack vertex stage for `gbuffers_textured[_lit]` particle fallbacks, retrying fragment-only if it can't be adapted.

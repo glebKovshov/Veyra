@@ -1,4 +1,8 @@
-# Shaderpack compatibility - beta.40 validation
+# Shaderpack compatibility - beta.41 validation
+
+## Beta.41 - 2026-10-24
+
+RTX 3070 lifecycles on beta.41 code: Sildur's Vibrant default 360,000 non-black px / 58 buckets, with particle and block-entity fallbacks now applied (previously skipped for `mc_Entity` and `vec4 normal`); Complementary Reimagined 331,449 / 58, Unbound 359,938 / 60, BSL HIGH 360,000 / 41, no skipped overrides. Sildur sign text remains skipped because its vertex stage packs the lightmap into `texcoord.zw` and material flags into `normal.a`. Generated scenes only; not natural-world visual certification.
 
 ## Beta.40 - 2026-10-24
 
