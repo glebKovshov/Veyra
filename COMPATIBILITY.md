@@ -1,4 +1,8 @@
-# Shaderpack compatibility - beta.42 validation
+# Shaderpack compatibility - beta.43 validation
+
+## Beta.43 - 2026-10-24
+
+The RTX 3070 Complementary Reimagined HIGH generated-scene smoke passed (230,400 non-black pixels / 124 color buckets). Runtime evidence confirms the pack-owned cloud-water image is bound to VeyraColortex3Sampler in the deferred shader, and volumetric clouds are visible again. Sky/light colors and sign appearance still differ from Iris in this controlled scene. This result verifies the targeted texture-binding path; it is not natural-world or whole-pack visual certification.
 
 ## Beta.42 - 2026-10-24
 
