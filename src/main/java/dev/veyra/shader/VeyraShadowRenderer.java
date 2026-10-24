@@ -669,7 +669,8 @@ public final class VeyraShadowRenderer {
             float tickDelta = deltaTracker.getGameTimeDeltaPartialTick(false);
             var entityDispatcher = minecraft.getEntityRenderDispatcher();
             entityDispatcher.prepare(camera, minecraft.crosshairPickEntity);
-            for (var entity : minecraft.level.entitiesForRendering()) {
+            for (var entity : shadowSettings.shadowEntities()
+                    ? minecraft.level.entitiesForRendering() : java.util.List.<net.minecraft.world.entity.Entity>of()) {
                 if (!entityDispatcher.shouldRender(entity, entityShadowFrustum,
                         cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
                     continue;
@@ -682,7 +683,7 @@ public final class VeyraShadowRenderer {
             }
 
             var player = minecraft.player;
-            if (player != null && submittedEntities.add(player)
+            if (shadowSettings.shadowEntities() && player != null && submittedEntities.add(player)
                     && entityDispatcher.shouldRender(player, entityShadowFrustum,
                     cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
                 EntityRenderState state = entityDispatcher.extractEntity(player, tickDelta);
@@ -691,8 +692,10 @@ public final class VeyraShadowRenderer {
                         poseStack, submits);
             }
 
-            worldRenderer.renderBlockEntities(poseStack, levelRenderState, submits,
-                    new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
+            if (shadowSettings.shadowBlockEntities()) {
+                worldRenderer.renderBlockEntities(poseStack, levelRenderState, submits,
+                        new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
+            }
             shadowFeatureRenderDispatcher.renderAllFeatures();
             buffers.bufferSource().endBatch();
             shadowFeatureRenderDispatcher.endFrame();

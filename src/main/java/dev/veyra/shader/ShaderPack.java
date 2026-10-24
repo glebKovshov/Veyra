@@ -414,9 +414,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         float entityShadowDistanceMultiplier = parseShadowFloat(values, "entityShadowDistanceMul",
                 ShadowSettings.DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER);
         boolean shadowTranslucent = readBooleanProperty("shadowTranslucent", false);
+        // Iris shaders.properties toggles; both default to rendering into the shadow map.
+        boolean shadowEntities = readBooleanProperty("shadowEntities", true);
+        boolean shadowBlockEntities = readBooleanProperty("shadowBlockEntities", true);
         try {
             return new ShadowSettings(resolution, distance, intervalSize, sunPathRotation, nearPlane, farPlane,
-                    distanceRenderMultiplier, entityShadowDistanceMultiplier, shadowTranslucent);
+                    distanceRenderMultiplier, entityShadowDistanceMultiplier, shadowTranslucent,
+                    shadowEntities, shadowBlockEntities);
         } catch (IllegalArgumentException exception) {
             throw new IOException("Invalid Iris shadow setting: " + exception.getMessage(), exception);
         }
