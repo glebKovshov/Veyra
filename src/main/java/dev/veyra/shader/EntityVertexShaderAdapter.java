@@ -202,8 +202,9 @@ final class EntityVertexShaderAdapter {
                 .replaceAll("\\btexture2DProj\\s*\\(", "textureProj(")
                 .replaceAll("\\btexture2D\\s*\\(", "texture(");
         source = isEntityShadowProgram(programName)
-                ? replaceShadowEntityMaterialInput(source, programName)
-                : removeUnusedMcEntityDeclaration(source, programName);
+                ? replaceEntityMaterialInput(source, programName, "vec4(0.0)")
+                // Iris' ENTITY format has no mc_Entity element, so GL reads the default generic attribute.
+                : replaceEntityMaterialInput(source, programName, "vec4(0.0, 0.0, 0.0, 1.0)");
         if (isEntityShadowProgram(programName)) {
             // Entity and block-entity draws have no block material or mid-block attribute. The
             // material bridge above maps mc_Entity to zero, so voxel writers take their existing
@@ -261,34 +262,6 @@ final class EntityVertexShaderAdapter {
                 outputs.declarationsAndMacros(), outputs.varyings(), samplers.usesNoiseSampler(), usesMidTexCoord);
     }
 
-    private static String removeUnusedMcEntityDeclaration(String source, String programName) throws IOException {
-        String uncommented = ShaderSource.maskBlockAndLineComments(source);
-        Matcher declaration = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(uncommented);
-        List<int[]> declarations = new ArrayList<>();
-        StringBuilder withoutDeclarations = new StringBuilder(uncommented);
-        while (declaration.find()) {
-            declarations.add(new int[] {declaration.start(), declaration.end()});
-            for (int i = declaration.start(); i < declaration.end(); i++) {
-                if (withoutDeclarations.charAt(i) != '\n' && withoutDeclarations.charAt(i) != '\r') {
-                    withoutDeclarations.setCharAt(i, ' ');
-                }
-            }
-        }
-        if (declarations.isEmpty()) return source;
-        if (Pattern.compile("\\bmc_Entity\\b").matcher(withoutDeclarations).find()) {
-            throw new IOException(programName + ".vsh uses legacy interface 'mc_Entity', which is not provided by Minecraft's "
-                    + vertexFormatName(programName) + " vertex format.");
-        }
-        StringBuilder clean = new StringBuilder(source.length());
-        int cursor = 0;
-        for (int[] span : declarations) {
-            clean.append(source, cursor, span[0]);
-            cursor = span[1];
-        }
-        clean.append(source, cursor, source.length());
-        return clean.toString();
-    }
-
     private static String removeDefaultFunctionInputQualifiers(String source) {
         Matcher matcher = FUNCTION_INPUT_QUALIFIER.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuilder normalized = new StringBuilder(source.length());
@@ -300,8 +273,9 @@ final class EntityVertexShaderAdapter {
         return normalized.append(source, cursor, source.length()).toString();
     }
 
-    /** Entity and block-entity shadow draws have no block-material vertex attribute; zero is the Iris sentinel. */
-    private static String replaceShadowEntityMaterialInput(String source, String programName) throws IOException {
+    /** Entity and block-entity formats have no block-material attribute; substitute its constant value. */
+    private static String replaceEntityMaterialInput(String source, String programName, String value)
+            throws IOException {
         String masked = ShaderSource.maskBlockAndLineComments(source);
         Matcher declarations = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(masked);
         StringBuilder withoutDeclarations = new StringBuilder(source.length());
@@ -321,7 +295,7 @@ final class EntityVertexShaderAdapter {
         StringBuilder replaced = new StringBuilder(clean.length());
         cursor = 0;
         while (references.find()) {
-            replaced.append(clean, cursor, references.start()).append("vec4(0.0)");
+            replaced.append(clean, cursor, references.start()).append(value);
             cursor = references.end();
         }
         return replaced.append(clean, cursor, clean.length()).toString();

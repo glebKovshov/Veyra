@@ -297,7 +297,8 @@ final class BasicVertexShaderAdapter {
             if (integerType(type) && !interpolation.equals("flat")) {
                 throw new IOException(programName + ".vsh integer output '" + name + "' must use flat interpolation.");
             }
-            FixedOutput fixed = name.equals("normal") && format == Format.TEXTURED && type.equals("vec4")
+            FixedOutput fixed = name.equals("normal") && (format == Format.TEXTURED || format == Format.WEATHER)
+                    && type.equals("vec4")
                     ? null : FIXED_OUTPUTS.get(name);
             if (fixed != null && !fixed.type().equals(type)) {
                 throw new IOException(programName + ".vsh output '" + name + "' must use " + fixed.type() + ".");
@@ -631,13 +632,15 @@ final class BasicVertexShaderAdapter {
 
     private static String nativeDefaultAttribute(Format format, String type, String name, String programName)
             throws IOException {
-        if (format != Format.TEXTURED || !(name.equals("mc_Entity") || name.equals("mc_midTexCoord"))) {
+        if ((format != Format.TEXTURED && format != Format.WEATHER)
+                || !(name.equals("mc_Entity") || name.equals("mc_midTexCoord"))) {
             return null;
         }
         if (!type.equals("vec4")) {
             throw new IOException(programName + ".vsh input '" + name + "' must be declared as vec4.");
         }
-        // Iris maps WORLD_BORDER to TEXTURED but does not extend this POSITION_TEX format.
+        // Iris maps WORLD_BORDER to TEXTURED and draws particles with the vanilla PARTICLE format;
+        // neither carries these elements.
         // Match OpenGL's generic-attribute default for pack declarations absent from that format.
         return "#define " + name + " vec4(0.0, 0.0, 0.0, 1.0)\n";
     }

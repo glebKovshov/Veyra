@@ -5378,7 +5378,7 @@ public final class VeyraRenderer {
                     if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, programName,
                             adaptedVertex.varyings(), pack.hasShadowFragment(),
-                            original.getSamplers().contains("Sampler2"));
+                            original.getSamplers().contains("Sampler2"), false);
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
                 } else {
                     boolean lightmapAvailable = original.getSamplers().contains("Sampler2");
@@ -5420,7 +5420,8 @@ public final class VeyraRenderer {
                             : compileColorDistancePipeline(original, programName, fragmentSource, sourceHash,
                                     vertexSource, usesNoiseSampler, outputLayout, blendSettings, samplerInputs,
                                     imageResourceIdentity, customImageStage);
-                } catch (IOException exception) {
+                } catch (IOException | RuntimeException exception) {
+                    // VulkanMod reports SPIR-V compile failures as RuntimeException.
                     if (!fallback) {
                         throw exception;
                     }
