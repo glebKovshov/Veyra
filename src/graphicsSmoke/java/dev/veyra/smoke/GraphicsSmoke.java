@@ -28,6 +28,7 @@ import java.util.Set;
 public final class GraphicsSmoke {
     private static int ticks, worldTicks, stage, activePixels, baselineAt, disabledPixels, reenabledShadowMrtPixels;
     private static int lifecycleInitialWidth, lifecycleInitialHeight;
+    private static boolean setupComputeFixture, setupResizePassed;
     private static boolean pending, finished, requested, captureActive;
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
@@ -142,6 +143,7 @@ public final class GraphicsSmoke {
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
             shadowColorMrtLifecycleFixture = fixture.equals("shadow-color-mrt-lifecycle");
+            setupComputeFixture = fixture.equals("compute-setup-stage");
             shadowColorMrtFixture = fixture.equals("shadow-color-mrt") || shadowColorMrtLifecycleFixture;
             basicCustomImageFixture = fixture.equals("basic-custom-image");
             entityCustomImageFixture = fixture.equals("entity-custom-image");
@@ -379,7 +381,8 @@ public final class GraphicsSmoke {
                     && (stage == 1 || stage == 2) && worldTicks >= baselineAt
                     && !(normalAtlasAnimatedFixture && stage == 2)) {
                 pending = true;
-                requested = true; captureActive = (skyTexturedStageFixture || shadowColorMrtFixture) && stage == 2;
+                requested = true; captureActive = (skyTexturedStageFixture || shadowColorMrtFixture
+                        || setupComputeFixture) && stage == 2;
             } else if (shadowColorMrtLifecycleFixture && stage == 3 && worldTicks >= baselineAt) {
                 pending = true;
                 requested = true;
@@ -636,6 +639,7 @@ public final class GraphicsSmoke {
                     : skyTexturedStageFixture
                     ? active && stage == 2 ? "skytextured-moon-active.png"
                             : active ? "skytextured-sun-active.png" : "skytextured-disabled.png"
+                    : setupComputeFixture && active && stage == 2 ? "setup-resized.png"
                     : active ? "mrt-active.png" : "shaders-disabled.png";
             image.writeToFile(output.resolve(imageName));
             if (glintMrtImage != null) {
@@ -704,6 +708,28 @@ public final class GraphicsSmoke {
                 } else if (vanillaBaseline) {
                     finish(client, count >= 2000 ? new IllegalStateException("Unexpected shader signal in vanilla baseline: " + count) : null, count);
                 } else if (active) {
+                    if (setupComputeFixture) {
+                        if (count < frameWidth * frameHeight * 0.9) {
+                            finish(client, new IllegalStateException("Setup compute sizing/count/viewport signal failed at stage "
+                                    + stage + ": " + count + " pixels"), -1);
+                            return;
+                        }
+                        if (stage == 0) {
+                            lifecycleInitialWidth = frameWidth;
+                            lifecycleInitialHeight = frameHeight;
+                            int resizedWidth = frameWidth == 800 ? 960 : 800;
+                            client.getWindow().setWindowed(resizedWidth, resizedWidth * 9 / 16);
+                            stage = 2;
+                            baselineAt = worldTicks + 100;
+                            pending = false;
+                            return;
+                        }
+                        if (frameWidth == lifecycleInitialWidth && frameHeight == lifecycleInitialHeight) {
+                            finish(client, new IllegalStateException("Setup fixture window did not resize"), -1);
+                            return;
+                        }
+                        setupResizePassed = true;
+                    }
                     if (storageBufferFixture && count < 2000) {
                         finish(client, new IllegalStateException("The shadow storage-buffer write/read signal is absent: "
                                 + count + " magenta pixels"), -1);
@@ -1283,6 +1309,7 @@ public final class GraphicsSmoke {
                     + ",\"shadowMrtReenabledPixels\":" + reenabledShadowMrtPixels
                     + ",\"lifecycleInitialWidth\":" + lifecycleInitialWidth
                     + ",\"lifecycleInitialHeight\":" + lifecycleInitialHeight
+                    + ",\"setupResizePassed\":" + setupResizePassed
                     + ",\"activeOppositeMidTexCoordPixels\":" + activeOppositeMidTexCoordPixels
                     + ",\"activeCurrentRenderedItemGreenPixels\":" + activeCurrentRenderedItemGreenPixels
                     + ",\"disabledMagentaPixels\":" + baseline

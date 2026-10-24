@@ -230,10 +230,11 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
     }
 
     /** Dispatches setup programs once after the compute pipeline is installed or resized. */
-    public void dispatchSetupPrograms(int renderWidth, int renderHeight) {
+    public void dispatchSetupPrograms() {
         ensureOpen();
         for (String programName : setupProgramNames()) {
-            dispatchProgram(programName, renderWidth, renderHeight);
+            // Iris resolves setup workGroupsRender against 1x1, including after a viewport resize.
+            dispatchProgram(programName, 1, 1);
         }
     }
 
