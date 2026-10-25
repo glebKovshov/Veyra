@@ -1,4 +1,12 @@
-# Shaderpack compatibility - beta.46 validation
+# Shaderpack compatibility - beta.47 validation
+
+## Beta.47 - 2026-10-25
+
+On an RTX 3070, the matched Complementary Reimagined r5.9.3 HIGH capture on `dad0e27` passed (230,400 non-black pixels / 103 color buckets). In the same 640×360 scene, Veyra's Vulkan readback and Minecraft Screenshot API output were pixel-identical. The Iris 1.10.8 + Sodium 0.8.14 reference has matching sky, clouds, wall and layout, while Veyra remains substantially darker. This rules out Veyra's choice between these two capture paths, but not the underlying rendering or color-space cause.
+
+Pinned RTX 3070 lifecycle smokes passed for BSL 10.1.8 HIGH (360,000 / 124), Sildur's Vibrant v2.02 Extreme default (360,000 / 122), Complementary Unbound r5.9.3 HIGH (358,109 / 92), and Unbound COMPLEMENTARY (359,042 / 93). The latter now honors `shadowBlockEntities=false` and no longer fails compiling `shadow_block` with `voxel_img`. These generated-scene runs validate the stated profiles only; they are not whole-pack certification.
+
+PR #127 and #128 each passed 57/57 exact-head hosted checks. Natural-world visuals, exact Iris parity, whole-pack certification, and Sildur sign readability remain unverified.
 
 ## Beta.46 - 2026-10-25
 
