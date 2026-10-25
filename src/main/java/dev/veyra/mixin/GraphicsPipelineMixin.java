@@ -74,7 +74,9 @@ public abstract class GraphicsPipelineMixin implements VeyraPipelinePassCache {
         var attachments = VkPipelineColorBlendAttachmentState.calloc(count, MemoryStack.stackGet());
         for (int i = 0; i < attachments.capacity(); i++) {
             attachments.get(i).set(original.get(0));
-            if (!layout.writes(i)) attachments.get(i).colorWriteMask(0);
+            attachments.get(i).colorWriteMask(layout.writes(i) ? VK10.VK_COLOR_COMPONENT_R_BIT
+                    | VK10.VK_COLOR_COMPONENT_G_BIT | VK10.VK_COLOR_COMPONENT_B_BIT
+                    | VK10.VK_COLOR_COMPONENT_A_BIT : 0);
             var mode = blending.forTarget(layout.targets().get(i));
             if (mode != null) attachments.get(i).blendEnable(mode.enabled())
                     .srcColorBlendFactor(mode.sourceColor()).dstColorBlendFactor(mode.destinationColor())
