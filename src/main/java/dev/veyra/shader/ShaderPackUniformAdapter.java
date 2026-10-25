@@ -11,6 +11,10 @@ import java.util.regex.Pattern;
 
 /** Normalizes supported Iris uniforms for VulkanMod geometry pipelines. */
 public final class ShaderPackUniformAdapter {
+    /** Iris EntityPatcher: entityColor = vec4(overlay.rgb, 1 - overlay.a), with rgb cleared when alpha is 0. */
+    static final String ENTITY_COLOR_FROM_OVERLAY =
+            "(vec4(overlayColor.rgb * float(overlayColor.a != 1.0), 1.0 - overlayColor.a))";
+
     private static final List<String> MATRIX_UNIFORMS = List.of(
             "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
             "gbufferPreviousModelView", "gbufferPreviousProjection", "shadowModelView", "shadowModelViewInverse",
@@ -61,8 +65,9 @@ public final class ShaderPackUniformAdapter {
                 }
                 withoutUniforms.append(source, uniformCursor, matcher.start());
                 uniformCursor = matcher.end();
+                // Vanilla's overlay alpha means "keep the entity colour"; Iris exposes the tint strength instead.
                 macros.append(entityColorAvailable
-                        ? "#define entityColor overlayColor\n"
+                        ? "#define entityColor " + ENTITY_COLOR_FROM_OVERLAY + "\n"
                         : "const vec4 entityColor = vec4(0.0);\n");
                 continue;
             }

@@ -73,25 +73,25 @@ class EntityIdentifierUniformTest {
     @Test
     void entityColorUsesMinecraftOverlayForEntityPipelines() throws IOException {
         String entities = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_entities");
-        assertTrue(entities.contains("#define entityColor overlayColor"), entities);
+        assertTrue(entities.contains("#define entityColor " + ShaderPackUniformAdapter.ENTITY_COLOR_FROM_OVERLAY), entities);
         assertTrue(entities.contains("in vec4 overlayColor;"), entities);
         assertFalse(entities.contains("uniform vec4 entityColor"), entities);
         assertFalse(entities.contains("const vec4 entityColor"), entities);
 
         String handFallback = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_textured");
-        assertTrue(handFallback.contains("#define entityColor overlayColor"), handFallback);
+        assertTrue(handFallback.contains("#define entityColor " + ShaderPackUniformAdapter.ENTITY_COLOR_FROM_OVERLAY), handFallback);
 
         String itemEntity = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_entities",
                 false, false, -1, -1, ItemIdMap.UNMAPPED, false);
         assertTrue(itemEntity.contains("const vec4 entityColor = vec4(0.0);"), itemEntity);
-        assertFalse(itemEntity.contains("#define entityColor overlayColor"), itemEntity);
+        assertFalse(itemEntity.contains("#define entityColor " + ShaderPackUniformAdapter.ENTITY_COLOR_FROM_OVERLAY), itemEntity);
     }
 
     @Test
     void entityColorDefaultsToTransparentOnPipelinesWithoutEntityOverlay() throws IOException {
         String signText = EntityShaderAdapter.adaptTextFragment(ENTITY_COLOR_SOURCE, "gbuffers_textured");
         assertTrue(signText.contains("const vec4 entityColor = vec4(0.0);"), signText);
-        assertFalse(signText.contains("#define entityColor overlayColor"), signText);
+        assertFalse(signText.contains("#define entityColor " + ShaderPackUniformAdapter.ENTITY_COLOR_FROM_OVERLAY), signText);
 
         String text = EntityShaderAdapter.adaptFragment(ENTITY_COLOR_SOURCE, "gbuffers_text");
         assertTrue(text.contains("const vec4 entityColor = vec4(0.0);"), text);
@@ -197,5 +197,25 @@ class EntityIdentifierUniformTest {
         org.junit.jupiter.api.Assertions.assertTrue(EntityShaderAdapter.requiresLightmapInput(
                 "varying vec2 texCoord, lmCoord;\n"
                         + "void main() { gl_FragData[0] = vec4(lmCoord, 0.0, 1.0); }\n"));
+    }
+
+    @Test
+    void entityColorUsesIrisOverlayConversion() {
+        // Pin the generated GLSL, then check its semantics with a Java mirror of that exact expression.
+        assertEquals("(vec4(overlayColor.rgb * float(overlayColor.a != 1.0), 1.0 - overlayColor.a))",
+                ShaderPackUniformAdapter.ENTITY_COLOR_FROM_OVERLAY);
+        // Vanilla's "no overlay" texel is opaque white: Iris exposes no tint at all.
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new float[] {0, 0, 0, 0},
+                irisEntityColor(1.0F, 1.0F, 1.0F, 1.0F));
+        // Vanilla's hurt overlay is red with partial alpha: Iris exposes red at 1 - alpha strength.
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new float[] {1.0F, 0.0F, 0.0F, 0.3F},
+                irisEntityColor(1.0F, 0.0F, 0.0F, 0.7F), 1.0e-6F);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new float[] {0.25F, 0.5F, 0.75F, 1.0F},
+                irisEntityColor(0.25F, 0.5F, 0.75F, 0.0F), 1.0e-6F);
+    }
+
+    private static float[] irisEntityColor(float r, float g, float b, float a) {
+        float keep = a != 1.0F ? 1.0F : 0.0F;
+        return new float[] {r * keep, g * keep, b * keep, 1.0F - a};
     }
 }
