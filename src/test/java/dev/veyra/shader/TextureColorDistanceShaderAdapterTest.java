@@ -292,7 +292,7 @@ class TextureColorDistanceShaderAdapterTest {
                 source, "gbuffers_textured", false, false, true, false, true, false);
 
         assertTrue(adapted.contains("const vec4 entityColor = vec4(0.0);"), adapted);
-        assertFalse(adapted.contains("#define entityColor overlayColor"), adapted);
+        assertFalse(adapted.contains("#define entityColor " + ShaderPackUniformAdapter.ENTITY_COLOR_FROM_OVERLAY), adapted);
     }
 
     @Test
