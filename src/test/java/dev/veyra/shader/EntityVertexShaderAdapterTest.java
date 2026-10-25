@@ -90,6 +90,56 @@ class EntityVertexShaderAdapterTest {
         assertTrue(adapted.contains("texture(Sampler2, vec2(0.0))"), adapted);
     }
 
+    @Test
+    void entityShadowStagesUseIrisShadowProjectionAndRemapDepthToVulkan() throws Exception {
+        String remap = "gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;";
+        String[] shadowPrograms = {"shadow_entities", "shadow_block"};
+        String[] projectionExpressions = {
+                "ftransform()",
+                "gl_ProjectionMatrix * gl_Vertex",
+                "gl_ModelViewProjectionMatrix * gl_Vertex"
+        };
+        for (String program : shadowPrograms) {
+            for (String expression : projectionExpressions) {
+                String pack = "#version 120\nvoid main() { gl_Position = " + expression + "; }\n";
+                String adapted = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, program, false).source();
+                String packMain = functionBody(adapted, "veyraShaderPackMain");
+
+                assertTrue(packMain.contains("shadowProjection"), packMain);
+                assertFalse(packMain.contains("ProjMat"), packMain);
+                assertTrue(adapted.indexOf(remap) > adapted.indexOf("void veyraShaderPackMain()"), adapted);
+            }
+        }
+        String declaringPack = """
+                #version 120
+                uniform mat4 shadowProjection;
+                uniform mat4 shadowModelView;
+                void main() { gl_Position = shadowProjection * shadowModelView * gl_Vertex; }
+                """;
+
+        String declared = EntityVertexShaderAdapter.adaptStage(NATIVE, declaringPack, "shadow_block", false).source();
+        String color = EntityVertexShaderAdapter.adaptStage(NATIVE,
+                "#version 120\nvoid main() { gl_Position = ftransform(); }\n", "gbuffers_entities", false).source();
+        String hand = EntityVertexShaderAdapter.adaptStage(NATIVE,
+                "#version 120\nvoid main() { gl_Position = ftransform(); }\n", "gbuffers_hand", true).source();
+
+        assertEquals(1, occurrences(declared, "uniform mat4 shadowProjection;"), declared);
+        assertTrue(functionBody(color, "veyraShaderPackMain").contains("ProjMat"), color);
+        assertFalse(color.contains(remap), color);
+        assertTrue(functionBody(hand, "veyraShaderPackMain").contains("ProjMat"), hand);
+        assertTrue(hand.contains("gl_Position.z *= 0.125;"), hand);
+        assertFalse(hand.contains(remap), hand);
+    }
+
+    private static String functionBody(String source, String functionName) {
+        int signature = source.indexOf("void " + functionName + "()");
+        assertTrue(signature >= 0, source);
+        int open = source.indexOf('{', signature);
+        int close = source.indexOf('}', open);
+        assertTrue(open >= 0 && close > open, source);
+        return source.substring(open + 1, close);
+    }
+
     private static int occurrences(String source, String needle) {
         int count = 0;
         for (int offset = 0; (offset = source.indexOf(needle, offset)) >= 0; offset += needle.length()) count++;

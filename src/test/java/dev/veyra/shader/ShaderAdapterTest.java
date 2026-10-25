@@ -440,6 +440,15 @@ class ShaderAdapterTest {
                     chunkFade = mc_chunkFade;
                 }
                 """, "gbuffers_terrain");
+        String shadowVertex = TerrainVertexShaderAdapter.adaptStage(baseVertex, """
+                #version 130
+                uniform mat4 shadowProjection;
+                uniform mat4 shadowModelView;
+                void main() { gl_Position = shadowProjection * shadowModelView * gl_Vertex; gl_Position.z *= 0.2; }
+                """, "shadow_solid").source();
+        String remap = "gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;";
+        assertTrue(shadowVertex.indexOf(remap) > shadowVertex.indexOf("veyraShaderPackMain();"), shadowVertex);
+        assertFalse(vertex.source().contains(remap), vertex.source());
         String fragment = TerrainShaderAdapter.adaptFragment("""
                 #version 130
                 in vec2 texCoord;
