@@ -84,6 +84,7 @@ import net.vulkanmod.vulkan.shader.PipelineConfig;
 import net.vulkanmod.vulkan.shader.SPIRVUtils;
 import net.vulkanmod.vulkan.shader.Uniforms;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
+import net.vulkanmod.vulkan.shader.layout.Uniform;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 import net.vulkanmod.vulkan.util.MappedBuffer;
 import org.joml.Matrix4f;
@@ -4273,6 +4274,7 @@ public final class VeyraRenderer {
     /**
      * VulkanMod collects loose shader-pack uniforms into the generated "UBO 0" block. RenderPipeline draws only
      * bind GpuBuffer slices for Minecraft's named blocks, so that block must read the registered suppliers.
+     * VulkanMod's parser creates its fields without resolving suppliers, so they would upload zeros.
      */
     private static CompiledRenderPipeline precompileGeometryPipeline(RenderPipeline pipeline, ShaderSource source) {
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
@@ -4280,7 +4282,9 @@ public final class VeyraRenderer {
             GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
             if (nativePipeline != null) {
                 for (UBO ubo : nativePipeline.getBuffers()) {
-                    if (ubo.name.equals(LOOSE_UNIFORM_BLOCK)) ubo.setUseGlobalBuffer(true);
+                    if (!ubo.name.equals(LOOSE_UNIFORM_BLOCK)) continue;
+                    ubo.setUseGlobalBuffer(true);
+                    for (Uniform field : ubo.getUniforms()) attachUniformSupplier(field);
                 }
             }
         }
@@ -4288,6 +4292,27 @@ public final class VeyraRenderer {
     }
 
     private static final String LOOSE_UNIFORM_BLOCK = "UBO 0";
+    private static final java.lang.reflect.Method UNIFORM_SETUP_SUPPLIER;
+
+    static {
+        try {
+            UNIFORM_SETUP_SUPPLIER = Uniform.class.getDeclaredMethod("setupSupplier");
+            UNIFORM_SETUP_SUPPLIER.setAccessible(true);
+        } catch (ReflectiveOperationException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    /** Resolves the registered value supplier, then lets the typed field (Vec1f, Vec1i, ...) adopt it. */
+    private static void attachUniformSupplier(Uniform field) {
+        if (field.getInfo().hasSupplier()) return;
+        field.getInfo().setupSupplier();
+        try {
+            UNIFORM_SETUP_SUPPLIER.invoke(field);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Could not attach the supplier for uniform " + field.getName() + ".", exception);
+        }
+    }
 
     private static GraphicsPipeline compileCloudPipeline(ShaderPack pack) throws IOException {
         return compileCloudPipeline(pack, terrainPipelineSet == null ? null : terrainPipelineSet.compute());
