@@ -45,6 +45,7 @@ public final class GraphicsSmoke {
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
             entityMrtFixture, entityColorFeedbackFixture, entityNormalFixture, entityNormalMissingFixture,
+            shadowColorEntityFixture,
             currentRenderedItemFixture, glintVertexFixture,
             glintMrtFixture, shadowColorMrtFixture, shadowColorMrtLifecycleFixture, basicVertexFixture, basicCustomImageFixture,
             entityCustomImageFixture, entityCustomTextureFixture,
@@ -146,6 +147,7 @@ public final class GraphicsSmoke {
             currentRenderedItemFixture = fixture.equals("current-rendered-item-id");
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
+            shadowColorEntityFixture = fixture.equals("shadow-color-entity");
             shadowColorMrtLifecycleFixture = fixture.equals("shadow-color-mrt-lifecycle");
             setupComputeFixture = fixture.equals("compute-setup-stage");
             shadowColorMrtFixture = fixture.equals("shadow-color-mrt") || shadowColorMrtLifecycleFixture;
@@ -204,7 +206,7 @@ public final class GraphicsSmoke {
                     || handVertexFixture;
             boolean entityFixture = itemFixture || fixture.equals("specular-entity")
                     || entityNormalFixture || entityNormalMissingFixture
-                    || fixture.equals("shadow-color-entity") || shadowColorMrtFixture
+                    || shadowColorEntityFixture || shadowColorMrtFixture
                     || fixture.equals("water-shadow-depth-entity")
                     || entityColorFeedbackFixture || entityMrtFixture || basicVertexFixture
                     || fixture.equals("entity-vertex-execution") || blockVertexFixture || entityCustomImageFixture
@@ -1001,6 +1003,10 @@ public final class GraphicsSmoke {
                                 ? new IllegalStateException("The missing entity normal-map fallback was absent or unchanged: active red="
                                         + activeEntityNormalFallbackRedPixels + ", disabled red="
                                         + disabledEntityNormalFallbackRedPixels) : null;
+                    } else if (shadowColorEntityFixture) {
+                        failure = activePixels < 100 || count * 4 >= activePixels
+                                ? new IllegalStateException("The entity-written shadow color marker was absent or unchanged: active="
+                                        + activePixels + ", disabled=" + count) : null;
                     } else if (storageBufferFixture) {
                         failure = activePixels < 2000 || count * 4 >= activePixels
                                 ? new IllegalStateException("The shadow storage-buffer signal was absent or unchanged: active="
