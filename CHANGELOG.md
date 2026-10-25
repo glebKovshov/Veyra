@@ -4,7 +4,7 @@
 
 - Feed loose shader-pack uniforms (`sunAngle`, `worldTime`, `viewWidth`, ...) in sky, particle, weather, entity and shadow-entity RenderPipeline passes; they previously read 0, giving Complementary a pre-dawn sky without clouds (#127).
 - Honour Iris `shadowEntities` / `shadowBlockEntities`; Complementary Unbound's COMPLEMENTARY profile no longer fails on a `shadow_block` storage-image write (#128).
-- RTX 3070 lifecycles: BSL HIGH, Sildur default, Unbound HIGH and Unbound COMPLEMENTARY pass. Against Iris 1.10.8, Complementary sky/clouds/layout now match; Veyra's capture remains ~2x darker (under investigation). Not stable Iris parity.
+- RTX 3070 lifecycle smokes passed: BSL HIGH 360,000 / 124 buckets; Sildur default 360,000 / 122; Unbound HIGH 358,109 / 92; Unbound COMPLEMENTARY 359,042 / 93. In the matched Complementary HIGH fixture, Veyra capture methods are pixel-identical but the output remains darker than Iris. Full visual parity is unverified.
 
 ## 0.2.0-beta.46 - 2026-10-25 (experimental prerelease)
 
