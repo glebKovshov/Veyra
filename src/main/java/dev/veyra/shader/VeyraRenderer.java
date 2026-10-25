@@ -50,6 +50,7 @@ import net.minecraft.client.renderer.PostPass;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.UniformValue;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -369,6 +370,7 @@ public final class VeyraRenderer {
     private static final ThreadLocal<Integer> BLOCK_ENTITY_SUBMISSION_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<Deque<Integer>> ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Deque<Integer>> BLOCK_ENTITY_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
+    private static final TextSubmissionContexts TEXT_SUBMISSION_CONTEXTS = new TextSubmissionContexts();
     private static final ThreadLocal<Deque<Integer>> RENDERED_ITEM_IDENTIFIER_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static boolean handPipelineRoutingLogged;
     private static boolean blockEntityPipelineRoutingLogged;
@@ -1636,6 +1638,24 @@ public final class VeyraRenderer {
         }
     }
 
+    public static void trackTextSubmit(SubmitNodeStorage.TextSubmit textSubmit) {
+        if (BLOCK_ENTITY_SUBMISSION_DEPTH.get() > 0) {
+            TEXT_SUBMISSION_CONTEXTS.capture(textSubmit, currentBlockEntityIdentifier());
+        }
+    }
+
+    public static void beginTextSubmitRender(SubmitNodeStorage.TextSubmit textSubmit) {
+        TEXT_SUBMISSION_CONTEXTS.begin(textSubmit);
+    }
+
+    public static void endTextSubmitRender() {
+        TEXT_SUBMISSION_CONTEXTS.end();
+    }
+
+    public static void clearTextSubmitContexts(List<SubmitNodeStorage.TextSubmit> textSubmits) {
+        TEXT_SUBMISSION_CONTEXTS.clear(textSubmits);
+    }
+
     public static void beginEntitySubmission(EntityType<?> type) {
         int id = type == null ? EntityIdMap.UNMAPPED
                 : EntityIdMap.active().id(BuiltInRegistries.ENTITY_TYPE.getKey(type).toString());
@@ -1735,6 +1755,19 @@ public final class VeyraRenderer {
         return replaceRenderTypePipeline(originalType, replacement, "_veyra_entity");
     }
 
+    public static RenderType routeBlockEntityTextRenderType(RenderType originalType) {
+        if (originalType == null || VeyraShadowRenderer.isRendering()
+                || !TEXT_SUBMISSION_CONTEXTS.isBlockEntityText()
+                || !isSignTextPipeline(originalType.pipeline())) {
+            return originalType;
+        }
+        RenderPipeline replacement = getSignTextPipeline(originalType.pipeline());
+        if (replacement == null) {
+            return originalType;
+        }
+        return replaceRenderTypePipeline(originalType, replacement, "_veyra_block_entity_text");
+    }
+
     public static RenderPipeline getSignTextPipeline(RenderPipeline original) {
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         if (!isSignTextPipeline(original)) {
@@ -1745,7 +1778,15 @@ public final class VeyraRenderer {
             return null;
         }
         EntityPipelineSet pipelines = getBlockEntityPipelineSet(pack);
-        RenderPipeline replacement = pipelines == null ? null : pipelines.pipelines().get(original);
+        if (pipelines != null && pipelines.allPipelines().contains(original)) return null;
+        if (pipelines != null && TEXT_SUBMISSION_CONTEXTS.isBlockEntityText()) {
+            EntityPipelineSet blockTextPipelines = pipelines.blockEntityTextPipelines();
+            if (blockTextPipelines != null && blockTextPipelines.pipelines().containsKey(original)) {
+                pipelines = blockTextPipelines;
+            }
+        }
+        RenderPipeline replacement = entityPipelineVariant(pipelines, original, EntityIdMap.UNMAPPED,
+                TEXT_SUBMISSION_CONTEXTS.blockEntityId(), ItemIdMap.UNMAPPED, false);
         if (replacement != null && !signTextPipelineRoutingLogged) {
             VeyraClient.LOGGER.info("Routing sign text through shader pack '{}'.", pack.name());
             signTextPipelineRoutingLogged = true;
@@ -3498,8 +3539,10 @@ public final class VeyraRenderer {
             String block = resolveBlockEntityProgram(pack, candidate);
             if (block != null) blockPrograms.add(block);
         }
-        String textProgram = resolveBlockTextProgram(pack);
+        String textProgram = resolveBlockTextProgram(pack, false);
         if (textProgram != null) blockPrograms.add(textProgram);
+        String blockEntityTextProgram = resolveBlockTextProgram(pack, true);
+        if (blockEntityTextProgram != null) blockPrograms.add(blockEntityTextProgram);
 
         for (String program : entityPrograms) {
             var source = pack.readEntityFragment(program);
@@ -4852,18 +4895,24 @@ public final class VeyraRenderer {
                     packVertexSource, packVertexVaryings, imageResourceIdentity, customTextureSamplers,
                     customImageStage, null));
         }
-        compileSignTextPipelines(pack, customImages, pipelines, variantSources);
+        Map<RenderPipeline, RenderPipeline> blockTextPipelines = new IdentityHashMap<>();
+        Map<RenderPipeline, EntityPipelineSpec> blockTextVariantSources = new IdentityHashMap<>();
+        compileSignTextPipelines(pack, customImages, pipelines, variantSources, false);
+        compileSignTextPipelines(pack, customImages, blockTextPipelines, blockTextVariantSources, true);
         if (pipelines.isEmpty() && pack.hasEnabledProgramFragment(pack.blockPrograms())) {
             throw new IOException("Minecraft's block entity render pipelines were not found or do not support this shader interface.");
         }
-        return new EntityPipelineSet(pipelines, variantSources);
+        EntityPipelineSet blockTextSet = blockTextPipelines.isEmpty() ? null
+                : new EntityPipelineSet(blockTextPipelines, blockTextVariantSources);
+        return new EntityPipelineSet(pipelines, variantSources, blockTextSet);
     }
 
     private static void compileSignTextPipelines(ShaderPack pack,
                                                  VeyraComputePipelineSet customImages,
                                                  Map<RenderPipeline, RenderPipeline> pipelines,
-                                                 Map<RenderPipeline, EntityPipelineSpec> variantSources) throws IOException {
-        String programName = resolveBlockTextProgram(pack);
+                                                 Map<RenderPipeline, EntityPipelineSpec> variantSources,
+                                                 boolean blockEntityText) throws IOException {
+        String programName = resolveBlockTextProgram(pack, blockEntityText);
         if (programName == null) {
             return;
         }
@@ -4882,7 +4931,7 @@ public final class VeyraRenderer {
         String packVertexSource = null;
         Map<String, TerrainVertexShaderAdapter.PackVarying> packVertexVaryings = Map.of();
         try {
-            rawFragmentSource = pack.readBlockFragment(programName)
+            rawFragmentSource = pack.readBlockTextFragment(programName)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + programName + ".fsh."));
             customImageStage = prepareNativeImageSamplers(pack, programName, rawFragmentSource, customImages);
             rawFragmentSource = customImageStage.source();
@@ -4890,13 +4939,11 @@ public final class VeyraRenderer {
                     rawFragmentSource, pack.readCustomTextureProperties().samplersForProgram(programName));
             colorInputs = GeometryColorSamplers.indices(
                     GeometryColorSamplers.read(rawFragmentSource, customTextureSamplers));
-            if (programName.equals("gbuffers_textured")) {
-                Optional<String> packVertex = pack.readStage(programName + ".vsh");
-                if (packVertex.isPresent()) {
-                    packVertexSource = packVertex.get();
-                    packVertexVaryings = BasicVertexShaderAdapter.describeVaryings(
-                            programName, packVertexSource, BasicVertexShaderAdapter.Format.SIGN_TEXT);
-                }
+            Optional<String> packVertex = pack.readStage(programName + ".vsh");
+            if (packVertex.isPresent()) {
+                packVertexSource = packVertex.get();
+                packVertexVaryings = BasicVertexShaderAdapter.describeVaryings(
+                        programName, packVertexSource, BasicVertexShaderAdapter.Format.SIGN_TEXT);
             }
             outputLayout = FragmentOutputs.parse(rawFragmentSource);
             blendSettings = pack.readGeometryBlendSettings(programName);
@@ -4954,20 +5001,8 @@ public final class VeyraRenderer {
         }
     }
 
-    private static String resolveBlockTextProgram(ShaderPack pack) throws IOException {
-        if (pack.blockPrograms().contains("gbuffers_block")
-                && pack.hasEnabledProgramFragment("gbuffers_block")) {
-            return "gbuffers_block";
-        }
-        if (pack.terrainPrograms().contains("gbuffers_terrain")
-                && pack.hasEnabledProgramFragment("gbuffers_terrain")) {
-            return "gbuffers_terrain";
-        }
-        if (pack.hasTexturedLitFragment() && pack.hasEnabledProgramFragment("gbuffers_textured_lit")) {
-            return "gbuffers_textured_lit";
-        }
-        return pack.hasTexturedFragment() && pack.hasEnabledProgramFragment("gbuffers_textured")
-                ? "gbuffers_textured" : null;
+    private static String resolveBlockTextProgram(ShaderPack pack, boolean blockEntityText) throws IOException {
+        return pack.blockTextProgram(blockEntityText);
     }
 
     private static boolean isSignTextPipeline(RenderPipeline pipeline) {
@@ -8422,13 +8457,21 @@ public final class VeyraRenderer {
     private static final class EntityPipelineSet {
         private final Map<RenderPipeline, RenderPipeline> pipelines;
         private final Map<RenderPipeline, EntityPipelineSpec> variantSources;
+        private final EntityPipelineSet blockEntityTextPipelines;
         private final Map<RenderPipeline, Map<EntityIdentifierPair, RenderPipeline>> variants = new IdentityHashMap<>();
         private final Map<RenderPipeline, Set<EntityIdentifierPair>> failedVariants = new IdentityHashMap<>();
 
         private EntityPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines,
                                   Map<RenderPipeline, EntityPipelineSpec> variantSources) {
+            this(pipelines, variantSources, null);
+        }
+
+        private EntityPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines,
+                                  Map<RenderPipeline, EntityPipelineSpec> variantSources,
+                                  EntityPipelineSet blockEntityTextPipelines) {
             this.pipelines = pipelines;
             this.variantSources = variantSources;
+            this.blockEntityTextPipelines = blockEntityTextPipelines;
         }
 
         private Map<RenderPipeline, RenderPipeline> pipelines() {
@@ -8437,6 +8480,10 @@ public final class VeyraRenderer {
 
         private Map<RenderPipeline, EntityPipelineSpec> variantSources() {
             return variantSources;
+        }
+
+        private EntityPipelineSet blockEntityTextPipelines() {
+            return blockEntityTextPipelines;
         }
 
         private Map<RenderPipeline, Map<EntityIdentifierPair, RenderPipeline>> variants() {
@@ -8451,6 +8498,7 @@ public final class VeyraRenderer {
             Set<RenderPipeline> all = Collections.newSetFromMap(new IdentityHashMap<>());
             all.addAll(pipelines.values());
             variants.values().forEach(byIdentifier -> all.addAll(byIdentifier.values()));
+            if (blockEntityTextPipelines != null) all.addAll(blockEntityTextPipelines.allPipelines());
             return all;
         }
     }

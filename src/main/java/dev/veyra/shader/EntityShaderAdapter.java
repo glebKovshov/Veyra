@@ -1222,7 +1222,30 @@ public final class EntityShaderAdapter {
                     + "\n    normal = faceforward(normal, viewPos, normal);"
                     + adapted.substring(fragmentMain.end());
         }
+        if (textPipeline) {
+            String firstOutput = outputLayout.variables().entrySet().stream()
+                    .min(Map.Entry.comparingByKey()).orElseThrow().getValue();
+            adapted = wrapTextAlphaTest(adapted, firstOutput, programName);
+        }
         return result.append(adapted).toString();
+    }
+
+    private static String wrapTextAlphaTest(String source, String output, String programName) throws IOException {
+        Matcher main = MAIN_FUNCTION.matcher(ShaderSource.maskBlockAndLineComments(source));
+        if (!main.find()) throw new IOException(programName + " has no fragment main function.");
+        int start = main.start();
+        int end = main.end();
+        if (main.find()) throw new IOException(programName + " has multiple fragment main functions.");
+        String declaration = source.substring(start, end);
+        int name = declaration.indexOf("main");
+        declaration = declaration.substring(0, name) + "veyraTextPackMain"
+                + declaration.substring(name + "main".length());
+        return source.substring(0, start) + declaration + source.substring(end)
+                + "\nvoid main() {\n"
+                + "    " + output + " = vec4(0.0);\n"
+                + "    veyraTextPackMain();\n"
+                + "    if (" + output + ".a < alphaTestRef) discard;\n"
+                + "}\n";
     }
 
     private static String replaceLinkedPackVaryings(
