@@ -528,6 +528,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return halfLife;
     }
 
+    /** Iris' oldLighting directive (default false): keep vanilla directional block shading under this pack. */
+    public boolean readOldLighting() throws IOException {
+        return readBooleanProperty("oldLighting", false);
+    }
+
     private boolean readBooleanProperty(String propertyName, boolean defaultValue) throws IOException {
         Optional<String> source = readShader("shaders.properties");
         if (source.isEmpty()) {

@@ -7,6 +7,7 @@
     "VulkanCleanupMixin",
     "BiomesMixin",
     "LightTextureMixin",
+    "ClientLevelShadeMixin",
     "GameRendererMixin",
     "ItemInHandRendererMixin",
     "ItemModelResolverMixin",

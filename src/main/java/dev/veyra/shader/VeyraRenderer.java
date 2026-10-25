@@ -366,6 +366,9 @@ public final class VeyraRenderer {
     private static boolean cloudPipelineDirty = true;
     private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
+    private static volatile boolean directionalShadingDisabled;
+    private static ShaderPack oldLightingPack;
+    private static boolean oldLighting;
     private static final ThreadLocal<Integer> HAND_RENDER_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<Deque<Boolean>> HAND_SIDE_SUBMISSION_CONTEXT = ThreadLocal.withInitial(ArrayDeque::new);
     private static final ThreadLocal<Integer> BLOCK_ENTITY_SUBMISSION_DEPTH = ThreadLocal.withInitial(() -> 0);
@@ -1322,6 +1325,7 @@ public final class VeyraRenderer {
 
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
+        updateDirectionalShading();
         updateFrameClock();
         nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
         Matrix4f currentModelView = new Matrix4f(modelView);
@@ -6937,6 +6941,30 @@ public final class VeyraRenderer {
                     "Restored VulkanMod uniqueOpaqueLayer to {} after shader pack use.", originalValue);
         }
         return changed;
+    }
+
+    /** Iris disables vanilla directional block shading unless the active pack sets oldLighting=true. */
+    public static boolean shouldDisableDirectionalShading() {
+        return directionalShadingDisabled;
+    }
+
+    /** Directional shading is baked into chunk vertex colors, so a change needs rebuilt terrain. */
+    private static void updateDirectionalShading() {
+        ShaderPack pack = renderingEnabled ? selectedPack().orElse(null) : null;
+        if (pack != null && pack != oldLightingPack) {
+            oldLightingPack = pack;
+            try {
+                oldLighting = pack.readOldLighting();
+            } catch (IOException exception) {
+                VeyraClient.LOGGER.warn("Could not read oldLighting for '{}'; disabling directional shading like Iris.",
+                        pack.name(), exception);
+                oldLighting = false;
+            }
+        }
+        boolean disable = pack != null && !oldLighting;
+        if (disable == directionalShadingDisabled) return;
+        directionalShadingDisabled = disable;
+        rebuildTerrainSections();
     }
 
     private static void rebuildTerrainSections() {

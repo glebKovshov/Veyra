@@ -169,6 +169,18 @@ class ShaderPackComputeStagesTest {
     }
 
     @Test
+    void readsIrisOldLightingDirectiveDefaultingToFalse(@TempDir Path root) throws Exception {
+        Path enabled = Files.createDirectories(root.resolve("enabled").resolve("shaders"));
+        Files.writeString(enabled.resolve("shadow.fsh"), "void main() {}\n");
+        Files.writeString(enabled.resolve("shaders.properties"), "oldLighting = true\n");
+        Path defaults = Files.createDirectories(root.resolve("defaults").resolve("shaders"));
+        Files.writeString(defaults.resolve("shadow.fsh"), "void main() {}\n");
+
+        org.junit.jupiter.api.Assertions.assertTrue(ShaderPack.inspect(root.resolve("enabled")).readOldLighting());
+        org.junit.jupiter.api.Assertions.assertFalse(ShaderPack.inspect(root.resolve("defaults")).readOldLighting());
+    }
+
+    @Test
     void loadsShadowLetterComponentsWithoutSuffixlessComputeAndStopsAtFirstGap(@TempDir Path root)
             throws Exception {
         Path shaders = Files.createDirectories(root.resolve("shaders"));
