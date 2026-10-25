@@ -5,7 +5,7 @@
 - Attach Iris loose-uniform suppliers in generated UBO 0 blocks so sky, entity, particle, weather and shadow-entity passes receive the shader-pack values (#134).
 - Match Iris directional block shading unless the pack enables `oldLighting` (#135), and apply Iris entity color / hurt-overlay conversion (#136).
 - Enable declared color outputs for shadow-entity pipelines and add a terrain-versus-entity shadow-color regression fixture (#137). Entity shadow depth was not validated by this color-output change.
-- The release candidate has no new GPU visual run. See `COMPATIBILITY.md` for older profile evidence and unresolved visual checks.
+- A targeted RTX 3070 GraphicsSmoke fixture for #137 found 217 active entity-written shadow-color samples and 0 after disabling the pack. This checks shadow color output only; it does not validate entity shadow depth or full shaderpack visuals. See `COMPATIBILITY.md` for older profile evidence and remaining visual checks.
 - The pinned source audit covered 4 shaderpacks × 3 dimensions (12 defaults / 63 profile cases): 939 geometry fragments accepted / 0 rejected; 18 active compute stages compiled. Eighteen profile/dimension records report that the audit device lacks `vertexPipelineStoresAndAtomics` for Complementary's `voxel_img` shadow-vertex writes; source acceptance is not runtime or visual validation.
 - The exact beta.49 candidate passed the local JDK 21 gate: 597 tests (0 failures/errors/skips), 104 example shaders, 122 Vulkan SPIR-V compilations, GraphicsSmoke compilation, build and example-pack packaging. `verify_jar.py` accepted the 1,068,866-byte mod JAR (SHA-256 `9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9`).
 
