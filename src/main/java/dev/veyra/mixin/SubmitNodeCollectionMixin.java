@@ -5,7 +5,9 @@ import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(SubmitNodeCollection.class)
 public abstract class SubmitNodeCollectionMixin {
@@ -32,5 +34,16 @@ public abstract class SubmitNodeCollectionMixin {
     @ModifyVariable(method = "submitCustomGeometry", at = @At("HEAD"), argsOnly = true)
     private RenderType veyra$routeBlockCustomGeometry(RenderType renderType) {
         return VeyraRenderer.routeBlockEntityRenderType(renderType);
+    }
+
+    @Inject(method = "submitText", at = @At("TAIL"))
+    private void veyra$trackBlockEntityText(CallbackInfo ci) {
+        var submits = ((SubmitNodeCollection) (Object) this).getTextSubmits();
+        if (!submits.isEmpty()) VeyraRenderer.trackTextSubmit(submits.getLast());
+    }
+
+    @Inject(method = "clear", at = @At("HEAD"))
+    private void veyra$clearPendingTextContexts(CallbackInfo ci) {
+        VeyraRenderer.clearTextSubmitContexts(((SubmitNodeCollection) (Object) this).getTextSubmits());
     }
 }

@@ -141,6 +141,35 @@ class EntityFragmentOutputsTest {
     }
 
     @Test
+    void signTextChecksFirstOutputAlphaAfterPackMainReturns() throws IOException {
+        String source = """
+                #version 120
+                uniform sampler2D texture;
+                varying vec2 texcoord;
+                varying vec4 color;
+                void main() {
+                    if (color.r < 0.0) return;
+                    gl_FragColor = texture2D(texture, texcoord) * color;
+                    if (color.g < 0.0) discard;
+                }
+                """;
+
+        String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block_translucent");
+
+        assertTrue(adapted.contains("void veyraTextPackMain()"), adapted);
+        assertTrue(adapted.contains("if (color.r < 0.0) return;"), adapted);
+        assertTrue(adapted.contains("if (color.g < 0.0) discard;"), adapted);
+        assertTrue(adapted.contains("veyraFragColor = vec4(0.0);"), adapted);
+        assertTrue(adapted.contains("veyraTextPackMain();"), adapted);
+        assertTrue(adapted.contains("if (veyraFragColor.a < alphaTestRef) discard;"), adapted);
+        assertTrue(adapted.indexOf("veyraTextPackMain();")
+                < adapted.indexOf("if (veyraFragColor.a < alphaTestRef) discard;"), adapted);
+
+        String entity = EntityShaderAdapter.adaptFragment(source, "gbuffers_entities");
+        assertFalse(entity.contains("veyraTextPackMain"), entity);
+    }
+
+    @Test
     void keepsUnboundEntityDrawBufferSlotsPrivate() throws IOException {
         String source = "/* DRAWBUFFERS:0 */\nvoid main() { gl_FragData[1] = vec4(0.5); gl_FragData[0] = gl_FragData[1]; }";
         String adapted = EntityShaderAdapter.adaptFragment(source, "gbuffers_entities");

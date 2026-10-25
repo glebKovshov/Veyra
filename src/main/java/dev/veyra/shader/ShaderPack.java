@@ -809,6 +809,23 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 || hasTexturedLitFragment || hasTexturedFragment;
     }
 
+    /** Selects the Iris text program used by block-entity text or ordinary world text. */
+    public String blockTextProgram(boolean blockEntityText) throws IOException {
+        if (blockEntityText && blockPrograms.contains("gbuffers_block_translucent")) {
+            return "gbuffers_block_translucent";
+        }
+        if (blockPrograms.contains("gbuffers_block") && hasEnabledProgramFragment("gbuffers_block")) {
+            return "gbuffers_block";
+        }
+        if (terrainPrograms.contains("gbuffers_terrain") && hasEnabledProgramFragment("gbuffers_terrain")) {
+            return "gbuffers_terrain";
+        }
+        if (hasTexturedLitFragment && hasEnabledProgramFragment(TEXTURED_LIT_PROGRAM)) {
+            return TEXTURED_LIT_PROGRAM;
+        }
+        return hasTexturedFragment && hasEnabledProgramFragment(TEXTURED_PROGRAM) ? TEXTURED_PROGRAM : null;
+    }
+
     public Optional<String> readBlockFragment(String programName) throws IOException {
         if (!supportsShaderPrograms()) {
             return Optional.empty();
@@ -826,6 +843,15 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             return Optional.empty();
         }
         return Optional.of(expandIncludes(fileName, source.get()));
+    }
+
+    /** Iris selects BlockTrans for sign text even when its regular translucent pass is disabled. */
+    public Optional<String> readBlockTextFragment(String programName) throws IOException {
+        if (!"gbuffers_block_translucent".equals(programName)) return readBlockFragment(programName);
+        if (!supportsShaderPrograms() || !blockPrograms.contains(programName)) return Optional.empty();
+        String fileName = programName + ".fsh";
+        Optional<String> source = readShader(fileName, true);
+        return source.isPresent() ? Optional.of(expandIncludes(fileName, source.get())) : Optional.empty();
     }
 
     public Optional<String> readHandFragment(String programName) throws IOException {
@@ -1762,7 +1788,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private Optional<String> readShader(String fileName) throws IOException {
+        return readShader(fileName, false);
+    }
+
+    private Optional<String> readShader(String fileName, boolean allowDisabledProgram) throws IOException {
         if (!fileName.contains("/") && fileName.matches(".+\\.(?:fsh|vsh|gsh|tcs|tes|csh)")
+                && !allowDisabledProgram
                 && !isProgramEnabled(fileName.substring(0, fileName.lastIndexOf('.')))) return Optional.empty();
         if (fileName.equals("shaders.properties") && configuration.processed(fileName) != null)
             return Optional.of(configuration.processed(fileName));
