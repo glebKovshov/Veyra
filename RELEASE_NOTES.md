@@ -19,7 +19,7 @@ Beta.49 includes the beta.48 shadow-depth and sign-text routing fixes, then adds
 
 ## Validation and known limits
 
-- The exact beta.49 candidate passed the local JDK 21 gate: 597 tests (0 failures/errors/skips), 104 example shaders, 122 Vulkan SPIR-V compilations, GraphicsSmoke compilation, build, shader validation and example-pack packaging. `scripts/verify_jar.py` accepted the 1,068,866-byte mod JAR (SHA-256 `9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9`).
+- The beta.49 candidate containing PR #137 head `14c2201` passed the local JDK 21 gate: 597 tests (0 failures/errors/skips), 104 example shaders, 122 Vulkan SPIR-V compilations, GraphicsSmoke compilation, build, shader validation and example-pack packaging. `scripts/verify_jar.py` accepted the 1,068,905-byte mod JAR (SHA-256 `1879AC741407C724610485BCB4A96E91AAE5FD258B9FA6F6F102CE4E71D41FF9`). Exact-head hosted checks are still running.
 - The pinned source audit accepted 939 geometry fragments with none rejected and compiled all 18 selected compute stages across four pinned packs, three dimensions, 12 defaults and 63 declared-profile cases. All 75 records are source-only; 18 Complementary Reimagined/Unbound profile-dimension cases need `vertexPipelineStoresAndAtomics` for `voxel_img` shadow-vertex writes, unavailable on the audit device.
 - Earlier RTX 3070 captures and lifecycle runs are listed in `COMPATIBILITY.md`; they were made on beta.47/beta.48 code and are not a fresh GPU validation of beta.49.
 - Entity shadow depth remains unresolved. The forced near-depth readback found no near-zero samples in its probe area, but the golem footprint was at the UV edge and the player's shadow submission was not confirmed. No second GPU run was made.

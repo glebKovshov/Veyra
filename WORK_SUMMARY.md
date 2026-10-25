@@ -1845,3 +1845,8 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Re-ran the pinned source audit on this candidate: 4 shaderpacks, 3 dimensions, 12 default and 63 profile cases; 939 geometry fragment programs accepted, 0 rejected; all 18 selected compute stages compiled; 75/75 records remain visualValidation=false.
 - scripts/verify_jar.py accepted the beta.49 JAR for Minecraft 1.21.11 / VulkanMod 0.6.8. JAR: 1,068,866 bytes, SHA-256 9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9. Example packs: 133,392 bytes, SHA-256 E741BB9866CAC4D7FCE1EAD96BA64596FB0973B93CBB9D3B128F518FBC70E474.
 - Updated candidate compatibility/release notes to cite 15aa476 and the fresh source audit. Exact-head hosted checks are still watched; entity-shadow depth and sign glyph readability remain unverified. No release ref, tag, or publication was made.
+### Beta.49 release-candidate rebuild - 2026-10-25
+
+- Rebuilt the release candidate containing PR #137 head `14c2201` with Temurin JDK 21. `build`, `test`, `validateShaders`, and `packageExamplePacks` passed; 597 tests had 0 failures, 0 errors, and 0 skipped. The gate preprocessed 104 example shaders and compiled 122 to Vulkan SPIR-V.
+- `scripts/verify_jar.py` accepted `veyra-0.2.0-beta.49+mc1.21.11.jar` for Minecraft 1.21.11 / VulkanMod 0.6.8. Size 1,068,905 bytes; SHA-256 `1879AC741407C724610485BCB4A96E91AAE5FD258B9FA6F6F102CE4E71D41FF9`. Example-pack ZIP: 133,392 bytes; SHA-256 `E741BB9866CAC4D7FCE1EAD96BA64596FB0973B93CBB9D3B128F518FBC70E474`.
+- The exact-head GitHub Build passed; source-audit and Graphics-smoke runs remain in progress. No release has been published.
