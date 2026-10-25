@@ -1,4 +1,18 @@
-# Shaderpack compatibility - beta.47 validation
+# Shaderpack compatibility - beta.48 validation
+
+## Beta.48 - 2026-10-25
+
+The current beta.48 candidate was tested on an NVIDIA RTX 3070 with the pinned Complementary Reimagined r5.9.3 HIGH archive. The 640x360 generated-scene smoke passed with 230,400 non-black pixels and 116 color buckets. Its generated `shadow_entities.vsh` uses `shadowProjection` in the pack main and remaps clip depth after the pack's `gl_Position.z *= 0.2`. Compared with the matched Iris 1.10.8 + Sodium 0.8.14 reference, candidate mean RGB is 106.82/98.85/72.82 vs 121.49/108.53/80.95; MAE is 17.69. This is a substantial improvement over beta.47, but full visual parity is not reached.
+
+| Pack | Version / profile | RTX 3070 generated-scene evidence | Status |
+|---|---|---|---|
+| Complementary Reimagined | r5.9.3 / HIGH | beta.48 candidate, 230,400 non-black / 116 buckets | Current one-shot smoke passed; darker than Iris reference. |
+| Complementary Unbound | r5.9.3 / HIGH | prior selected-profile lifecycle, 358,109 / 92 | Passed resize, dimension round-trip, disable/re-enable and reload on beta.47 code. |
+| Complementary Unbound | r5.9.3 / COMPLEMENTARY | prior selected-profile lifecycle, 359,042 / 93 | Passed after #128 shadow-entity toggle fix; beta.47 code. |
+| BSL | v10.1.8 / HIGH | prior selected-profile lifecycle, 360,000 / 124 | Passed on beta.47 code. |
+| Sildur's Vibrant | v2.02 Extreme / default | #131 lifecycle, 360,000 / 125 | Lifecycle passed. BlockTrans routing, submission context and alpha cutoff are implemented; glyph readability is unverified because the matched Iris fixture is blank too. |
+
+The source audit and Lavapipe graphics matrix are automated support checks, not full-pack visual certification. The profile-specific runs above use generated scenes; they do not establish natural-world results or arbitrary option combinations. See `validation/shaderpack-profile-audit.json` for source-only profile outcomes (`visualValidation=false`).
 
 ## Beta.47 - 2026-10-25
 
