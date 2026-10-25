@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0-beta.48 - 2026-10-25 (experimental prerelease)
+
+- Use Iris `shadowProjection` in entity shadow pack mains after legacy source preparation and remap OpenGL clip depth to Vulkan zero-to-one after terrain/entity shadow pack execution (#132).
+- Route block-entity text through Iris `BlockTrans`, preserving submission identity, the corresponding pack vertex stage, and native text alpha cutoff (#131). Sildur glyph readability remains unverified because the matched Iris reference fixture is blank too.
+- Flush deferred Vulkan image frees before allocator destruction (#130); the new Complementary GPU run exited normally. A historical one-off Windows `0xC0000409` shutdown status has not been reproduced or fully explained.
+- On RTX 3070, pinned Complementary Reimagined r5.9.3 HIGH ran at 640x360 with 230,400 non-black pixels / 116 color buckets. Against the matched Iris reference, candidate mean RGB is 106.82/98.85/72.82 vs 121.49/108.53/80.95 (MAE 17.69): materially brighter than beta.47, but still not at Iris brightness.
+- Local JDK 21 gate: 595 tests, 0 failures/errors/skips; 104 example shaders, 122 Vulkan SPIR-V compilations, build, graphics-smoke compilation and example-pack packaging passed. PR #132 passed exact-head Build, source audit, and all 30 Graphics jobs.
+- The release remains an experimental subset; lifecycle evidence and generated scenes do not certify full packs, natural worlds, or full Iris parity.
+
 ## 0.2.0-beta.47 - 2026-10-25 (experimental prerelease)
 
 - Feed loose shader-pack uniforms (`sunAngle`, `worldTime`, `viewWidth`, ...) in sky, particle, weather, entity and shadow-entity RenderPipeline passes; they previously read 0, giving Complementary a pre-dawn sky without clouds (#127).
