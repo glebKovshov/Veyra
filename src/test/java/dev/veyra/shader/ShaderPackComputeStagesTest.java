@@ -146,6 +146,29 @@ class ShaderPackComputeStagesTest {
     }
 
     @Test
+    void readsIrisShadowEntityTogglesHonouringPropertyConditions(@TempDir Path root) throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        Files.writeString(shaders.resolve("shadow.fsh"), "void main() {}\n");
+        Files.writeString(shaders.resolve("shaders.properties"), """
+                shadowBlockEntities = false
+                #if 0
+                shadowEntities = false
+                #endif
+                """);
+        Path defaultRoot = Files.createDirectories(root.resolve("defaults"));
+        Files.writeString(Files.createDirectories(defaultRoot.resolve("shaders")).resolve("shadow.fsh"),
+                "void main() {}\n");
+
+        var configured = ShaderPack.inspect(root).readShadowSettings();
+        var defaults = ShaderPack.inspect(defaultRoot).readShadowSettings();
+
+        org.junit.jupiter.api.Assertions.assertFalse(configured.shadowBlockEntities());
+        org.junit.jupiter.api.Assertions.assertTrue(configured.shadowEntities());
+        org.junit.jupiter.api.Assertions.assertTrue(defaults.shadowBlockEntities());
+        org.junit.jupiter.api.Assertions.assertTrue(defaults.shadowEntities());
+    }
+
+    @Test
     void loadsShadowLetterComponentsWithoutSuffixlessComputeAndStopsAtFirstGap(@TempDir Path root)
             throws Exception {
         Path shaders = Files.createDirectories(root.resolve("shaders"));

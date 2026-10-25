@@ -4,7 +4,7 @@ package dev.veyra.shader;
 public record ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation,
                              float nearPlane, float farPlane,
                              float distanceRenderMultiplier, float entityShadowDistanceMultiplier,
-                             boolean shadowTranslucent) {
+                             boolean shadowTranslucent, boolean shadowEntities, boolean shadowBlockEntities) {
     public static final int DEFAULT_RESOLUTION = 1024;
     public static final float DEFAULT_DISTANCE = 128.0F;
     public static final float DEFAULT_NEAR_PLANE = -100.05F;
@@ -16,7 +16,16 @@ public record ShadowSettings(int resolution, float distance, float intervalSize,
     public static final ShadowSettings DEFAULT = new ShadowSettings(
             DEFAULT_RESOLUTION, DEFAULT_DISTANCE, DEFAULT_INTERVAL_SIZE, DEFAULT_SUN_PATH_ROTATION,
             DEFAULT_NEAR_PLANE, DEFAULT_FAR_PLANE,
-            DEFAULT_DISTANCE_RENDER_MULTIPLIER, DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER, false);
+            DEFAULT_DISTANCE_RENDER_MULTIPLIER, DEFAULT_ENTITY_SHADOW_DISTANCE_MULTIPLIER, false, true, true);
+
+    /** Settings without the Iris entity toggles, which default to rendering entities and block entities. */
+    public ShadowSettings(int resolution, float distance, float intervalSize, float sunPathRotation,
+                          float nearPlane, float farPlane,
+                          float distanceRenderMultiplier, float entityShadowDistanceMultiplier,
+                          boolean shadowTranslucent) {
+        this(resolution, distance, intervalSize, sunPathRotation, nearPlane, farPlane,
+                distanceRenderMultiplier, entityShadowDistanceMultiplier, shadowTranslucent, true, true);
+    }
 
     public ShadowSettings {
         if (resolution < 1 || resolution > 8192) {
