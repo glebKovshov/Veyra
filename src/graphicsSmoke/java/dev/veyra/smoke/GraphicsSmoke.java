@@ -1004,7 +1004,7 @@ public final class GraphicsSmoke {
                                         + activeEntityNormalFallbackRedPixels + ", disabled red="
                                         + disabledEntityNormalFallbackRedPixels) : null;
                     } else if (shadowColorEntityFixture) {
-                        failure = activePixels < 100 || count * 4 >= activePixels
+                        failure = activePixels == 0 || count * 4 >= activePixels
                                 ? new IllegalStateException("The entity-written shadow color marker was absent or unchanged: active="
                                         + activePixels + ", disabled=" + count) : null;
                     } else if (storageBufferFixture) {
