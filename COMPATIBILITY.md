@@ -2,12 +2,12 @@
 
 ## Beta.49 candidate - 2026-10-25
 
-The candidate is based on main `6e0d7ba` plus PR #137 (`2ce8cb3`). The change enables shadow-entity color outputs and adds an entity-versus-terrain color fixture. It does not establish entity shadow depth writes. No new GPU visual run was made for this candidate; the forced-depth readback on the same code base was inconclusive because the golem footprint landed at the readback square's edge and player submission was not confirmed.
+The candidate is based on main `6e0d7ba` plus PR #137 (`15aa476`). The change enables shadow-entity color outputs; its fixture uses a constant entity fragment output to isolate color writes from custom varying linkage. It does not establish entity shadow depth writes. No new GPU visual run was made for this candidate; the forced-depth readback on the same code base was inconclusive because the golem footprint landed at the readback square's edge and player submission was not confirmed.
 
 | Area | Evidence | Status |
 |---|---|---|
-| Pinned source audit | 4 shaderpacks × 3 dimensions; 12 defaults / 63 profile cases; 939 geometry fragments accepted / 0 rejected; 18/18 active compute stages compiled | Source-only; all 75 records have visualValidation=false. Eighteen Complementary Reimagined/Unbound profile-dimension records need vertexPipelineStoresAndAtomics for voxel_img shadow-vertex writes, unavailable on the audit device. |
-| Entity shadow color outputs | PR #137 source change and regression fixture; local JDK 21 gate passed (597 tests, build, shader validation and packaging); T3 watcher active for hosted checks | Candidate visuals not measured. |
+| Pinned source audit | Fresh run on the rebased candidate: 4 shaderpacks × 3 dimensions; 12 defaults / 63 profile cases; 939 geometry fragments accepted / 0 rejected; 18/18 active compute stages compiled | Source-only; all 75 records have visualValidation=false. Eighteen Complementary Reimagined/Unbound profile-dimension records need vertexPipelineStoresAndAtomics for voxel_img shadow-vertex writes, unavailable on the audit device. |
+| Entity shadow color outputs | PR #137 at 15aa476; fixture uses constant entity output; local JDK 21 gate passed (597 tests, build, shader validation and packaging); T3 watcher active for hosted checks | Candidate visuals not measured; exact-head hosted checks pending. |
 | Entity shadow depth | One forced near-depth probe, with an edge-clamped golem footprint and unconfirmed player submission | Unresolved. |
 | Sildur sign glyphs | Existing generated-scene lifecycle and BlockTrans route; matched Iris fixture was blank too | Glyph readability unverified. |
 | Complementary Reimagined | beta.48 RTX 3070 generated-scene capture: 230,400 non-black pixels / 116 buckets; mean RGB 106.82/98.85/72.82 vs Iris 121.49/108.53/80.95 | Older-code capture; darker than Iris and not a beta.49 rerun. |

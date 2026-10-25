@@ -1837,3 +1837,11 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Implementations already present in current main with newer source/tests/fixtures: terrain vertex stages (main d97dcb1; TerrainVertexShaderAdapter tests and terrain-vertex-execution/varyings fixtures) and armor glint vertex stages (main df3df82; GlintVertexShaderAdapter tests and glint-vertex-execution fixture). Their stale branches are not safe merge candidates.
 - The stale Sildur lifecycle commit ec04a00 is superseded by the later main commit fb85d43 with the same fix area and newer bindings/routing. Old beta publication/release-prep branches contain historical records, not pending feature work.
 - PR #137 remains the only current code contribution not represented in main. Its entity-shadow color-output change is distinct from the unresolved depth-write question.
+
+### Beta.49 candidate rebase and full source audit - 2026-10-25
+
+- Rebased the local release-prep/beta49 commit onto current PR #137 head 15aa476. The release candidate now includes the isolated constant-output fixture; source branch, user root checkout, and remote release refs were not changed.
+- Re-ran build, test, validateShaders, and packageExamplePacks on the rebased candidate with Temurin 21.0.12.1: all tasks passed; 597 tests had 0 failures/errors/skips; 104 example shaders were preprocessed and 122 SPIR-V compilations passed.
+- Re-ran the pinned source audit on this candidate: 4 shaderpacks, 3 dimensions, 12 default and 63 profile cases; 939 geometry fragment programs accepted, 0 rejected; all 18 selected compute stages compiled; 75/75 records remain visualValidation=false.
+- scripts/verify_jar.py accepted the beta.49 JAR for Minecraft 1.21.11 / VulkanMod 0.6.8. JAR: 1,068,866 bytes, SHA-256 9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9. Example packs: 133,392 bytes, SHA-256 E741BB9866CAC4D7FCE1EAD96BA64596FB0973B93CBB9D3B128F518FBC70E474.
+- Updated candidate compatibility/release notes to cite 15aa476 and the fresh source audit. Exact-head hosted checks are still watched; entity-shadow depth and sign glyph readability remain unverified. No release ref, tag, or publication was made.

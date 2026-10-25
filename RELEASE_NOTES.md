@@ -4,7 +4,7 @@ Beta.49 includes the beta.48 shadow-depth and sign-text routing fixes, then adds
 
 ## Changes
 
-- **Entity shadow color:** Enable declared fragment color outputs for shadow-entity pipelines and add a regression fixture that distinguishes entity shadow color from terrain shadow color (#137).
+- **Entity shadow color:** Enable declared fragment color outputs for shadow-entity pipelines and add a regression fixture with a constant entity output to isolate color writes from custom varying linkage (#137).
 - **Entity overlays:** Convert vanilla entity and hurt overlay colors using Iris' `entityColor` rules (#136).
 - **Directional shading:** Match Iris face shading unless the shader pack enables `oldLighting` (#135).
 - **Loose uniforms:** Attach VulkanMod value suppliers to generated UBO 0 fields across geometry pipelines (#134).
