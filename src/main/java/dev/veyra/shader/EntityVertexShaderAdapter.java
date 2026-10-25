@@ -49,6 +49,7 @@ final class EntityVertexShaderAdapter {
     private static final Pattern LEGACY_INPUT = Pattern.compile(
             "\\b(gl_MultiTexCoord[3-7]|gl_VertexID|gl_InstanceID|gl_ClipVertex|gl_FrontColor|gl_BackColor|"
                     + "mc_Entity|at_tangent|at_midBlock|mc_midBlock)\\b");
+    private static final Pattern SHADOW_PROJECTION_DECLARATION = Pattern.compile("\\buniform\\s+mat4\\s+shadowProjection\\s*;");
     private static final Pattern MC_ENTITY_ATTRIBUTE_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
                     + "(?:attribute|in)\\s+vec4\\s+mc_Entity\\s*;"
@@ -123,6 +124,8 @@ final class EntityVertexShaderAdapter {
         PreparedStage pack = prepare(shaderPackSource, programName,
                 entityId, blockEntityId, currentRenderedItemId,
                 IrisFogUniformAdapter.nativeFogValuesDeclared(minecraftSource), customTextureSamplers);
+        String packSource = pack.source();
+        String packUniformBridge = pack.uniformBridge();
         Matcher version = VERSION.matcher(minecraftSource);
         if (!version.find()) throw new IOException("Minecraft's " + programName + " vertex shader has no #version directive.");
         StringBuilder extensions = new StringBuilder();
@@ -140,14 +143,26 @@ final class EntityVertexShaderAdapter {
                     + nativeSource.substring(header.end());
         }
         String bridge = nativeBridge(programName, pack.usesMidTexCoord());
+        if (isEntityShadowProgram(programName)) {
+            // Iris gives shadow stages its OpenGL shadowProjection; the wrapper below maps that depth to Vulkan.
+            bridge = bridge.replace("ProjMat", "shadowProjection");
+            packSource = packSource.replaceAll("\\bProjMat\\b", "shadowProjection");
+            packUniformBridge = packUniformBridge.replaceAll("\\bProjMat\\b", "shadowProjection");
+            if (!SHADOW_PROJECTION_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(
+                    packUniformBridge + "\n" + packSource)).find()) {
+                bridge = "uniform mat4 shadowProjection;\n" + bridge;
+            }
+        }
         String wrapper = "\nvoid main() { veyraMinecraftEntityMain(); veyraShaderPackMain();"
-                + (handPass ? " gl_Position.z *= 0.125;" : "") + " }\n";
+                + (handPass ? " gl_Position.z *= 0.125;" : "")
+                + (isEntityShadowProgram(programName) ? "\n" + TerrainVertexShaderAdapter.SHADOW_DEPTH_REMAP : "")
+                + " }\n";
         String uniformBridge = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
-                nativeSource, pack.uniformBridge(), programName + " vertex bridge");
+                nativeSource, packUniformBridge, programName + " vertex bridge");
         uniformBridge = ShaderStageUniformDeduplicator.removeDuplicateSamplers(
                 nativeSource, uniformBridge, programName + " vertex bridge");
         String source = nativeSource + "\n" + pack.outputDeclarations() + bridge
-                + uniformBridge + pack.source().replaceFirst(
+                + uniformBridge + packSource.replaceFirst(
                         "(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain(") + wrapper;
         return new AdaptedStage(source, pack.varyings(), pack.usesNoiseSampler(), pack.usesMidTexCoord());
     }
