@@ -2,13 +2,13 @@
 
 ## Beta.49 candidate - 2026-10-25
 
-The candidate is based on main `6e0d7ba` plus PR #137 (`68a89ad`). The change enables declared shader-pack color outputs in entity-shadow pipelines; its fixture uses a constant entity fragment output to isolate color writes from custom varying linkage. The targeted RTX 3070 fixture passed with 217 active entity-written shadow-color samples and 0 after disabling the pack. This is synthetic color-output evidence only: it does not establish entity shadow depth writes or full shaderpack visuals. The forced-depth readback remains inconclusive because the golem footprint reached the readback square's edge and player submission was not confirmed.
+The candidate is based on main `6e0d7ba` plus PR #137 (`68a89ad`). The change enables declared shader-pack color outputs in entity-shadow pipelines; its fixture uses a constant entity fragment output to isolate color writes from custom varying linkage. The targeted RTX 3070 fixture passed with 217 active entity-written shadow-color samples and 0 after disabling the pack. This synthetic color-output fixture does not establish natural entity shadows or full shaderpack visuals. Two RTX 3070 forced-near-depth probes confirmed depth writes: 20,656 magenta pixels with centered geometry and 205 with pack XY preserved; both had 0 after disabling the pack. Natural-depth entity shadows remain unresolved because both probes overrode z and did not test the stock shadow-depth comparison.
 
 | Area | Evidence | Status |
 |---|---|---|
 | Pinned source audit | Fresh run on the rebased candidate: 4 shaderpacks × 3 dimensions; 12 defaults / 63 profile cases; 939 geometry fragments accepted / 0 rejected; 18/18 active compute stages compiled | Source-only; all 75 records have visualValidation=false. Eighteen Complementary Reimagined/Unbound profile-dimension records need vertexPipelineStoresAndAtomics for voxel_img shadow-vertex writes, unavailable on the audit device. |
 | Entity shadow color outputs | PR #137 at 68a89ad; constant-output fixture; RTX 3070 result: 217 active marker samples / 0 after disabling the pack | Targeted color-output fixture passed. Local run had no Vulkan validation layer; hosted exact-head checks are monitored by T3. This does not validate depth. |
-| Entity shadow depth | One forced near-depth probe, with an edge-clamped golem footprint and unconfirmed player submission | Unresolved. |
+| Entity shadow depth | Two RTX 3070 forced-near-depth probes: 20,656 centered-geometry and 205 pack-XY magenta samples; 0 after disabling the pack | Forced depth writes confirmed; natural-depth entity shadows remain unresolved. |
 | Sildur sign glyphs | Existing generated-scene lifecycle and BlockTrans route; matched Iris fixture was blank too | Glyph readability unverified. |
 | Complementary Reimagined | beta.48 RTX 3070 generated-scene capture: 230,400 non-black pixels / 116 buckets; mean RGB 106.82/98.85/72.82 vs Iris 121.49/108.53/80.95 | Older-code capture; darker than Iris and not a beta.49 rerun. |
 

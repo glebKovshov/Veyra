@@ -1859,3 +1859,10 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - `scripts/verify_jar.py` accepted the rebuilt beta.49 JAR for Minecraft 1.21.11 / VulkanMod 0.6.8: 1,068,866 bytes, SHA-256 `9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9`. Example-packs ZIP: 133,321 bytes, SHA-256 `78339D6A8A8FA985170928C068CB691BE38B5EACF4492C4E8FC9FFE3F321E045`.
 - The exact `68a89ad` RTX 3070 GraphicsSmoke artifact reports passed, with 217 active magenta shadow-color samples and 0 after disabling the pack. This tests shadow color output only; entity shadow depth and full shaderpack visuals remain unresolved. The local Windows run had no Vulkan validation layer.
 - Updated candidate changelog, compatibility and release notes to distinguish this synthetic color fixture from full visual or depth validation. The beta.49 GitHub release endpoint still returns 404; no release ref or tag has been pushed.
+
+### Entity shadow forced-depth diagnostic - 2026-10-25
+
+- Ran two `runGraphicsSmoke` probes in a detached worktree at beta.49 candidate commit `d8f3bdc`, on an RTX 3070. The first centered the entity geometry and forced near depth; it recorded 20,656 active magenta depth samples and 0 after pack disable.
+- The second preserved the pack's XY projection (`ftransform()`) and overrode only z to near depth. It passed with 205 active magenta samples, 0 normal-fallback red samples, and 0 active samples after pack disable. This confirms entity shadow depth writes at the pack-projected XY under forced near depth.
+- Neither probe validates the pack's natural z/depth comparison, ordinary shadow placement, or visible natural entity shadows. No Windows Vulkan validation layer was enabled. Artifacts are preserved in `veyra-entity-shadow-depth-centered-20261025/build/reports/graphics-smoke-entity-shadow-depth-{centered,natural}-20261025/`.
+- PR #137 is open; no existing issue comments or submitted reviews were found. Its watcher was inactive at inspection; PR #137 is open and eligible for a new watch. The checked PRs #92, #96-#102, #112, #114-#117, #124, #125, #130 and #131 are closed.
