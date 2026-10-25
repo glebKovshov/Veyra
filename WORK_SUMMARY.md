@@ -1790,3 +1790,50 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - Опубликованный install JAR: 1,055,544 байта, SHA-256 `00551BC00E4A22730577075CF49132D4594DC3992158A0CBBC75C539C785C1A6`; скачанный asset прошёл `scripts/verify_jar.py` для Minecraft 1.21.11 / VulkanMod 0.6.8.
 - Sources JAR: 397,182 байта, SHA-256 `DD826937E604DC76629BC5847B5A444489D8CD5BBE316AD4E36020DFFB14019C`. Example-packs ZIP: 131,484 байта, SHA-256 `9FCA0033E9D74D827DCF430EF5DDEBA2EB080D20266E2E8C395EF64F0F2EC2F8`. Все три скачанных assets совпали с `SHA256SUMS.txt`.
 - Полная Iris-паритетность и natural-world validation остаются неподтверждёнными; beta.45 — experimental prerelease.
+
+
+### Beta.49 release candidate local gate - 2026-10-25
+
+- Prepared an isolated local worktree release-prep/beta49 from PR #137 head 2ce8cb3; mod_version and release-facing README, changelog, compatibility, and release notes now target 0.2.0-beta.49+mc1.21.11.
+- Temurin JDK 21.0.12 gate passed: 597 tests, 0 failures/errors/skips; 104 example shaders preprocessed; 122 Vulkan SPIR-V compilations; GraphicsSmoke Java compilation, build, validateShaders, and packageExamplePacks all succeeded. scripts/verify_jar.py accepted the mod JAR for Minecraft 1.21.11 / VulkanMod 0.6.8.
+- Install JAR: 1,068,866 bytes, SHA-256 9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9. Example-packs ZIP: 133,443 bytes, SHA-256 35905720B140799391294B461E234F23410761EEA06C3F5256810AB6387970DA.
+- The candidate was built locally only: no release branch push, tag, publication, or GPU run. It still needs PR #137 integration; documented visual limitations remain unresolved.
+
+### Beta.49 pinned shaderpack source audit - 2026-10-25
+
+- Ran the release workflow command on the beta.49 candidate: 75 records across four pinned packs, three dimensions, 12 defaults and 63 declared-profile cases; 939 geometry fragments accepted, 0 rejected, and all 18 active compute stages compiled.
+- The report has visualValidation=false for all 75 records. Eighteen Complementary Reimagined/Unbound profile-dimension records report that the audit device lacks vertexPipelineStoresAndAtomics for voxel_img shadow-vertex writes. This is device-capability evidence, not a visual test; the RTX lifecycle runs remain profile-specific.
+- No GPU job was run. The audit report is under build/reports/external-shaderpacks in the isolated worktree.
+### Entity-shadow forced-depth probe - 2026-10-25
+
+- The one agreed GPU slot completed on a clean diagnostic branch from 6e0d7ba. No production source change was made; temporary GraphicsSmoke and run-dir pack edits were restored. No further GPU job was started.
+- The forced near-depth shadow probe sampled 110,875 terrain pixels outside the golem screen bounds and found no exact-zero shadow depth; sampled values ranged from 102/255 to 255/255. The golem footprint reached the readback edge near UV x=0.10, so it was not a clean placement check.
+- The camera-origin player's expected footprint near UV x=0.075 and y=0.065-0.077 contained far depth. The report does not prove the player was submitted in those frames, so this remains conditional evidence; entity-shadow depth is unresolved.
+- This probe tests depth writes. PR #137 only enables entity-shadow color outputs and does not close the depth issue. Diagnostic artifacts are in diag-artifacts/entity-shadow-depth-20261025.
+
+### PR #137 readiness and shadow-depth source trace - 2026-10-25
+
+- Fresh fetch confirms origin/main=6e0d7ba and origin/fix/shadow-entity-color-writes=2ce8cb3. GitHub metadata reports PR #137 open, mergeable, non-draft, with no submitted reviews; the T3 thread still reports watching=true. Hosted check runs were not queried.
+- Read-only inspection on exact main confirms shadow entity pipelines request depth writes, and the feature geometry route targets the shaderpack shadow framebuffer depth attachment. Entity submission reaches renderAllFeatures and flushes its batches while the feature shadow route is active.
+- This confirms the intended depth path in source but does not prove a GPU draw writes depth. No static root cause was established; fragment discard, draw selection, or render-pass execution remain unresolved. No production code or GPU job changed.
+- The release candidate remains local, based on PR #137, and is not published.
+
+### Current merge inventory - 2026-10-25
+
+- GitHub open-PR search returns only PR #137. Remote branch comparison against origin/main shows fix/shadow-entity-color-writes as the only branch containing unique commits (one commit, head 2ce8cb3); all other fetched remote branches add no commits absent from main.
+- PR #137 remains the sole integration candidate. It is open and mergeable, with no submitted reviews; its hosted checks are left to the active T3 watcher.
+- No other branch was merged or altered. Release preparation remains local and unpublished.
+
+### Beta.49 publication workflow preflight - 2026-10-25
+
+- Reviewed the repository release workflow: pushes to release/** or v* tags invoke source-audit and Graphics smoke; the release job then runs JDK 21 build/tests, shader validation, example-pack packaging, JAR verification, and publishes the mod JAR plus example-pack ZIP with SHA256SUMS.txt.
+- Beta.49 is a prerelease version; the workflow creates its GitHub Release/tag automatically after those jobs pass. Pushing the candidate ref therefore starts publication and must happen only after PR integration and release gates are ready.
+- No release ref or tag was pushed. The verified candidate remains local.
+
+### Correction: divergent remote-branch audit - 2026-10-25
+
+- The earlier merge inventory counted only branches with no commits behind origin/main and overstated that PR #137 was the only remote ref with unique commits. A full divergent-branch audit found old unique commits that need separate classification.
+- Patch-equivalent to current main; do not merge again: Lavapipe storage probe 77e5607, darkness projection fcbd0be, deferred-free shutdown 802f9d5, sign-text routing f6fceed, and unused-varying scan 8a77929.
+- Implementations already present in current main with newer source/tests/fixtures: terrain vertex stages (main d97dcb1; TerrainVertexShaderAdapter tests and terrain-vertex-execution/varyings fixtures) and armor glint vertex stages (main df3df82; GlintVertexShaderAdapter tests and glint-vertex-execution fixture). Their stale branches are not safe merge candidates.
+- The stale Sildur lifecycle commit ec04a00 is superseded by the later main commit fb85d43 with the same fix area and newer bindings/routing. Old beta publication/release-prep branches contain historical records, not pending feature work.
+- PR #137 remains the only current code contribution not represented in main. Its entity-shadow color-output change is distinct from the unresolved depth-write question.

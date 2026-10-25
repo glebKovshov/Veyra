@@ -1,25 +1,29 @@
-# Veyra 0.2.0-beta.48+mc1.21.11 - experimental prerelease
+# Veyra 0.2.0-beta.49+mc1.21.11 - experimental prerelease
 
-Beta.48 fixes a Vulkan depth-space mismatch in shader-pack shadow geometry and selects Iris' shadow projection for entity shadow vertex mains. Complementary Reimagined HIGH is substantially brighter than the beta.47 capture, though it remains darker than Iris; this release does not claim full visual parity.
+Beta.49 includes the beta.48 shadow-depth and sign-text routing fixes, then adds Iris-style loose-uniform suppliers, directional block shading and entity color overlays. It also enables declared color outputs for shadow-entity pipelines. This does not prove that entity shadow depth is written correctly; the single forced-depth probe was inconclusive. Full Iris visual parity and stable compatibility are not claimed.
 
 ## Changes
 
-- **Shadow depth:** Terrain and entity shadow pack vertex stages now map OpenGL clip depth `[-w,w]` to Vulkan zero-to-one after the pack entry point. Entity shadow legacy projection forms (`ftransform()`, `gl_ProjectionMatrix` and `gl_ModelViewProjectionMatrix`) use Iris `shadowProjection` (#132).
-- **Loose uniforms and shadow toggles:** Shader-pack loose uniforms now receive VulkanMod suppliers in geometry pipelines, and `shadowEntities` / `shadowBlockEntities` options are honored (#127, #128).
-- **Shutdown:** Drain deferred Vulkan image frees before allocator destruction (#130).
-- **Sign text routing:** Carry block-entity text identity to the renderer, select Iris `BlockTrans`, load its pack vertex stage, and preserve native alpha cutoff (#131). Sildur glyph readability is still unverified.
+- **Entity shadow color:** Enable declared fragment color outputs for shadow-entity pipelines and add a regression fixture that distinguishes entity shadow color from terrain shadow color (#137).
+- **Entity overlays:** Convert vanilla entity and hurt overlay colors using Iris' `entityColor` rules (#136).
+- **Directional shading:** Match Iris face shading unless the shader pack enables `oldLighting` (#135).
+- **Loose uniforms:** Attach VulkanMod value suppliers to generated UBO 0 fields across geometry pipelines (#134).
+- **Shadow depth and sign text:** Preserve Vulkan shadow depth remapping and Iris `BlockTrans` sign-text routing, including the pack vertex stage and native alpha cutoff (#131, #132).
+- **Other fixes:** Honor shadow-entity toggles and drain deferred Vulkan image frees before allocator destruction (#128, #130).
 
 ## Installation
 
 - Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
-- Install `veyra-0.2.0-beta.48+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
+- Install `veyra-0.2.0-beta.49+mc1.21.11.jar` beside VulkanMod. Keep only one Veyra JAR in the instance and do not install the sources JAR.
 - Put shaderpack folders or ZIPs in `shaderpacks`. Press F6 to select a pack, then use Configure / Apply for supported options and profiles.
 
 ## Validation and known limits
 
-- On an RTX 3070, pinned Complementary Reimagined r5.9.3 HIGH passed the 640x360 generated-scene smoke (230,400 non-black pixels / 116 color buckets). Compared with Iris 1.10.8 + Sodium 0.8.14, candidate mean RGB was 106.82/98.85/72.82 vs 121.49/108.53/80.95; mean absolute error was 17.69. The remaining brightness difference is unresolved.
-- Selected-profile lifecycle evidence for BSL HIGH, Sildur default, Complementary Unbound HIGH and COMPLEMENTARY is recorded in `COMPATIBILITY.md`. These runs use generated scenes and do not certify natural worlds or whole packs. Sildur sign glyph readability remains unverified.
-- Exact-head PR #132 checks passed: Build, pinned shaderpack source audit, and all 30 Lavapipe Graphics jobs. The full JDK 21 gate passed 595 tests, 104 example shaders and 122 Vulkan SPIR-V compilations.
-- A previous Windows shutdown ended once with status `0xC0000409`; a later candidate run exited normally after #130, but the historical status is not fully explained.
+- The exact beta.49 candidate passed the local JDK 21 gate: 597 tests (0 failures/errors/skips), 104 example shaders, 122 Vulkan SPIR-V compilations, GraphicsSmoke compilation, build, shader validation and example-pack packaging. `scripts/verify_jar.py` accepted the 1,068,866-byte mod JAR (SHA-256 `9013C00509B3FE6B3D359F3BFA80B02833F50B3F5A856AF159C05F15EF9764D9`).
+- The pinned source audit accepted 939 geometry fragments with none rejected and compiled all 18 selected compute stages across four pinned packs, three dimensions, 12 defaults and 63 declared-profile cases. All 75 records are source-only; 18 Complementary Reimagined/Unbound profile-dimension cases need `vertexPipelineStoresAndAtomics` for `voxel_img` shadow-vertex writes, unavailable on the audit device.
+- Earlier RTX 3070 captures and lifecycle runs are listed in `COMPATIBILITY.md`; they were made on beta.47/beta.48 code and are not a fresh GPU validation of beta.49.
+- Entity shadow depth remains unresolved. The forced near-depth readback found no near-zero samples in its probe area, but the golem footprint was at the UV edge and the player's shadow submission was not confirmed. No second GPU run was made.
+- Sildur sign glyph readability is unverified; the matched Iris fixture was blank too. Complementary Reimagined HIGH remained darker than Iris in the beta.48 capture.
+- These generated-scene and selected-profile runs do not certify natural worlds, complete packs, or all options. A previous Windows shutdown once ended with status `0xC0000409`; a later run exited normally, but the old status is unexplained.
 
 Veyra remains an experimental Iris-compatible subset. Full Iris visual parity and stable compatibility are not claimed.
