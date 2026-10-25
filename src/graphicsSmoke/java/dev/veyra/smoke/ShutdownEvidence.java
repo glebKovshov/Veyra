@@ -13,6 +13,10 @@ import org.slf4j.LoggerFactory;
 
 /** Read-only registries at shutdown, excluded from the distributable mod. */
 public final class ShutdownEvidence {
+    private static boolean cleanupStarted;
+    private static int cleanupFlushes;
+    public static void beginCleanup() { cleanupStarted = true; }
+    public static void recordCleanupFlush() { if (cleanupStarted) record("after-freeAllBuffers-" + (++cleanupFlushes)); }
     private ShutdownEvidence() { }
     private static String hex(long value){return "0x"+Long.toHexString(value);}
     private static int[] sizes(ObjectArrayList<?>[] values){return Arrays.stream(values).mapToInt(List::size).toArray();}
