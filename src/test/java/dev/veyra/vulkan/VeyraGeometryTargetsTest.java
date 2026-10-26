@@ -9,6 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VeyraGeometryTargetsTest {
     @Test
+    void bindsTerrainShadowDepthOnlyForSceneTerrain() {
+        assertTrue(VeyraGeometryTargets.shouldBindTerrainShadowSampler(true, false));
+        assertFalse(VeyraGeometryTargets.shouldBindTerrainShadowSampler(true, true));
+        assertFalse(VeyraGeometryTargets.shouldBindTerrainShadowSampler(false, false));
+    }
+
+    @Test
     void acceptsSceneAndShaderPackAttachmentsWithMatchingDimensions() {
         var extent = new VeyraGeometryTargets.AttachmentExtent(800, 450);
 
