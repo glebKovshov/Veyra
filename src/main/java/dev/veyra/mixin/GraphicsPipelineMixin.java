@@ -15,6 +15,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
 import org.lwjgl.vulkan.VkPipelineColorBlendStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineRenderingCreateInfoKHR;
+import org.lwjgl.vulkan.VkPipelineRasterizationStateCreateInfo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Final;
@@ -33,6 +34,16 @@ import java.util.Set;
 public abstract class GraphicsPipelineMixin implements VeyraPipelinePassCache {
     @Shadow @Final private Object2LongMap<PipelineState> graphicsPipelines;
     private static long veyra$firstGraphicsPipelineDevice;
+
+    @Redirect(method = "createGraphicsPipeline", at = @At(value = "INVOKE", target =
+            "Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;frontFace(I)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;"))
+    private VkPipelineRasterizationStateCreateInfo veyra$shadowFrontFace(
+            VkPipelineRasterizationStateCreateInfo info, int original) {
+        // Shadow clip Y is inverted to retain OpenGL texture coordinates.
+        return info.frontFace(VeyraGeometryTargets.isShadowPipeline((GraphicsPipeline) (Object) this)
+                ? (original == VK10.VK_FRONT_FACE_CLOCKWISE ? VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE : VK10.VK_FRONT_FACE_CLOCKWISE)
+                : original);
+    }
 
     @Redirect(method = "createGraphicsPipeline", at = @At(value = "INVOKE", target =
             "Lorg/lwjgl/vulkan/VK10;vkCreateGraphicsPipelines(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I"))

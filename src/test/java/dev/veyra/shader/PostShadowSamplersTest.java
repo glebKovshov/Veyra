@@ -49,6 +49,10 @@ class PostShadowSamplersTest {
         assertTrue(adapted.source().contains("float a=veyraPostShadowCompare(shadowtex1,"));
         assertTrue(adapted.source().contains("return veyraPostShadowCompare(depthMap,"));
         assertFalse(adapted.source().contains("sampler2DShadow"));
+        String bridge = PostShadowSamplers.bridge(adapted.inputs());
+        assertTrue(bridge.contains("step(uv.z, texture(s,uv.xy).r)"));
+        assertTrue(bridge.contains("step(uv.z,texture(s,uv.xy,bias).r)"));
+        assertTrue(bridge.contains("step(uv.z,textureLod(s,uv.xy,bias).r)"));
     }
     @Test void rejectsUnavailableUnknownDuplicateAndInvalidInputs() {
         String source="uniform sampler2D shadowtex1;\nvoid main(){gl_FragColor=texture2D(shadowtex1,vec2(0));}\n";

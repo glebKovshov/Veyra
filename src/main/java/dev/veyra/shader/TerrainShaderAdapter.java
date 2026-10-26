@@ -236,7 +236,7 @@ public final class TerrainShaderAdapter {
                 return textureGrad(sourceSampler, sourceCoord, dx, dy);
             }
             vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
-                float visibility = step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                float visibility = step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r);
                 return vec4(visibility);
             }
             #define texture Sampler0

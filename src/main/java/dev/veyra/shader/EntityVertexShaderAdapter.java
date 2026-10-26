@@ -155,7 +155,7 @@ final class EntityVertexShaderAdapter {
         }
         String wrapper = "\nvoid main() { veyraMinecraftEntityMain(); veyraShaderPackMain();"
                 + (handPass ? " gl_Position.z *= 0.125;" : "")
-                + (isEntityShadowProgram(programName) ? "\n" + TerrainVertexShaderAdapter.SHADOW_DEPTH_REMAP : "")
+                + (isEntityShadowProgram(programName) ? "\n" + TerrainVertexShaderAdapter.SHADOW_CLIP_REMAP : "")
                 + " }\n";
         String uniformBridge = ShaderStageUniformDeduplicator.removeFragmentDuplicates(
                 nativeSource, packUniformBridge, programName + " vertex bridge");

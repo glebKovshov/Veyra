@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Preserve OpenGL shadow texture coordinates under VulkanMod's negative-height viewport, including pack vertex stages and native fallback projection; retain shadow face winding after the Y conversion.
+- Compare shadow depth against the shader pack's supplied reference without adding an extra depth bias.
+- The matched Complementary HIGH golem fixture now renders the long cast shadow: shadow-region luminance MAE against Iris fell from 22.67 to 5.33. This measurement covers the generated fixture, not complete visual parity.
+- Strengthen the entity shadow fixture to require color aliases and near depth in the expected shadow-map quadrant.
+
 ## 0.2.0-beta.48 - 2026-10-25 (experimental prerelease)
 
 - Use Iris `shadowProjection` in entity shadow pack mains after legacy source preparation and remap OpenGL clip depth to Vulkan zero-to-one after terrain/entity shadow pack execution (#132).

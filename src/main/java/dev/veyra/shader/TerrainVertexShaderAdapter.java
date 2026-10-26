@@ -93,10 +93,11 @@ final class TerrainVertexShaderAdapter {
     }
 
     /**
-     * Pack shadow stages write OpenGL clip depth through Iris' shadowProjection; Veyra's shadow pass uses
-     * Vulkan zero-to-one depth, so map [-w, w] to [0, w] as OpenGL's window transform would.
+     * Preserve OpenGL shadow texture coordinates under VulkanMod's negative-height viewport,
+     * and map OpenGL clip depth [-w, w] to Vulkan's [0, w].
      */
-    static final String SHADOW_DEPTH_REMAP = "    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;\n";
+    static final String SHADOW_CLIP_REMAP = "    gl_Position.y = -gl_Position.y;\n"
+            + "    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;\n";
 
     static AdaptedStage adaptStage(String vulkanModSource, String shaderPackSource, String programName) throws IOException {
         return adaptStage(vulkanModSource, shaderPackSource, programName, 6);
@@ -125,7 +126,7 @@ final class TerrainVertexShaderAdapter {
                 + source.substring(baseMain.start());
         baseMain = findMain(source, "VulkanMod terrain");
         source = source.substring(0, baseMain.closeBrace()) + "\n    veyraShaderPackMain();\n"
-                + (programName.startsWith("shadow") ? SHADOW_DEPTH_REMAP : "")
+                + (programName.startsWith("shadow") ? SHADOW_CLIP_REMAP : "")
                 + source.substring(baseMain.closeBrace());
         return new AdaptedStage(source + "\n" + pack.uniformMacros() + legacyInputBridge(programName) + pack.outputBridge() + "\n"
                 + pack.source().replaceFirst("(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain("),

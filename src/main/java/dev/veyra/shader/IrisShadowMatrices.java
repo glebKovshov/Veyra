@@ -37,6 +37,6 @@ final class IrisShadowMatrices {
 
     static Matrix4f createVulkanProjection(float halfPlaneLength, float nearPlane, float farPlane) {
         return new Matrix4f().setOrthoSymmetric(halfPlaneLength * 2.0F, halfPlaneLength * 2.0F,
-                nearPlane, farPlane, true);
+                nearPlane, farPlane, true).scale(1.0F, -1.0F, 1.0F);
     }
 }

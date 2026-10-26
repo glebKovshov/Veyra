@@ -1155,7 +1155,7 @@ public final class EntityShaderAdapter {
                         ? "uniform sampler2D Sampler3;\n#define shadowtex0 Sampler3\n" : "")
                 .replace("__VEYRA_SHADOW_FUNCTIONS__", usesShadowSampler || ShadowDepthSampler.used(source) ? """
                         float veyraEntityShadowCompare(sampler2D sourceSampler, vec3 sourceCoord) {
-                            return step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                            return step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r);
                         }
                         vec4 veyraEntityShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
                             return vec4(veyraEntityShadowCompare(sourceSampler, sourceCoord));

@@ -63,6 +63,7 @@ public final class VeyraGeometryTargets {
     }
     public static FragmentOutputs layout(GraphicsPipeline pipeline) { return layouts.get(pipeline); }
     public static GeometryBlendSettings blend(GraphicsPipeline pipeline) { return blends.get(pipeline); }
+    public static boolean isShadowPipeline(GraphicsPipeline pipeline) { return shadowPipelines.contains(pipeline); }
     static boolean shouldBindTerrainShadowSampler(boolean terrain, boolean shadowPass) { return terrain && !shadowPass; }
     public static void registerSpecularInput(GraphicsPipeline pipeline) { specularInputs.add(pipeline); }
     public static void unregister(GraphicsPipeline pipeline) {

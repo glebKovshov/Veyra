@@ -447,8 +447,11 @@ class ShaderAdapterTest {
                 void main() { gl_Position = shadowProjection * shadowModelView * gl_Vertex; gl_Position.z *= 0.2; }
                 """, "shadow_solid").source();
         String remap = "gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;";
+        String textureY = "gl_Position.y = -gl_Position.y;";
         assertTrue(shadowVertex.indexOf(remap) > shadowVertex.indexOf("veyraShaderPackMain();"), shadowVertex);
+        assertTrue(shadowVertex.indexOf(textureY) > shadowVertex.indexOf("veyraShaderPackMain();"), shadowVertex);
         assertFalse(vertex.source().contains(remap), vertex.source());
+        assertFalse(vertex.source().contains(textureY), vertex.source());
         String fragment = TerrainShaderAdapter.adaptFragment("""
                 #version 130
                 in vec2 texCoord;
@@ -1475,6 +1478,7 @@ class ShaderAdapterTest {
 
         assertTrue(adapted.contains("float sampleShadow(sampler2D depthSampler, vec3 coordinate)"));
         assertTrue(adapted.contains("#define shadow2D(sampler, coord) veyraSample(sampler, coord)"));
+        assertTrue(adapted.contains("step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r)"));
         assertTrue(adapted.contains("sampleShadow(shadowtex0"));
         assertFalse(adapted.contains("sampler2DShadow"));
     }
@@ -1497,6 +1501,7 @@ class ShaderAdapterTest {
         assertTrue(adapted.contains("#define shadowtex0 Sampler3"));
         assertTrue(adapted.contains("float sampleShadow(sampler2D depthSampler, vec3 coordinate)"));
         assertTrue(adapted.contains("float veyraEntityShadowCompare(sampler2D sourceSampler, vec3 sourceCoord)"));
+        assertTrue(adapted.contains("step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r)"));
         assertTrue(adapted.contains("veyraEntityShadowCompare(depthSampler, coordinate)"));
         assertFalse(adapted.contains("sampler2DShadow"));
 
