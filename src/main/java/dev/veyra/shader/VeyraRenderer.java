@@ -6861,7 +6861,7 @@ public final class VeyraRenderer {
                 .withDepthTestFunction(original.getDepthTestFunction())
                 .withPolygonMode(original.getPolygonMode())
                 .withCull(false)
-                .withColorWrite(false, false)
+                .withColorWrite(true, true)
                 .withDepthWrite(true)
                 .withVertexFormat(vertexFormat, original.getVertexFormatMode())
                 .withDepthBias(original.getDepthBiasScaleFactor(), original.getDepthBiasConstant());
