@@ -710,7 +710,9 @@ public final class GraphicsSmoke {
                     int bucket = ((red >>> 5) << 6) | ((green >>> 5) << 3) | (blue >>> 5);
                     if (!colors[bucket]) { colors[bucket] = true; colorBuckets++; }
                 }
-                if (red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
+                if (shadowColorEntityFixture
+                        ? red >= 200 && green <= 20 && blue >= 150 && red > blue
+                        : red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) colored++;
                 if (normalAtlasAnimatedFixture && green > 180 && red < 30 && blue < 30) animatedPbrGreen++;
                 if (entityNormalMissingFixture && red > 220 && green < 70 && blue < 70) normalFallbackRed++;
                 if (skyTexturedStageFixture && green > 220 && red < 24 && blue < 24) skyMoonGreen++;
@@ -1004,7 +1006,7 @@ public final class GraphicsSmoke {
                                         + activeEntityNormalFallbackRedPixels + ", disabled red="
                                         + disabledEntityNormalFallbackRedPixels) : null;
                     } else if (shadowColorEntityFixture) {
-                        failure = activePixels == 0 || count * 4 >= activePixels
+                        failure = activePixels < 100 || count * 4 >= activePixels
                                 ? new IllegalStateException("The entity-written shadow color marker was absent or unchanged: active="
                                         + activePixels + ", disabled=" + count) : null;
                     } else if (storageBufferFixture) {
