@@ -5983,13 +5983,13 @@ public final class VeyraRenderer {
 
     private static ShaderPackImageBindings.PreparedStage prepareNativeImageSamplers(
             ShaderPack pack, String programName, String extension, String source,
-            VeyraComputePipelineSet customImages, boolean allowShadowEntityVertexStorageImages) throws IOException {
+            VeyraComputePipelineSet customImages, boolean allowShadowGeometryVertexStorageImages) throws IOException {
         if (customImages == null) return new ShaderPackImageBindings.PreparedStage(source, List.of());
         var prepared = ShaderPackImageBindings.prepare(
                 programName + "." + extension, source, pack.readImageProperties());
         for (var resource : prepared.resources()) {
-            if (resource.storageImage() && !(allowShadowEntityVertexStorageImages
-                    && programName.equals("shadow_entities") && extension.equals("vsh"))) {
+            if (resource.storageImage() && !(allowShadowGeometryVertexStorageImages
+                    && ShaderPackImageBindings.isEntityOrBlockShadowVertexStage(programName, extension))) {
                 throw new IOException(programName + " cannot write graphics storage image '" + resource.name()
                         + "' through Minecraft's native RenderPipeline.");
             }
