@@ -26,6 +26,15 @@ class ShaderPackImageBindingsTest {
         VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = previousExtendedImageFormats;
     }
 
+    @Test void writableStorageImageStagesAreLimitedToEntityAndBlockShadowVertices() {
+        assertTrue(ShaderPackImageBindings.isEntityOrBlockShadowVertexStage("shadow_entities", "vsh"));
+        assertTrue(ShaderPackImageBindings.isEntityOrBlockShadowVertexStage("shadow_block", "vsh"));
+        assertFalse(ShaderPackImageBindings.isEntityOrBlockShadowVertexStage("shadow_entities", "fsh"));
+        assertFalse(ShaderPackImageBindings.isEntityOrBlockShadowVertexStage("shadow_block", "fsh"));
+        assertFalse(ShaderPackImageBindings.isEntityOrBlockShadowVertexStage("shadow", "vsh"));
+        assertFalse(ShaderPackImageBindings.isEntityOrBlockShadowVertexStage("gbuffers_entities", "vsh"));
+    }
+
     @Test void runtimeCustomImageFixturePassesCapabilitiesWithAnIsolatedFeatureSnapshot() throws Exception {
         var ordinary = ShaderPack.inspect(java.nio.file.Path.of("examples/custom-image-compute"));
         assertTrue(ordinary.readImageProperties().images().isEmpty());

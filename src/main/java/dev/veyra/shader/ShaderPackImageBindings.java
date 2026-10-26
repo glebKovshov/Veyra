@@ -20,6 +20,11 @@ final class ShaderPackImageBindings {
 
     private ShaderPackImageBindings() { }
 
+    static boolean isEntityOrBlockShadowVertexStage(String programName, String extension) {
+        return "vsh".equals(extension)
+                && ("shadow_entities".equals(programName) || "shadow_block".equals(programName));
+    }
+
     static PreparedStage prepare(String file, String source, ShaderPackImageProperties properties) throws IOException {
         String directivesSelected = RenderTargetDirectives.keepActiveComments(file, source);
         String active = GlslPreprocessor.process(file, directivesSelected, Map.of(
