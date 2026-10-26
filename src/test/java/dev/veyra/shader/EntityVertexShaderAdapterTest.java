@@ -93,6 +93,7 @@ class EntityVertexShaderAdapterTest {
     @Test
     void entityShadowStagesUseIrisShadowProjectionAndRemapDepthToVulkan() throws Exception {
         String remap = "gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;";
+        String textureY = "gl_Position.y = -gl_Position.y;";
         String[] shadowPrograms = {"shadow_entities", "shadow_block"};
         String[] projectionExpressions = {
                 "ftransform()",
@@ -108,6 +109,7 @@ class EntityVertexShaderAdapterTest {
                 assertTrue(packMain.contains("shadowProjection"), packMain);
                 assertFalse(packMain.contains("ProjMat"), packMain);
                 assertTrue(adapted.indexOf(remap) > adapted.indexOf("void veyraShaderPackMain()"), adapted);
+                assertTrue(adapted.indexOf(textureY) > adapted.indexOf("veyraShaderPackMain();"), adapted);
             }
         }
         String declaringPack = """
@@ -126,9 +128,11 @@ class EntityVertexShaderAdapterTest {
         assertEquals(1, occurrences(declared, "uniform mat4 shadowProjection;"), declared);
         assertTrue(functionBody(color, "veyraShaderPackMain").contains("ProjMat"), color);
         assertFalse(color.contains(remap), color);
+        assertFalse(color.contains(textureY), color);
         assertTrue(functionBody(hand, "veyraShaderPackMain").contains("ProjMat"), hand);
         assertTrue(hand.contains("gl_Position.z *= 0.125;"), hand);
         assertFalse(hand.contains(remap), hand);
+        assertFalse(hand.contains(textureY), hand);
     }
 
     private static String functionBody(String source, String functionName) {

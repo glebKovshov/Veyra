@@ -1,4 +1,10 @@
-# Shaderpack compatibility - beta.48 validation
+# Shaderpack compatibility
+
+## Unreleased shadow-coordinate validation - 2026-10-26
+
+VulkanMod uses a negative-height viewport. Shadow pack vertices now compensate clip Y before rasterization so the resulting image retains the OpenGL texture coordinates used by pack receivers. The native fallback shadow projection makes the same conversion, and shadow pipelines preserve their previous face winding. Shadow comparison emulation also preserves the pack's supplied reference without adding a fixed depth bias.
+
+On RTX 3070, pinned Complementary Reimagined r5.9.3 HIGH passed the 640×360 smoke with 230,400 non-black pixels and 142 color buckets. The natural iron-golem cast shadow is visible. Against the matched Iris 1.10.8 reference, ROI x=170..340 / y=270..340 has mean luminance 112.68 versus 112.04 and MAE 5.33, down from 22.67 before the orientation correction. The number of pixels where Iris is darker by more than 20 fell from 3,746 to 61. This validates that scene and ROI; natural worlds and full visual parity remain unverified.
 
 ## Beta.48 - 2026-10-25
 

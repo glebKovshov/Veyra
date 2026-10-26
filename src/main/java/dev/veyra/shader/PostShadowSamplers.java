@@ -104,12 +104,12 @@ public final class PostShadowSamplers {
                 vec4 veyraSample(sampler2D s, vec2 uv, float bias) { return texture(s, uv, bias); }
                 vec4 veyraSample(sampler3D s, vec3 uv) { return texture(s, uv); }
                 vec4 veyraSample(sampler3D s, vec3 uv, float bias) { return texture(s, uv, bias); }
-                float veyraPostShadowCompare(sampler2D s, vec3 uv) { return step(uv.z-0.0005, texture(s,uv.xy).r); }
-                float veyraPostShadowCompare(sampler2D s, vec3 uv, float bias) { return step(uv.z-0.0005,texture(s,uv.xy,bias).r); }
+                float veyraPostShadowCompare(sampler2D s, vec3 uv) { return step(uv.z, texture(s,uv.xy).r); }
+                float veyraPostShadowCompare(sampler2D s, vec3 uv, float bias) { return step(uv.z,texture(s,uv.xy,bias).r); }
                 vec4 veyraPostShadowSample(sampler2D s, vec3 uv, float bias) { return vec4(veyraPostShadowCompare(s,uv,bias)); }
                 vec4 veyraPostShadowSample(sampler2D s, vec3 uv) { return vec4(veyraPostShadowCompare(s,uv)); }
                 vec4 veyraSample(sampler2D s, vec3 uv) { return veyraPostShadowSample(s,uv); }
-                vec4 veyraSample(sampler2D s, vec3 uv, float bias) { return vec4(step(uv.z-0.0005,textureLod(s,uv.xy,bias).r)); }
+                vec4 veyraSample(sampler2D s, vec3 uv, float bias) { return vec4(step(uv.z,textureLod(s,uv.xy,bias).r)); }
                 """);
         for (Input input : Input.values()) if (inputs.contains(input))
             bridge.append("uniform sampler2D ").append(input.samplerName()).append(";\n");

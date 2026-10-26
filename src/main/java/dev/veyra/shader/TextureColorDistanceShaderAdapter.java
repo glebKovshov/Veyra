@@ -455,7 +455,7 @@ public final class TextureColorDistanceShaderAdapter {
         if (usesSampler2DShadow) {
             bridge.append("""
                     float veyraTextureShadowCompare(sampler2D sourceSampler, vec3 sourceCoord) {
-                        return step(sourceCoord.z - 0.0005, texture(sourceSampler, sourceCoord.xy).r);
+                        return step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r);
                     }
                     vec4 veyraTextureShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
                         return vec4(veyraTextureShadowCompare(sourceSampler, sourceCoord));

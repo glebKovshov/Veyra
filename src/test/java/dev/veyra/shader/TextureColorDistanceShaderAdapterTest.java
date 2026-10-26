@@ -246,6 +246,7 @@ class TextureColorDistanceShaderAdapterTest {
         assertTrue(adapted.contains("#define noisetex VeyraNoiseSampler"), adapted);
         assertTrue(adapted.contains("#define specular VeyraSpecularSampler"), adapted);
         assertTrue(adapted.contains("#define shadowtex0 Sampler3"), adapted);
+        assertTrue(adapted.contains("step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r)"), adapted);
         assertTrue(adapted.contains("#define shadowtex1 VeyraOpaqueShadowSampler"), adapted);
         assertTrue(adapted.contains("#define shadowcolor0 VeyraShadowColorSampler"), adapted);
         assertTrue(adapted.contains("#define gdepth VeyraGeometryColor1Sampler"), adapted);

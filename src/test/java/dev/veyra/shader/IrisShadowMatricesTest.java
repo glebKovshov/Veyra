@@ -29,5 +29,7 @@ class IrisShadowMatricesTest {
 
         assertEquals(iris.m22() * 0.5F, vulkan.m22(), 0.000001F);
         assertEquals(iris.m32() * 0.5F + 0.5F, vulkan.m32(), 0.000001F);
+        assertEquals(iris.m00(), vulkan.m00(), 0.000001F);
+        assertEquals(-iris.m11(), vulkan.m11(), 0.000001F);
     }
 }
