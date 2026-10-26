@@ -73,8 +73,8 @@ public final class VeyraShadowRenderer {
     private static final dev.veyra.vulkan.VeyraDepthTextureSnapshot opaqueDepth = new dev.veyra.vulkan.VeyraDepthTextureSnapshot("shadowtex1");
     private static GpuTextureView opaqueBinding;
     private static GpuTextureView depthTextureView;
-    /** Indexed texture-table bindings currently pointing at one of the owned shadow color views. */
-    private static final Map<Integer, GpuTextureView> colorBindings = new HashMap<>();
+    /** Indexed texture-table bindings currently pointing at one of the owned shadow map views. */
+    private static final Map<Integer, GpuTextureView> shadowBindings = new HashMap<>();
     private static GpuSampler shadowSampler;
     private static VkGpuTexture fallbackTexture;
     private static VkTextureView fallbackTextureView;
@@ -227,7 +227,7 @@ public final class VeyraShadowRenderer {
             int slot = descriptor.imageIdx;
             VRenderSystem.setShaderTexture(slot, view);
             VTextureSelector.bindTexture(slot, image);
-            colorBindings.put(slot, view);
+            shadowBindings.put(slot, view);
         }
     }
 
@@ -242,7 +242,7 @@ public final class VeyraShadowRenderer {
                 descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 descriptor.isReadOnlyLayout = false;
                 int slot = descriptor.imageIdx;
-                colorBindings.put(slot, fallbackTextureView);
+                shadowBindings.put(slot, fallbackTextureView);
                 pass.bindTexture(sampler, fallbackTextureView, fallbackSampler);
                 VTextureSelector.bindTexture(slot, fallbackTexture.getVulkanImage());
                 warnUnavailableShadowMap();
@@ -251,7 +251,7 @@ public final class VeyraShadowRenderer {
             descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             descriptor.isReadOnlyLayout = false;
             int slot = descriptor.imageIdx;
-            colorBindings.put(slot, view);
+            shadowBindings.put(slot, view);
             pass.bindTexture(sampler, view, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
             VTextureSelector.bindTexture(slot,
                     ((net.vulkanmod.render.engine.VkGpuTexture) view.texture()).getVulkanImage());
@@ -275,6 +275,26 @@ public final class VeyraShadowRenderer {
         image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
         VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
         VTextureSelector.bindTexture(descriptor.imageIdx, image);
+    }
+
+    public static void bindTerrainShadowSampler(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor("VeyraShadowSampler");
+        if (descriptor == null) return;
+        var view = shadowMapCompleted ? shadowDepthTextureView() : null;
+        if (view == null || view.isClosed()) {
+            bindTerrainFallback(descriptor.imageIdx);
+            shadowBindings.put(descriptor.imageIdx, fallbackTextureView);
+            warnUnavailableShadowMap();
+            return;
+        }
+        descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptor.isReadOnlyLayout = false;
+        var image = ((VkGpuTexture) view.texture()).getVulkanImage();
+        image.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+        int slot = descriptor.imageIdx;
+        VRenderSystem.setShaderTexture(slot, view);
+        VTextureSelector.bindTexture(slot, image);
+        shadowBindings.put(slot, view);
     }
 
     public static void bindEntityOpaqueDepth(VkRenderPass pass, GraphicsPipeline pipeline) {
@@ -510,7 +530,7 @@ public final class VeyraShadowRenderer {
             rendering = false;
         }
         VRenderSystem.setShaderTexture(3, null);
-        for (Map.Entry<Integer, GpuTextureView> entry : colorBindings.entrySet()) {
+        for (Map.Entry<Integer, GpuTextureView> entry : shadowBindings.entrySet()) {
             int slot = entry.getKey();
             GpuTextureView binding = entry.getValue();
             if (VRenderSystem.getShaderTexture(slot) == binding) VRenderSystem.setShaderTexture(slot, null);
@@ -520,7 +540,7 @@ public final class VeyraShadowRenderer {
                     VTextureSelector.bindTexture(slot, VTextureSelector.getWhiteTexture());
             }
         }
-        colorBindings.clear();
+        shadowBindings.clear();
         if (opaqueBinding != null && opaqueBindingSlot >= 0) {
             if (VRenderSystem.getShaderTexture(opaqueBindingSlot) == opaqueBinding)
                 VRenderSystem.setShaderTexture(opaqueBindingSlot, null);
@@ -568,6 +588,7 @@ public final class VeyraShadowRenderer {
 
     public static void clearBinding() {
         VRenderSystem.setShaderTexture(3, null);
+        VTextureSelector.bindTexture(3, VTextureSelector.getWhiteTexture());
     }
 
     private static void ensureResources() {

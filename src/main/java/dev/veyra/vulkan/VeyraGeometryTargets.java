@@ -63,6 +63,7 @@ public final class VeyraGeometryTargets {
     }
     public static FragmentOutputs layout(GraphicsPipeline pipeline) { return layouts.get(pipeline); }
     public static GeometryBlendSettings blend(GraphicsPipeline pipeline) { return blends.get(pipeline); }
+    static boolean shouldBindTerrainShadowSampler(boolean terrain, boolean shadowPass) { return terrain && !shadowPass; }
     public static void registerSpecularInput(GraphicsPipeline pipeline) { specularInputs.add(pipeline); }
     public static void unregister(GraphicsPipeline pipeline) {
         layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline);
@@ -79,6 +80,8 @@ public final class VeyraGeometryTargets {
             VeyraSpecularTextures.bindTerrain(pipeline);
         VeyraNormalTextures.bindTerrain(pipeline);
         if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
+        boolean bindTerrainShadowSampler = shouldBindTerrainShadowSampler(terrain, VeyraShadowRenderer.isRendering());
+        if (bindTerrainShadowSampler) VeyraShadowRenderer.bindTerrainShadowSampler(pipeline);
         Renderer renderer = Renderer.getInstance();
         Framebuffer bound = renderer.getBoundFramebuffer();
         if (shadowPipelines.contains(pipeline)) {
