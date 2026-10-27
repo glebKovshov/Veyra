@@ -1,10 +1,18 @@
 # Shaderpack compatibility
 
-## Unreleased shadow-coordinate validation - 2026-10-26
+## 0.2.0 validation on merged main `c242eb8` - 2026-10-27
 
 VulkanMod uses a negative-height viewport. Shadow pack vertices now compensate clip Y before rasterization so the resulting image retains the OpenGL texture coordinates used by pack receivers. The native fallback shadow projection makes the same conversion, and shadow pipelines preserve their previous face winding. Shadow comparison emulation also preserves the pack's supplied reference without adding a fixed depth bias.
 
-On RTX 3070, pinned Complementary Reimagined r5.9.3 HIGH passed the 640×360 smoke with 230,400 non-black pixels and 142 color buckets. The natural iron-golem cast shadow is visible. Against the matched Iris 1.10.8 reference, ROI x=170..340 / y=270..340 has mean luminance 112.68 versus 112.04 and MAE 5.33, down from 22.67 before the orientation correction. The number of pixels where Iris is darker by more than 20 fell from 3,746 to 61. This validates that scene and ROI; natural worlds and full visual parity remain unverified.
+On the shadow-fix candidate before PR #145, pinned Complementary Reimagined r5.9.3 HIGH passed the 640×360 smoke with 230,400 non-black pixels and 142 color buckets. The natural iron-golem cast shadow is visible. Against matched Iris 1.10.8, ROI x=170..340 / y=270..340 has mean luminance 112.68 versus 112.04 and MAE 5.33, down from 22.67 before the orientation correction. The number of pixels where Iris is darker by more than 20 fell from 3,746 to 61. This validates that fixture and ROI; it is not a natural-world or full-parity claim.
+
+The corrected matched Sildur v2.02 sign fixture from the prerelease candidate uses green VEYRA / SIGN TEST text at 1280x720. Iris has 1,345 green glyph pixels and Veyra 1,265 in the same sign ROI, with mask IoU 0.9333 and nearly identical bounds. Earlier controls in that fixture were occluded by the validation wall. This confirms visibility and placement in that generated fixture only; the sign-specific capture was not repeated on final candidate c242eb8. A separate fresh c3416b7 scene showed a blank sign on both Iris and Veyra, so that paired scene does not establish glyph readability.
+
+All four selected profiles passed the RTX lifecycle on PR #145 head `b1fff75`, now merged as `c242eb8`: Complementary Reimagined HIGH (360,000 pixels / 134 buckets), BSL HIGH (360,000 / 126), Sildur defaults (360,000 / 160), and Unbound COMPLEMENTARY (360,000 / 122). Each passed resize, Nether/Overworld, disable/re-enable and resource reload. These runs used the NVIDIA driver without Khronos validation; they are generated-scene/profile checks, not whole-pack certification.
+
+On PR #145 candidate `b1fff75`, a Complementary HIGH direct Fresnel probe matched Iris in an 8,700-pixel ROI. The water basin ROI RGB MAE was 13.87, but the same-main old-matrix baseline could not produce a frame: VulkanMod rejected generated `copy_*` and `depthtex1_capture` shaders because their first line was not `#version`. Therefore no before/after improvement is claimed; residual water-color difference remains open. The merged candidate also passed the 607-test JDK 21 gate and the pinned source audit (four packs / three dimensions / 63 profile cases / 939 accepted geometry fragments / 18 compiled compute stages); these checks do not prove full-pack visuals.
+
+PR #145 exact-head hosted checks passed: Build 1029, source audit 290, and all 30 Graphics smoke jobs. The final release ref still runs its own source-audit, graphics, build, packaging, and JAR-verification gates.
 
 ## Beta.48 - 2026-10-25
 

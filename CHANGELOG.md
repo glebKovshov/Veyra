@@ -1,11 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-27
 
 - Preserve OpenGL shadow texture coordinates under VulkanMod's negative-height viewport, including pack vertex stages and native fallback projection; retain shadow face winding after the Y conversion.
 - Compare shadow depth against the shader pack's supplied reference without adding an extra depth bias.
 - The matched Complementary HIGH golem fixture now renders the long cast shadow: shadow-region luminance MAE against Iris fell from 22.67 to 5.33. This measurement covers the generated fixture, not complete visual parity.
 - Strengthen the entity shadow fixture to require color aliases and near depth in the expected shadow-map quadrant.
+- Restore Iris shadow-view rotations and camera snapping; bind the terrain shadow depth image consistently across VulkanMod's descriptor and texture state (#139, #140).
+- Permit declared vertex-stage storage-image writes for block-entity shadow programs, restoring the tested Complementary Unbound COMPLEMENTARY lifecycle (#138).
+- A matched generated Sildur v2.02 sign fixture on a prerelease candidate measured glyph-mask intersection-over-union 0.9333 after correcting wall occlusion; that sign-specific check was not repeated on the final candidate.
+- Correct shader-pack inverse projection inputs, preserve fluid normals and final world/hand depth, and restore post-pass projection coordinates (#142–#145).
+- Pass all four selected RTX lifecycle profiles on the final projection candidate. Water color and natural-world parity remain incomplete; see COMPATIBILITY.md.
+
+## 0.2.0-beta.49 - 2026-10-26 (experimental prerelease)
+
+- Attach suppliers to generated geometry UBO fields so loose shader-pack uniforms receive live values (#134).
+- Match Iris directional block lighting unless the pack enables `oldLighting` (#135), and convert entity color overlays using Iris semantics (#136).
+- Enable declared shadow-entity color outputs (#137). The natural entity cast-shadow discrepancy remained open in beta.49.
 
 ## 0.2.0-beta.48 - 2026-10-25 (experimental prerelease)
 
