@@ -73,28 +73,15 @@ public final class TerrainMidTexCoord {
         float deltaU2 = u[2] - u[0], deltaV2 = v[2] - v[0];
         float determinant = deltaU1 * deltaV2 - deltaU2 * deltaV1;
 
-        float normalX = normalComponent(packedNormals[0], 0);
-        float normalY = normalComponent(packedNormals[0], 8);
-        float normalZ = normalComponent(packedNormals[0], 16);
+        int packedNormal = packedNormals[0] == 0 ? packedQuadNormal(x, y, z) : packedNormals[0];
+        float normalX = normalComponent(packedNormal, 0);
+        float normalY = normalComponent(packedNormal, 8);
+        float normalZ = normalComponent(packedNormal, 16);
         float normalLength = (float) Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
         if (normalLength > 1.0e-6F) {
             normalX /= normalLength;
             normalY /= normalLength;
             normalZ /= normalLength;
-        } else {
-            normalX = edge1Y * edge2Z - edge1Z * edge2Y;
-            normalY = edge1Z * edge2X - edge1X * edge2Z;
-            normalZ = edge1X * edge2Y - edge1Y * edge2X;
-            normalLength = (float) Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
-            if (normalLength > 1.0e-6F) {
-                normalX /= normalLength;
-                normalY /= normalLength;
-                normalZ /= normalLength;
-            } else {
-                normalX = 0.0F;
-                normalY = 0.0F;
-                normalZ = 1.0F;
-            }
         }
 
         float tangentX;
@@ -144,6 +131,17 @@ public final class TerrainMidTexCoord {
         result[1] = tangentY;
         result[2] = tangentZ;
         result[3] = handedness;
+    }
+
+    public static int packedQuadNormal(float[] x, float[] y, float[] z) {
+        float ax = x[1] - x[0], ay = y[1] - y[0], az = z[1] - z[0];
+        float bx = x[2] - x[0], by = y[2] - y[0], bz = z[2] - z[0];
+        float nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+        float length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (length <= 1.0e-6F) return 127 << 16;
+        return (Math.round(nx / length * 127.0F) & 255)
+                | (Math.round(ny / length * 127.0F) & 255) << 8
+                | (Math.round(nz / length * 127.0F) & 255) << 16;
     }
 
     private static float normalComponent(int packed, int shift) {

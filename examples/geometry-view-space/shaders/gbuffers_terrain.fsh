@@ -1,4 +1,6 @@
 #version 120
+/* RENDERTARGETS:0,1 */
+const vec4 colortex1ClearColor = vec4(0.0);
 
 uniform sampler2D texture;
 
@@ -26,7 +28,8 @@ void main() {
             && abs(dot(binormal, binormal) - 1.0) < 0.02;
     bool viewVectorKeepsLength = abs(dot(viewVector, viewVector) - dot(viewPos, viewPos))
             < max(0.05, dot(viewPos, viewPos) * 0.02);
-    gl_FragColor = validViewPosition && validDistance && orthonormalTangentFrame && viewVectorKeepsLength
+    gl_FragData[0] = validViewPosition && validDistance && orthonormalTangentFrame && viewVectorKeepsLength
             ? vec4(1.0, 0.0, 1.0, albedo.a)
             : vec4(0.0, 1.0, 0.0, albedo.a);
+    gl_FragData[1] = vec4(viewPos * 0.01 + 0.5, 1.0);
 }
