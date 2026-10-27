@@ -65,7 +65,15 @@ public abstract class TerrainBufferBuilderMixin {
         TerrainMidTexCoord.computeTangent(this.veyra$quadX, this.veyra$quadY, this.veyra$quadZ,
                 this.veyra$quadU, this.veyra$quadV, this.veyra$quadNormal, this.veyra$quadTangent);
         long firstVertex = this.bufferPtr + this.nextElementByte - (long) this.vertexSize * 4;
+        int fallbackNormal = 0;
         for (int corner = 0; corner < 4; corner++) {
+            // VulkanMod's fluid renderer supplies zero normals; shader packs need the geometric normal.
+            if (this.veyra$quadNormal[corner] == 0) {
+                if (fallbackNormal == 0) fallbackNormal = TerrainMidTexCoord.packedQuadNormal(
+                        this.veyra$quadX, this.veyra$quadY, this.veyra$quadZ);
+                MemoryUtil.memPutInt(firstVertex + (long) corner * this.vertexSize
+                        + TerrainMidTexCoord.PACKED_NORMAL_OFFSET, fallbackNormal);
+            }
             long pointer = firstVertex + (long) corner * this.vertexSize + TerrainMidTexCoord.ATTRIBUTE_OFFSET;
             MemoryUtil.memPutShort(pointer, midpointU);
             MemoryUtil.memPutShort(pointer + Short.BYTES, midpointV);
