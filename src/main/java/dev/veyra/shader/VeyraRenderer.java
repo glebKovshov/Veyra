@@ -7669,10 +7669,13 @@ public final class VeyraRenderer {
                 case "textureMatrix" -> new UniformValue.Matrix4x4Uniform(
                         new Matrix4f(textureMatrixUniformBuffer().buffer.asFloatBuffer()));
                 case "gbufferModelViewInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferModelViewInverse());
-                case "gbufferProjection" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferProjection());
-                case "gbufferProjectionInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferProjectionInverse());
+                case "gbufferProjection" -> new UniformValue.Matrix4x4Uniform(
+                        IrisProjectionMatrices.fromVulkan(frameUniforms.matrices().gbufferProjection()));
+                case "gbufferProjectionInverse" -> new UniformValue.Matrix4x4Uniform(
+                        IrisProjectionMatrices.fromVulkan(frameUniforms.matrices().gbufferProjection()).invert());
                 case "gbufferPreviousModelView" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferPreviousModelView());
-                case "gbufferPreviousProjection" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().gbufferPreviousProjection());
+                case "gbufferPreviousProjection" -> new UniformValue.Matrix4x4Uniform(
+                        IrisProjectionMatrices.fromVulkan(frameUniforms.matrices().gbufferPreviousProjection()));
                 case "shadowModelView" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowModelView());
                 case "shadowModelViewInverse" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowModelViewInverse());
                 case "shadowProjection" -> new UniformValue.Matrix4x4Uniform(frameUniforms.matrices().shadowProjection());
