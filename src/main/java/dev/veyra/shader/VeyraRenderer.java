@@ -777,8 +777,9 @@ public final class VeyraRenderer {
             case "gbufferModelViewInverse" -> matrices.gbufferModelViewInverse();
             case "gbufferProjection" -> isHandRendering()
                     ? handAdjustedProjection(matrices.gbufferProjection()) : matrices.gbufferProjection();
-            case "gbufferProjectionInverse" -> isHandRendering()
-                    ? handAdjustedProjection(matrices.gbufferProjection()).invert() : matrices.gbufferProjectionInverse();
+            case "gbufferProjectionInverse" -> IrisProjectionMatrices.fromVulkan(
+                    isHandRendering() ? handAdjustedProjection(matrices.gbufferProjection())
+                            : matrices.gbufferProjection()).invert();
             case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
             case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
             default -> throw new IllegalArgumentException("Unknown shader pack matrix uniform " + name + ".");
