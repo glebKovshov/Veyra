@@ -782,6 +782,8 @@ public final class VeyraRenderer {
                             : matrices.gbufferProjection()).invert();
             case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
             case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
+            case "veyraViewEffects" -> matrices.viewEffects();
+            case "veyraViewEffectsInverse" -> matrices.viewEffectsInverse();
             default -> throw new IllegalArgumentException("Unknown shader pack matrix uniform " + name + ".");
         };
     }
@@ -1324,12 +1326,14 @@ public final class VeyraRenderer {
         }
     }
 
-    public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
+    public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc renderedProjection,
+                                            Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
         updateDirectionalShading();
         updateFrameClock();
         nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
-        Matrix4f currentModelView = new Matrix4f(modelView);
+        Matrix4f viewEffects = IrisProjectionMatrices.viewEffects(renderedProjection, projection);
+        Matrix4f currentModelView = new Matrix4f(viewEffects).mul(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
                 ? new Matrix4f(frameMatrices.gbufferModelView()) : new Matrix4f(currentModelView);
@@ -1342,7 +1346,8 @@ public final class VeyraRenderer {
                 currentProjection, new Matrix4f(currentProjection).invert(),
                 previousModelView, previousProjection,
                 shadowModelView, new Matrix4f(shadowModelView).invert(),
-                shadowProjection, new Matrix4f(shadowProjection).invert());
+                shadowProjection, new Matrix4f(shadowProjection).invert(),
+                viewEffects, new Matrix4f(viewEffects).invert());
         frameMatricesInitialized = true;
         updateShaderPackMatrixUniforms(frameMatrices);
 
@@ -8428,10 +8433,11 @@ public final class VeyraRenderer {
                                  Matrix4f gbufferProjection, Matrix4f gbufferProjectionInverse,
                                  Matrix4f gbufferPreviousModelView, Matrix4f gbufferPreviousProjection,
                                  Matrix4f shadowModelView, Matrix4f shadowModelViewInverse,
-                                 Matrix4f shadowProjection, Matrix4f shadowProjectionInverse) {
+                                 Matrix4f shadowProjection, Matrix4f shadowProjectionInverse,
+                                 Matrix4f viewEffects, Matrix4f viewEffectsInverse) {
         private static final FrameMatrices IDENTITY = new FrameMatrices(
                 new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(),
-                new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f());
+                new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f());
     }
 
     private record CameraPosition(Vector3f position, Vector3i integerPosition, Vector3f fractionalPosition) {
@@ -8564,7 +8570,7 @@ public final class VeyraRenderer {
                                         boolean isMainHand) {
     }
 
-    private record EntityPipelineSpec(String programName, String fragmentSource,
+    record EntityPipelineSpec(String programName, String fragmentSource,
                                       boolean requiresNormal, boolean requiresLightmap,
                                       boolean requiresViewPosition, boolean requiresViewNormal,
                                       boolean shadowPass, boolean handPass, boolean textPipeline,
@@ -8575,25 +8581,32 @@ public final class VeyraRenderer {
                                       VeyraComputePipelineSet customImageResources,
                                       Set<String> customTextureSamplers,
                                       ShaderPackImageBindings.PreparedStage customImageStage,
-                                      ShaderPackImageBindings.PreparedStage shadowFragmentImageStage) {
-        private boolean usesEntityId() {
-            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId")
-                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "entityId");
-        }
-
-        private boolean usesBlockEntityId() {
-            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId")
-                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "blockEntityId");
-        }
-
-        private boolean usesCurrentRenderedItemId() {
-            return EntityShaderAdapter.usesEntityIdentifier(
-                    fragmentSource, programName, "currentRenderedItemId")
-                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "currentRenderedItemId");
-        }
-
-        private boolean usesIsMainHand() {
-            return handPass && EntityShaderAdapter.requiresMainHandInput(fragmentSource);
+                                      ShaderPackImageBindings.PreparedStage shadowFragmentImageStage,
+                                      boolean usesEntityId, boolean usesBlockEntityId,
+                                      boolean usesCurrentRenderedItemId, boolean usesIsMainHand) {
+        EntityPipelineSpec(String programName, String fragmentSource,
+                           boolean requiresNormal, boolean requiresLightmap,
+                           boolean requiresViewPosition, boolean requiresViewNormal,
+                           boolean shadowPass, boolean handPass, boolean textPipeline,
+                           boolean shadowSamplerAvailable, FragmentOutputs outputLayout,
+                           GeometryBlendSettings blendSettings, Set<Integer> colorInputs,
+                           String vertexSource,
+                           Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                           VeyraComputePipelineSet customImageResources, Set<String> customTextureSamplers,
+                           ShaderPackImageBindings.PreparedStage customImageStage,
+                           ShaderPackImageBindings.PreparedStage shadowFragmentImageStage) {
+            // Source analysis belongs to pack preparation, not every entity submission.
+            this(programName, fragmentSource, requiresNormal, requiresLightmap,
+                    requiresViewPosition, requiresViewNormal, shadowPass, handPass, textPipeline,
+                    shadowSamplerAvailable, outputLayout, blendSettings, colorInputs, vertexSource, vertexVaryings,
+                    customImageResources, customTextureSamplers, customImageStage, shadowFragmentImageStage,
+                    EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId")
+                            || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "entityId"),
+                    EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId")
+                            || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "blockEntityId"),
+                    EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "currentRenderedItemId")
+                            || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "currentRenderedItemId"),
+                    handPass && EntityShaderAdapter.requiresMainHandInput(fragmentSource));
         }
     }
 

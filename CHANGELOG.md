@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 - 2026-10-28
+
+- Analyze entity identifier usage once when preparing pipelines instead of scanning GLSL on every entity submission; skip unused identifier variants and cache shadow-program presence per pack configuration.
+- Keep magnified block textures sharp with shader packs while preserving mipmaps and anisotropic minification; reuse Minecraft's sampler for custom block-atlas aliases.
+- Restore alpha testing after terrain and entity pack fragments, including early returns, so transparent texels do not write opaque color and depth.
+- Move camera bob/hurt transforms from projection into the shader-pack model-view matrices and keep entity vertex and normal transforms consistent with that decomposition.
+- Local JDK 21 checks: 617 tests passed, 104 example shaders processed and 122 direct Vulkan SPIR-V modules compiled; the installed BSL v10.1.8 default source audit passed. The user reported improved frame pacing and texture sharpness. Full visual parity and the intermittent black-screen report remain unverified.
+
 ## 0.2.0 - 2026-10-27
 
 - Preserve OpenGL shadow texture coordinates under VulkanMod's negative-height viewport, including pack vertex stages and native fallback projection; retain shadow face winding after the Y conversion.

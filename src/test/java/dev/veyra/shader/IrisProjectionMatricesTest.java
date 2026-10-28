@@ -9,6 +9,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IrisProjectionMatricesTest {
     @Test
+    void movesCameraBobbingIntoModelViewWithoutMovingGeometry() {
+        Matrix4f projection = new Matrix4f().setPerspective(1.1F, 1.7F, 0.05F, 300.0F, true)
+                .scale(1.0F, -1.0F, 1.0F);
+        Matrix4f camera = new Matrix4f().rotateY(0.7F).rotateX(-0.2F);
+        for (float phase : new float[]{-0.04F, 0.0F, 0.06F}) {
+            Matrix4f bob = new Matrix4f().translate(phase, phase * 0.5F, 0.0F).rotateZ(phase);
+            Matrix4f renderedProjection = new Matrix4f(projection).mul(bob);
+            Matrix4f effects = IrisProjectionMatrices.viewEffects(renderedProjection, projection);
+            Matrix4f irisView = new Matrix4f(effects).mul(camera);
+            assertTrue(new Matrix4f(projection).mul(irisView)
+                    .equals(new Matrix4f(renderedProjection).mul(camera), 0.00001F));
+
+            Vector4f world = new Vector4f(1.0F, 2.0F, -15.0F, 1.0F);
+            Matrix4f irisProjection = IrisProjectionMatrices.fromVulkan(projection);
+            Vector4f screen = irisProjection.transform(irisView.transform(new Vector4f(world)));
+            screen.div(screen.w);
+            Vector4f reconstructed = new Matrix4f(irisProjection).invert().transform(screen);
+            reconstructed.div(reconstructed.w);
+            new Matrix4f(irisView).invert().transform(reconstructed);
+            assertTrue(reconstructed.equals(world, 0.001F), "phase=" + phase + " world=" + reconstructed);
+
+            Matrix4f entityView = new Matrix4f(camera).translate(3.0F, 0.0F, -5.0F);
+            Matrix4f entityProjection = new Matrix4f(renderedProjection).mul(new Matrix4f(effects).invert());
+            assertTrue(entityProjection.mul(new Matrix4f(effects).mul(entityView))
+                    .equals(new Matrix4f(renderedProjection).mul(entityView), 0.0001F));
+        }
+    }
+
+    @Test
     void convertsVulkanClipCoordinatesAndInvertsBackToViewSpace() {
         Matrix4f vulkan = new Matrix4f().setPerspective(1.0F, 1.7F, 0.05F, 300.0F, true)
                 .scale(1.0F, -1.0F, 1.0F);
