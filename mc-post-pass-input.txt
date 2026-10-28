@@ -1,0 +1,14 @@
+﻿Compiled from "SourceFile"
+public interface hox$a {
+  public abstract void a(fww, java.util.Map<amo, fyw<fxt>>);
+
+  public default void a(java.util.Map<amo, fyw<fxt>>);
+    Code:
+       0: return
+
+  public abstract com.mojang.blaze3d.textures.GpuTextureView b(java.util.Map<amo, fyw<fxt>>);
+
+  public abstract java.lang.String a();
+
+  public abstract boolean b();
+}

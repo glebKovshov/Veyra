@@ -1,0 +1,1064 @@
+﻿Compiled from "VkGlTexture.java"
+public class net.vulkanmod.gl.VkGlTexture {
+  private static int ID_COUNTER;
+
+  private static final it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap<net.vulkanmod.gl.VkGlTexture> map;
+
+  private static int boundTextureId;
+
+  private static net.vulkanmod.gl.VkGlTexture boundTexture;
+
+  private static int activeTexture;
+
+  private static int unpackRowLength;
+
+  private static int unpackSkipRows;
+
+  private static int unpackSkipPixels;
+
+  public final int id;
+
+  net.vulkanmod.vulkan.texture.VulkanImage vulkanImage;
+
+  int width;
+
+  int height;
+
+  int vkFormat;
+
+  boolean needsUpdate;
+
+  int maxLevel;
+
+  int maxLod;
+
+  int minFilter;
+
+  int magFilter;
+
+  boolean clamp;
+
+  public static void bindIdToImage(int, net.vulkanmod.vulkan.texture.VulkanImage);
+    Code:
+       0: getstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+       3: iload_0
+       4: invokevirtual #50                 // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap.get:(I)Ljava/lang/Object;
+       7: checkcast     #2                  // class net/vulkanmod/gl/VkGlTexture
+      10: astore_2
+      11: aload_2
+      12: aload_1
+      13: putfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      16: return
+
+  public static int genTextureId();
+    Code:
+       0: getstatic     #57                 // Field ID_COUNTER:I
+       3: istore_0
+       4: getstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+       7: iload_0
+       8: new           #2                  // class net/vulkanmod/gl/VkGlTexture
+      11: dup
+      12: iload_0
+      13: invokespecial #61                 // Method "<init>":(I)V
+      16: invokevirtual #65                 // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap.put:(ILjava/lang/Object;)Ljava/lang/Object;
+      19: pop
+      20: getstatic     #57                 // Field ID_COUNTER:I
+      23: iconst_1
+      24: iadd
+      25: putstatic     #57                 // Field ID_COUNTER:I
+      28: iload_0
+      29: ireturn
+
+  public static void bindTexture(int);
+    Code:
+       0: iload_0
+       1: putstatic     #68                 // Field boundTextureId:I
+       4: getstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+       7: iload_0
+       8: invokevirtual #50                 // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap.get:(I)Ljava/lang/Object;
+      11: checkcast     #2                  // class net/vulkanmod/gl/VkGlTexture
+      14: putstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      17: iload_0
+      18: ifgt          22
+      21: return
+      22: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      25: ifnonnull     43
+      28: getstatic     #76                 // Field net/vulkanmod/Initializer.LOGGER:Lorg/apache/logging/log4j/Logger;
+      31: ldc           #78                 // String Invalid id({}) value
+      33: iload_0
+      34: invokestatic  #84                 // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+      37: invokeinterface #90,  3           // InterfaceMethod org/apache/logging/log4j/Logger.error:(Ljava/lang/String;Ljava/lang/Object;)V
+      42: return
+      43: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      46: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      49: astore_1
+      50: aload_1
+      51: ifnull        61
+      54: getstatic     #92                 // Field activeTexture:I
+      57: aload_1
+      58: invokestatic  #96                 // Method net/vulkanmod/vulkan/texture/VTextureSelector.bindTexture:(ILnet/vulkanmod/vulkan/texture/VulkanImage;)V
+      61: return
+
+  public static void glDeleteTextures(java.nio.IntBuffer);
+    Code:
+       0: aload_0
+       1: invokevirtual #104                // Method java/nio/IntBuffer.position:()I
+       4: istore_1
+       5: iload_1
+       6: aload_0
+       7: invokevirtual #107                // Method java/nio/IntBuffer.limit:()I
+      10: if_icmpge     27
+      13: aload_0
+      14: iload_1
+      15: invokevirtual #110                // Method java/nio/IntBuffer.get:(I)I
+      18: invokestatic  #112                // Method glDeleteTextures:(I)V
+      21: iinc          1, 1
+      24: goto          5
+      27: return
+
+  public static void glDeleteTextures(int);
+    Code:
+       0: getstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+       3: iload_0
+       4: invokevirtual #117                // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap.remove:(I)Ljava/lang/Object;
+       7: checkcast     #2                  // class net/vulkanmod/gl/VkGlTexture
+      10: astore_1
+      11: aload_1
+      12: ifnull        22
+      15: aload_1
+      16: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      19: goto          23
+      22: aconst_null
+      23: astore_2
+      24: aload_2
+      25: ifnull        35
+      28: invokestatic  #123                // Method net/vulkanmod/vulkan/memory/MemoryManager.getInstance:()Lnet/vulkanmod/vulkan/memory/MemoryManager;
+      31: aload_2
+      32: invokevirtual #127                // Method net/vulkanmod/vulkan/memory/MemoryManager.addToFreeable:(Lnet/vulkanmod/vulkan/texture/VulkanImage;)V
+      35: return
+
+  public static net.vulkanmod.gl.VkGlTexture getTexture(int);
+    Code:
+       0: iload_0
+       1: ifne          6
+       4: aconst_null
+       5: areturn
+       6: getstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+       9: iload_0
+      10: invokevirtual #50                 // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap.get:(I)Ljava/lang/Object;
+      13: checkcast     #2                  // class net/vulkanmod/gl/VkGlTexture
+      16: areturn
+
+  public static void activeTexture(int);
+    Code:
+       0: iload_0
+       1: ldc           #132                // int 33984
+       3: isub
+       4: putstatic     #92                 // Field activeTexture:I
+       7: getstatic     #92                 // Field activeTexture:I
+      10: invokestatic  #135                // Method net/vulkanmod/vulkan/texture/VTextureSelector.setActiveTexture:(I)V
+      13: return
+
+  public static void texImage2D(int, int, int, int, int, int, int, int, long);
+    Code:
+       0: iload_1
+       1: iload_3
+       2: iload         4
+       4: invokestatic  #148                // Method checkParams:(III)Z
+       7: ifeq          11
+      10: return
+      11: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      14: iload_1
+      15: iload_3
+      16: iload         4
+      18: iload_2
+      19: iload         7
+      21: invokevirtual #152                // Method updateParams:(IIIII)V
+      24: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      27: invokevirtual #156                // Method allocateIfNeeded:()V
+      30: getstatic     #92                 // Field activeTexture:I
+      33: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      36: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      39: invokestatic  #96                 // Method net/vulkanmod/vulkan/texture/VTextureSelector.bindTexture:(ILnet/vulkanmod/vulkan/texture/VulkanImage;)V
+      42: iload_0
+      43: iload_1
+      44: iconst_0
+      45: iconst_0
+      46: iload_3
+      47: iload         4
+      49: iload         6
+      51: iload         7
+      53: lload         8
+      55: invokestatic  #159                // Method texSubImage2D:(IIIIIIIIJ)V
+      58: return
+
+  public static void texImage2D(int, int, int, int, int, int, int, int, java.nio.ByteBuffer);
+    Code:
+       0: iload_1
+       1: iload_3
+       2: iload         4
+       4: invokestatic  #148                // Method checkParams:(III)Z
+       7: ifeq          11
+      10: return
+      11: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      14: iload_1
+      15: iload_3
+      16: iload         4
+      18: iload_2
+      19: iload         7
+      21: invokevirtual #152                // Method updateParams:(IIIII)V
+      24: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      27: invokevirtual #156                // Method allocateIfNeeded:()V
+      30: getstatic     #92                 // Field activeTexture:I
+      33: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      36: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      39: invokestatic  #96                 // Method net/vulkanmod/vulkan/texture/VTextureSelector.bindTexture:(ILnet/vulkanmod/vulkan/texture/VulkanImage;)V
+      42: iload_0
+      43: iload_1
+      44: iconst_0
+      45: iconst_0
+      46: iload_3
+      47: iload         4
+      49: iload         6
+      51: iload         7
+      53: aload         8
+      55: invokestatic  #164                // Method texSubImage2D:(IIIIIIIILjava/nio/ByteBuffer;)V
+      58: return
+
+  private static boolean checkParams(int, int, int);
+    Code:
+       0: iload_1
+       1: ifeq          8
+       4: iload_2
+       5: ifne          10
+       8: iconst_1
+       9: ireturn
+      10: iconst_0
+      11: ireturn
+
+  public static void texSubImage2D(int, int, int, int, int, int, int, int, long);
+    Code:
+       0: iload         4
+       2: ifeq          10
+       5: iload         5
+       7: ifne          11
+      10: return
+      11: invokestatic  #173                // Method net/vulkanmod/gl/VkGlBuffer.getPixelUnpackBufferBound:()Lnet/vulkanmod/gl/VkGlBuffer;
+      14: astore        11
+      16: aload         11
+      18: ifnull        43
+      21: aload         11
+      23: getfield      #176                // Field net/vulkanmod/gl/VkGlBuffer.data:Ljava/nio/ByteBuffer;
+      26: lload         8
+      28: l2i
+      29: invokevirtual #181                // Method java/nio/ByteBuffer.position:(I)Ljava/nio/ByteBuffer;
+      32: pop
+      33: aload         11
+      35: getfield      #176                // Field net/vulkanmod/gl/VkGlBuffer.data:Ljava/nio/ByteBuffer;
+      38: astore        10
+      40: goto          67
+      43: lload         8
+      45: lconst_0
+      46: lcmp
+      47: ifeq          64
+      50: iload         4
+      52: iload         5
+      54: lload         8
+      56: invokestatic  #185                // Method getByteBuffer:(IIJ)Ljava/nio/ByteBuffer;
+      59: astore        10
+      61: goto          67
+      64: aconst_null
+      65: astore        10
+      67: aload         10
+      69: ifnull        89
+      72: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      75: iload_1
+      76: iload_2
+      77: iload_3
+      78: iload         4
+      80: iload         5
+      82: iload         6
+      84: aload         10
+      86: invokevirtual #189                // Method uploadSubImage:(IIIIIILjava/nio/ByteBuffer;)V
+      89: return
+
+  private static java.nio.ByteBuffer getByteBuffer(int, int, long);
+    Code:
+       0: iconst_4
+       1: istore        5
+       3: getstatic     #194                // Field unpackRowLength:I
+       6: ifeq          15
+       9: getstatic     #194                // Field unpackRowLength:I
+      12: goto          16
+      15: iload_0
+      16: istore        6
+      18: getstatic     #196                // Field unpackSkipRows:I
+      21: iload         6
+      23: imul
+      24: getstatic     #198                // Field unpackSkipPixels:I
+      27: iadd
+      28: iload         5
+      30: imul
+      31: istore        7
+      33: lload_2
+      34: iload         7
+      36: i2l
+      37: ladd
+      38: iload         6
+      40: iload_1
+      41: imul
+      42: getstatic     #198                // Field unpackSkipPixels:I
+      45: isub
+      46: iload         5
+      48: imul
+      49: invokestatic  #204                // Method org/lwjgl/system/MemoryUtil.memByteBuffer:(JI)Ljava/nio/ByteBuffer;
+      52: astore        4
+      54: aload         4
+      56: areturn
+
+  public static void texSubImage2D(int, int, int, int, int, int, int, int, java.nio.ByteBuffer);
+    Code:
+       0: iload         4
+       2: ifeq          10
+       5: iload         5
+       7: ifne          11
+      10: return
+      11: invokestatic  #173                // Method net/vulkanmod/gl/VkGlBuffer.getPixelUnpackBufferBound:()Lnet/vulkanmod/gl/VkGlBuffer;
+      14: astore        10
+      16: aload         10
+      18: ifnull        56
+      21: aload         8
+      23: ifnull        36
+      26: new           #209                // class java/lang/IllegalStateException
+      29: dup
+      30: ldc           #211                // String Trying to use pixel buffer when there is a Pixel Unpack Buffer bound.
+      32: invokespecial #214                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      35: athrow
+      36: aload         10
+      38: getfield      #176                // Field net/vulkanmod/gl/VkGlBuffer.data:Ljava/nio/ByteBuffer;
+      41: iconst_0
+      42: invokevirtual #181                // Method java/nio/ByteBuffer.position:(I)Ljava/nio/ByteBuffer;
+      45: pop
+      46: aload         10
+      48: getfield      #176                // Field net/vulkanmod/gl/VkGlBuffer.data:Ljava/nio/ByteBuffer;
+      51: astore        9
+      53: goto          60
+      56: aload         8
+      58: astore        9
+      60: aload         9
+      62: ifnull        82
+      65: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      68: iload_1
+      69: iload_2
+      70: iload_3
+      71: iload         4
+      73: iload         5
+      75: iload         6
+      77: aload         9
+      79: invokevirtual #189                // Method uploadSubImage:(IIIIIILjava/nio/ByteBuffer;)V
+      82: return
+
+  public static void texParameteri(int, int, int);
+    Code:
+       0: iload_0
+       1: sipush        3553
+       4: if_icmpeq     17
+       7: new           #220                // class java/lang/UnsupportedOperationException
+      10: dup
+      11: ldc           #222                // String target != GL_TEXTURE_2D not supported
+      13: invokespecial #223                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      20: ifnonnull     24
+      23: return
+      24: iload_1
+      25: lookupswitch  { // 8
+
+                 10240: 126
+
+                 10241: 136
+
+                 10242: 146
+
+                 10243: 146
+
+                 33082: 120
+
+                 33083: 110
+
+                 33085: 100
+
+                 34049: 123
+               default: 156
+          }
+     100: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     103: iload_2
+     104: invokevirtual #226                // Method setMaxLevel:(I)V
+     107: goto          156
+     110: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     113: iload_2
+     114: invokevirtual #229                // Method setMaxLod:(I)V
+     117: goto          156
+     120: goto          156
+     123: goto          156
+     126: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     129: iload_2
+     130: invokevirtual #232                // Method setMagFilter:(I)V
+     133: goto          156
+     136: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     139: iload_2
+     140: invokevirtual #235                // Method setMinFilter:(I)V
+     143: goto          156
+     146: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     149: iload_2
+     150: invokevirtual #238                // Method setClamp:(I)V
+     153: goto          156
+     156: return
+
+  public static int getTexParameteri(int, int);
+    Code:
+       0: iload_0
+       1: sipush        3553
+       4: if_icmpeq     17
+       7: new           #220                // class java/lang/UnsupportedOperationException
+      10: dup
+      11: ldc           #222                // String target != GL_TEXTURE_2D not supported
+      13: invokespecial #223                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      20: ifnonnull     25
+      23: iconst_m1
+      24: ireturn
+      25: iload_1
+      26: lookupswitch  { // 7
+
+                  4096: 107
+
+                  4097: 119
+
+                  4099: 92
+
+                 10240: 149
+
+                 10241: 158
+
+                 33083: 140
+
+                 33085: 131
+               default: 167
+          }
+      92: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      95: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      98: getfield      #242                // Field net/vulkanmod/vulkan/texture/VulkanImage.format:I
+     101: invokestatic  #247                // Method net/vulkanmod/gl/GlUtil.getGlFormat:(I)I
+     104: goto          168
+     107: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     110: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     113: getfield      #249                // Field net/vulkanmod/vulkan/texture/VulkanImage.width:I
+     116: goto          168
+     119: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     122: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     125: getfield      #251                // Field net/vulkanmod/vulkan/texture/VulkanImage.height:I
+     128: goto          168
+     131: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     134: getfield      #253                // Field maxLevel:I
+     137: goto          168
+     140: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     143: getfield      #255                // Field maxLod:I
+     146: goto          168
+     149: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     152: getfield      #257                // Field magFilter:I
+     155: goto          168
+     158: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+     161: getfield      #259                // Field minFilter:I
+     164: goto          168
+     167: iconst_m1
+     168: ireturn
+
+  public static int getTexLevelParameter(int, int, int);
+    Code:
+       0: iload_0
+       1: sipush        3553
+       4: if_icmpeq     17
+       7: new           #220                // class java/lang/UnsupportedOperationException
+      10: dup
+      11: ldc           #222                // String target != GL_TEXTURE_2D not supported
+      13: invokespecial #223                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      20: ifnonnull     25
+      23: iconst_m1
+      24: ireturn
+      25: iload_2
+      26: tableswitch   { // 4096 to 4099
+
+                  4096: 71
+
+                  4097: 83
+
+                  4098: 95
+
+                  4099: 56
+               default: 95
+          }
+      56: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      59: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      62: getfield      #242                // Field net/vulkanmod/vulkan/texture/VulkanImage.format:I
+      65: invokestatic  #247                // Method net/vulkanmod/gl/GlUtil.getGlFormat:(I)I
+      68: goto          96
+      71: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      74: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      77: getfield      #249                // Field net/vulkanmod/vulkan/texture/VulkanImage.width:I
+      80: goto          96
+      83: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+      86: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      89: getfield      #251                // Field net/vulkanmod/vulkan/texture/VulkanImage.height:I
+      92: goto          96
+      95: iconst_m1
+      96: ireturn
+
+  public static void pixelStoreI(int, int);
+    Code:
+       0: iload_0
+       1: tableswitch   { // 3314 to 3316
+
+                  3314: 28
+
+                  3315: 35
+
+                  3316: 42
+               default: 46
+          }
+      28: iload_1
+      29: putstatic     #194                // Field unpackRowLength:I
+      32: goto          46
+      35: iload_1
+      36: putstatic     #196                // Field unpackSkipRows:I
+      39: goto          46
+      42: iload_1
+      43: putstatic     #198                // Field unpackSkipPixels:I
+      46: return
+
+  public static void generateMipmap(int);
+    Code:
+       0: iload_0
+       1: sipush        3553
+       4: if_icmpeq     17
+       7: new           #220                // class java/lang/UnsupportedOperationException
+      10: dup
+      11: ldc           #222                // String target != GL_TEXTURE_2D not supported
+      13: invokespecial #223                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: return
+
+  public static void getTexImage(int, int, int, int, long);
+    Code:
+       0: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+       3: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       6: astore        6
+       8: invokestatic  #271                // Method net/vulkanmod/gl/VkGlBuffer.getPixelPackBufferBound:()Lnet/vulkanmod/gl/VkGlBuffer;
+      11: astore        7
+      13: aload         7
+      15: ifnull        43
+      18: aload         7
+      20: getfield      #176                // Field net/vulkanmod/gl/VkGlBuffer.data:Ljava/nio/ByteBuffer;
+      23: lload         4
+      25: l2i
+      26: invokevirtual #181                // Method java/nio/ByteBuffer.position:(I)Ljava/nio/ByteBuffer;
+      29: pop
+      30: aload         7
+      32: getfield      #176                // Field net/vulkanmod/gl/VkGlBuffer.data:Ljava/nio/ByteBuffer;
+      35: invokestatic  #275                // Method org/lwjgl/system/MemoryUtil.memAddress:(Ljava/nio/ByteBuffer;)J
+      38: lstore        8
+      40: goto          47
+      43: lload         4
+      45: lstore        8
+      47: aload         6
+      49: lload         8
+      51: invokestatic  #281                // Method net/vulkanmod/vulkan/texture/ImageUtil.downloadTexture:(Lnet/vulkanmod/vulkan/texture/VulkanImage;J)V
+      54: return
+
+  public static void setVulkanImage(int, net.vulkanmod.vulkan.texture.VulkanImage);
+    Code:
+       0: getstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+       3: iload_0
+       4: invokevirtual #50                 // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap.get:(I)Ljava/lang/Object;
+       7: checkcast     #2                  // class net/vulkanmod/gl/VkGlTexture
+      10: astore_2
+      11: aload_2
+      12: aload_1
+      13: putfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      16: return
+
+  public static net.vulkanmod.gl.VkGlTexture getBoundTexture();
+    Code:
+       0: getstatic     #70                 // Field boundTexture:Lnet/vulkanmod/gl/VkGlTexture;
+       3: areturn
+
+  public net.vulkanmod.gl.VkGlTexture(int);
+    Code:
+       0: aload_0
+       1: invokespecial #288                // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: iconst_0
+       6: putfield      #290                // Field needsUpdate:Z
+       9: aload_0
+      10: iconst_0
+      11: putfield      #253                // Field maxLevel:I
+      14: aload_0
+      15: iconst_0
+      16: putfield      #255                // Field maxLod:I
+      19: aload_0
+      20: sipush        9728
+      23: putfield      #259                // Field minFilter:I
+      26: aload_0
+      27: sipush        9728
+      30: putfield      #257                // Field magFilter:I
+      33: aload_0
+      34: iconst_1
+      35: putfield      #292                // Field clamp:Z
+      38: aload_0
+      39: iload_1
+      40: putfield      #294                // Field id:I
+      43: return
+
+  void updateParams(int, int, int, int, int);
+    Code:
+       0: iload_1
+       1: aload_0
+       2: getfield      #253                // Field maxLevel:I
+       5: if_icmple     18
+       8: aload_0
+       9: iload_1
+      10: putfield      #253                // Field maxLevel:I
+      13: aload_0
+      14: iconst_1
+      15: putfield      #290                // Field needsUpdate:Z
+      18: iload_1
+      19: ifne          87
+      22: iload         4
+      24: iload         5
+      26: invokestatic  #298                // Method net/vulkanmod/gl/GlUtil.vulkanFormat:(II)I
+      29: istore        6
+      31: aload_0
+      32: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      35: ifnull        66
+      38: aload_0
+      39: getfield      #299                // Field width:I
+      42: iload_2
+      43: if_icmpne     66
+      46: aload_0
+      47: getfield      #300                // Field height:I
+      50: iload_3
+      51: if_icmpne     66
+      54: iload         6
+      56: aload_0
+      57: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      60: getfield      #242                // Field net/vulkanmod/vulkan/texture/VulkanImage.format:I
+      63: if_icmpeq     87
+      66: aload_0
+      67: iload_2
+      68: putfield      #299                // Field width:I
+      71: aload_0
+      72: iload_3
+      73: putfield      #300                // Field height:I
+      76: aload_0
+      77: iload         6
+      79: putfield      #302                // Field vkFormat:I
+      82: aload_0
+      83: iconst_1
+      84: putfield      #290                // Field needsUpdate:Z
+      87: return
+
+  void allocateIfNeeded();
+    Code:
+       0: aload_0
+       1: getfield      #290                // Field needsUpdate:Z
+       4: ifeq          32
+       7: aload_0
+       8: aload_0
+       9: getfield      #299                // Field width:I
+      12: aload_0
+      13: getfield      #300                // Field height:I
+      16: aload_0
+      17: getfield      #302                // Field vkFormat:I
+      20: invokevirtual #305                // Method allocateImage:(III)V
+      23: aload_0
+      24: invokevirtual #308                // Method updateSampler:()V
+      27: aload_0
+      28: iconst_0
+      29: putfield      #290                // Field needsUpdate:Z
+      32: return
+
+  void allocateImage(int, int, int);
+    Code:
+       0: aload_0
+       1: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: ifnull        14
+       7: aload_0
+       8: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      11: invokevirtual #311                // Method net/vulkanmod/vulkan/texture/VulkanImage.free:()V
+      14: iload_3
+      15: invokestatic  #315                // Method net/vulkanmod/vulkan/texture/VulkanImage.isDepthFormat:(I)Z
+      18: ifeq          38
+      21: aload_0
+      22: iload_3
+      23: iload_1
+      24: iload_2
+      25: bipush        37
+      27: iconst_0
+      28: iconst_1
+      29: invokestatic  #319                // Method net/vulkanmod/vulkan/texture/VulkanImage.createDepthImage:(IIIIZZ)Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      32: putfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      35: goto          95
+      38: aload_0
+      39: new           #7                  // class net/vulkanmod/vulkan/texture/VulkanImage$Builder
+      42: dup
+      43: iload_1
+      44: iload_2
+      45: invokespecial #321                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder."<init>":(II)V
+      48: ldc_w         #323                // String GlTexture %d
+      51: iconst_1
+      52: anewarray     #4                  // class java/lang/Object
+      55: dup
+      56: iconst_0
+      57: aload_0
+      58: getfield      #294                // Field id:I
+      61: invokestatic  #84                 // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+      64: aastore
+      65: invokestatic  #328                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+      68: invokevirtual #332                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setName:(Ljava/lang/String;)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      71: aload_0
+      72: getfield      #253                // Field maxLevel:I
+      75: iconst_1
+      76: iadd
+      77: invokevirtual #336                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setMipLevels:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      80: iload_3
+      81: invokevirtual #339                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setFormat:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      84: bipush        16
+      86: invokevirtual #342                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.addUsage:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      89: invokevirtual #346                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.createVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      92: putfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      95: return
+
+  void updateSampler();
+    Code:
+       0: aload_0
+       1: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: ifnonnull     8
+       7: return
+       8: aload_0
+       9: getfield      #292                // Field clamp:Z
+      12: ifeq          19
+      15: iconst_2
+      16: goto          20
+      19: iconst_0
+      20: istore_1
+      21: aload_0
+      22: getfield      #259                // Field minFilter:I
+      25: lookupswitch  { // 6
+
+                  9728: 100
+
+                  9729: 84
+
+                  9984: 100
+
+                  9985: 92
+
+                  9986: 108
+
+                  9987: 84
+               default: 116
+          }
+      84: iconst_1
+      85: istore_3
+      86: iconst_1
+      87: istore        4
+      89: goto          144
+      92: iconst_1
+      93: istore_3
+      94: iconst_0
+      95: istore        4
+      97: goto          144
+     100: iconst_0
+     101: istore_3
+     102: iconst_0
+     103: istore        4
+     105: goto          144
+     108: iconst_0
+     109: istore_3
+     110: iconst_1
+     111: istore        4
+     113: goto          144
+     116: new           #209                // class java/lang/IllegalStateException
+     119: dup
+     120: ldc_w         #348                // String Unexpected min filter value: %d
+     123: iconst_1
+     124: anewarray     #4                  // class java/lang/Object
+     127: dup
+     128: iconst_0
+     129: aload_0
+     130: getfield      #259                // Field minFilter:I
+     133: invokestatic  #84                 // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+     136: aastore
+     137: invokevirtual #352                // Method java/lang/String.formatted:([Ljava/lang/Object;)Ljava/lang/String;
+     140: invokespecial #214                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     143: athrow
+     144: aload_0
+     145: getfield      #257                // Field magFilter:I
+     148: lookupswitch  { // 2
+
+                  9728: 180
+
+                  9729: 176
+               default: 184
+          }
+     176: iconst_1
+     177: goto          212
+     180: iconst_0
+     181: goto          212
+     184: new           #209                // class java/lang/IllegalStateException
+     187: dup
+     188: ldc_w         #354                // String Unexpected mag filter value: %d
+     191: iconst_1
+     192: anewarray     #4                  // class java/lang/Object
+     195: dup
+     196: iconst_0
+     197: aload_0
+     198: getfield      #257                // Field magFilter:I
+     201: invokestatic  #84                 // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+     204: aastore
+     205: invokevirtual #352                // Method java/lang/String.formatted:([Ljava/lang/Object;)Ljava/lang/String;
+     208: invokespecial #214                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     211: athrow
+     212: istore_2
+     213: iload_1
+     214: iload_1
+     215: iload_3
+     216: iload_2
+     217: iload         4
+     219: aload_0
+     220: getfield      #255                // Field maxLod:I
+     223: i2f
+     224: iconst_0
+     225: fconst_0
+     226: iconst_m1
+     227: invokestatic  #360                // Method net/vulkanmod/vulkan/texture/SamplerManager.getSampler:(IIIIIFZFI)J
+     230: lstore        5
+     232: aload_0
+     233: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     236: lload         5
+     238: invokevirtual #364                // Method net/vulkanmod/vulkan/texture/VulkanImage.setSampler:(J)V
+     241: return
+
+  private void uploadSubImage(int, int, int, int, int, int, java.nio.ByteBuffer);
+    Code:
+       0: iload         6
+       2: sipush        6407
+       5: if_icmpne     30
+       8: aload_0
+       9: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      12: getfield      #242                // Field net/vulkanmod/vulkan/texture/VulkanImage.format:I
+      15: bipush        37
+      17: if_icmpne     30
+      20: aload         7
+      22: invokestatic  #373                // Method net/vulkanmod/gl/GlUtil.RGBtoRGBA_buffer:(Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer;
+      25: astore        8
+      27: goto          64
+      30: iload         6
+      32: ldc_w         #374                // int 32993
+      35: if_icmpne     60
+      38: aload_0
+      39: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      42: getfield      #242                // Field net/vulkanmod/vulkan/texture/VulkanImage.format:I
+      45: bipush        37
+      47: if_icmpne     60
+      50: aload         7
+      52: invokestatic  #377                // Method net/vulkanmod/gl/GlUtil.BGRAtoRGBA_buffer:(Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer;
+      55: astore        8
+      57: goto          64
+      60: aload         7
+      62: astore        8
+      64: aload_0
+      65: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      68: iload_1
+      69: iload         4
+      71: iload         5
+      73: iload_2
+      74: iload_3
+      75: iconst_0
+      76: iconst_0
+      77: getstatic     #194                // Field unpackRowLength:I
+      80: aload         8
+      82: invokevirtual #380                // Method net/vulkanmod/vulkan/texture/VulkanImage.uploadSubTextureAsync:(IIIIIIIILjava/nio/ByteBuffer;)V
+      85: aload         8
+      87: aload         7
+      89: if_acmpeq     97
+      92: aload         8
+      94: invokestatic  #384                // Method org/lwjgl/system/MemoryUtil.memFree:(Ljava/nio/Buffer;)V
+      97: return
+
+  void generateMipmaps();
+    Code:
+       0: aload_0
+       1: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: invokestatic  #387                // Method net/vulkanmod/vulkan/texture/ImageUtil.generateMipmaps:(Lnet/vulkanmod/vulkan/texture/VulkanImage;)V
+       7: return
+
+  void setMaxLevel(int);
+    Code:
+       0: iload_1
+       1: ifge          15
+       4: new           #209                // class java/lang/IllegalStateException
+       7: dup
+       8: ldc_w         #390                // String max level cannot be < 0.
+      11: invokespecial #214                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      14: athrow
+      15: aload_0
+      16: getfield      #253                // Field maxLevel:I
+      19: iload_1
+      20: if_icmpeq     33
+      23: aload_0
+      24: iload_1
+      25: putfield      #253                // Field maxLevel:I
+      28: aload_0
+      29: iconst_1
+      30: putfield      #290                // Field needsUpdate:Z
+      33: return
+
+  void setMaxLod(int);
+    Code:
+       0: iload_1
+       1: ifge          15
+       4: new           #209                // class java/lang/IllegalStateException
+       7: dup
+       8: ldc_w         #390                // String max level cannot be < 0.
+      11: invokespecial #214                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      14: athrow
+      15: aload_0
+      16: getfield      #255                // Field maxLod:I
+      19: iload_1
+      20: if_icmpeq     32
+      23: aload_0
+      24: iload_1
+      25: putfield      #255                // Field maxLod:I
+      28: aload_0
+      29: invokevirtual #308                // Method updateSampler:()V
+      32: return
+
+  void setMagFilter(int);
+    Code:
+       0: iload_1
+       1: lookupswitch  { // 2
+
+                  9728: 28
+
+                  9729: 28
+               default: 31
+          }
+      28: goto          45
+      31: new           #393                // class java/lang/IllegalArgumentException
+      34: dup
+      35: iload_1
+      36: invokedynamic #405,  0            // InvokeDynamic #0:makeConcatWithConstants:(I)Ljava/lang/String;
+      41: invokespecial #406                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      44: athrow
+      45: aload_0
+      46: iload_1
+      47: putfield      #257                // Field magFilter:I
+      50: aload_0
+      51: invokevirtual #308                // Method updateSampler:()V
+      54: return
+
+  void setMinFilter(int);
+    Code:
+       0: iload_1
+       1: lookupswitch  { // 6
+
+                  9728: 60
+
+                  9729: 60
+
+                  9984: 60
+
+                  9985: 60
+
+                  9986: 60
+
+                  9987: 60
+               default: 63
+          }
+      60: goto          77
+      63: new           #393                // class java/lang/IllegalArgumentException
+      66: dup
+      67: iload_1
+      68: invokedynamic #409,  0            // InvokeDynamic #1:makeConcatWithConstants:(I)Ljava/lang/String;
+      73: invokespecial #406                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      76: athrow
+      77: aload_0
+      78: iload_1
+      79: putfield      #259                // Field minFilter:I
+      82: aload_0
+      83: invokevirtual #308                // Method updateSampler:()V
+      86: return
+
+  void setClamp(int);
+    Code:
+       0: iload_1
+       1: ldc_w         #410                // int 33071
+       4: if_icmpne     15
+       7: aload_0
+       8: iconst_1
+       9: putfield      #292                // Field clamp:Z
+      12: goto          20
+      15: aload_0
+      16: iconst_0
+      17: putfield      #292                // Field clamp:Z
+      20: aload_0
+      21: invokevirtual #308                // Method updateSampler:()V
+      24: return
+
+  public net.vulkanmod.vulkan.texture.VulkanImage getVulkanImage();
+    Code:
+       0: aload_0
+       1: getfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: areturn
+
+  public void setVulkanImage(net.vulkanmod.vulkan.texture.VulkanImage);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: putfield      #52                 // Field vulkanImage:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       5: aload_0
+       6: aload_1
+       7: getfield      #249                // Field net/vulkanmod/vulkan/texture/VulkanImage.width:I
+      10: putfield      #299                // Field width:I
+      13: aload_0
+      14: aload_1
+      15: getfield      #251                // Field net/vulkanmod/vulkan/texture/VulkanImage.height:I
+      18: putfield      #300                // Field height:I
+      21: aload_0
+      22: aload_1
+      23: getfield      #414                // Field net/vulkanmod/vulkan/texture/VulkanImage.mipLevels:I
+      26: putfield      #253                // Field maxLevel:I
+      29: aload_0
+      30: aload_1
+      31: getfield      #242                // Field net/vulkanmod/vulkan/texture/VulkanImage.format:I
+      34: putfield      #302                // Field vkFormat:I
+      37: return
+
+  static {};
+    Code:
+       0: iconst_1
+       1: putstatic     #57                 // Field ID_COUNTER:I
+       4: new           #46                 // class it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap
+       7: dup
+       8: invokespecial #416                // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap."<init>":()V
+      11: putstatic     #44                 // Field map:Lit/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap;
+      14: iconst_0
+      15: putstatic     #68                 // Field boundTextureId:I
+      18: iconst_0
+      19: putstatic     #92                 // Field activeTexture:I
+      22: return
+}

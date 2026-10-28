@@ -1,0 +1,20 @@
+{
+  "videoMode": {
+    "width": 2560,
+    "height": 1600,
+    "bitDepth": 8,
+    "refreshRate": 60
+  },
+  "windowMode": 0,
+  "advCulling": 2,
+  "indirectDraw": true,
+  "uniqueOpaqueLayer": true,
+  "entityCulling": true,
+  "device": -1,
+  "useWayland": false,
+  "ambientOcclusion": 1,
+  "frameQueueSize": 2,
+  "builderThreads": 0,
+  "backFaceCulling": true,
+  "textureAnimations": true
+}

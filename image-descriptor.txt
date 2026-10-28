@@ -1,0 +1,156 @@
+﻿Compiled from "ImageDescriptor.java"
+public class net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor implements net.vulkanmod.vulkan.shader.descriptor.Descriptor {
+  private final int descriptorType;
+
+  private final int binding;
+
+  public final java.lang.String qualifier;
+
+  public final java.lang.String name;
+
+  public final int imageIdx;
+
+  public boolean useSampler;
+
+  public boolean isReadOnlyLayout;
+
+  private int layout;
+
+  private int mipLevel;
+
+  public net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor(int, java.lang.String, java.lang.String, int, int);
+    Code:
+       0: aload_0
+       1: invokespecial #28                 // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: iconst_m1
+       6: putfield      #30                 // Field mipLevel:I
+       9: aload_0
+      10: iload_1
+      11: putfield      #32                 // Field binding:I
+      14: aload_0
+      15: aload_2
+      16: putfield      #34                 // Field qualifier:Ljava/lang/String;
+      19: aload_0
+      20: aload_3
+      21: putfield      #36                 // Field name:Ljava/lang/String;
+      24: aload_0
+      25: iload         4
+      27: putfield      #38                 // Field imageIdx:I
+      30: aload_0
+      31: getfield      #38                 // Field imageIdx:I
+      34: iconst_m1
+      35: if_icmpne     46
+      38: new           #40                 // class java/lang/IllegalArgumentException
+      41: dup
+      42: invokespecial #41                 // Method java/lang/IllegalArgumentException."<init>":()V
+      45: athrow
+      46: aload_0
+      47: iload         5
+      49: putfield      #45                 // Field descriptorType:I
+      52: aload_0
+      53: invokevirtual #49                 // Method isStorageImage:()Z
+      56: istore        6
+      58: aload_0
+      59: iload         6
+      61: ifne          68
+      64: iconst_1
+      65: goto          69
+      68: iconst_0
+      69: putfield      #51                 // Field useSampler:Z
+      72: aload_0
+      73: iload         6
+      75: ifeq          82
+      78: iconst_1
+      79: goto          83
+      82: iconst_5
+      83: invokevirtual #55                 // Method setLayout:(I)V
+      86: return
+
+  public int getBinding();
+    Code:
+       0: aload_0
+       1: getfield      #32                 // Field binding:I
+       4: ireturn
+
+  public int getType();
+    Code:
+       0: aload_0
+       1: getfield      #45                 // Field descriptorType:I
+       4: ireturn
+
+  public int getStages();
+    Code:
+       0: bipush        63
+       2: ireturn
+
+  public void setLayout(int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: putfield      #63                 // Field layout:I
+       5: aload_0
+       6: iload_1
+       7: iconst_5
+       8: if_icmpne     15
+      11: iconst_1
+      12: goto          16
+      15: iconst_0
+      16: putfield      #65                 // Field isReadOnlyLayout:Z
+      19: return
+
+  public int getLayout();
+    Code:
+       0: aload_0
+       1: getfield      #63                 // Field layout:I
+       4: ireturn
+
+  public void setMipLevel(int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: putfield      #30                 // Field mipLevel:I
+       5: return
+
+  public int getMipLevel();
+    Code:
+       0: aload_0
+       1: getfield      #30                 // Field mipLevel:I
+       4: ireturn
+
+  public net.vulkanmod.vulkan.texture.VulkanImage getImage();
+    Code:
+       0: aload_0
+       1: getfield      #38                 // Field imageIdx:I
+       4: invokestatic  #75                 // Method net/vulkanmod/vulkan/texture/VTextureSelector.getImage:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       7: areturn
+
+  public long getImageView(net.vulkanmod.vulkan.texture.VulkanImage);
+    Code:
+       0: aload_0
+       1: getfield      #30                 // Field mipLevel:I
+       4: iconst_m1
+       5: if_icmpne     16
+       8: aload_1
+       9: invokevirtual #83                 // Method net/vulkanmod/vulkan/texture/VulkanImage.getImageView:()J
+      12: lstore_2
+      13: goto          25
+      16: aload_1
+      17: aload_0
+      18: getfield      #30                 // Field mipLevel:I
+      21: invokevirtual #87                 // Method net/vulkanmod/vulkan/texture/VulkanImage.getLevelImageView:(I)J
+      24: lstore_2
+      25: lload_2
+      26: lreturn
+
+  public boolean isStorageImage();
+    Code:
+       0: aload_0
+       1: getfield      #45                 // Field descriptorType:I
+       4: iconst_3
+       5: if_icmpne     12
+       8: iconst_1
+       9: goto          13
+      12: iconst_0
+      13: ireturn
+}

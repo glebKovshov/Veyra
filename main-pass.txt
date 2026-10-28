@@ -1,0 +1,46 @@
+﻿Compiled from "MainPass.java"
+public interface net.vulkanmod.vulkan.pass.MainPass {
+  public abstract void begin(org.lwjgl.vulkan.VkCommandBuffer, org.lwjgl.system.MemoryStack);
+
+  public abstract void end(org.lwjgl.vulkan.VkCommandBuffer);
+
+  public abstract void cleanUp();
+
+  public abstract void onResize();
+
+  public default void mainTargetBindWrite();
+    Code:
+       0: return
+
+  public default void mainTargetUnbindWrite();
+    Code:
+       0: return
+
+  public default void rebindMainTarget();
+    Code:
+       0: return
+
+  public default void bindAsTexture();
+    Code:
+       0: return
+
+  public default net.vulkanmod.vulkan.framebuffer.Framebuffer getMainFramebuffer();
+    Code:
+       0: aconst_null
+       1: areturn
+
+  public default com.mojang.blaze3d.textures.GpuTexture getColorAttachment();
+    Code:
+       0: aconst_null
+       1: areturn
+
+  public default com.mojang.blaze3d.textures.GpuTextureView getColorAttachmentView();
+    Code:
+       0: aconst_null
+       1: areturn
+
+  public default com.mojang.blaze3d.textures.GpuTexture getDepthAttachment();
+    Code:
+       0: aconst_null
+       1: areturn
+}

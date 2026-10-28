@@ -1,0 +1,2283 @@
+﻿Compiled from "VkCommandEncoder.java"
+public class net.vulkanmod.render.engine.VkCommandEncoder implements com.mojang.blaze3d.systems.CommandEncoder {
+  private static final org.slf4j.Logger LOGGER;
+
+  private final net.vulkanmod.render.engine.VkGpuDevice device;
+
+  private com.mojang.blaze3d.pipeline.RenderPipeline lastPipeline;
+
+  private boolean inRenderPass;
+
+  private net.vulkanmod.render.engine.EGlProgram lastProgram;
+
+  private int framebufferId;
+
+  static final boolean $assertionsDisabled;
+
+  protected net.vulkanmod.render.engine.VkCommandEncoder(net.vulkanmod.render.engine.VkGpuDevice);
+    Code:
+       0: aload_0
+       1: invokespecial #108                // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: invokestatic  #114                // Method net/vulkanmod/gl/VkGlFramebuffer.genFramebufferId:()I
+       8: putfield      #116                // Field framebufferId:I
+      11: aload_0
+      12: aload_1
+      13: putfield      #118                // Field device:Lnet/vulkanmod/render/engine/VkGpuDevice;
+      16: return
+
+  public com.mojang.blaze3d.systems.RenderPass createRenderPass(java.util.function.Supplier<java.lang.String>, com.mojang.blaze3d.textures.GpuTextureView, java.util.OptionalInt);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: aload_3
+       4: aconst_null
+       5: invokestatic  #132                // Method java/util/OptionalDouble.empty:()Ljava/util/OptionalDouble;
+       8: invokevirtual #135                // Method createRenderPass:(Ljava/util/function/Supplier;Lcom/mojang/blaze3d/textures/GpuTextureView;Ljava/util/OptionalInt;Lcom/mojang/blaze3d/textures/GpuTextureView;Ljava/util/OptionalDouble;)Lcom/mojang/blaze3d/systems/RenderPass;
+      11: areturn
+
+  public com.mojang.blaze3d.systems.RenderPass createRenderPass(java.util.function.Supplier<java.lang.String>, com.mojang.blaze3d.textures.GpuTextureView, java.util.OptionalInt, com.mojang.blaze3d.textures.GpuTextureView, java.util.OptionalDouble);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          17
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc           #148                // String Close the existing render pass before creating a new one!
+      13: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: aload         5
+      19: invokevirtual #155                // Method java/util/OptionalDouble.isPresent:()Z
+      22: ifeq          40
+      25: aload         4
+      27: ifnonnull     40
+      30: getstatic     #157                // Field LOGGER:Lorg/slf4j/Logger;
+      33: ldc           #159                // String Depth clear value was provided but no depth texture is being used
+      35: invokeinterface #164,  2          // InterfaceMethod org/slf4j/Logger.warn:(Ljava/lang/String;)V
+      40: invokestatic  #170                // Method net/minecraft/class_310.method_1551:()Lnet/minecraft/class_310;
+      43: invokevirtual #174                // Method net/minecraft/class_310.method_1522:()Lnet/minecraft/class_276;
+      46: invokevirtual #180                // Method net/minecraft/class_276.method_30277:()Lcom/mojang/blaze3d/textures/GpuTexture;
+      49: aload_2
+      50: invokevirtual #185                // Method com/mojang/blaze3d/textures/GpuTextureView.texture:()Lcom/mojang/blaze3d/textures/GpuTexture;
+      53: if_acmpne     187
+      56: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      59: invokevirtual #195                // Method net/vulkanmod/vulkan/Renderer.getMainPass:()Lnet/vulkanmod/vulkan/pass/MainPass;
+      62: invokeinterface #200,  1          // InterfaceMethod net/vulkanmod/vulkan/pass/MainPass.rebindMainTarget:()V
+      67: iconst_0
+      68: istore        6
+      70: aload_3
+      71: invokevirtual #203                // Method java/util/OptionalInt.isPresent:()Z
+      74: ifeq          114
+      77: aload_3
+      78: invokevirtual #206                // Method java/util/OptionalInt.getAsInt:()I
+      81: istore        7
+      83: iload         7
+      85: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+      88: iload         7
+      90: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+      93: iload         7
+      95: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+      98: iload         7
+     100: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+     103: invokestatic  #227                // Method org/lwjgl/opengl/GL11.glClearColor:(FFFF)V
+     106: iload         6
+     108: sipush        16384
+     111: ior
+     112: istore        6
+     114: aload         4
+     116: ifnull        143
+     119: aload         5
+     121: invokevirtual #155                // Method java/util/OptionalDouble.isPresent:()Z
+     124: ifeq          143
+     127: aload         5
+     129: invokevirtual #231                // Method java/util/OptionalDouble.getAsDouble:()D
+     132: invokestatic  #235                // Method org/lwjgl/opengl/GL11.glClearDepth:(D)V
+     135: iload         6
+     137: sipush        256
+     140: ior
+     141: istore        6
+     143: iload         6
+     145: ifeq          167
+     148: invokestatic  #240                // Method com/mojang/blaze3d/opengl/GlStateManager._disableScissorTest:()V
+     151: iconst_1
+     152: invokestatic  #244                // Method com/mojang/blaze3d/opengl/GlStateManager._depthMask:(Z)V
+     155: iconst_1
+     156: iconst_1
+     157: iconst_1
+     158: iconst_1
+     159: invokestatic  #248                // Method com/mojang/blaze3d/opengl/GlStateManager._colorMask:(ZZZZ)V
+     162: iload         6
+     164: invokestatic  #252                // Method com/mojang/blaze3d/opengl/GlStateManager._clear:(I)V
+     167: new           #77                 // class net/vulkanmod/render/engine/VkRenderPass
+     170: dup
+     171: aload_0
+     172: aload         4
+     174: ifnull        181
+     177: iconst_1
+     178: goto          182
+     181: iconst_0
+     182: iconst_1
+     183: invokespecial #257                // Method net/vulkanmod/render/engine/VkRenderPass."<init>":(Lnet/vulkanmod/render/engine/VkCommandEncoder;ZZ)V
+     186: areturn
+     187: aload_2
+     188: invokevirtual #260                // Method com/mojang/blaze3d/textures/GpuTextureView.isClosed:()Z
+     191: ifeq          205
+     194: new           #146                // class java/lang/IllegalStateException
+     197: dup
+     198: ldc_w         #262                // String Color texture is closed
+     201: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     204: athrow
+     205: aload         4
+     207: ifnull        229
+     210: aload         4
+     212: invokevirtual #260                // Method com/mojang/blaze3d/textures/GpuTextureView.isClosed:()Z
+     215: ifeq          229
+     218: new           #146                // class java/lang/IllegalStateException
+     221: dup
+     222: ldc_w         #264                // String Depth texture is closed
+     225: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     228: athrow
+     229: aload_0
+     230: iconst_1
+     231: putfield      #144                // Field inRenderPass:Z
+     234: aload         4
+     236: ifnull        247
+     239: aload         4
+     241: invokevirtual #185                // Method com/mojang/blaze3d/textures/GpuTextureView.texture:()Lcom/mojang/blaze3d/textures/GpuTexture;
+     244: goto          248
+     247: aconst_null
+     248: astore        6
+     250: aload_2
+     251: checkcast     #268                // class net/vulkanmod/render/engine/VkTextureView
+     254: aload         6
+     256: invokevirtual #272                // Method net/vulkanmod/render/engine/VkTextureView.getFbo:(Lcom/mojang/blaze3d/textures/GpuTexture;)Lnet/vulkanmod/render/engine/VkFbo;
+     259: astore        7
+     261: aload         7
+     263: invokevirtual #277                // Method net/vulkanmod/render/engine/VkFbo.bind:()V
+     266: iconst_0
+     267: istore        8
+     269: aload_3
+     270: invokevirtual #203                // Method java/util/OptionalInt.isPresent:()Z
+     273: ifeq          313
+     276: aload_3
+     277: invokevirtual #206                // Method java/util/OptionalInt.getAsInt:()I
+     280: istore        9
+     282: iload         9
+     284: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+     287: iload         9
+     289: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+     292: iload         9
+     294: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+     297: iload         9
+     299: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+     302: invokestatic  #227                // Method org/lwjgl/opengl/GL11.glClearColor:(FFFF)V
+     305: iload         8
+     307: sipush        16384
+     310: ior
+     311: istore        8
+     313: aload         4
+     315: ifnull        342
+     318: aload         5
+     320: invokevirtual #155                // Method java/util/OptionalDouble.isPresent:()Z
+     323: ifeq          342
+     326: aload         5
+     328: invokevirtual #231                // Method java/util/OptionalDouble.getAsDouble:()D
+     331: invokestatic  #235                // Method org/lwjgl/opengl/GL11.glClearDepth:(D)V
+     334: iload         8
+     336: sipush        256
+     339: ior
+     340: istore        8
+     342: iload         8
+     344: ifeq          366
+     347: invokestatic  #240                // Method com/mojang/blaze3d/opengl/GlStateManager._disableScissorTest:()V
+     350: iconst_1
+     351: invokestatic  #244                // Method com/mojang/blaze3d/opengl/GlStateManager._depthMask:(Z)V
+     354: iconst_1
+     355: iconst_1
+     356: iconst_1
+     357: iconst_1
+     358: invokestatic  #248                // Method com/mojang/blaze3d/opengl/GlStateManager._colorMask:(ZZZZ)V
+     361: iload         8
+     363: invokestatic  #252                // Method com/mojang/blaze3d/opengl/GlStateManager._clear:(I)V
+     366: iconst_0
+     367: iconst_0
+     368: aload_2
+     369: iconst_0
+     370: invokevirtual #281                // Method com/mojang/blaze3d/textures/GpuTextureView.getWidth:(I)I
+     373: aload_2
+     374: iconst_0
+     375: invokevirtual #284                // Method com/mojang/blaze3d/textures/GpuTextureView.getHeight:(I)I
+     378: invokestatic  #288                // Method com/mojang/blaze3d/opengl/GlStateManager._viewport:(IIII)V
+     381: aload_0
+     382: aconst_null
+     383: putfield      #290                // Field lastPipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+     386: new           #77                 // class net/vulkanmod/render/engine/VkRenderPass
+     389: dup
+     390: aload_0
+     391: aload         4
+     393: ifnull        400
+     396: iconst_1
+     397: goto          401
+     400: iconst_0
+     401: iconst_1
+     402: invokespecial #257                // Method net/vulkanmod/render/engine/VkRenderPass."<init>":(Lnet/vulkanmod/render/engine/VkCommandEncoder;ZZ)V
+     405: areturn
+
+  public void clearColorTexture(com.mojang.blaze3d.textures.GpuTexture, int);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          17
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc           #148                // String Close the existing render pass before creating a new one!
+      13: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: invokestatic  #306                // Method net/vulkanmod/vulkan/Renderer.isRecording:()Z
+      20: ifeq          202
+      23: invokestatic  #170                // Method net/minecraft/class_310.method_1551:()Lnet/minecraft/class_310;
+      26: invokevirtual #174                // Method net/minecraft/class_310.method_1522:()Lnet/minecraft/class_276;
+      29: invokevirtual #180                // Method net/minecraft/class_276.method_30277:()Lcom/mojang/blaze3d/textures/GpuTexture;
+      32: aload_1
+      33: if_acmpne     75
+      36: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      39: invokevirtual #195                // Method net/vulkanmod/vulkan/Renderer.getMainPass:()Lnet/vulkanmod/vulkan/pass/MainPass;
+      42: invokeinterface #200,  1          // InterfaceMethod net/vulkanmod/vulkan/pass/MainPass.rebindMainTarget:()V
+      47: iload_2
+      48: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+      51: iload_2
+      52: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+      55: iload_2
+      56: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+      59: iload_2
+      60: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+      63: invokestatic  #311                // Method net/vulkanmod/vulkan/VRenderSystem.setClearColor:(FFFF)V
+      66: sipush        16384
+      69: invokestatic  #314                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(I)V
+      72: goto          383
+      75: aload_1
+      76: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      79: astore_3
+      80: ldc_w         #317                // int 36160
+      83: aload_0
+      84: getfield      #116                // Field framebufferId:I
+      87: invokestatic  #321                // Method net/vulkanmod/gl/VkGlFramebuffer.bindFramebuffer:(II)V
+      90: ldc_w         #317                // int 36160
+      93: ldc_w         #322                // int 36064
+      96: sipush        3553
+      99: aload_3
+     100: invokevirtual #325                // Method net/vulkanmod/render/engine/VkGpuTexture.method_68427:()I
+     103: iconst_0
+     104: invokestatic  #329                // Method net/vulkanmod/gl/VkGlFramebuffer.framebufferTexture2D:(IIIII)V
+     107: aload_0
+     108: getfield      #116                // Field framebufferId:I
+     111: invokestatic  #333                // Method net/vulkanmod/gl/VkGlFramebuffer.getFramebuffer:(I)Lnet/vulkanmod/gl/VkGlFramebuffer;
+     114: invokestatic  #337                // Method net/vulkanmod/gl/VkGlFramebuffer.beginRendering:(Lnet/vulkanmod/gl/VkGlFramebuffer;)V
+     117: iload_2
+     118: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+     121: iload_2
+     122: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+     125: iload_2
+     126: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+     129: iload_2
+     130: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+     133: invokestatic  #311                // Method net/vulkanmod/vulkan/VRenderSystem.setClearColor:(FFFF)V
+     136: sipush        16384
+     139: invokestatic  #314                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(I)V
+     142: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+     145: invokevirtual #340                // Method net/vulkanmod/vulkan/Renderer.endRenderPass:()V
+     148: aload_1
+     149: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     152: aconst_null
+     153: invokevirtual #341                // Method net/vulkanmod/render/engine/VkGpuTexture.getFbo:(Lcom/mojang/blaze3d/textures/GpuTexture;)Lnet/vulkanmod/render/engine/VkFbo;
+     156: astore        4
+     158: aload_1
+     159: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     162: iload_2
+     163: invokevirtual #343                // Method net/vulkanmod/render/engine/VkGpuTexture.setClearColor:(I)V
+     166: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+     169: invokevirtual #347                // Method net/vulkanmod/vulkan/Renderer.getBoundFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+     172: astore        5
+     174: aload         5
+     176: ifnull        199
+     179: aload         5
+     181: invokevirtual #353                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getColorAttachment:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     184: aload_1
+     185: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     188: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     191: if_acmpne     199
+     194: aload         4
+     196: invokevirtual #358                // Method net/vulkanmod/render/engine/VkFbo.clearAttachments:()V
+     199: goto          383
+     202: invokestatic  #364                // Method net/vulkanmod/vulkan/device/DeviceManager.getGraphicsQueue:()Lnet/vulkanmod/vulkan/queue/GraphicsQueue;
+     205: astore_3
+     206: aload_3
+     207: invokevirtual #370                // Method net/vulkanmod/vulkan/queue/GraphicsQueue.getCommandBuffer:()Lnet/vulkanmod/vulkan/queue/CommandPool$CommandBuffer;
+     210: astore        4
+     212: aload_1
+     213: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     216: astore        5
+     218: aload_0
+     219: getfield      #116                // Field framebufferId:I
+     222: invokestatic  #333                // Method net/vulkanmod/gl/VkGlFramebuffer.getFramebuffer:(I)Lnet/vulkanmod/gl/VkGlFramebuffer;
+     225: astore        6
+     227: aload         6
+     229: ldc_w         #322                // int 36064
+     232: aload         5
+     234: invokevirtual #325                // Method net/vulkanmod/render/engine/VkGpuTexture.method_68427:()I
+     237: invokevirtual #373                // Method net/vulkanmod/gl/VkGlFramebuffer.setAttachmentTexture:(II)V
+     240: aload         6
+     242: invokevirtual #376                // Method net/vulkanmod/gl/VkGlFramebuffer.create:()V
+     245: aload         6
+     247: invokevirtual #378                // Method net/vulkanmod/gl/VkGlFramebuffer.getFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+     250: astore        7
+     252: aload         6
+     254: invokevirtual #382                // Method net/vulkanmod/gl/VkGlFramebuffer.getRenderPass:()Lnet/vulkanmod/vulkan/framebuffer/RenderPass;
+     257: astore        8
+     259: invokestatic  #388                // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+     262: astore        9
+     264: aload         7
+     266: aload         4
+     268: getfield      #392                // Field net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.handle:Lorg/lwjgl/vulkan/VkCommandBuffer;
+     271: aload         8
+     273: aload         9
+     275: invokevirtual #396                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.beginRenderPass:(Lorg/lwjgl/vulkan/VkCommandBuffer;Lnet/vulkanmod/vulkan/framebuffer/RenderPass;Lorg/lwjgl/system/MemoryStack;)V
+     278: aload         9
+     280: ifnull        318
+     283: aload         9
+     285: invokevirtual #399                // Method org/lwjgl/system/MemoryStack.close:()V
+     288: goto          318
+     291: astore        10
+     293: aload         9
+     295: ifnull        315
+     298: aload         9
+     300: invokevirtual #399                // Method org/lwjgl/system/MemoryStack.close:()V
+     303: goto          315
+     306: astore        11
+     308: aload         10
+     310: aload         11
+     312: invokevirtual #405                // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     315: aload         10
+     317: athrow
+     318: iload_2
+     319: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+     322: iload_2
+     323: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+     326: iload_2
+     327: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+     330: iload_2
+     331: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+     334: invokestatic  #311                // Method net/vulkanmod/vulkan/VRenderSystem.setClearColor:(FFFF)V
+     337: aload         4
+     339: getfield      #392                // Field net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.handle:Lorg/lwjgl/vulkan/VkCommandBuffer;
+     342: sipush        16384
+     345: iconst_0
+     346: iconst_0
+     347: aload         7
+     349: invokevirtual #407                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getWidth:()I
+     352: aload         7
+     354: invokevirtual #409                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getHeight:()I
+     357: invokestatic  #412                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(Lorg/lwjgl/vulkan/VkCommandBuffer;IIIII)V
+     360: aload         8
+     362: aload         4
+     364: getfield      #392                // Field net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.handle:Lorg/lwjgl/vulkan/VkCommandBuffer;
+     367: invokevirtual #415                // Method net/vulkanmod/vulkan/framebuffer/RenderPass.endRenderPass:(Lorg/lwjgl/vulkan/VkCommandBuffer;)V
+     370: aload_3
+     371: aload         4
+     373: invokevirtual #419                // Method net/vulkanmod/vulkan/queue/GraphicsQueue.submitCommands:(Lnet/vulkanmod/vulkan/queue/CommandPool$CommandBuffer;)J
+     376: lstore        9
+     378: lload         9
+     380: invokestatic  #425                // Method net/vulkanmod/vulkan/Synchronization.waitFence:(J)V
+     383: return
+    Exception table:
+       from    to  target type
+         264   278   291   Class java/lang/Throwable
+         298   303   306   Class java/lang/Throwable
+
+  public void clearColorAndDepthTextures(com.mojang.blaze3d.textures.GpuTexture, int, com.mojang.blaze3d.textures.GpuTexture, double);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          17
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc           #148                // String Close the existing render pass before creating a new one!
+      13: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: invokestatic  #170                // Method net/minecraft/class_310.method_1551:()Lnet/minecraft/class_310;
+      20: invokevirtual #174                // Method net/minecraft/class_310.method_1522:()Lnet/minecraft/class_276;
+      23: invokevirtual #180                // Method net/minecraft/class_276.method_30277:()Lcom/mojang/blaze3d/textures/GpuTexture;
+      26: aload_1
+      27: if_acmpne     74
+      30: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      33: invokevirtual #195                // Method net/vulkanmod/vulkan/Renderer.getMainPass:()Lnet/vulkanmod/vulkan/pass/MainPass;
+      36: invokeinterface #200,  1          // InterfaceMethod net/vulkanmod/vulkan/pass/MainPass.rebindMainTarget:()V
+      41: dload         4
+      43: invokestatic  #448                // Method net/vulkanmod/vulkan/VRenderSystem.clearDepth:(D)V
+      46: iload_2
+      47: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+      50: iload_2
+      51: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+      54: iload_2
+      55: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+      58: iload_2
+      59: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+      62: invokestatic  #311                // Method net/vulkanmod/vulkan/VRenderSystem.setClearColor:(FFFF)V
+      65: sipush        16640
+      68: invokestatic  #314                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(I)V
+      71: goto          150
+      74: aload_1
+      75: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      78: aload_3
+      79: invokevirtual #341                // Method net/vulkanmod/render/engine/VkGpuTexture.getFbo:(Lcom/mojang/blaze3d/textures/GpuTexture;)Lnet/vulkanmod/render/engine/VkFbo;
+      82: astore        6
+      84: aload_1
+      85: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      88: iload_2
+      89: invokevirtual #343                // Method net/vulkanmod/render/engine/VkGpuTexture.setClearColor:(I)V
+      92: aload_3
+      93: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      96: dload         4
+      98: d2f
+      99: invokevirtual #452                // Method net/vulkanmod/render/engine/VkGpuTexture.setDepthClearValue:(F)V
+     102: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+     105: invokevirtual #347                // Method net/vulkanmod/vulkan/Renderer.getBoundFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+     108: astore        7
+     110: aload         7
+     112: ifnull        150
+     115: aload         7
+     117: invokevirtual #353                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getColorAttachment:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     120: aload_1
+     121: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     124: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     127: if_acmpne     150
+     130: aload         7
+     132: invokevirtual #455                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getDepthAttachment:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     135: aload_3
+     136: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     139: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     142: if_acmpne     150
+     145: aload         6
+     147: invokevirtual #358                // Method net/vulkanmod/render/engine/VkFbo.clearAttachments:()V
+     150: return
+
+  public void clearColorAndDepthTextures(com.mojang.blaze3d.textures.GpuTexture, int, com.mojang.blaze3d.textures.GpuTexture, double, int, int, int, int);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          17
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc           #148                // String Close the existing render pass before creating a new one!
+      13: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: dload         4
+      19: invokestatic  #448                // Method net/vulkanmod/vulkan/VRenderSystem.clearDepth:(D)V
+      22: iload_2
+      23: invokestatic  #212                // Method net/minecraft/class_9848.method_65101:(I)F
+      26: iload_2
+      27: invokestatic  #215                // Method net/minecraft/class_9848.method_65102:(I)F
+      30: iload_2
+      31: invokestatic  #218                // Method net/minecraft/class_9848.method_65103:(I)F
+      34: iload_2
+      35: invokestatic  #221                // Method net/minecraft/class_9848.method_65100:(I)F
+      38: invokestatic  #311                // Method net/vulkanmod/vulkan/VRenderSystem.setClearColor:(FFFF)V
+      41: aload_1
+      42: iconst_0
+      43: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      46: istore        10
+      48: iload         10
+      50: iload         9
+      52: isub
+      53: iload         7
+      55: isub
+      56: istore        7
+      58: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      61: invokevirtual #347                // Method net/vulkanmod/vulkan/Renderer.getBoundFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+      64: astore        11
+      66: aload         11
+      68: ifnull        118
+      71: aload         11
+      73: invokevirtual #353                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getColorAttachment:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      76: aload_1
+      77: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      80: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      83: if_acmpne     118
+      86: aload         11
+      88: invokevirtual #455                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getDepthAttachment:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      91: aload_3
+      92: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      95: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      98: if_acmpne     118
+     101: sipush        16640
+     104: iload         6
+     106: iload         7
+     108: iload         8
+     110: iload         9
+     112: invokestatic  #464                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(IIIII)V
+     115: goto          147
+     118: aload_1
+     119: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     122: astore        12
+     124: aload         12
+     126: aload_3
+     127: invokevirtual #341                // Method net/vulkanmod/render/engine/VkGpuTexture.getFbo:(Lcom/mojang/blaze3d/textures/GpuTexture;)Lnet/vulkanmod/render/engine/VkFbo;
+     130: invokevirtual #277                // Method net/vulkanmod/render/engine/VkFbo.bind:()V
+     133: sipush        16640
+     136: iload         6
+     138: iload         7
+     140: iload         8
+     142: iload         9
+     144: invokestatic  #464                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(IIIII)V
+     147: return
+
+  public void clearDepthTexture(com.mojang.blaze3d.textures.GpuTexture, double);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          17
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc           #148                // String Close the existing render pass before creating a new one!
+      13: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      16: athrow
+      17: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      20: invokevirtual #347                // Method net/vulkanmod/vulkan/Renderer.getBoundFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+      23: astore        4
+      25: aload         4
+      27: ifnull        58
+      30: aload         4
+      32: invokevirtual #455                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getDepthAttachment:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      35: aload_1
+      36: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      39: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      42: if_acmpne     58
+      45: dload_2
+      46: invokestatic  #448                // Method net/vulkanmod/vulkan/VRenderSystem.clearDepth:(D)V
+      49: sipush        256
+      52: invokestatic  #314                // Method net/vulkanmod/vulkan/Renderer.clearAttachments:(I)V
+      55: goto          67
+      58: aload_1
+      59: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      62: dload_2
+      63: d2f
+      64: invokevirtual #452                // Method net/vulkanmod/render/engine/VkGpuTexture.setDepthClearValue:(F)V
+      67: return
+
+  public void writeToBuffer(com.mojang.blaze3d.buffers.GpuBufferSlice, java.nio.ByteBuffer);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: aload_1
+      19: invokevirtual #480                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.buffer:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      22: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      25: astore_3
+      26: aload_3
+      27: getfield      #483                // Field net/vulkanmod/render/engine/VkGpuBuffer.closed:Z
+      30: ifeq          44
+      33: new           #146                // class java/lang/IllegalStateException
+      36: dup
+      37: ldc_w         #485                // String Buffer already closed
+      40: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      43: athrow
+      44: aload_2
+      45: invokevirtual #490                // Method java/nio/ByteBuffer.remaining:()I
+      48: istore        4
+      50: iload         4
+      52: i2l
+      53: aload_1
+      54: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+      57: ladd
+      58: aload_3
+      59: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+      62: lcmp
+      63: ifle          89
+      66: new           #499                // class java/lang/IllegalArgumentException
+      69: dup
+      70: iload         4
+      72: aload_1
+      73: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+      76: aload_1
+      77: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+      80: invokedynamic #514,  0            // InvokeDynamic #0:makeConcatWithConstants:(IJJ)Ljava/lang/String;
+      85: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      88: athrow
+      89: aload_1
+      90: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+      93: lstore        5
+      95: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      98: invokevirtual #518                // Method net/vulkanmod/vulkan/Renderer.getTransferCb:()Lnet/vulkanmod/vulkan/queue/CommandPool$CommandBuffer;
+     101: astore        7
+     103: invokestatic  #524                // Method net/vulkanmod/vulkan/Vulkan.getStagingBuffer:()Lnet/vulkanmod/vulkan/memory/buffer/StagingBuffer;
+     106: astore        8
+     108: aload         8
+     110: iload         4
+     112: aload_2
+     113: invokevirtual #530                // Method net/vulkanmod/vulkan/memory/buffer/StagingBuffer.copyBuffer:(ILjava/nio/ByteBuffer;)V
+     116: aload         8
+     118: invokevirtual #533                // Method net/vulkanmod/vulkan/memory/buffer/StagingBuffer.getOffset:()J
+     121: lstore        9
+     123: invokestatic  #388                // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+     126: astore        11
+     128: aload         7
+     130: invokevirtual #534                // Method net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.isRecording:()Z
+     133: ifne          143
+     136: aload         7
+     138: aload         11
+     140: invokevirtual #538                // Method net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.begin:(Lorg/lwjgl/system/MemoryStack;)V
+     143: iconst_1
+     144: aload         11
+     146: invokestatic  #542                // Method org/lwjgl/vulkan/VkMemoryBarrier.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkMemoryBarrier$Buffer;
+     149: astore        12
+     151: aload         12
+     153: invokevirtual #546                // Method org/lwjgl/vulkan/VkMemoryBarrier$Buffer.sType$Default:()Lorg/lwjgl/vulkan/VkMemoryBarrier$Buffer;
+     156: pop
+     157: iconst_1
+     158: aload         11
+     160: invokestatic  #549                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkBufferMemoryBarrier$Buffer;
+     163: astore        13
+     165: aload         13
+     167: iconst_0
+     168: invokevirtual #553                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier$Buffer.get:(I)Lorg/lwjgl/system/Struct;
+     171: checkcast     #25                 // class org/lwjgl/vulkan/VkBufferMemoryBarrier
+     174: astore        14
+     176: aload         14
+     178: invokevirtual #556                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier.sType$Default:()Lorg/lwjgl/vulkan/VkBufferMemoryBarrier;
+     181: pop
+     182: aload         14
+     184: aload_3
+     185: getfield      #559                // Field net/vulkanmod/render/engine/VkGpuBuffer.buffer:Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+     188: invokevirtual #564                // Method net/vulkanmod/vulkan/memory/buffer/Buffer.getId:()J
+     191: invokevirtual #567                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier.buffer:(J)Lorg/lwjgl/vulkan/VkBufferMemoryBarrier;
+     194: pop
+     195: aload         14
+     197: sipush        4096
+     200: invokevirtual #571                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier.srcAccessMask:(I)Lorg/lwjgl/vulkan/VkBufferMemoryBarrier;
+     203: pop
+     204: aload         14
+     206: sipush        4096
+     209: invokevirtual #574                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier.dstAccessMask:(I)Lorg/lwjgl/vulkan/VkBufferMemoryBarrier;
+     212: pop
+     213: aload         14
+     215: ldc2_w        #575                // long -1l
+     218: invokevirtual #578                // Method org/lwjgl/vulkan/VkBufferMemoryBarrier.size:(J)Lorg/lwjgl/vulkan/VkBufferMemoryBarrier;
+     221: pop
+     222: aload         7
+     224: getfield      #392                // Field net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.handle:Lorg/lwjgl/vulkan/VkCommandBuffer;
+     227: sipush        4096
+     230: sipush        4096
+     233: iconst_0
+     234: aload         12
+     236: aload         13
+     238: aconst_null
+     239: invokestatic  #584                // Method org/lwjgl/vulkan/VK10.vkCmdPipelineBarrier:(Lorg/lwjgl/vulkan/VkCommandBuffer;IIILorg/lwjgl/vulkan/VkMemoryBarrier$Buffer;Lorg/lwjgl/vulkan/VkBufferMemoryBarrier$Buffer;Lorg/lwjgl/vulkan/VkImageMemoryBarrier$Buffer;)V
+     242: iconst_1
+     243: aload         11
+     245: invokestatic  #587                // Method org/lwjgl/vulkan/VkBufferCopy.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkBufferCopy$Buffer;
+     248: astore        15
+     250: aload         15
+     252: iload         4
+     254: i2l
+     255: invokevirtual #590                // Method org/lwjgl/vulkan/VkBufferCopy$Buffer.size:(J)Lorg/lwjgl/vulkan/VkBufferCopy$Buffer;
+     258: pop
+     259: aload         15
+     261: lload         9
+     263: invokevirtual #593                // Method org/lwjgl/vulkan/VkBufferCopy$Buffer.srcOffset:(J)Lorg/lwjgl/vulkan/VkBufferCopy$Buffer;
+     266: pop
+     267: aload         15
+     269: lload         5
+     271: invokevirtual #596                // Method org/lwjgl/vulkan/VkBufferCopy$Buffer.dstOffset:(J)Lorg/lwjgl/vulkan/VkBufferCopy$Buffer;
+     274: pop
+     275: aload         7
+     277: getfield      #392                // Field net/vulkanmod/vulkan/queue/CommandPool$CommandBuffer.handle:Lorg/lwjgl/vulkan/VkCommandBuffer;
+     280: aload         8
+     282: invokevirtual #597                // Method net/vulkanmod/vulkan/memory/buffer/StagingBuffer.getId:()J
+     285: aload_3
+     286: getfield      #559                // Field net/vulkanmod/render/engine/VkGpuBuffer.buffer:Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+     289: invokevirtual #564                // Method net/vulkanmod/vulkan/memory/buffer/Buffer.getId:()J
+     292: aload         15
+     294: invokestatic  #601                // Method org/lwjgl/vulkan/VK10.vkCmdCopyBuffer:(Lorg/lwjgl/vulkan/VkCommandBuffer;JJLorg/lwjgl/vulkan/VkBufferCopy$Buffer;)V
+     297: aload         11
+     299: ifnull        337
+     302: aload         11
+     304: invokevirtual #399                // Method org/lwjgl/system/MemoryStack.close:()V
+     307: goto          337
+     310: astore        12
+     312: aload         11
+     314: ifnull        334
+     317: aload         11
+     319: invokevirtual #399                // Method org/lwjgl/system/MemoryStack.close:()V
+     322: goto          334
+     325: astore        13
+     327: aload         12
+     329: aload         13
+     331: invokevirtual #405                // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     334: aload         12
+     336: athrow
+     337: return
+    Exception table:
+       from    to  target type
+         128   297   310   Class java/lang/Throwable
+         317   322   325   Class java/lang/Throwable
+
+  public com.mojang.blaze3d.buffers.GpuBuffer$MappedView mapBuffer(com.mojang.blaze3d.buffers.GpuBuffer, boolean, boolean);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #624                // Method com/mojang/blaze3d/buffers/GpuBuffer.slice:()Lcom/mojang/blaze3d/buffers/GpuBufferSlice;
+       5: iload_2
+       6: iload_3
+       7: invokevirtual #627                // Method mapBuffer:(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;ZZ)Lcom/mojang/blaze3d/buffers/GpuBuffer$MappedView;
+      10: areturn
+
+  public com.mojang.blaze3d.buffers.GpuBuffer$MappedView mapBuffer(com.mojang.blaze3d.buffers.GpuBufferSlice, boolean, boolean);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: aload_1
+      19: invokevirtual #480                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.buffer:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      22: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      25: astore        4
+      27: aload         4
+      29: getfield      #483                // Field net/vulkanmod/render/engine/VkGpuBuffer.closed:Z
+      32: ifeq          46
+      35: new           #146                // class java/lang/IllegalStateException
+      38: dup
+      39: ldc_w         #485                // String Buffer already closed
+      42: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      45: athrow
+      46: iload_2
+      47: ifne          65
+      50: iload_3
+      51: ifne          65
+      54: new           #499                // class java/lang/IllegalArgumentException
+      57: dup
+      58: ldc_w         #630                // String At least read or write must be true
+      61: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      64: athrow
+      65: iload_2
+      66: ifeq          90
+      69: aload         4
+      71: invokevirtual #633                // Method net/vulkanmod/render/engine/VkGpuBuffer.usage:()I
+      74: iconst_1
+      75: iand
+      76: ifne          90
+      79: new           #146                // class java/lang/IllegalStateException
+      82: dup
+      83: ldc_w         #635                // String Buffer is not readable
+      86: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      89: athrow
+      90: iload_3
+      91: ifeq          115
+      94: aload         4
+      96: invokevirtual #633                // Method net/vulkanmod/render/engine/VkGpuBuffer.usage:()I
+      99: iconst_2
+     100: iand
+     101: ifne          115
+     104: new           #146                // class java/lang/IllegalStateException
+     107: dup
+     108: ldc_w         #637                // String Buffer is not writable
+     111: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     114: athrow
+     115: aload_1
+     116: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     119: aload_1
+     120: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     123: ladd
+     124: aload         4
+     126: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+     129: lcmp
+     130: ifle          159
+     133: new           #499                // class java/lang/IllegalArgumentException
+     136: dup
+     137: aload_1
+     138: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     141: aload_1
+     142: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     145: aload         4
+     147: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+     150: invokedynamic #642,  0            // InvokeDynamic #1:makeConcatWithConstants:(JJJ)Ljava/lang/String;
+     155: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     158: athrow
+     159: iconst_0
+     160: istore        5
+     162: iload_2
+     163: ifeq          172
+     166: iload         5
+     168: iconst_1
+     169: ior
+     170: istore        5
+     172: iload_3
+     173: ifeq          183
+     176: iload         5
+     178: bipush        34
+     180: ior
+     181: istore        5
+     183: aload         4
+     185: invokevirtual #646                // Method net/vulkanmod/render/engine/VkGpuBuffer.getBuffer:()Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+     188: invokevirtual #649                // Method net/vulkanmod/vulkan/memory/buffer/Buffer.getDataPtr:()J
+     191: aload_1
+     192: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     195: ladd
+     196: aload_1
+     197: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     200: l2i
+     201: invokestatic  #655                // Method org/lwjgl/system/MemoryUtil.memByteBuffer:(JI)Ljava/nio/ByteBuffer;
+     204: astore        6
+     206: new           #40                 // class net/vulkanmod/render/engine/VkGpuBuffer$MappedView
+     209: dup
+     210: iconst_0
+     211: aload         6
+     213: invokespecial #657                // Method net/vulkanmod/render/engine/VkGpuBuffer$MappedView."<init>":(ILjava/nio/ByteBuffer;)V
+     216: areturn
+
+  public void copyToBuffer(com.mojang.blaze3d.buffers.GpuBufferSlice, com.mojang.blaze3d.buffers.GpuBufferSlice);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: aload_1
+      19: invokevirtual #480                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.buffer:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      22: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      25: astore_3
+      26: aload_3
+      27: getfield      #483                // Field net/vulkanmod/render/engine/VkGpuBuffer.closed:Z
+      30: ifeq          44
+      33: new           #146                // class java/lang/IllegalStateException
+      36: dup
+      37: ldc_w         #663                // String Source buffer already closed
+      40: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      43: athrow
+      44: aload_3
+      45: invokevirtual #633                // Method net/vulkanmod/render/engine/VkGpuBuffer.usage:()I
+      48: bipush        8
+      50: iand
+      51: ifne          65
+      54: new           #146                // class java/lang/IllegalStateException
+      57: dup
+      58: ldc_w         #665                // String Source buffer needs USAGE_COPY_DST to be a destination for a copy
+      61: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      64: athrow
+      65: aload_2
+      66: invokevirtual #480                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.buffer:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      69: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      72: astore        4
+      74: aload         4
+      76: getfield      #483                // Field net/vulkanmod/render/engine/VkGpuBuffer.closed:Z
+      79: ifeq          93
+      82: new           #146                // class java/lang/IllegalStateException
+      85: dup
+      86: ldc_w         #667                // String Target buffer already closed
+      89: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      92: athrow
+      93: aload         4
+      95: invokevirtual #633                // Method net/vulkanmod/render/engine/VkGpuBuffer.usage:()I
+      98: bipush        8
+     100: iand
+     101: ifne          115
+     104: new           #146                // class java/lang/IllegalStateException
+     107: dup
+     108: ldc_w         #669                // String Target buffer needs USAGE_COPY_DST to be a destination for a copy
+     111: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     114: athrow
+     115: aload_1
+     116: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     119: aload_2
+     120: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     123: lcmp
+     124: ifeq          152
+     127: aload_1
+     128: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     131: lstore        5
+     133: new           #499                // class java/lang/IllegalArgumentException
+     136: dup
+     137: lload         5
+     139: aload_2
+     140: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     143: invokedynamic #674,  0            // InvokeDynamic #2:makeConcatWithConstants:(JJ)Ljava/lang/String;
+     148: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     151: athrow
+     152: aload_1
+     153: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     156: aload_1
+     157: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     160: ladd
+     161: aload_3
+     162: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+     165: lcmp
+     166: ifle          198
+     169: aload_1
+     170: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     173: lstore        5
+     175: new           #499                // class java/lang/IllegalArgumentException
+     178: dup
+     179: lload         5
+     181: aload_1
+     182: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     185: aload_3
+     186: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+     189: invokedynamic #677,  0            // InvokeDynamic #3:makeConcatWithConstants:(JJJ)Ljava/lang/String;
+     194: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     197: athrow
+     198: aload_2
+     199: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     202: aload_2
+     203: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     206: ladd
+     207: aload         4
+     209: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+     212: lcmp
+     213: ifle          246
+     216: aload_2
+     217: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     220: lstore        5
+     222: new           #499                // class java/lang/IllegalArgumentException
+     225: dup
+     226: lload         5
+     228: aload_2
+     229: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     232: aload         4
+     234: invokevirtual #497                // Method net/vulkanmod/render/engine/VkGpuBuffer.size:()J
+     237: invokedynamic #680,  0            // InvokeDynamic #4:makeConcatWithConstants:(JJJ)Ljava/lang/String;
+     242: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     245: athrow
+     246: new           #682                // class java/lang/UnsupportedOperationException
+     249: dup
+     250: invokespecial #683                // Method java/lang/UnsupportedOperationException."<init>":()V
+     253: athrow
+
+  public void writeToTexture(com.mojang.blaze3d.textures.GpuTexture, net.minecraft.class_1011);
+    Code:
+       0: aload_1
+       1: iconst_0
+       2: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+       5: istore_3
+       6: aload_1
+       7: iconst_0
+       8: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      11: istore        4
+      13: aload_2
+      14: invokevirtual #694                // Method net/minecraft/class_1011.method_4307:()I
+      17: iload_3
+      18: if_icmpne     30
+      21: aload_2
+      22: invokevirtual #697                // Method net/minecraft/class_1011.method_4323:()I
+      25: iload         4
+      27: if_icmpeq     54
+      30: new           #499                // class java/lang/IllegalArgumentException
+      33: dup
+      34: iload_3
+      35: iload         4
+      37: aload_2
+      38: invokevirtual #694                // Method net/minecraft/class_1011.method_4307:()I
+      41: aload_2
+      42: invokevirtual #697                // Method net/minecraft/class_1011.method_4323:()I
+      45: invokedynamic #702,  0            // InvokeDynamic #5:makeConcatWithConstants:(IIII)Ljava/lang/String;
+      50: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      53: athrow
+      54: aload_1
+      55: invokevirtual #703                // Method com/mojang/blaze3d/textures/GpuTexture.isClosed:()Z
+      58: ifeq          72
+      61: new           #146                // class java/lang/IllegalStateException
+      64: dup
+      65: ldc_w         #705                // String Destination texture is closed
+      68: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      71: athrow
+      72: aload_0
+      73: aload_1
+      74: aload_2
+      75: iconst_0
+      76: iconst_0
+      77: iconst_0
+      78: iconst_0
+      79: iload_3
+      80: iload         4
+      82: iconst_0
+      83: iconst_0
+      84: invokevirtual #708                // Method writeToTexture:(Lcom/mojang/blaze3d/textures/GpuTexture;Lnet/minecraft/class_1011;IIIIIIII)V
+      87: return
+
+  public void writeToTexture(com.mojang.blaze3d.textures.GpuTexture, net.minecraft.class_1011, int, int, int, int, int, int, int, int);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: iload_3
+      19: iflt          206
+      22: iload_3
+      23: aload_1
+      24: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+      27: if_icmpge     206
+      30: iload         9
+      32: iload         7
+      34: iadd
+      35: aload_2
+      36: invokevirtual #694                // Method net/minecraft/class_1011.method_4307:()I
+      39: if_icmpgt     54
+      42: iload         10
+      44: iload         8
+      46: iadd
+      47: aload_2
+      48: invokevirtual #697                // Method net/minecraft/class_1011.method_4323:()I
+      51: if_icmple     83
+      54: new           #499                // class java/lang/IllegalArgumentException
+      57: dup
+      58: aload_2
+      59: invokevirtual #694                // Method net/minecraft/class_1011.method_4307:()I
+      62: aload_2
+      63: invokevirtual #697                // Method net/minecraft/class_1011.method_4323:()I
+      66: iload         7
+      68: iload         8
+      70: iload         9
+      72: iload         10
+      74: invokedynamic #723,  0            // InvokeDynamic #6:makeConcatWithConstants:(IIIIII)Ljava/lang/String;
+      79: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      82: athrow
+      83: iload         5
+      85: iload         7
+      87: iadd
+      88: aload_1
+      89: iload_3
+      90: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+      93: if_icmpgt     109
+      96: iload         6
+      98: iload         8
+     100: iadd
+     101: aload_1
+     102: iload_3
+     103: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+     106: if_icmple     135
+     109: new           #499                // class java/lang/IllegalArgumentException
+     112: dup
+     113: iload         7
+     115: iload         8
+     117: iload         7
+     119: iload         8
+     121: iload         5
+     123: iload         6
+     125: iload_3
+     126: invokedynamic #728,  0            // InvokeDynamic #7:makeConcatWithConstants:(IIIIIII)Ljava/lang/String;
+     131: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     134: athrow
+     135: aload_1
+     136: invokevirtual #703                // Method com/mojang/blaze3d/textures/GpuTexture.isClosed:()Z
+     139: ifeq          153
+     142: new           #146                // class java/lang/IllegalStateException
+     145: dup
+     146: ldc_w         #705                // String Destination texture is closed
+     149: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     152: athrow
+     153: iconst_0
+     154: invokestatic  #733                // Method net/vulkanmod/vulkan/texture/VTextureSelector.setActiveTexture:(I)V
+     157: aload_1
+     158: checkcast     #735                // class net/minecraft/class_10868
+     161: invokevirtual #736                // Method net/minecraft/class_10868.method_68427:()I
+     164: invokestatic  #742                // Method net/vulkanmod/gl/VkGlTexture.getTexture:(I)Lnet/vulkanmod/gl/VkGlTexture;
+     167: astore        11
+     169: aload         11
+     171: invokevirtual #743                // Method net/vulkanmod/gl/VkGlTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     174: invokestatic  #747                // Method net/vulkanmod/vulkan/texture/VTextureSelector.bindTexture:(Lnet/vulkanmod/vulkan/texture/VulkanImage;)V
+     177: iload_3
+     178: iload         4
+     180: iload         7
+     182: iload         8
+     184: iload         5
+     186: iload         6
+     188: iload         10
+     190: iload         9
+     192: aload_2
+     193: invokevirtual #694                // Method net/minecraft/class_1011.method_4307:()I
+     196: aload_2
+     197: invokevirtual #750                // Method net/minecraft/class_1011.method_67769:()J
+     200: invokestatic  #754                // Method net/vulkanmod/vulkan/texture/VTextureSelector.uploadSubTexture:(IIIIIIIIIJ)V
+     203: goto          224
+     206: new           #499                // class java/lang/IllegalArgumentException
+     209: dup
+     210: iload_3
+     211: aload_1
+     212: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+     215: invokedynamic #759,  0            // InvokeDynamic #8:makeConcatWithConstants:(II)Ljava/lang/String;
+     220: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     223: athrow
+     224: return
+
+  public void writeToTexture(com.mojang.blaze3d.textures.GpuTexture, java.nio.ByteBuffer, net.minecraft.class_1011$class_1012, int, int, int, int, int, int);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: iload         4
+      20: iflt          268
+      23: iload         4
+      25: aload_1
+      26: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+      29: if_icmpge     268
+      32: iload         8
+      34: iload         9
+      36: imul
+      37: aload_3
+      38: invokevirtual #766                // Method net/minecraft/class_1011$class_1012.method_4335:()I
+      41: imul
+      42: aload_2
+      43: invokevirtual #490                // Method java/nio/ByteBuffer.remaining:()I
+      46: if_icmple     74
+      49: new           #499                // class java/lang/IllegalArgumentException
+      52: dup
+      53: aload_2
+      54: invokevirtual #490                // Method java/nio/ByteBuffer.remaining:()I
+      57: iload         8
+      59: iload         9
+      61: aload_3
+      62: invokestatic  #772                // Method java/lang/String.valueOf:(Ljava/lang/Object;)Ljava/lang/String;
+      65: invokedynamic #777,  0            // InvokeDynamic #9:makeConcatWithConstants:(IIILjava/lang/String;)Ljava/lang/String;
+      70: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      73: athrow
+      74: iload         6
+      76: iload         8
+      78: iadd
+      79: aload_1
+      80: iload         4
+      82: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+      85: if_icmpgt     102
+      88: iload         7
+      90: iload         9
+      92: iadd
+      93: aload_1
+      94: iload         4
+      96: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      99: if_icmple     135
+     102: new           #499                // class java/lang/IllegalArgumentException
+     105: dup
+     106: aload_1
+     107: iload         4
+     109: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+     112: aload_1
+     113: iload         4
+     115: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+     118: iload         8
+     120: iload         9
+     122: iload         6
+     124: iload         7
+     126: invokedynamic #780,  0            // InvokeDynamic #10:makeConcatWithConstants:(IIIIII)Ljava/lang/String;
+     131: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     134: athrow
+     135: aload_1
+     136: invokevirtual #703                // Method com/mojang/blaze3d/textures/GpuTexture.isClosed:()Z
+     139: ifeq          153
+     142: new           #146                // class java/lang/IllegalStateException
+     145: dup
+     146: ldc_w         #705                // String Destination texture is closed
+     149: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     152: athrow
+     153: aload_1
+     154: invokevirtual #781                // Method com/mojang/blaze3d/textures/GpuTexture.usage:()I
+     157: iconst_1
+     158: iand
+     159: ifne          173
+     162: new           #146                // class java/lang/IllegalStateException
+     165: dup
+     166: ldc_w         #783                // String Color texture must have USAGE_COPY_DST to be a destination for a write
+     169: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     172: athrow
+     173: iload         5
+     175: aload_1
+     176: invokevirtual #786                // Method com/mojang/blaze3d/textures/GpuTexture.getDepthOrLayers:()I
+     179: if_icmplt     199
+     182: new           #682                // class java/lang/UnsupportedOperationException
+     185: dup
+     186: aload_1
+     187: invokevirtual #786                // Method com/mojang/blaze3d/textures/GpuTexture.getDepthOrLayers:()I
+     190: invokedynamic #791,  0            // InvokeDynamic #11:makeConcatWithConstants:(I)Ljava/lang/String;
+     195: invokespecial #792                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+     198: athrow
+     199: aload_1
+     200: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+     203: getfield      #795                // Field net/vulkanmod/render/engine/VkGpuTexture.id:I
+     206: invokestatic  #798                // Method com/mojang/blaze3d/opengl/GlStateManager._bindTexture:(I)V
+     209: sipush        3314
+     212: iload         8
+     214: invokestatic  #801                // Method com/mojang/blaze3d/opengl/GlStateManager._pixelStore:(II)V
+     217: sipush        3316
+     220: iconst_0
+     221: invokestatic  #801                // Method com/mojang/blaze3d/opengl/GlStateManager._pixelStore:(II)V
+     224: sipush        3315
+     227: iconst_0
+     228: invokestatic  #801                // Method com/mojang/blaze3d/opengl/GlStateManager._pixelStore:(II)V
+     231: sipush        3317
+     234: aload_3
+     235: invokevirtual #766                // Method net/minecraft/class_1011$class_1012.method_4335:()I
+     238: invokestatic  #801                // Method com/mojang/blaze3d/opengl/GlStateManager._pixelStore:(II)V
+     241: sipush        3553
+     244: iload         4
+     246: iload         6
+     248: iload         7
+     250: iload         8
+     252: iload         9
+     254: aload_3
+     255: invokestatic  #807                // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lnet/minecraft/class_1011$class_1012;)I
+     258: sipush        5121
+     261: aload_2
+     262: invokestatic  #811                // Method com/mojang/blaze3d/opengl/GlStateManager._texSubImage2D:(IIIIIIIILjava/nio/ByteBuffer;)V
+     265: goto          285
+     268: new           #499                // class java/lang/IllegalArgumentException
+     271: dup
+     272: aload_1
+     273: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+     276: invokedynamic #814,  0            // InvokeDynamic #12:makeConcatWithConstants:(I)Ljava/lang/String;
+     281: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     284: athrow
+     285: return
+
+  public void copyTextureToBuffer(com.mojang.blaze3d.textures.GpuTexture, com.mojang.blaze3d.buffers.GpuBuffer, long, java.lang.Runnable, int);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: aload_0
+      19: aload_1
+      20: aload_2
+      21: lload_3
+      22: aload         5
+      24: iload         6
+      26: iconst_0
+      27: iconst_0
+      28: aload_1
+      29: iload         6
+      31: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+      34: aload_1
+      35: iload         6
+      37: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      40: invokevirtual #821                // Method copyTextureToBuffer:(Lcom/mojang/blaze3d/textures/GpuTexture;Lcom/mojang/blaze3d/buffers/GpuBuffer;JLjava/lang/Runnable;IIIII)V
+      43: return
+
+  public void copyTextureToBuffer(com.mojang.blaze3d.textures.GpuTexture, com.mojang.blaze3d.buffers.GpuBuffer, long, java.lang.Runnable, int, int, int, int, int);
+    Code:
+       0: aload_2
+       1: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+       4: astore        11
+       6: aload_1
+       7: checkcast     #316                // class net/vulkanmod/render/engine/VkGpuTexture
+      10: astore        12
+      12: aload_0
+      13: getfield      #144                // Field inRenderPass:Z
+      16: ifeq          30
+      19: new           #146                // class java/lang/IllegalStateException
+      22: dup
+      23: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      26: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      29: athrow
+      30: iload         6
+      32: iflt          242
+      35: iload         6
+      37: aload_1
+      38: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+      41: if_icmpge     242
+      44: aload_1
+      45: iload         6
+      47: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+      50: aload_1
+      51: iload         6
+      53: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      56: imul
+      57: aload         12
+      59: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      62: getfield      #828                // Field net/vulkanmod/vulkan/texture/VulkanImage.formatSize:I
+      65: imul
+      66: i2l
+      67: lload_3
+      68: ladd
+      69: aload_2
+      70: invokevirtual #829                // Method com/mojang/blaze3d/buffers/GpuBuffer.size:()J
+      73: lcmp
+      74: ifle          107
+      77: new           #499                // class java/lang/IllegalArgumentException
+      80: dup
+      81: aload_2
+      82: invokevirtual #829                // Method com/mojang/blaze3d/buffers/GpuBuffer.size:()J
+      85: iload         9
+      87: iload         10
+      89: aload         12
+      91: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      94: getfield      #828                // Field net/vulkanmod/vulkan/texture/VulkanImage.formatSize:I
+      97: lload_3
+      98: invokedynamic #834,  0            // InvokeDynamic #13:makeConcatWithConstants:(JIIIJ)Ljava/lang/String;
+     103: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     106: athrow
+     107: iload         7
+     109: iload         9
+     111: iadd
+     112: aload_1
+     113: iload         6
+     115: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+     118: if_icmpgt     135
+     121: iload         8
+     123: iload         10
+     125: iadd
+     126: aload_1
+     127: iload         6
+     129: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+     132: if_icmple     168
+     135: new           #499                // class java/lang/IllegalArgumentException
+     138: dup
+     139: aload_1
+     140: iload         6
+     142: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+     145: aload_1
+     146: iload         6
+     148: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+     151: iload         9
+     153: iload         10
+     155: iload         7
+     157: iload         8
+     159: invokedynamic #837,  0            // InvokeDynamic #14:makeConcatWithConstants:(IIIIII)Ljava/lang/String;
+     164: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     167: athrow
+     168: aload_1
+     169: invokevirtual #703                // Method com/mojang/blaze3d/textures/GpuTexture.isClosed:()Z
+     172: ifeq          186
+     175: new           #146                // class java/lang/IllegalStateException
+     178: dup
+     179: ldc_w         #839                // String Source texture is closed
+     182: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     185: athrow
+     186: aload_2
+     187: invokevirtual #840                // Method com/mojang/blaze3d/buffers/GpuBuffer.isClosed:()Z
+     190: ifeq          204
+     193: new           #146                // class java/lang/IllegalStateException
+     196: dup
+     197: ldc_w         #842                // String Destination buffer is closed
+     200: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     203: athrow
+     204: aload         12
+     206: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     209: aload         11
+     211: invokevirtual #646                // Method net/vulkanmod/render/engine/VkGpuBuffer.getBuffer:()Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+     214: iload         6
+     216: iload         9
+     218: iload         10
+     220: iload         7
+     222: iload         8
+     224: lload_3
+     225: iload         9
+     227: iload         10
+     229: invokestatic  #848                // Method net/vulkanmod/vulkan/texture/ImageUtil.copyImageToBuffer:(Lnet/vulkanmod/vulkan/texture/VulkanImage;Lnet/vulkanmod/vulkan/memory/buffer/Buffer;IIIIIJII)V
+     232: aload         5
+     234: invokeinterface #853,  1          // InterfaceMethod java/lang/Runnable.run:()V
+     239: goto          261
+     242: new           #499                // class java/lang/IllegalArgumentException
+     245: dup
+     246: iload         6
+     248: aload_1
+     249: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+     252: invokedynamic #759,  0            // InvokeDynamic #8:makeConcatWithConstants:(II)Ljava/lang/String;
+     257: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     260: athrow
+     261: return
+
+  public void copyTextureToTexture(com.mojang.blaze3d.textures.GpuTexture, com.mojang.blaze3d.textures.GpuTexture, int, int, int, int, int, int, int);
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: iload_3
+      19: iflt          188
+      22: iload_3
+      23: aload_1
+      24: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+      27: if_icmpge     188
+      30: iload_3
+      31: aload_2
+      32: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+      35: if_icmpge     188
+      38: iload         4
+      40: iload         8
+      42: iadd
+      43: aload_2
+      44: iload_3
+      45: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+      48: if_icmpgt     64
+      51: iload         5
+      53: iload         9
+      55: iadd
+      56: aload_2
+      57: iload_3
+      58: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      61: if_icmple     95
+      64: new           #499                // class java/lang/IllegalArgumentException
+      67: dup
+      68: aload_2
+      69: iload_3
+      70: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+      73: aload_2
+      74: iload_3
+      75: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+      78: iload         8
+      80: iload         9
+      82: iload         4
+      84: iload         5
+      86: invokedynamic #780,  0            // InvokeDynamic #10:makeConcatWithConstants:(IIIIII)Ljava/lang/String;
+      91: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+      94: athrow
+      95: iload         6
+      97: iload         8
+      99: iadd
+     100: aload_1
+     101: iload_3
+     102: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+     105: if_icmpgt     121
+     108: iload         7
+     110: iload         9
+     112: iadd
+     113: aload_1
+     114: iload_3
+     115: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+     118: if_icmple     152
+     121: new           #499                // class java/lang/IllegalArgumentException
+     124: dup
+     125: aload_1
+     126: iload_3
+     127: invokevirtual #691                // Method com/mojang/blaze3d/textures/GpuTexture.getWidth:(I)I
+     130: aload_1
+     131: iload_3
+     132: invokevirtual #462                // Method com/mojang/blaze3d/textures/GpuTexture.getHeight:(I)I
+     135: iload         8
+     137: iload         9
+     139: iload         6
+     141: iload         7
+     143: invokedynamic #863,  0            // InvokeDynamic #15:makeConcatWithConstants:(IIIIII)Ljava/lang/String;
+     148: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     151: athrow
+     152: aload_1
+     153: invokevirtual #703                // Method com/mojang/blaze3d/textures/GpuTexture.isClosed:()Z
+     156: ifeq          170
+     159: new           #146                // class java/lang/IllegalStateException
+     162: dup
+     163: ldc_w         #839                // String Source texture is closed
+     166: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     169: athrow
+     170: aload_2
+     171: invokevirtual #703                // Method com/mojang/blaze3d/textures/GpuTexture.isClosed:()Z
+     174: ifeq          210
+     177: new           #146                // class java/lang/IllegalStateException
+     180: dup
+     181: ldc_w         #705                // String Destination texture is closed
+     184: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     187: athrow
+     188: new           #499                // class java/lang/IllegalArgumentException
+     191: dup
+     192: iload_3
+     193: aload_1
+     194: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+     197: aload_2
+     198: invokevirtual #718                // Method com/mojang/blaze3d/textures/GpuTexture.getMipLevels:()I
+     201: invokedynamic #868,  0            // InvokeDynamic #16:makeConcatWithConstants:(III)Ljava/lang/String;
+     206: invokespecial #515                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     209: athrow
+     210: return
+
+  public com.mojang.blaze3d.buffers.GpuFence createFence();
+    Code:
+       0: aload_0
+       1: getfield      #144                // Field inRenderPass:Z
+       4: ifeq          18
+       7: new           #146                // class java/lang/IllegalStateException
+      10: dup
+      11: ldc_w         #474                // String Close the existing render pass before performing additional commands
+      14: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      17: athrow
+      18: new           #11                 // class net/vulkanmod/render/engine/VkCommandEncoder$1
+      21: dup
+      22: aload_0
+      23: invokespecial #873                // Method net/vulkanmod/render/engine/VkCommandEncoder$1."<init>":(Lnet/vulkanmod/render/engine/VkCommandEncoder;)V
+      26: areturn
+
+  public com.mojang.blaze3d.systems.GpuQuery timerQueryBegin();
+    Code:
+       0: aconst_null
+       1: areturn
+
+  public void timerQueryEnd(com.mojang.blaze3d.systems.GpuQuery);
+    Code:
+       0: return
+
+  public void presentTexture(com.mojang.blaze3d.textures.GpuTextureView);
+    Code:
+       0: new           #682                // class java/lang/UnsupportedOperationException
+       3: dup
+       4: invokespecial #683                // Method java/lang/UnsupportedOperationException."<init>":()V
+       7: athrow
+
+  protected <T> void executeDrawMultiple(net.vulkanmod.render.engine.VkRenderPass, java.util.Collection<com.mojang.blaze3d.systems.RenderPass$class_10884<T>>, com.mojang.blaze3d.buffers.GpuBuffer, com.mojang.blaze3d.vertex.VertexFormat$class_5595, java.util.Collection<java.lang.String>, T);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #893                // Method trySetup:(Lnet/vulkanmod/render/engine/VkRenderPass;)Z
+       5: ifeq          270
+       8: aload         4
+      10: ifnonnull     18
+      13: getstatic     #897                // Field com/mojang/blaze3d/vertex/VertexFormat$class_5595.field_27372:Lcom/mojang/blaze3d/vertex/VertexFormat$class_5595;
+      16: astore        4
+      18: aload_1
+      19: invokevirtual #901                // Method net/vulkanmod/render/engine/VkRenderPass.getPipeline:()Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+      22: invokestatic  #907                // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.of:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lnet/vulkanmod/interfaces/shader/ExtendedRenderPipeline;
+      25: invokeinterface #910,  1          // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.getPipeline:()Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;
+      30: astore        7
+      32: aload_2
+      33: invokeinterface #916,  1          // InterfaceMethod java/util/Collection.iterator:()Ljava/util/Iterator;
+      38: astore        8
+      40: aload         8
+      42: invokeinterface #923,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      47: ifeq          270
+      50: aload         8
+      52: invokeinterface #927,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      57: checkcast     #54                 // class com/mojang/blaze3d/systems/RenderPass$class_10884
+      60: astore        9
+      62: aload         9
+      64: invokevirtual #931                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3807:()Lcom/mojang/blaze3d/vertex/VertexFormat$class_5595;
+      67: ifnonnull     75
+      70: aload         4
+      72: goto          80
+      75: aload         9
+      77: invokevirtual #931                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3807:()Lcom/mojang/blaze3d/vertex/VertexFormat$class_5595;
+      80: astore        10
+      82: aload_1
+      83: aload         9
+      85: invokevirtual #934                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3806:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      88: ifnonnull     95
+      91: aload_3
+      92: goto          100
+      95: aload         9
+      97: invokevirtual #934                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3806:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     100: aload         10
+     102: invokevirtual #938                // Method net/vulkanmod/render/engine/VkRenderPass.setIndexBuffer:(Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/vertex/VertexFormat$class_5595;)V
+     105: aload_1
+     106: aload         9
+     108: invokevirtual #941                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3804:()I
+     111: aload         9
+     113: invokevirtual #944                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3805:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     116: invokevirtual #948                // Method net/vulkanmod/render/engine/VkRenderPass.setVertexBuffer:(ILcom/mojang/blaze3d/buffers/GpuBuffer;)V
+     119: getstatic     #953                // Field net/minecraft/class_10866.field_57867:Z
+     122: ifeq          207
+     125: aload_1
+     126: getfield      #955                // Field net/vulkanmod/render/engine/VkRenderPass.indexBuffer:Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     129: ifnonnull     143
+     132: new           #146                // class java/lang/IllegalStateException
+     135: dup
+     136: ldc_w         #957                // String Missing index buffer
+     139: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     142: athrow
+     143: aload_1
+     144: getfield      #955                // Field net/vulkanmod/render/engine/VkRenderPass.indexBuffer:Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     147: invokevirtual #840                // Method com/mojang/blaze3d/buffers/GpuBuffer.isClosed:()Z
+     150: ifeq          164
+     153: new           #146                // class java/lang/IllegalStateException
+     156: dup
+     157: ldc_w         #959                // String Index buffer has been closed!
+     160: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     163: athrow
+     164: aload_1
+     165: getfield      #963                // Field net/vulkanmod/render/engine/VkRenderPass.vertexBuffers:[Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     168: iconst_0
+     169: aaload
+     170: ifnonnull     184
+     173: new           #146                // class java/lang/IllegalStateException
+     176: dup
+     177: ldc_w         #965                // String Missing vertex buffer at slot 0
+     180: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     183: athrow
+     184: aload_1
+     185: getfield      #963                // Field net/vulkanmod/render/engine/VkRenderPass.vertexBuffers:[Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     188: iconst_0
+     189: aaload
+     190: invokevirtual #840                // Method com/mojang/blaze3d/buffers/GpuBuffer.isClosed:()Z
+     193: ifeq          207
+     196: new           #146                // class java/lang/IllegalStateException
+     199: dup
+     200: ldc_w         #967                // String Vertex buffer at slot 0 has been closed!
+     203: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     206: athrow
+     207: aload         9
+     209: invokevirtual #971                // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3810:()Ljava/util/function/BiConsumer;
+     212: astore        11
+     214: aload         11
+     216: ifnull        244
+     219: aload         11
+     221: aload         6
+     223: aload_1
+     224: aload         7
+     226: invokedynamic #989,  0            // InvokeDynamic #17:upload:(Lnet/vulkanmod/render/engine/VkRenderPass;Lnet/vulkanmod/vulkan/shader/Pipeline;)Lcom/mojang/blaze3d/systems/RenderPass$class_10885;
+     231: invokeinterface #995,  3          // InterfaceMethod java/util/function/BiConsumer.accept:(Ljava/lang/Object;Ljava/lang/Object;)V
+     236: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+     239: aload         7
+     241: invokevirtual #999                // Method net/vulkanmod/vulkan/Renderer.uploadAndBindUBOs:(Lnet/vulkanmod/vulkan/shader/Pipeline;)V
+     244: aload_0
+     245: aload_1
+     246: iconst_0
+     247: aload         9
+     249: invokevirtual #1002               // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3808:()I
+     252: aload         9
+     254: invokevirtual #1005               // Method com/mojang/blaze3d/systems/RenderPass$class_10884.comp_3809:()I
+     257: aload         10
+     259: aload_1
+     260: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+     263: iconst_1
+     264: invokevirtual #1012               // Method drawFromBuffers:(Lnet/vulkanmod/render/engine/VkRenderPass;IIILcom/mojang/blaze3d/vertex/VertexFormat$class_5595;Lcom/mojang/blaze3d/pipeline/RenderPipeline;I)V
+     267: goto          40
+     270: return
+
+  protected void executeDraw(net.vulkanmod.render.engine.VkRenderPass, int, int, int, com.mojang.blaze3d.vertex.VertexFormat$class_5595, int);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #893                // Method trySetup:(Lnet/vulkanmod/render/engine/VkRenderPass;)Z
+       5: ifeq          118
+       8: getstatic     #953                // Field net/minecraft/class_10866.field_57867:Z
+      11: ifeq          101
+      14: aload         5
+      16: ifnull        58
+      19: aload_1
+      20: getfield      #955                // Field net/vulkanmod/render/engine/VkRenderPass.indexBuffer:Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      23: ifnonnull     37
+      26: new           #146                // class java/lang/IllegalStateException
+      29: dup
+      30: ldc_w         #957                // String Missing index buffer
+      33: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      36: athrow
+      37: aload_1
+      38: getfield      #955                // Field net/vulkanmod/render/engine/VkRenderPass.indexBuffer:Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      41: invokevirtual #840                // Method com/mojang/blaze3d/buffers/GpuBuffer.isClosed:()Z
+      44: ifeq          58
+      47: new           #146                // class java/lang/IllegalStateException
+      50: dup
+      51: ldc_w         #959                // String Index buffer has been closed!
+      54: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      57: athrow
+      58: aload_1
+      59: getfield      #963                // Field net/vulkanmod/render/engine/VkRenderPass.vertexBuffers:[Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      62: iconst_0
+      63: aaload
+      64: ifnonnull     78
+      67: new           #146                // class java/lang/IllegalStateException
+      70: dup
+      71: ldc_w         #965                // String Missing vertex buffer at slot 0
+      74: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      77: athrow
+      78: aload_1
+      79: getfield      #963                // Field net/vulkanmod/render/engine/VkRenderPass.vertexBuffers:[Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      82: iconst_0
+      83: aaload
+      84: invokevirtual #840                // Method com/mojang/blaze3d/buffers/GpuBuffer.isClosed:()Z
+      87: ifeq          101
+      90: new           #146                // class java/lang/IllegalStateException
+      93: dup
+      94: ldc_w         #967                // String Vertex buffer at slot 0 has been closed!
+      97: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     100: athrow
+     101: aload_0
+     102: aload_1
+     103: iload_2
+     104: iload_3
+     105: iload         4
+     107: aload         5
+     109: aload_1
+     110: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+     113: iload         6
+     115: invokevirtual #1012               // Method drawFromBuffers:(Lnet/vulkanmod/render/engine/VkRenderPass;IIILcom/mojang/blaze3d/vertex/VertexFormat$class_5595;Lcom/mojang/blaze3d/pipeline/RenderPipeline;I)V
+     118: return
+
+  public void drawFromBuffers(net.vulkanmod.render.engine.VkRenderPass, int, int, int, com.mojang.blaze3d.vertex.VertexFormat$class_5595, com.mojang.blaze3d.pipeline.RenderPipeline, int);
+    Code:
+       0: iload         7
+       2: iconst_1
+       3: if_icmpge     9
+       6: iconst_1
+       7: istore        7
+       9: iload_2
+      10: ifge          15
+      13: iconst_0
+      14: istore_2
+      15: invokestatic  #1035               // Method net/vulkanmod/vulkan/Renderer.getCommandBuffer:()Lorg/lwjgl/vulkan/VkCommandBuffer;
+      18: astore        8
+      20: aload_1
+      21: getfield      #963                // Field net/vulkanmod/render/engine/VkRenderPass.vertexBuffers:[Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      24: iconst_0
+      25: aaload
+      26: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      29: astore        9
+      31: invokestatic  #388                // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+      34: astore        10
+      36: aload         9
+      38: ifnull        71
+      41: aload         8
+      43: iconst_0
+      44: aload         10
+      46: aload         9
+      48: getfield      #559                // Field net/vulkanmod/render/engine/VkGpuBuffer.buffer:Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+      51: invokevirtual #564                // Method net/vulkanmod/vulkan/memory/buffer/Buffer.getId:()J
+      54: invokevirtual #1039               // Method org/lwjgl/system/MemoryStack.longs:(J)Ljava/nio/LongBuffer;
+      57: aload         10
+      59: aload         9
+      61: getfield      #1041               // Field net/vulkanmod/render/engine/VkGpuBuffer.offset:I
+      64: i2l
+      65: invokevirtual #1039               // Method org/lwjgl/system/MemoryStack.longs:(J)Ljava/nio/LongBuffer;
+      68: invokestatic  #1047               // Method org/lwjgl/vulkan/VK11.vkCmdBindVertexBuffers:(Lorg/lwjgl/vulkan/VkCommandBuffer;ILjava/nio/LongBuffer;Ljava/nio/LongBuffer;)V
+      71: aload_1
+      72: getfield      #955                // Field net/vulkanmod/render/engine/VkRenderPass.indexBuffer:Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      75: ifnull        177
+      78: aload_1
+      79: getfield      #955                // Field net/vulkanmod/render/engine/VkRenderPass.indexBuffer:Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      82: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      85: astore        11
+      87: getstatic     #1053               // Field net/vulkanmod/render/engine/VkCommandEncoder$2.$SwitchMap$com$mojang$blaze3d$vertex$VertexFormat$IndexType:[I
+      90: aload         5
+      92: invokevirtual #1056               // Method com/mojang/blaze3d/vertex/VertexFormat$class_5595.ordinal:()I
+      95: iaload
+      96: lookupswitch  { // 2
+
+                     1: 134
+
+                     2: 138
+               default: 124
+          }
+     124: new           #1058               // class java/lang/MatchException
+     127: dup
+     128: aconst_null
+     129: aconst_null
+     130: invokespecial #1061               // Method java/lang/MatchException."<init>":(Ljava/lang/String;Ljava/lang/Throwable;)V
+     133: athrow
+     134: iconst_0
+     135: goto          139
+     138: iconst_1
+     139: istore        12
+     141: aload         8
+     143: aload         11
+     145: getfield      #559                // Field net/vulkanmod/render/engine/VkGpuBuffer.buffer:Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+     148: invokevirtual #564                // Method net/vulkanmod/vulkan/memory/buffer/Buffer.getId:()J
+     151: aload         11
+     153: getfield      #1041               // Field net/vulkanmod/render/engine/VkGpuBuffer.offset:I
+     156: i2l
+     157: iload         12
+     159: invokestatic  #1065               // Method org/lwjgl/vulkan/VK11.vkCmdBindIndexBuffer:(Lorg/lwjgl/vulkan/VkCommandBuffer;JJI)V
+     162: aload         8
+     164: iload         4
+     166: iload         7
+     168: iload_3
+     169: iload_2
+     170: iconst_0
+     171: invokestatic  #1068               // Method org/lwjgl/vulkan/VK11.vkCmdDrawIndexed:(Lorg/lwjgl/vulkan/VkCommandBuffer;IIIII)V
+     174: goto          257
+     177: invokestatic  #1072               // Method net/vulkanmod/vulkan/Renderer.getDrawer:()Lnet/vulkanmod/vulkan/Drawer;
+     180: aload         6
+     182: invokevirtual #1076               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getVertexFormatMode:()Lcom/mojang/blaze3d/vertex/VertexFormat$class_5596;
+     185: iload         4
+     187: invokevirtual #1082               // Method net/vulkanmod/vulkan/Drawer.getAutoIndexBuffer:(Lcom/mojang/blaze3d/vertex/VertexFormat$class_5596;I)Lnet/vulkanmod/vulkan/memory/buffer/index/AutoIndexBuffer;
+     190: astore        11
+     192: aload         11
+     194: ifnull        246
+     197: aload         11
+     199: iload         4
+     201: invokevirtual #1087               // Method net/vulkanmod/vulkan/memory/buffer/index/AutoIndexBuffer.getIndexCount:(I)I
+     204: istore        12
+     206: aload         8
+     208: aload         11
+     210: invokevirtual #1091               // Method net/vulkanmod/vulkan/memory/buffer/index/AutoIndexBuffer.getIndexBuffer:()Lnet/vulkanmod/vulkan/memory/buffer/IndexBuffer;
+     213: invokevirtual #1092               // Method net/vulkanmod/vulkan/memory/buffer/IndexBuffer.getId:()J
+     216: lconst_0
+     217: aload         11
+     219: invokevirtual #1091               // Method net/vulkanmod/vulkan/memory/buffer/index/AutoIndexBuffer.getIndexBuffer:()Lnet/vulkanmod/vulkan/memory/buffer/IndexBuffer;
+     222: getfield      #1095               // Field net/vulkanmod/vulkan/memory/buffer/IndexBuffer.indexType:Lnet/vulkanmod/vulkan/memory/buffer/IndexBuffer$IndexType;
+     225: getfield      #1098               // Field net/vulkanmod/vulkan/memory/buffer/IndexBuffer$IndexType.value:I
+     228: invokestatic  #1065               // Method org/lwjgl/vulkan/VK11.vkCmdBindIndexBuffer:(Lorg/lwjgl/vulkan/VkCommandBuffer;JJI)V
+     231: aload         8
+     233: iload         12
+     235: iload         7
+     237: iload_3
+     238: iload_2
+     239: iconst_0
+     240: invokestatic  #1068               // Method org/lwjgl/vulkan/VK11.vkCmdDrawIndexed:(Lorg/lwjgl/vulkan/VkCommandBuffer;IIIII)V
+     243: goto          257
+     246: aload         8
+     248: iload         4
+     250: iload         7
+     252: iload_2
+     253: iconst_0
+     254: invokestatic  #1102               // Method org/lwjgl/vulkan/VK11.vkCmdDraw:(Lorg/lwjgl/vulkan/VkCommandBuffer;IIII)V
+     257: aload         10
+     259: ifnull        297
+     262: aload         10
+     264: invokevirtual #399                // Method org/lwjgl/system/MemoryStack.close:()V
+     267: goto          297
+     270: astore        11
+     272: aload         10
+     274: ifnull        294
+     277: aload         10
+     279: invokevirtual #399                // Method org/lwjgl/system/MemoryStack.close:()V
+     282: goto          294
+     285: astore        12
+     287: aload         11
+     289: aload         12
+     291: invokevirtual #405                // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     294: aload         11
+     296: athrow
+     297: return
+    Exception table:
+       from    to  target type
+          36   257   270   Class java/lang/Throwable
+         277   282   285   Class java/lang/Throwable
+
+  public boolean trySetup(net.vulkanmod.render.engine.VkRenderPass);
+    Code:
+       0: getstatic     #1111               // Field net/vulkanmod/render/engine/VkRenderPass.VALIDATION:Z
+       3: ifeq          116
+       6: aload_1
+       7: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+      10: ifnonnull     24
+      13: new           #146                // class java/lang/IllegalStateException
+      16: dup
+      17: ldc_w         #1113               // String Can\'t draw without a render pipeline
+      20: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      23: athrow
+      24: aload_1
+      25: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+      28: invokevirtual #1117               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getUniforms:()Ljava/util/List;
+      31: invokeinterface #1120,  1         // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+      36: astore_2
+      37: aload_2
+      38: invokeinterface #923,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      43: ifeq          116
+      46: aload_2
+      47: invokeinterface #927,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      52: checkcast     #70                 // class com/mojang/blaze3d/pipeline/RenderPipeline$UniformDescription
+      55: astore_3
+      56: aload_1
+      57: getfield      #1124               // Field net/vulkanmod/render/engine/VkRenderPass.uniforms:Ljava/util/HashMap;
+      60: aload_3
+      61: invokevirtual #1128               // Method com/mojang/blaze3d/pipeline/RenderPipeline$UniformDescription.name:()Ljava/lang/String;
+      64: invokevirtual #1133               // Method java/util/HashMap.get:(Ljava/lang/Object;)Ljava/lang/Object;
+      67: astore        4
+      69: aload         4
+      71: ifnonnull     113
+      74: getstatic     #1139               // Field net/minecraft/class_5944.field_57863:Ljava/util/Set;
+      77: aload_3
+      78: invokevirtual #1128               // Method com/mojang/blaze3d/pipeline/RenderPipeline$UniformDescription.name:()Ljava/lang/String;
+      81: invokeinterface #1145,  2         // InterfaceMethod java/util/Set.contains:(Ljava/lang/Object;)Z
+      86: ifne          113
+      89: new           #146                // class java/lang/IllegalStateException
+      92: dup
+      93: aload_3
+      94: invokevirtual #1128               // Method com/mojang/blaze3d/pipeline/RenderPipeline$UniformDescription.name:()Ljava/lang/String;
+      97: aload_3
+      98: invokevirtual #1149               // Method com/mojang/blaze3d/pipeline/RenderPipeline$UniformDescription.type:()Lnet/minecraft/class_10789;
+     101: invokestatic  #772                // Method java/lang/String.valueOf:(Ljava/lang/Object;)Ljava/lang/String;
+     104: invokedynamic #1154,  0           // InvokeDynamic #18:makeConcatWithConstants:(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+     109: invokespecial #151                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+     112: athrow
+     113: goto          37
+     116: aload_0
+     117: aload_1
+     118: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+     121: invokevirtual #1158               // Method applyPipelineState:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)V
+     124: aload_0
+     125: aload_1
+     126: invokevirtual #1162               // Method setupUniforms:(Lnet/vulkanmod/render/engine/VkRenderPass;)V
+     129: aload_1
+     130: invokevirtual #1165               // Method net/vulkanmod/render/engine/VkRenderPass.isScissorEnabled:()Z
+     133: ifeq          161
+     136: invokestatic  #1168               // Method com/mojang/blaze3d/opengl/GlStateManager._enableScissorTest:()V
+     139: aload_1
+     140: invokevirtual #1171               // Method net/vulkanmod/render/engine/VkRenderPass.getScissorX:()I
+     143: aload_1
+     144: invokevirtual #1174               // Method net/vulkanmod/render/engine/VkRenderPass.getScissorY:()I
+     147: aload_1
+     148: invokevirtual #1177               // Method net/vulkanmod/render/engine/VkRenderPass.getScissorWidth:()I
+     151: aload_1
+     152: invokevirtual #1180               // Method net/vulkanmod/render/engine/VkRenderPass.getScissorHeight:()I
+     155: invokestatic  #1183               // Method com/mojang/blaze3d/opengl/GlStateManager._scissorBox:(IIII)V
+     158: goto          164
+     161: invokestatic  #240                // Method com/mojang/blaze3d/opengl/GlStateManager._disableScissorTest:()V
+     164: aload_0
+     165: aload_1
+     166: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+     169: invokevirtual #1187               // Method bindPipeline:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Z
+     172: ireturn
+
+  public void setupUniforms(net.vulkanmod.render.engine.VkRenderPass);
+    Code:
+       0: aload_1
+       1: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+       4: astore_2
+       5: aload_1
+       6: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+       9: invokestatic  #907                // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.of:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lnet/vulkanmod/interfaces/shader/ExtendedRenderPipeline;
+      12: invokeinterface #1193,  1         // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.getProgram:()Lnet/vulkanmod/render/engine/EGlProgram;
+      17: astore_3
+      18: aload_1
+      19: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+      22: invokestatic  #907                // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.of:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lnet/vulkanmod/interfaces/shader/ExtendedRenderPipeline;
+      25: invokeinterface #910,  1          // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.getPipeline:()Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;
+      30: astore        4
+      32: aload         4
+      34: invokevirtual #1196               // Method net/vulkanmod/vulkan/shader/Pipeline.getBuffers:()Ljava/util/List;
+      37: invokeinterface #1120,  1         // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+      42: astore        5
+      44: aload         5
+      46: invokeinterface #923,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      51: ifeq          177
+      54: aload         5
+      56: invokeinterface #927,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      61: checkcast     #1200               // class net/vulkanmod/vulkan/shader/descriptor/UBO
+      64: astore        6
+      66: aload         6
+      68: getfield      #1203               // Field net/vulkanmod/vulkan/shader/descriptor/UBO.name:Ljava/lang/String;
+      71: astore        7
+      73: aload_3
+      74: aload         7
+      76: invokevirtual #1207               // Method net/vulkanmod/render/engine/EGlProgram.getUniform:(Ljava/lang/String;)Lnet/minecraft/class_284;
+      79: astore        8
+      81: aload_1
+      82: getfield      #1124               // Field net/vulkanmod/render/engine/VkRenderPass.uniforms:Ljava/util/HashMap;
+      85: aload         7
+      87: invokevirtual #1133               // Method java/util/HashMap.get:(Ljava/lang/Object;)Ljava/lang/Object;
+      90: checkcast     #476                // class com/mojang/blaze3d/buffers/GpuBufferSlice
+      93: astore        9
+      95: aload         9
+      97: ifnonnull     115
+     100: aload         6
+     102: iconst_1
+     103: invokevirtual #1210               // Method net/vulkanmod/vulkan/shader/descriptor/UBO.setUseGlobalBuffer:(Z)V
+     106: aload         6
+     108: iconst_1
+     109: invokevirtual #1213               // Method net/vulkanmod/vulkan/shader/descriptor/UBO.setUpdate:(Z)V
+     112: goto          44
+     115: aload         9
+     117: invokevirtual #480                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.buffer:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+     120: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+     123: astore        10
+     125: getstatic     #1215               // Field $assertionsDisabled:Z
+     128: ifne          144
+     131: aload         6
+     133: ifnonnull     144
+     136: new           #1217               // class java/lang/AssertionError
+     139: dup
+     140: invokespecial #1218               // Method java/lang/AssertionError."<init>":()V
+     143: athrow
+     144: aload         6
+     146: iconst_0
+     147: invokevirtual #1210               // Method net/vulkanmod/vulkan/shader/descriptor/UBO.setUseGlobalBuffer:(Z)V
+     150: aload         6
+     152: invokevirtual #1222               // Method net/vulkanmod/vulkan/shader/descriptor/UBO.getBufferSlice:()Lnet/vulkanmod/vulkan/memory/buffer/BufferSlice;
+     155: aload         10
+     157: getfield      #559                // Field net/vulkanmod/render/engine/VkGpuBuffer.buffer:Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+     160: aload         9
+     162: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     165: aload         9
+     167: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     170: l2i
+     171: invokevirtual #1228               // Method net/vulkanmod/vulkan/memory/buffer/BufferSlice.set:(Lnet/vulkanmod/vulkan/memory/buffer/Buffer;JI)V
+     174: goto          44
+     177: aload         4
+     179: invokevirtual #1231               // Method net/vulkanmod/vulkan/shader/Pipeline.getImageDescriptors:()Ljava/util/List;
+     182: invokeinterface #1120,  1         // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+     187: astore        5
+     189: aload         5
+     191: invokeinterface #923,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+     196: ifeq          308
+     199: aload         5
+     201: invokeinterface #927,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+     206: checkcast     #1233               // class net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor
+     209: astore        6
+     211: aload         6
+     213: getfield      #1234               // Field net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.name:Ljava/lang/String;
+     216: astore        7
+     218: aload         6
+     220: getfield      #1237               // Field net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.imageIdx:I
+     223: istore        8
+     225: aload_1
+     226: getfield      #1240               // Field net/vulkanmod/render/engine/VkRenderPass.samplers:Ljava/util/HashMap;
+     229: aload         7
+     231: invokevirtual #1133               // Method java/util/HashMap.get:(Ljava/lang/Object;)Ljava/lang/Object;
+     234: checkcast     #75                 // class net/vulkanmod/render/engine/VkRenderPass$TextureViewAndSampler
+     237: astore        9
+     239: aload         9
+     241: ifnonnull     247
+     244: goto          189
+     247: aload         9
+     249: invokevirtual #1244               // Method net/vulkanmod/render/engine/VkRenderPass$TextureViewAndSampler.view:()Lnet/vulkanmod/render/engine/VkTextureView;
+     252: astore        10
+     254: aload         10
+     256: invokevirtual #1247               // Method net/vulkanmod/render/engine/VkTextureView.texture:()Lnet/vulkanmod/render/engine/VkGpuTexture;
+     259: astore        11
+     261: aload         11
+     263: invokevirtual #1248               // Method net/vulkanmod/render/engine/VkGpuTexture.isClosed:()Z
+     266: ifeq          272
+     269: goto          189
+     272: ldc_w         #1249               // int 33984
+     275: iload         8
+     277: iadd
+     278: invokestatic  #1252               // Method com/mojang/blaze3d/opengl/GlStateManager._activeTexture:(I)V
+     281: aload         11
+     283: getfield      #795                // Field net/vulkanmod/render/engine/VkGpuTexture.id:I
+     286: invokestatic  #798                // Method com/mojang/blaze3d/opengl/GlStateManager._bindTexture:(I)V
+     289: aload         11
+     291: invokevirtual #356                // Method net/vulkanmod/render/engine/VkGpuTexture.getVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     294: aload         9
+     296: invokevirtual #1256               // Method net/vulkanmod/render/engine/VkRenderPass$TextureViewAndSampler.sampler:()Lnet/vulkanmod/render/engine/VkSampler;
+     299: invokevirtual #1259               // Method net/vulkanmod/render/engine/VkSampler.getId:()J
+     302: invokevirtual #1262               // Method net/vulkanmod/vulkan/texture/VulkanImage.setSampler:(J)V
+     305: goto          189
+     308: return
+
+  public boolean bindPipeline(com.mojang.blaze3d.pipeline.RenderPipeline);
+    Code:
+       0: aload_1
+       1: invokestatic  #907                // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.of:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lnet/vulkanmod/interfaces/shader/ExtendedRenderPipeline;
+       4: invokeinterface #910,  1          // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.getPipeline:()Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;
+       9: astore_2
+      10: aload_2
+      11: ifnonnull     16
+      14: iconst_0
+      15: ireturn
+      16: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      19: astore_3
+      20: aload_3
+      21: aload_2
+      22: checkcast     #1277               // class net/vulkanmod/vulkan/shader/GraphicsPipeline
+      25: invokevirtual #1281               // Method net/vulkanmod/vulkan/Renderer.bindGraphicsPipeline:(Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;)V
+      28: aload_3
+      29: aload_2
+      30: invokevirtual #999                // Method net/vulkanmod/vulkan/Renderer.uploadAndBindUBOs:(Lnet/vulkanmod/vulkan/shader/Pipeline;)V
+      33: iconst_1
+      34: ireturn
+
+  public void applyPipelineState(com.mojang.blaze3d.pipeline.RenderPipeline);
+    Code:
+       0: aload_0
+       1: getfield      #290                // Field lastPipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+       4: aload_1
+       5: if_acmpeq     257
+       8: aload_0
+       9: aload_1
+      10: putfield      #290                // Field lastPipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+      13: aload_1
+      14: invokevirtual #1287               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getDepthTestFunction:()Lcom/mojang/blaze3d/platform/DepthTestFunction;
+      17: getstatic     #1293               // Field com/mojang/blaze3d/platform/DepthTestFunction.NO_DEPTH_TEST:Lcom/mojang/blaze3d/platform/DepthTestFunction;
+      20: if_acmpeq     39
+      23: invokestatic  #1296               // Method com/mojang/blaze3d/opengl/GlStateManager._enableDepthTest:()V
+      26: aload_1
+      27: invokevirtual #1287               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getDepthTestFunction:()Lcom/mojang/blaze3d/platform/DepthTestFunction;
+      30: invokestatic  #1299               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/platform/DepthTestFunction;)I
+      33: invokestatic  #1302               // Method com/mojang/blaze3d/opengl/GlStateManager._depthFunc:(I)V
+      36: goto          42
+      39: invokestatic  #1305               // Method com/mojang/blaze3d/opengl/GlStateManager._disableDepthTest:()V
+      42: aload_1
+      43: invokevirtual #1308               // Method com/mojang/blaze3d/pipeline/RenderPipeline.isCull:()Z
+      46: ifeq          55
+      49: invokestatic  #1311               // Method com/mojang/blaze3d/opengl/GlStateManager._enableCull:()V
+      52: goto          58
+      55: invokestatic  #1314               // Method com/mojang/blaze3d/opengl/GlStateManager._disableCull:()V
+      58: aload_1
+      59: invokevirtual #1318               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getBlendFunction:()Ljava/util/Optional;
+      62: invokevirtual #1321               // Method java/util/Optional.isPresent:()Z
+      65: ifeq          116
+      68: invokestatic  #1324               // Method com/mojang/blaze3d/opengl/GlStateManager._enableBlend:()V
+      71: aload_1
+      72: invokevirtual #1318               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getBlendFunction:()Ljava/util/Optional;
+      75: invokevirtual #1326               // Method java/util/Optional.get:()Ljava/lang/Object;
+      78: checkcast     #1328               // class com/mojang/blaze3d/pipeline/BlendFunction
+      81: astore_2
+      82: aload_2
+      83: invokevirtual #1332               // Method com/mojang/blaze3d/pipeline/BlendFunction.sourceColor:()Lcom/mojang/blaze3d/platform/SourceFactor;
+      86: invokestatic  #1335               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/platform/SourceFactor;)I
+      89: aload_2
+      90: invokevirtual #1339               // Method com/mojang/blaze3d/pipeline/BlendFunction.destColor:()Lcom/mojang/blaze3d/platform/DestFactor;
+      93: invokestatic  #1342               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/platform/DestFactor;)I
+      96: aload_2
+      97: invokevirtual #1345               // Method com/mojang/blaze3d/pipeline/BlendFunction.sourceAlpha:()Lcom/mojang/blaze3d/platform/SourceFactor;
+     100: invokestatic  #1335               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/platform/SourceFactor;)I
+     103: aload_2
+     104: invokevirtual #1348               // Method com/mojang/blaze3d/pipeline/BlendFunction.destAlpha:()Lcom/mojang/blaze3d/platform/DestFactor;
+     107: invokestatic  #1342               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/platform/DestFactor;)I
+     110: invokestatic  #1351               // Method com/mojang/blaze3d/opengl/GlStateManager._blendFuncSeparate:(IIII)V
+     113: goto          119
+     116: invokestatic  #1354               // Method com/mojang/blaze3d/opengl/GlStateManager._disableBlend:()V
+     119: sipush        1032
+     122: aload_1
+     123: invokevirtual #1358               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getPolygonMode:()Lcom/mojang/blaze3d/platform/PolygonMode;
+     126: invokestatic  #1361               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/platform/PolygonMode;)I
+     129: invokestatic  #1364               // Method com/mojang/blaze3d/opengl/GlStateManager._polygonMode:(II)V
+     132: aload_1
+     133: invokevirtual #1367               // Method com/mojang/blaze3d/pipeline/RenderPipeline.isWriteDepth:()Z
+     136: invokestatic  #244                // Method com/mojang/blaze3d/opengl/GlStateManager._depthMask:(Z)V
+     139: aload_1
+     140: invokevirtual #1370               // Method com/mojang/blaze3d/pipeline/RenderPipeline.isWriteColor:()Z
+     143: aload_1
+     144: invokevirtual #1370               // Method com/mojang/blaze3d/pipeline/RenderPipeline.isWriteColor:()Z
+     147: aload_1
+     148: invokevirtual #1370               // Method com/mojang/blaze3d/pipeline/RenderPipeline.isWriteColor:()Z
+     151: aload_1
+     152: invokevirtual #1373               // Method com/mojang/blaze3d/pipeline/RenderPipeline.isWriteAlpha:()Z
+     155: invokestatic  #248                // Method com/mojang/blaze3d/opengl/GlStateManager._colorMask:(ZZZZ)V
+     158: aload_1
+     159: invokevirtual #1377               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getDepthBiasConstant:()F
+     162: fconst_0
+     163: fcmpl
+     164: ifne          182
+     167: aload_1
+     168: invokevirtual #1380               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getDepthBiasScaleFactor:()F
+     171: fconst_0
+     172: fcmpl
+     173: ifne          182
+     176: invokestatic  #1383               // Method com/mojang/blaze3d/opengl/GlStateManager._disablePolygonOffset:()V
+     179: goto          196
+     182: aload_1
+     183: invokevirtual #1380               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getDepthBiasScaleFactor:()F
+     186: aload_1
+     187: invokevirtual #1377               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getDepthBiasConstant:()F
+     190: invokestatic  #1387               // Method com/mojang/blaze3d/opengl/GlStateManager._polygonOffset:(FF)V
+     193: invokestatic  #1390               // Method com/mojang/blaze3d/opengl/GlStateManager._enablePolygonOffset:()V
+     196: getstatic     #1393               // Field net/vulkanmod/render/engine/VkCommandEncoder$2.$SwitchMap$com$mojang$blaze3d$platform$LogicOp:[I
+     199: aload_1
+     200: invokevirtual #1397               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getColorLogic:()Lcom/mojang/blaze3d/platform/LogicOp;
+     203: invokevirtual #1400               // Method com/mojang/blaze3d/platform/LogicOp.ordinal:()I
+     206: iaload
+     207: lookupswitch  { // 2
+
+                     1: 232
+
+                     2: 238
+               default: 247
+          }
+     232: invokestatic  #1403               // Method com/mojang/blaze3d/opengl/GlStateManager._disableColorLogicOp:()V
+     235: goto          247
+     238: invokestatic  #1406               // Method com/mojang/blaze3d/opengl/GlStateManager._enableColorLogicOp:()V
+     241: sipush        5387
+     244: invokestatic  #1409               // Method com/mojang/blaze3d/opengl/GlStateManager._logicOp:(I)V
+     247: aload_1
+     248: invokevirtual #1076               // Method com/mojang/blaze3d/pipeline/RenderPipeline.getVertexFormatMode:()Lcom/mojang/blaze3d/vertex/VertexFormat$class_5596;
+     251: invokestatic  #1412               // Method com/mojang/blaze3d/opengl/GlConst.toGl:(Lcom/mojang/blaze3d/vertex/VertexFormat$class_5596;)I
+     254: invokestatic  #1415               // Method net/vulkanmod/vulkan/VRenderSystem.setPrimitiveTopologyGL:(I)V
+     257: return
+
+  public void finishRenderPass(boolean);
+    Code:
+       0: iload_1
+       1: ifeq          10
+       4: invokestatic  #191                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+       7: invokevirtual #340                // Method net/vulkanmod/vulkan/Renderer.endRenderPass:()V
+      10: aload_0
+      11: iconst_0
+      12: putfield      #144                // Field inRenderPass:Z
+      15: return
+
+  protected net.vulkanmod.render.engine.VkGpuDevice getDevice();
+    Code:
+       0: aload_0
+       1: getfield      #118                // Field device:Lnet/vulkanmod/render/engine/VkGpuDevice;
+       4: areturn
+
+  private static void lambda$executeDrawMultiple$0(net.vulkanmod.render.engine.VkRenderPass, net.vulkanmod.vulkan.shader.Pipeline, java.lang.String, com.mojang.blaze3d.buffers.GpuBufferSlice);
+    Code:
+       0: aload_0
+       1: getfield      #1008               // Field net/vulkanmod/render/engine/VkRenderPass.pipeline:Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+       4: invokestatic  #907                // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.of:(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lnet/vulkanmod/interfaces/shader/ExtendedRenderPipeline;
+       7: invokeinterface #1193,  1         // InterfaceMethod net/vulkanmod/interfaces/shader/ExtendedRenderPipeline.getProgram:()Lnet/vulkanmod/render/engine/EGlProgram;
+      12: astore        4
+      14: aload         4
+      16: aload_2
+      17: invokevirtual #1207               // Method net/vulkanmod/render/engine/EGlProgram.getUniform:(Ljava/lang/String;)Lnet/minecraft/class_284;
+      20: astore        6
+      22: aload         6
+      24: instanceof    #80                 // class net/minecraft/class_284$class_11272
+      27: ifeq          109
+      30: aload         6
+      32: checkcast     #80                 // class net/minecraft/class_284$class_11272
+      35: astore        5
+      37: aload         5
+      39: invokevirtual #1425               // Method net/minecraft/class_284$class_11272.comp_4150:()I
+      42: istore        6
+      44: goto          64
+      47: astore        7
+      49: new           #1058               // class java/lang/MatchException
+      52: dup
+      53: aload         7
+      55: invokevirtual #1428               // Method java/lang/Throwable.toString:()Ljava/lang/String;
+      58: aload         7
+      60: invokespecial #1061               // Method java/lang/MatchException."<init>":(Ljava/lang/String;Ljava/lang/Throwable;)V
+      63: athrow
+      64: aload_3
+      65: invokevirtual #480                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.buffer:()Lcom/mojang/blaze3d/buffers/GpuBuffer;
+      68: checkcast     #42                 // class net/vulkanmod/render/engine/VkGpuBuffer
+      71: astore        7
+      73: aload_1
+      74: iload         6
+      76: invokevirtual #1432               // Method net/vulkanmod/vulkan/shader/Pipeline.getUBO:(I)Lnet/vulkanmod/vulkan/shader/descriptor/UBO;
+      79: astore        8
+      81: aload         8
+      83: iconst_0
+      84: invokevirtual #1210               // Method net/vulkanmod/vulkan/shader/descriptor/UBO.setUseGlobalBuffer:(Z)V
+      87: aload         8
+      89: invokevirtual #1222               // Method net/vulkanmod/vulkan/shader/descriptor/UBO.getBufferSlice:()Lnet/vulkanmod/vulkan/memory/buffer/BufferSlice;
+      92: aload         7
+      94: getfield      #559                // Field net/vulkanmod/render/engine/VkGpuBuffer.buffer:Lnet/vulkanmod/vulkan/memory/buffer/Buffer;
+      97: aload_3
+      98: invokevirtual #494                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.offset:()J
+     101: aload_3
+     102: invokevirtual #502                // Method com/mojang/blaze3d/buffers/GpuBufferSlice.length:()J
+     105: l2i
+     106: invokevirtual #1228               // Method net/vulkanmod/vulkan/memory/buffer/BufferSlice.set:(Lnet/vulkanmod/vulkan/memory/buffer/Buffer;JI)V
+     109: return
+    Exception table:
+       from    to  target type
+          37    44    47   Class java/lang/Throwable
+
+  static {};
+    Code:
+       0: ldc           #2                  // class net/vulkanmod/render/engine/VkCommandEncoder
+       2: invokevirtual #1445               // Method java/lang/Class.desiredAssertionStatus:()Z
+       5: ifne          12
+       8: iconst_1
+       9: goto          13
+      12: iconst_0
+      13: putstatic     #1215               // Field $assertionsDisabled:Z
+      16: invokestatic  #1451               // Method com/mojang/logging/LogUtils.getLogger:()Lorg/slf4j/Logger;
+      19: putstatic     #157                // Field LOGGER:Lorg/slf4j/Logger;
+      22: return
+}

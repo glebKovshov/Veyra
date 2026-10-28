@@ -1,0 +1,650 @@
+﻿Compiled from "Pipeline.java"
+public abstract class net.vulkanmod.vulkan.shader.Pipeline {
+  private static final org.lwjgl.vulkan.VkDevice DEVICE;
+
+  protected static final long PIPELINE_CACHE;
+
+  protected static final java.util.List<net.vulkanmod.vulkan.shader.Pipeline> PIPELINES;
+
+  public final java.lang.String name;
+
+  protected long descriptorSetLayout;
+
+  protected long pipelineLayout;
+
+  protected net.vulkanmod.vulkan.shader.DescriptorSets[] descriptorSets;
+
+  protected java.util.List<net.vulkanmod.vulkan.shader.descriptor.UBO> buffers;
+
+  protected java.util.List<net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor> imageDescriptors;
+
+  protected net.vulkanmod.vulkan.shader.layout.PushConstants pushConstants;
+
+  private static long createPipelineCache();
+    Code:
+       0: invokestatic  #51                 // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+       3: astore_0
+       4: aload_0
+       5: invokestatic  #57                 // Method org/lwjgl/vulkan/VkPipelineCacheCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineCacheCreateInfo;
+       8: astore_1
+       9: aload_1
+      10: bipush        17
+      12: invokevirtual #61                 // Method org/lwjgl/vulkan/VkPipelineCacheCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineCacheCreateInfo;
+      15: pop
+      16: aload_0
+      17: iconst_1
+      18: invokevirtual #65                 // Method org/lwjgl/system/MemoryStack.mallocLong:(I)Ljava/nio/LongBuffer;
+      21: astore_2
+      22: getstatic     #67                 // Field DEVICE:Lorg/lwjgl/vulkan/VkDevice;
+      25: aload_1
+      26: aconst_null
+      27: aload_2
+      28: invokestatic  #73                 // Method org/lwjgl/vulkan/VK10.vkCreatePipelineCache:(Lorg/lwjgl/vulkan/VkDevice;Lorg/lwjgl/vulkan/VkPipelineCacheCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I
+      31: ifeq          44
+      34: new           #75                 // class java/lang/RuntimeException
+      37: dup
+      38: ldc           #77                 // String Failed to create graphics pipeline
+      40: invokespecial #81                 // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+      43: athrow
+      44: aload_2
+      45: iconst_0
+      46: invokevirtual #87                 // Method java/nio/LongBuffer.get:(I)J
+      49: lstore_3
+      50: aload_0
+      51: ifnull        58
+      54: aload_0
+      55: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+      58: lload_3
+      59: lreturn
+      60: astore_1
+      61: aload_0
+      62: ifnull        78
+      65: aload_0
+      66: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+      69: goto          78
+      72: astore_2
+      73: aload_1
+      74: aload_2
+      75: invokevirtual #95                 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+      78: aload_1
+      79: athrow
+    Exception table:
+       from    to  target type
+           4    50    60   Class java/lang/Throwable
+          65    69    72   Class java/lang/Throwable
+
+  public static void destroyPipelineCache();
+    Code:
+       0: getstatic     #67                 // Field DEVICE:Lorg/lwjgl/vulkan/VkDevice;
+       3: getstatic     #104                // Field PIPELINE_CACHE:J
+       6: aconst_null
+       7: invokestatic  #108                // Method org/lwjgl/vulkan/VK10.vkDestroyPipelineCache:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+      10: return
+
+  public static void recreateDescriptorSets(int);
+    Code:
+       0: getstatic     #113                // Field PIPELINES:Ljava/util/List;
+       3: iload_0
+       4: invokedynamic #133,  0            // InvokeDynamic #0:accept:(I)Ljava/util/function/Consumer;
+       9: invokeinterface #139,  2          // InterfaceMethod java/util/List.forEach:(Ljava/util/function/Consumer;)V
+      14: return
+
+  public net.vulkanmod.vulkan.shader.Pipeline(java.lang.String);
+    Code:
+       0: aload_0
+       1: invokespecial #142                // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: aload_1
+       6: putfield      #144                // Field name:Ljava/lang/String;
+       9: return
+
+  protected void createDescriptorSetLayout();
+    Code:
+       0: invokestatic  #51                 // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+       3: astore_1
+       4: aload_0
+       5: getfield      #149                // Field buffers:Ljava/util/List;
+       8: invokeinterface #153,  1          // InterfaceMethod java/util/List.size:()I
+      13: aload_0
+      14: getfield      #155                // Field imageDescriptors:Ljava/util/List;
+      17: invokeinterface #153,  1          // InterfaceMethod java/util/List.size:()I
+      22: iadd
+      23: istore_2
+      24: iload_2
+      25: aload_1
+      26: invokestatic  #158                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding$Buffer;
+      29: astore_3
+      30: aload_0
+      31: getfield      #149                // Field buffers:Ljava/util/List;
+      34: invokeinterface #162,  1          // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+      39: astore        4
+      41: aload         4
+      43: invokeinterface #168,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      48: ifeq          127
+      51: aload         4
+      53: invokeinterface #172,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      58: checkcast     #174                // class net/vulkanmod/vulkan/shader/descriptor/UBO
+      61: astore        5
+      63: aload_3
+      64: aload         5
+      66: invokevirtual #177                // Method net/vulkanmod/vulkan/shader/descriptor/UBO.getBinding:()I
+      69: invokevirtual #180                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding$Buffer.get:(I)Lorg/lwjgl/system/Struct;
+      72: checkcast     #11                 // class org/lwjgl/vulkan/VkDescriptorSetLayoutBinding
+      75: astore        6
+      77: aload         6
+      79: aload         5
+      81: invokevirtual #177                // Method net/vulkanmod/vulkan/shader/descriptor/UBO.getBinding:()I
+      84: invokevirtual #184                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.binding:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+      87: pop
+      88: aload         6
+      90: iconst_1
+      91: invokevirtual #187                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.descriptorCount:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+      94: pop
+      95: aload         6
+      97: aload         5
+      99: invokevirtual #190                // Method net/vulkanmod/vulkan/shader/descriptor/UBO.getType:()I
+     102: invokevirtual #193                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.descriptorType:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     105: pop
+     106: aload         6
+     108: aconst_null
+     109: invokevirtual #197                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.pImmutableSamplers:(Ljava/nio/LongBuffer;)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     112: pop
+     113: aload         6
+     115: aload         5
+     117: invokevirtual #200                // Method net/vulkanmod/vulkan/shader/descriptor/UBO.getStages:()I
+     120: invokevirtual #203                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.stageFlags:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     123: pop
+     124: goto          41
+     127: aload_0
+     128: getfield      #155                // Field imageDescriptors:Ljava/util/List;
+     131: invokeinterface #162,  1          // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+     136: astore        4
+     138: aload         4
+     140: invokeinterface #168,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+     145: ifeq          224
+     148: aload         4
+     150: invokeinterface #172,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+     155: checkcast     #205                // class net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor
+     158: astore        5
+     160: aload_3
+     161: aload         5
+     163: invokevirtual #206                // Method net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.getBinding:()I
+     166: invokevirtual #180                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding$Buffer.get:(I)Lorg/lwjgl/system/Struct;
+     169: checkcast     #11                 // class org/lwjgl/vulkan/VkDescriptorSetLayoutBinding
+     172: astore        6
+     174: aload         6
+     176: aload         5
+     178: invokevirtual #206                // Method net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.getBinding:()I
+     181: invokevirtual #184                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.binding:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     184: pop
+     185: aload         6
+     187: iconst_1
+     188: invokevirtual #187                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.descriptorCount:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     191: pop
+     192: aload         6
+     194: aload         5
+     196: invokevirtual #207                // Method net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.getType:()I
+     199: invokevirtual #193                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.descriptorType:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     202: pop
+     203: aload         6
+     205: aconst_null
+     206: invokevirtual #197                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.pImmutableSamplers:(Ljava/nio/LongBuffer;)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     209: pop
+     210: aload         6
+     212: aload         5
+     214: invokevirtual #208                // Method net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.getStages:()I
+     217: invokevirtual #203                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutBinding.stageFlags:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding;
+     220: pop
+     221: goto          138
+     224: aload_1
+     225: invokestatic  #213                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo;
+     228: astore        4
+     230: aload         4
+     232: bipush        32
+     234: invokevirtual #216                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo;
+     237: pop
+     238: aload         4
+     240: aload_3
+     241: invokevirtual #220                // Method org/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo.pBindings:(Lorg/lwjgl/vulkan/VkDescriptorSetLayoutBinding$Buffer;)Lorg/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo;
+     244: pop
+     245: aload_1
+     246: iconst_1
+     247: invokevirtual #65                 // Method org/lwjgl/system/MemoryStack.mallocLong:(I)Ljava/nio/LongBuffer;
+     250: astore        5
+     252: getstatic     #225                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+     255: aload         4
+     257: aconst_null
+     258: aload         5
+     260: invokestatic  #229                // Method org/lwjgl/vulkan/VK10.vkCreateDescriptorSetLayout:(Lorg/lwjgl/vulkan/VkDevice;Lorg/lwjgl/vulkan/VkDescriptorSetLayoutCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I
+     263: ifeq          276
+     266: new           #75                 // class java/lang/RuntimeException
+     269: dup
+     270: ldc           #231                // String Failed to create descriptor set layout
+     272: invokespecial #81                 // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+     275: athrow
+     276: aload_0
+     277: aload         5
+     279: iconst_0
+     280: invokevirtual #87                 // Method java/nio/LongBuffer.get:(I)J
+     283: putfield      #233                // Field descriptorSetLayout:J
+     286: aload_1
+     287: ifnull        317
+     290: aload_1
+     291: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+     294: goto          317
+     297: astore_2
+     298: aload_1
+     299: ifnull        315
+     302: aload_1
+     303: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+     306: goto          315
+     309: astore_3
+     310: aload_2
+     311: aload_3
+     312: invokevirtual #95                 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     315: aload_2
+     316: athrow
+     317: return
+    Exception table:
+       from    to  target type
+           4   286   297   Class java/lang/Throwable
+         302   306   309   Class java/lang/Throwable
+
+  protected void createPipelineLayout();
+    Code:
+       0: invokestatic  #51                 // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+       3: astore_1
+       4: aload_1
+       5: invokestatic  #252                // Method org/lwjgl/vulkan/VkPipelineLayoutCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineLayoutCreateInfo;
+       8: astore_2
+       9: aload_2
+      10: bipush        30
+      12: invokevirtual #255                // Method org/lwjgl/vulkan/VkPipelineLayoutCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineLayoutCreateInfo;
+      15: pop
+      16: aload_2
+      17: aload_1
+      18: aload_0
+      19: getfield      #233                // Field descriptorSetLayout:J
+      22: invokevirtual #259                // Method org/lwjgl/system/MemoryStack.longs:(J)Ljava/nio/LongBuffer;
+      25: invokevirtual #263                // Method org/lwjgl/vulkan/VkPipelineLayoutCreateInfo.pSetLayouts:(Ljava/nio/LongBuffer;)Lorg/lwjgl/vulkan/VkPipelineLayoutCreateInfo;
+      28: pop
+      29: aload_0
+      30: getfield      #265                // Field pushConstants:Lnet/vulkanmod/vulkan/shader/layout/PushConstants;
+      33: ifnull        78
+      36: iconst_1
+      37: aload_1
+      38: invokestatic  #268                // Method org/lwjgl/vulkan/VkPushConstantRange.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPushConstantRange$Buffer;
+      41: astore_3
+      42: aload_3
+      43: aload_0
+      44: getfield      #265                // Field pushConstants:Lnet/vulkanmod/vulkan/shader/layout/PushConstants;
+      47: invokevirtual #273                // Method net/vulkanmod/vulkan/shader/layout/PushConstants.getSize:()I
+      50: invokevirtual #276                // Method org/lwjgl/vulkan/VkPushConstantRange$Buffer.size:(I)Lorg/lwjgl/vulkan/VkPushConstantRange$Buffer;
+      53: pop
+      54: aload_3
+      55: iconst_0
+      56: invokevirtual #279                // Method org/lwjgl/vulkan/VkPushConstantRange$Buffer.offset:(I)Lorg/lwjgl/vulkan/VkPushConstantRange$Buffer;
+      59: pop
+      60: aload_3
+      61: aload_0
+      62: getfield      #265                // Field pushConstants:Lnet/vulkanmod/vulkan/shader/layout/PushConstants;
+      65: getfield      #282                // Field net/vulkanmod/vulkan/shader/layout/PushConstants.stages:I
+      68: invokevirtual #284                // Method org/lwjgl/vulkan/VkPushConstantRange$Buffer.stageFlags:(I)Lorg/lwjgl/vulkan/VkPushConstantRange$Buffer;
+      71: pop
+      72: aload_2
+      73: aload_3
+      74: invokevirtual #288                // Method org/lwjgl/vulkan/VkPipelineLayoutCreateInfo.pPushConstantRanges:(Lorg/lwjgl/vulkan/VkPushConstantRange$Buffer;)Lorg/lwjgl/vulkan/VkPipelineLayoutCreateInfo;
+      77: pop
+      78: aload_1
+      79: lconst_0
+      80: invokevirtual #259                // Method org/lwjgl/system/MemoryStack.longs:(J)Ljava/nio/LongBuffer;
+      83: astore_3
+      84: getstatic     #67                 // Field DEVICE:Lorg/lwjgl/vulkan/VkDevice;
+      87: aload_2
+      88: aconst_null
+      89: aload_3
+      90: invokestatic  #292                // Method org/lwjgl/vulkan/VK10.vkCreatePipelineLayout:(Lorg/lwjgl/vulkan/VkDevice;Lorg/lwjgl/vulkan/VkPipelineLayoutCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I
+      93: ifeq          107
+      96: new           #75                 // class java/lang/RuntimeException
+      99: dup
+     100: ldc_w         #294                // String Failed to create pipeline layout
+     103: invokespecial #81                 // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+     106: athrow
+     107: aload_0
+     108: aload_3
+     109: iconst_0
+     110: invokevirtual #87                 // Method java/nio/LongBuffer.get:(I)J
+     113: putfield      #296                // Field pipelineLayout:J
+     116: aload_1
+     117: ifnull        147
+     120: aload_1
+     121: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+     124: goto          147
+     127: astore_2
+     128: aload_1
+     129: ifnull        145
+     132: aload_1
+     133: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+     136: goto          145
+     139: astore_3
+     140: aload_2
+     141: aload_3
+     142: invokevirtual #95                 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     145: aload_2
+     146: athrow
+     147: return
+    Exception table:
+       from    to  target type
+           4   116   127   Class java/lang/Throwable
+         132   136   139   Class java/lang/Throwable
+
+  protected void createDescriptorSets(int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: anewarray     #304                // class net/vulkanmod/vulkan/shader/DescriptorSets
+       5: putfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+       8: iconst_0
+       9: istore_2
+      10: iload_2
+      11: iload_1
+      12: if_icmpge     35
+      15: aload_0
+      16: getfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+      19: iload_2
+      20: new           #304                // class net/vulkanmod/vulkan/shader/DescriptorSets
+      23: dup
+      24: aload_0
+      25: invokespecial #308                // Method net/vulkanmod/vulkan/shader/DescriptorSets."<init>":(Lnet/vulkanmod/vulkan/shader/Pipeline;)V
+      28: aastore
+      29: iinc          2, 1
+      32: goto          10
+      35: return
+
+  public void scheduleCleanUp();
+    Code:
+       0: invokestatic  #316                // Method net/vulkanmod/vulkan/memory/MemoryManager.getInstance:()Lnet/vulkanmod/vulkan/memory/MemoryManager;
+       3: aload_0
+       4: invokedynamic #325,  0            // InvokeDynamic #1:run:(Lnet/vulkanmod/vulkan/shader/Pipeline;)Ljava/lang/Runnable;
+       9: invokevirtual #329                // Method net/vulkanmod/vulkan/memory/MemoryManager.addFrameOp:(Ljava/lang/Runnable;)V
+      12: return
+
+  public abstract void cleanUp();
+
+  protected void destroyDescriptorSets();
+    Code:
+       0: aload_0
+       1: getfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+       4: astore_1
+       5: aload_1
+       6: arraylength
+       7: istore_2
+       8: iconst_0
+       9: istore_3
+      10: iload_3
+      11: iload_2
+      12: if_icmpge     31
+      15: aload_1
+      16: iload_3
+      17: aaload
+      18: astore        4
+      20: aload         4
+      22: invokevirtual #332                // Method net/vulkanmod/vulkan/shader/DescriptorSets.cleanUp:()V
+      25: iinc          3, 1
+      28: goto          10
+      31: aload_0
+      32: aconst_null
+      33: putfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+      36: return
+
+  public void resetDescriptorPool(int);
+    Code:
+       0: aload_0
+       1: getfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+       4: ifnull        16
+       7: aload_0
+       8: getfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+      11: iload_1
+      12: aaload
+      13: invokevirtual #337                // Method net/vulkanmod/vulkan/shader/DescriptorSets.resetIdx:()V
+      16: return
+
+  public net.vulkanmod.vulkan.shader.layout.PushConstants getPushConstants();
+    Code:
+       0: aload_0
+       1: getfield      #265                // Field pushConstants:Lnet/vulkanmod/vulkan/shader/layout/PushConstants;
+       4: areturn
+
+  public long getLayout();
+    Code:
+       0: aload_0
+       1: getfield      #296                // Field pipelineLayout:J
+       4: lreturn
+
+  public java.util.List<net.vulkanmod.vulkan.shader.descriptor.UBO> getBuffers();
+    Code:
+       0: aload_0
+       1: getfield      #149                // Field buffers:Ljava/util/List;
+       4: areturn
+
+  public net.vulkanmod.vulkan.shader.descriptor.UBO getUBO(int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: invokedynamic #358,  0            // InvokeDynamic #2:test:(I)Ljava/util/function/Predicate;
+       7: invokevirtual #361                // Method getUBO:(Ljava/util/function/Predicate;)Lnet/vulkanmod/vulkan/shader/descriptor/UBO;
+      10: areturn
+
+  public net.vulkanmod.vulkan.shader.descriptor.UBO getUBO(java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokedynamic #370,  0            // InvokeDynamic #3:test:(Ljava/lang/String;)Ljava/util/function/Predicate;
+       7: invokevirtual #361                // Method getUBO:(Ljava/util/function/Predicate;)Lnet/vulkanmod/vulkan/shader/descriptor/UBO;
+      10: areturn
+
+  public net.vulkanmod.vulkan.shader.descriptor.UBO getUBO(java.util.function.Predicate<net.vulkanmod.vulkan.shader.descriptor.UBO>);
+    Code:
+       0: aconst_null
+       1: astore_2
+       2: aload_0
+       3: getfield      #149                // Field buffers:Ljava/util/List;
+       6: invokeinterface #162,  1          // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+      11: astore_3
+      12: aload_3
+      13: invokeinterface #168,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      18: ifeq          49
+      21: aload_3
+      22: invokeinterface #172,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      27: checkcast     #174                // class net/vulkanmod/vulkan/shader/descriptor/UBO
+      30: astore        4
+      32: aload_1
+      33: aload         4
+      35: invokeinterface #376,  2          // InterfaceMethod java/util/function/Predicate.test:(Ljava/lang/Object;)Z
+      40: ifeq          46
+      43: aload         4
+      45: astore_2
+      46: goto          12
+      49: aload_2
+      50: areturn
+
+  public net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor getImageDescriptor(java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokedynamic #389,  0            // InvokeDynamic #4:test:(Ljava/lang/String;)Ljava/util/function/Predicate;
+       7: invokevirtual #392                // Method getImageDescriptor:(Ljava/util/function/Predicate;)Lnet/vulkanmod/vulkan/shader/descriptor/ImageDescriptor;
+      10: areturn
+
+  public net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor getImageDescriptor(java.util.function.Predicate<net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor>);
+    Code:
+       0: aconst_null
+       1: astore_2
+       2: aload_0
+       3: getfield      #155                // Field imageDescriptors:Ljava/util/List;
+       6: invokeinterface #162,  1          // InterfaceMethod java/util/List.iterator:()Ljava/util/Iterator;
+      11: astore_3
+      12: aload_3
+      13: invokeinterface #168,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      18: ifeq          49
+      21: aload_3
+      22: invokeinterface #172,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      27: checkcast     #205                // class net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor
+      30: astore        4
+      32: aload_1
+      33: aload         4
+      35: invokeinterface #376,  2          // InterfaceMethod java/util/function/Predicate.test:(Ljava/lang/Object;)Z
+      40: ifeq          46
+      43: aload         4
+      45: astore_2
+      46: goto          12
+      49: aload_2
+      50: areturn
+
+  public java.util.List<net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor> getImageDescriptors();
+    Code:
+       0: aload_0
+       1: getfield      #155                // Field imageDescriptors:Ljava/util/List;
+       4: areturn
+
+  public void bindDescriptorSets(org.lwjgl.vulkan.VkCommandBuffer, int);
+    Code:
+       0: invokestatic  #408                // Method net/vulkanmod/vulkan/Renderer.getDrawer:()Lnet/vulkanmod/vulkan/Drawer;
+       3: invokevirtual #414                // Method net/vulkanmod/vulkan/Drawer.getUniformBuffer:()Lnet/vulkanmod/vulkan/memory/buffer/UniformBuffer;
+       6: astore_3
+       7: aload_0
+       8: getfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+      11: iload_2
+      12: aaload
+      13: aload_1
+      14: aload_3
+      15: iconst_0
+      16: invokevirtual #418                // Method net/vulkanmod/vulkan/shader/DescriptorSets.bindSets:(Lorg/lwjgl/vulkan/VkCommandBuffer;Lnet/vulkanmod/vulkan/memory/buffer/UniformBuffer;I)V
+      19: return
+
+  public void bindDescriptorSets(org.lwjgl.vulkan.VkCommandBuffer, net.vulkanmod.vulkan.memory.buffer.UniformBuffer, int);
+    Code:
+       0: aload_0
+       1: getfield      #306                // Field descriptorSets:[Lnet/vulkanmod/vulkan/shader/DescriptorSets;
+       4: iload_3
+       5: aaload
+       6: aload_1
+       7: aload_2
+       8: iconst_0
+       9: invokevirtual #418                // Method net/vulkanmod/vulkan/shader/DescriptorSets.bindSets:(Lorg/lwjgl/vulkan/VkCommandBuffer;Lnet/vulkanmod/vulkan/memory/buffer/UniformBuffer;I)V
+      12: return
+
+  protected static long createShaderModule(java.nio.ByteBuffer);
+    Code:
+       0: invokestatic  #51                 // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+       3: astore_1
+       4: aload_1
+       5: invokestatic  #429                // Method org/lwjgl/vulkan/VkShaderModuleCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkShaderModuleCreateInfo;
+       8: astore_2
+       9: aload_2
+      10: bipush        16
+      12: invokevirtual #432                // Method org/lwjgl/vulkan/VkShaderModuleCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkShaderModuleCreateInfo;
+      15: pop
+      16: aload_2
+      17: aload_0
+      18: invokevirtual #436                // Method org/lwjgl/vulkan/VkShaderModuleCreateInfo.pCode:(Ljava/nio/ByteBuffer;)Lorg/lwjgl/vulkan/VkShaderModuleCreateInfo;
+      21: pop
+      22: aload_1
+      23: iconst_1
+      24: invokevirtual #65                 // Method org/lwjgl/system/MemoryStack.mallocLong:(I)Ljava/nio/LongBuffer;
+      27: astore_3
+      28: getstatic     #67                 // Field DEVICE:Lorg/lwjgl/vulkan/VkDevice;
+      31: aload_2
+      32: aconst_null
+      33: aload_3
+      34: invokestatic  #440                // Method org/lwjgl/vulkan/VK10.vkCreateShaderModule:(Lorg/lwjgl/vulkan/VkDevice;Lorg/lwjgl/vulkan/VkShaderModuleCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I
+      37: ifeq          51
+      40: new           #75                 // class java/lang/RuntimeException
+      43: dup
+      44: ldc_w         #442                // String Failed to create shader module
+      47: invokespecial #81                 // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+      50: athrow
+      51: aload_3
+      52: iconst_0
+      53: invokevirtual #87                 // Method java/nio/LongBuffer.get:(I)J
+      56: lstore        4
+      58: aload_1
+      59: ifnull        66
+      62: aload_1
+      63: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+      66: lload         4
+      68: lreturn
+      69: astore_2
+      70: aload_1
+      71: ifnull        87
+      74: aload_1
+      75: invokevirtual #91                 // Method org/lwjgl/system/MemoryStack.close:()V
+      78: goto          87
+      81: astore_3
+      82: aload_2
+      83: aload_3
+      84: invokevirtual #95                 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+      87: aload_2
+      88: athrow
+    Exception table:
+       from    to  target type
+           4    58    69   Class java/lang/Throwable
+          74    78    81   Class java/lang/Throwable
+
+  public static net.vulkanmod.vulkan.shader.Pipeline$Builder builder(com.mojang.blaze3d.vertex.VertexFormat, java.lang.String);
+    Code:
+       0: new           #7                  // class net/vulkanmod/vulkan/shader/Pipeline$Builder
+       3: dup
+       4: aload_0
+       5: aload_1
+       6: invokespecial #455                // Method net/vulkanmod/vulkan/shader/Pipeline$Builder."<init>":(Lcom/mojang/blaze3d/vertex/VertexFormat;Ljava/lang/String;)V
+       9: areturn
+
+  private static boolean lambda$getImageDescriptor$3(java.lang.String, net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor);
+    Code:
+       0: aload_1
+       1: getfield      #457                // Field net/vulkanmod/vulkan/shader/descriptor/ImageDescriptor.name:Ljava/lang/String;
+       4: aload_0
+       5: invokevirtual #462                // Method java/lang/String.equals:(Ljava/lang/Object;)Z
+       8: ireturn
+
+  private static boolean lambda$getUBO$2(java.lang.String, net.vulkanmod.vulkan.shader.descriptor.UBO);
+    Code:
+       0: aload_1
+       1: getfield      #463                // Field net/vulkanmod/vulkan/shader/descriptor/UBO.name:Ljava/lang/String;
+       4: aload_0
+       5: invokevirtual #462                // Method java/lang/String.equals:(Ljava/lang/Object;)Z
+       8: ireturn
+
+  private static boolean lambda$getUBO$1(int, net.vulkanmod.vulkan.shader.descriptor.UBO);
+    Code:
+       0: aload_1
+       1: getfield      #465                // Field net/vulkanmod/vulkan/shader/descriptor/UBO.binding:I
+       4: iload_0
+       5: if_icmpne     12
+       8: iconst_1
+       9: goto          13
+      12: iconst_0
+      13: ireturn
+
+  private static void lambda$recreateDescriptorSets$0(int, net.vulkanmod.vulkan.shader.Pipeline);
+    Code:
+       0: aload_1
+       1: invokevirtual #468                // Method destroyDescriptorSets:()V
+       4: aload_1
+       5: iload_0
+       6: invokevirtual #470                // Method createDescriptorSets:(I)V
+       9: return
+
+  static {};
+    Code:
+       0: invokestatic  #477                // Method net/vulkanmod/vulkan/Vulkan.getVkDevice:()Lorg/lwjgl/vulkan/VkDevice;
+       3: putstatic     #67                 // Field DEVICE:Lorg/lwjgl/vulkan/VkDevice;
+       6: invokestatic  #479                // Method createPipelineCache:()J
+       9: putstatic     #104                // Field PIPELINE_CACHE:J
+      12: new           #481                // class java/util/ArrayList
+      15: dup
+      16: invokespecial #482                // Method java/util/ArrayList."<init>":()V
+      19: putstatic     #113                // Field PIPELINES:Ljava/util/List;
+      22: return
+}

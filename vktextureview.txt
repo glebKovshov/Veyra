@@ -1,0 +1,99 @@
+﻿Compiled from "VkTextureView.java"
+public class net.vulkanmod.render.engine.VkTextureView extends com.mojang.blaze3d.textures.GpuTextureView {
+  private boolean closed;
+
+  private final it.unimi.dsi.fastutil.ints.Int2ReferenceMap<net.vulkanmod.render.engine.VkFbo> fboCache;
+
+  protected net.vulkanmod.render.engine.VkTextureView(net.vulkanmod.render.engine.VkGpuTexture, int, int);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: iload_2
+       3: iload_3
+       4: invokespecial #23                 // Method com/mojang/blaze3d/textures/GpuTextureView."<init>":(Lcom/mojang/blaze3d/textures/GpuTexture;II)V
+       7: aload_0
+       8: new           #25                 // class it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap
+      11: dup
+      12: invokespecial #28                 // Method it/unimi/dsi/fastutil/ints/Int2ReferenceOpenHashMap."<init>":()V
+      15: putfield      #30                 // Field fboCache:Lit/unimi/dsi/fastutil/ints/Int2ReferenceMap;
+      18: aload_1
+      19: invokevirtual #35                 // Method net/vulkanmod/render/engine/VkGpuTexture.method_71635:()V
+      22: return
+
+  public net.vulkanmod.render.engine.VkFbo getFbo(com.mojang.blaze3d.textures.GpuTexture);
+    Code:
+       0: aload_1
+       1: ifnonnull     8
+       4: iconst_0
+       5: goto          15
+       8: aload_1
+       9: checkcast     #32                 // class net/vulkanmod/render/engine/VkGpuTexture
+      12: getfield      #46                 // Field net/vulkanmod/render/engine/VkGpuTexture.id:I
+      15: istore_2
+      16: aload_0
+      17: getfield      #30                 // Field fboCache:Lit/unimi/dsi/fastutil/ints/Int2ReferenceMap;
+      20: iload_2
+      21: aload_0
+      22: aload_1
+      23: invokedynamic #66,  0             // InvokeDynamic #0:get:(Lnet/vulkanmod/render/engine/VkTextureView;Lcom/mojang/blaze3d/textures/GpuTexture;)Lit/unimi/dsi/fastutil/ints/Int2ReferenceFunction;
+      28: invokeinterface #72,  3           // InterfaceMethod it/unimi/dsi/fastutil/ints/Int2ReferenceMap.computeIfAbsent:(ILit/unimi/dsi/fastutil/ints/Int2ReferenceFunction;)Ljava/lang/Object;
+      33: checkcast     #74                 // class net/vulkanmod/render/engine/VkFbo
+      36: areturn
+
+  public boolean isClosed();
+    Code:
+       0: aload_0
+       1: getfield      #80                 // Field closed:Z
+       4: ireturn
+
+  public void close();
+    Code:
+       0: aload_0
+       1: getfield      #80                 // Field closed:Z
+       4: ifne          19
+       7: aload_0
+       8: iconst_1
+       9: putfield      #80                 // Field closed:Z
+      12: aload_0
+      13: invokevirtual #85                 // Method texture:()Lnet/vulkanmod/render/engine/VkGpuTexture;
+      16: invokevirtual #88                 // Method net/vulkanmod/render/engine/VkGpuTexture.method_71636:()V
+      19: aload_0
+      20: getfield      #30                 // Field fboCache:Lit/unimi/dsi/fastutil/ints/Int2ReferenceMap;
+      23: invokeinterface #92,  1           // InterfaceMethod it/unimi/dsi/fastutil/ints/Int2ReferenceMap.values:()Lit/unimi/dsi/fastutil/objects/ReferenceCollection;
+      28: invokeinterface #98,  1           // InterfaceMethod it/unimi/dsi/fastutil/objects/ReferenceCollection.iterator:()Lit/unimi/dsi/fastutil/objects/ObjectIterator;
+      33: astore_1
+      34: aload_1
+      35: invokeinterface #103,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      40: ifeq          60
+      43: aload_1
+      44: invokeinterface #107,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      49: checkcast     #74                 // class net/vulkanmod/render/engine/VkFbo
+      52: astore_2
+      53: aload_2
+      54: invokevirtual #109                // Method net/vulkanmod/render/engine/VkFbo.close:()V
+      57: goto          34
+      60: return
+
+  public net.vulkanmod.render.engine.VkGpuTexture texture();
+    Code:
+       0: aload_0
+       1: invokespecial #114                // Method com/mojang/blaze3d/textures/GpuTextureView.texture:()Lcom/mojang/blaze3d/textures/GpuTexture;
+       4: checkcast     #32                 // class net/vulkanmod/render/engine/VkGpuTexture
+       7: areturn
+
+  public com.mojang.blaze3d.textures.GpuTexture texture();
+    Code:
+       0: aload_0
+       1: invokevirtual #85                 // Method texture:()Lnet/vulkanmod/render/engine/VkGpuTexture;
+       4: areturn
+
+  private net.vulkanmod.render.engine.VkFbo lambda$getFbo$0(com.mojang.blaze3d.textures.GpuTexture, int);
+    Code:
+       0: new           #74                 // class net/vulkanmod/render/engine/VkFbo
+       3: dup
+       4: aload_0
+       5: aload_1
+       6: checkcast     #32                 // class net/vulkanmod/render/engine/VkGpuTexture
+       9: invokespecial #118                // Method net/vulkanmod/render/engine/VkFbo."<init>":(Lnet/vulkanmod/render/engine/VkTextureView;Lnet/vulkanmod/render/engine/VkGpuTexture;)V
+      12: areturn
+}

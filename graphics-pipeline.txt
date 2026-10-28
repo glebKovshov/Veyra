@@ -1,0 +1,968 @@
+﻿Compiled from "GraphicsPipeline.java"
+public class net.vulkanmod.vulkan.shader.GraphicsPipeline extends net.vulkanmod.vulkan.shader.Pipeline {
+  private final it.unimi.dsi.fastutil.objects.Object2LongMap<net.vulkanmod.vulkan.shader.PipelineState> graphicsPipelines;
+
+  private final com.mojang.blaze3d.vertex.VertexFormat vertexFormat;
+
+  private final net.vulkanmod.vulkan.shader.GraphicsPipeline$VertexInputDescription vertexInputDescription;
+
+  private long vertShaderModule;
+
+  private long fragShaderModule;
+
+  net.vulkanmod.vulkan.shader.GraphicsPipeline(net.vulkanmod.vulkan.shader.Pipeline$Builder);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: getfield      #86                 // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.name:Ljava/lang/String;
+       5: invokespecial #89                 // Method net/vulkanmod/vulkan/shader/Pipeline."<init>":(Ljava/lang/String;)V
+       8: aload_0
+       9: new           #91                 // class it/unimi/dsi/fastutil/objects/Object2LongOpenHashMap
+      12: dup
+      13: invokespecial #94                 // Method it/unimi/dsi/fastutil/objects/Object2LongOpenHashMap."<init>":()V
+      16: putfield      #96                 // Field graphicsPipelines:Lit/unimi/dsi/fastutil/objects/Object2LongMap;
+      19: aload_0
+      20: lconst_0
+      21: putfield      #98                 // Field vertShaderModule:J
+      24: aload_0
+      25: lconst_0
+      26: putfield      #100                // Field fragShaderModule:J
+      29: aload_0
+      30: aload_1
+      31: getfield      #104                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.UBOs:Ljava/util/List;
+      34: putfield      #107                // Field buffers:Ljava/util/List;
+      37: aload_0
+      38: aload_1
+      39: getfield      #110                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.imageDescriptors:Ljava/util/List;
+      42: putfield      #111                // Field imageDescriptors:Ljava/util/List;
+      45: aload_0
+      46: aload_1
+      47: getfield      #115                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.pushConstants:Lnet/vulkanmod/vulkan/shader/layout/PushConstants;
+      50: putfield      #116                // Field pushConstants:Lnet/vulkanmod/vulkan/shader/layout/PushConstants;
+      53: aload_0
+      54: aload_1
+      55: getfield      #118                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.vertexFormat:Lcom/mojang/blaze3d/vertex/VertexFormat;
+      58: putfield      #119                // Field vertexFormat:Lcom/mojang/blaze3d/vertex/VertexFormat;
+      61: aload_0
+      62: new           #9                  // class net/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription
+      65: dup
+      66: aload_0
+      67: getfield      #119                // Field vertexFormat:Lcom/mojang/blaze3d/vertex/VertexFormat;
+      70: invokespecial #122                // Method net/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription."<init>":(Lcom/mojang/blaze3d/vertex/VertexFormat;)V
+      73: putfield      #124                // Field vertexInputDescription:Lnet/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription;
+      76: aload_0
+      77: invokevirtual #127                // Method createDescriptorSetLayout:()V
+      80: aload_0
+      81: invokevirtual #130                // Method createPipelineLayout:()V
+      84: aload_0
+      85: aload_1
+      86: invokevirtual #133                // Method createShaderModules:(Lnet/vulkanmod/vulkan/shader/Pipeline$Builder;)V
+      89: aload_1
+      90: getfield      #137                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.renderPass:Lnet/vulkanmod/vulkan/framebuffer/RenderPass;
+      93: ifnull        115
+      96: aload_0
+      97: getfield      #96                 // Field graphicsPipelines:Lit/unimi/dsi/fastutil/objects/Object2LongMap;
+     100: getstatic     #141                // Field net/vulkanmod/vulkan/shader/PipelineState.DEFAULT:Lnet/vulkanmod/vulkan/shader/PipelineState;
+     103: aload_0
+     104: invokedynamic #160,  0            // InvokeDynamic #0:applyAsLong:(Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;)Ljava/util/function/ToLongFunction;
+     109: invokeinterface #166,  3          // InterfaceMethod it/unimi/dsi/fastutil/objects/Object2LongMap.computeIfAbsent:(Ljava/lang/Object;Ljava/util/function/ToLongFunction;)J
+     114: pop2
+     115: aload_0
+     116: invokestatic  #172                // Method net/vulkanmod/vulkan/Renderer.getFramesNum:()I
+     119: invokevirtual #176                // Method createDescriptorSets:(I)V
+     122: getstatic     #179                // Field PIPELINES:Ljava/util/List;
+     125: aload_0
+     126: invokeinterface #185,  2          // InterfaceMethod java/util/List.add:(Ljava/lang/Object;)Z
+     131: pop
+     132: return
+
+  public long getHandle(net.vulkanmod.vulkan.shader.PipelineState);
+    Code:
+       0: aload_0
+       1: getfield      #96                 // Field graphicsPipelines:Lit/unimi/dsi/fastutil/objects/Object2LongMap;
+       4: aload_1
+       5: aload_0
+       6: invokedynamic #160,  0            // InvokeDynamic #0:applyAsLong:(Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;)Ljava/util/function/ToLongFunction;
+      11: invokeinterface #166,  3          // InterfaceMethod it/unimi/dsi/fastutil/objects/Object2LongMap.computeIfAbsent:(Ljava/lang/Object;Ljava/util/function/ToLongFunction;)J
+      16: lreturn
+
+  private long createGraphicsPipeline(net.vulkanmod.vulkan.shader.PipelineState);
+    Code:
+       0: invokestatic  #198                // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+       3: astore_2
+       4: aload_2
+       5: ldc           #200                // String main
+       7: invokevirtual #204                // Method org/lwjgl/system/MemoryStack.UTF8:(Ljava/lang/CharSequence;)Ljava/nio/ByteBuffer;
+      10: astore_3
+      11: iconst_2
+      12: aload_2
+      13: invokestatic  #208                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo$Buffer;
+      16: astore        4
+      18: aload         4
+      20: iconst_0
+      21: invokevirtual #212                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo$Buffer.get:(I)Lorg/lwjgl/system/Struct;
+      24: checkcast     #17                 // class org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo
+      27: astore        5
+      29: aload         5
+      31: bipush        18
+      33: invokevirtual #216                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      36: pop
+      37: aload         5
+      39: iconst_1
+      40: invokevirtual #219                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.stage:(I)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      43: pop
+      44: aload         5
+      46: aload_0
+      47: getfield      #98                 // Field vertShaderModule:J
+      50: invokevirtual #223                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.module:(J)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      53: pop
+      54: aload         5
+      56: aload_3
+      57: invokevirtual #227                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.pName:(Ljava/nio/ByteBuffer;)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      60: pop
+      61: aload         4
+      63: iconst_1
+      64: invokevirtual #212                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo$Buffer.get:(I)Lorg/lwjgl/system/Struct;
+      67: checkcast     #17                 // class org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo
+      70: astore        6
+      72: aload         6
+      74: bipush        18
+      76: invokevirtual #216                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      79: pop
+      80: aload         6
+      82: bipush        16
+      84: invokevirtual #219                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.stage:(I)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      87: pop
+      88: aload         6
+      90: aload_0
+      91: getfield      #100                // Field fragShaderModule:J
+      94: invokevirtual #223                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.module:(J)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+      97: pop
+      98: aload         6
+     100: aload_3
+     101: invokevirtual #227                // Method org/lwjgl/vulkan/VkPipelineShaderStageCreateInfo.pName:(Ljava/nio/ByteBuffer;)Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo;
+     104: pop
+     105: aload_2
+     106: invokestatic  #232                // Method org/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo;
+     109: astore        7
+     111: aload         7
+     113: bipush        19
+     115: invokevirtual #235                // Method org/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo;
+     118: pop
+     119: aload_0
+     120: getfield      #124                // Field vertexInputDescription:Lnet/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription;
+     123: ifnull        152
+     126: aload         7
+     128: aload_0
+     129: getfield      #124                // Field vertexInputDescription:Lnet/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription;
+     132: getfield      #239                // Field net/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription.bindingDescriptions:Lorg/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer;
+     135: invokevirtual #243                // Method org/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo.pVertexBindingDescriptions:(Lorg/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer;)Lorg/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo;
+     138: pop
+     139: aload         7
+     141: aload_0
+     142: getfield      #124                // Field vertexInputDescription:Lnet/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription;
+     145: getfield      #247                // Field net/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription.attributeDescriptions:Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription$Buffer;
+     148: invokevirtual #251                // Method org/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions:(Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription$Buffer;)Lorg/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo;
+     151: pop
+     152: aload_1
+     153: getfield      #257                // Field net/vulkanmod/vulkan/shader/PipelineState.assemblyRasterState:I
+     156: invokestatic  #261                // Method net/vulkanmod/vulkan/shader/PipelineState$AssemblyRasterState.decodeTopology:(I)I
+     159: istore        8
+     161: aload_2
+     162: invokestatic  #266                // Method org/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo;
+     165: astore        9
+     167: aload         9
+     169: bipush        20
+     171: invokevirtual #269                // Method org/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo;
+     174: pop
+     175: aload         9
+     177: iload         8
+     179: invokevirtual #272                // Method org/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo.topology:(I)Lorg/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo;
+     182: pop
+     183: aload         9
+     185: iconst_0
+     186: invokevirtual #276                // Method org/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo.primitiveRestartEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo;
+     189: pop
+     190: aload_2
+     191: invokestatic  #281                // Method org/lwjgl/vulkan/VkPipelineViewportStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineViewportStateCreateInfo;
+     194: astore        10
+     196: aload         10
+     198: bipush        22
+     200: invokevirtual #284                // Method org/lwjgl/vulkan/VkPipelineViewportStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineViewportStateCreateInfo;
+     203: pop
+     204: aload         10
+     206: iconst_1
+     207: invokevirtual #287                // Method org/lwjgl/vulkan/VkPipelineViewportStateCreateInfo.viewportCount:(I)Lorg/lwjgl/vulkan/VkPipelineViewportStateCreateInfo;
+     210: pop
+     211: aload         10
+     213: iconst_1
+     214: invokevirtual #290                // Method org/lwjgl/vulkan/VkPipelineViewportStateCreateInfo.scissorCount:(I)Lorg/lwjgl/vulkan/VkPipelineViewportStateCreateInfo;
+     217: pop
+     218: aload_1
+     219: getfield      #257                // Field net/vulkanmod/vulkan/shader/PipelineState.assemblyRasterState:I
+     222: invokestatic  #293                // Method net/vulkanmod/vulkan/shader/PipelineState$AssemblyRasterState.decodePolygonMode:(I)I
+     225: istore        11
+     227: aload_1
+     228: getfield      #257                // Field net/vulkanmod/vulkan/shader/PipelineState.assemblyRasterState:I
+     231: invokestatic  #296                // Method net/vulkanmod/vulkan/shader/PipelineState$AssemblyRasterState.decodeCullMode:(I)I
+     234: istore        12
+     236: aload_2
+     237: invokestatic  #301                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     240: astore        13
+     242: aload         13
+     244: bipush        23
+     246: invokevirtual #304                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     249: pop
+     250: aload         13
+     252: iconst_0
+     253: invokevirtual #308                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.depthClampEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     256: pop
+     257: aload         13
+     259: iconst_0
+     260: invokevirtual #311                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.rasterizerDiscardEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     263: pop
+     264: aload         13
+     266: iload         11
+     268: invokevirtual #314                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.polygonMode:(I)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     271: pop
+     272: aload         13
+     274: fconst_1
+     275: invokevirtual #318                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.lineWidth:(F)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     278: pop
+     279: aload         13
+     281: iload         12
+     283: invokevirtual #321                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.cullMode:(I)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     286: pop
+     287: aload         13
+     289: iconst_0
+     290: invokevirtual #324                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.frontFace:(I)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     293: pop
+     294: aload         13
+     296: iconst_1
+     297: invokevirtual #327                // Method org/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo.depthBiasEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;
+     300: pop
+     301: aload_2
+     302: invokestatic  #332                // Method org/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo;
+     305: astore        14
+     307: aload         14
+     309: bipush        24
+     311: invokevirtual #335                // Method org/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo;
+     314: pop
+     315: aload         14
+     317: iconst_0
+     318: invokevirtual #339                // Method org/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo.sampleShadingEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo;
+     321: pop
+     322: aload         14
+     324: iconst_1
+     325: invokevirtual #342                // Method org/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo.rasterizationSamples:(I)Lorg/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo;
+     328: pop
+     329: aload_2
+     330: invokestatic  #347                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     333: astore        15
+     335: aload         15
+     337: bipush        25
+     339: invokevirtual #350                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     342: pop
+     343: aload         15
+     345: aload_1
+     346: getfield      #353                // Field net/vulkanmod/vulkan/shader/PipelineState.depthState_i:I
+     349: invokestatic  #357                // Method net/vulkanmod/vulkan/shader/PipelineState$DepthState.depthTest:(I)Z
+     352: invokevirtual #361                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.depthTestEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     355: pop
+     356: aload         15
+     358: aload_1
+     359: getfield      #353                // Field net/vulkanmod/vulkan/shader/PipelineState.depthState_i:I
+     362: invokestatic  #364                // Method net/vulkanmod/vulkan/shader/PipelineState$DepthState.depthMask:(I)Z
+     365: invokevirtual #367                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.depthWriteEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     368: pop
+     369: aload         15
+     371: aload_1
+     372: getfield      #353                // Field net/vulkanmod/vulkan/shader/PipelineState.depthState_i:I
+     375: invokestatic  #370                // Method net/vulkanmod/vulkan/shader/PipelineState$DepthState.decodeDepthFun:(I)I
+     378: invokevirtual #373                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.depthCompareOp:(I)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     381: pop
+     382: aload         15
+     384: iconst_0
+     385: invokevirtual #376                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.depthBoundsTestEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     388: pop
+     389: aload         15
+     391: fconst_0
+     392: invokevirtual #380                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.minDepthBounds:(F)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     395: pop
+     396: aload         15
+     398: fconst_1
+     399: invokevirtual #383                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.maxDepthBounds:(F)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     402: pop
+     403: aload         15
+     405: iconst_0
+     406: invokevirtual #386                // Method org/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo.stencilTestEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;
+     409: pop
+     410: iconst_1
+     411: aload_2
+     412: invokestatic  #389                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     415: astore        16
+     417: aload         16
+     419: aload_1
+     420: getfield      #392                // Field net/vulkanmod/vulkan/shader/PipelineState.colorMask_i:I
+     423: invokevirtual #396                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.colorWriteMask:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     426: pop
+     427: aload_1
+     428: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     431: invokestatic  #402                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.enable:(I)Z
+     434: ifeq          525
+     437: aload         16
+     439: iconst_1
+     440: invokevirtual #406                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.blendEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     443: pop
+     444: aload         16
+     446: aload_1
+     447: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     450: invokestatic  #409                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.getSrcRgbFactor:(I)I
+     453: invokevirtual #412                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.srcColorBlendFactor:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     456: pop
+     457: aload         16
+     459: aload_1
+     460: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     463: invokestatic  #415                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.getDstRgbFactor:(I)I
+     466: invokevirtual #418                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.dstColorBlendFactor:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     469: pop
+     470: aload         16
+     472: aload_1
+     473: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     476: invokestatic  #421                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.blendOp:(I)I
+     479: invokevirtual #424                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.colorBlendOp:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     482: pop
+     483: aload         16
+     485: aload_1
+     486: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     489: invokestatic  #427                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.getSrcAlphaFactor:(I)I
+     492: invokevirtual #430                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.srcAlphaBlendFactor:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     495: pop
+     496: aload         16
+     498: aload_1
+     499: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     502: invokestatic  #433                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.getDstAlphaFactor:(I)I
+     505: invokevirtual #436                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.dstAlphaBlendFactor:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     508: pop
+     509: aload         16
+     511: aload_1
+     512: getfield      #399                // Field net/vulkanmod/vulkan/shader/PipelineState.blendState_i:I
+     515: invokestatic  #421                // Method net/vulkanmod/vulkan/shader/PipelineState$BlendState.blendOp:(I)I
+     518: invokevirtual #439                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.alphaBlendOp:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     521: pop
+     522: goto          532
+     525: aload         16
+     527: iconst_0
+     528: invokevirtual #406                // Method org/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer.blendEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;
+     531: pop
+     532: aload_2
+     533: invokestatic  #444                // Method org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;
+     536: astore        17
+     538: aload         17
+     540: bipush        26
+     542: invokevirtual #447                // Method org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;
+     545: pop
+     546: aload         17
+     548: aload_1
+     549: getfield      #450                // Field net/vulkanmod/vulkan/shader/PipelineState.logicOp_i:I
+     552: invokestatic  #451                // Method net/vulkanmod/vulkan/shader/PipelineState$LogicOpState.enable:(I)Z
+     555: invokevirtual #455                // Method org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo.logicOpEnable:(Z)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;
+     558: pop
+     559: aload         17
+     561: aload_1
+     562: getfield      #450                // Field net/vulkanmod/vulkan/shader/PipelineState.logicOp_i:I
+     565: invokestatic  #458                // Method net/vulkanmod/vulkan/shader/PipelineState$LogicOpState.decodeFun:(I)I
+     568: invokevirtual #461                // Method org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo.logicOp:(I)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;
+     571: pop
+     572: aload         17
+     574: aload         16
+     576: invokevirtual #465                // Method org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo.pAttachments:(Lorg/lwjgl/vulkan/VkPipelineColorBlendAttachmentState$Buffer;)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;
+     579: pop
+     580: aload         17
+     582: aload_2
+     583: fconst_0
+     584: fconst_0
+     585: fconst_0
+     586: fconst_0
+     587: invokevirtual #469                // Method org/lwjgl/system/MemoryStack.floats:(FFFF)Ljava/nio/FloatBuffer;
+     590: invokevirtual #473                // Method org/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo.blendConstants:(Ljava/nio/FloatBuffer;)Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;
+     593: pop
+     594: aload_2
+     595: invokestatic  #478                // Method org/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo;
+     598: astore        18
+     600: aload         18
+     602: bipush        27
+     604: invokevirtual #481                // Method org/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo.sType:(I)Lorg/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo;
+     607: pop
+     608: iload         8
+     610: iconst_1
+     611: if_icmpeq     620
+     614: iload         11
+     616: iconst_1
+     617: if_icmpne     637
+     620: aload         18
+     622: aload_2
+     623: iconst_3
+     624: iconst_0
+     625: iconst_1
+     626: iconst_2
+     627: invokevirtual #485                // Method org/lwjgl/system/MemoryStack.ints:(IIII)Ljava/nio/IntBuffer;
+     630: invokevirtual #489                // Method org/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo.pDynamicStates:(Ljava/nio/IntBuffer;)Lorg/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo;
+     633: pop
+     634: goto          650
+     637: aload         18
+     639: aload_2
+     640: iconst_3
+     641: iconst_0
+     642: iconst_1
+     643: invokevirtual #492                // Method org/lwjgl/system/MemoryStack.ints:(III)Ljava/nio/IntBuffer;
+     646: invokevirtual #489                // Method org/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo.pDynamicStates:(Ljava/nio/IntBuffer;)Lorg/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo;
+     649: pop
+     650: iconst_1
+     651: aload_2
+     652: invokestatic  #495                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo.calloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     655: astore        19
+     657: aload         19
+     659: bipush        28
+     661: invokevirtual #498                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.sType:(I)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     664: pop
+     665: aload         19
+     667: aload         4
+     669: invokevirtual #502                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pStages:(Lorg/lwjgl/vulkan/VkPipelineShaderStageCreateInfo$Buffer;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     672: pop
+     673: aload         19
+     675: aload         7
+     677: invokevirtual #506                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pVertexInputState:(Lorg/lwjgl/vulkan/VkPipelineVertexInputStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     680: pop
+     681: aload         19
+     683: aload         9
+     685: invokevirtual #510                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pInputAssemblyState:(Lorg/lwjgl/vulkan/VkPipelineInputAssemblyStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     688: pop
+     689: aload         19
+     691: aload         10
+     693: invokevirtual #514                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pViewportState:(Lorg/lwjgl/vulkan/VkPipelineViewportStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     696: pop
+     697: aload         19
+     699: aload         13
+     701: invokevirtual #518                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pRasterizationState:(Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     704: pop
+     705: aload         19
+     707: aload         14
+     709: invokevirtual #522                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pMultisampleState:(Lorg/lwjgl/vulkan/VkPipelineMultisampleStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     712: pop
+     713: aload         19
+     715: aload         15
+     717: invokevirtual #526                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pDepthStencilState:(Lorg/lwjgl/vulkan/VkPipelineDepthStencilStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     720: pop
+     721: aload         19
+     723: aload         17
+     725: invokevirtual #530                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pColorBlendState:(Lorg/lwjgl/vulkan/VkPipelineColorBlendStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     728: pop
+     729: aload         19
+     731: aload         18
+     733: invokevirtual #534                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pDynamicState:(Lorg/lwjgl/vulkan/VkPipelineDynamicStateCreateInfo;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     736: pop
+     737: aload         19
+     739: aload_0
+     740: getfield      #537                // Field pipelineLayout:J
+     743: invokevirtual #541                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.layout:(J)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     746: pop
+     747: aload         19
+     749: lconst_0
+     750: invokevirtual #544                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.basePipelineHandle:(J)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     753: pop
+     754: aload         19
+     756: iconst_m1
+     757: invokevirtual #547                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.basePipelineIndex:(I)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     760: pop
+     761: aload_2
+     762: invokestatic  #552                // Method org/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR;
+     765: astore        20
+     767: aload         20
+     769: ldc_w         #553                // int 1000044002
+     772: invokevirtual #556                // Method org/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR.sType:(I)Lorg/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR;
+     775: pop
+     776: aload_1
+     777: getfield      #557                // Field net/vulkanmod/vulkan/shader/PipelineState.renderPass:Lnet/vulkanmod/vulkan/framebuffer/RenderPass;
+     780: ifnull        795
+     783: aload_1
+     784: getfield      #557                // Field net/vulkanmod/vulkan/shader/PipelineState.renderPass:Lnet/vulkanmod/vulkan/framebuffer/RenderPass;
+     787: invokevirtual #563                // Method net/vulkanmod/vulkan/framebuffer/RenderPass.getFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+     790: astore        21
+     792: goto          808
+     795: invokestatic  #567                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+     798: invokevirtual #571                // Method net/vulkanmod/vulkan/Renderer.getMainPass:()Lnet/vulkanmod/vulkan/pass/MainPass;
+     801: invokeinterface #576,  1          // InterfaceMethod net/vulkanmod/vulkan/pass/MainPass.getMainFramebuffer:()Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;
+     806: astore        21
+     808: aload         20
+     810: aload_2
+     811: aload         21
+     813: invokevirtual #581                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getFormat:()I
+     816: invokevirtual #584                // Method org/lwjgl/system/MemoryStack.ints:(I)Ljava/nio/IntBuffer;
+     819: invokevirtual #588                // Method org/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR.pColorAttachmentFormats:(Ljava/nio/IntBuffer;)Lorg/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR;
+     822: pop
+     823: aload         20
+     825: aload         21
+     827: invokevirtual #591                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer.getDepthFormat:()I
+     830: invokevirtual #594                // Method org/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR.depthAttachmentFormat:(I)Lorg/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR;
+     833: pop
+     834: aload         19
+     836: aload         20
+     838: invokevirtual #598                // Method org/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer.pNext:(Lorg/lwjgl/vulkan/VkPipelineRenderingCreateInfoKHR;)Lorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;
+     841: pop
+     842: aload_2
+     843: iconst_1
+     844: invokevirtual #602                // Method org/lwjgl/system/MemoryStack.mallocLong:(I)Ljava/nio/LongBuffer;
+     847: astore        20
+     849: getstatic     #608                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+     852: getstatic     #611                // Field PIPELINE_CACHE:J
+     855: aload         19
+     857: aconst_null
+     858: aload         20
+     860: invokestatic  #617                // Method org/lwjgl/vulkan/VK10.vkCreateGraphicsPipelines:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkGraphicsPipelineCreateInfo$Buffer;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I
+     863: aload_0
+     864: getfield      #618                // Field name:Ljava/lang/String;
+     867: invokedynamic #630,  0            // InvokeDynamic #1:makeConcatWithConstants:(Ljava/lang/String;)Ljava/lang/String;
+     872: invokestatic  #636                // Method net/vulkanmod/vulkan/Vulkan.checkResult:(ILjava/lang/String;)V
+     875: aload         20
+     877: iconst_0
+     878: invokevirtual #641                // Method java/nio/LongBuffer.get:(I)J
+     881: lstore        21
+     883: aload_2
+     884: ifnull        891
+     887: aload_2
+     888: invokevirtual #644                // Method org/lwjgl/system/MemoryStack.close:()V
+     891: lload         21
+     893: lreturn
+     894: astore_3
+     895: aload_2
+     896: ifnull        914
+     899: aload_2
+     900: invokevirtual #644                // Method org/lwjgl/system/MemoryStack.close:()V
+     903: goto          914
+     906: astore        4
+     908: aload_3
+     909: aload         4
+     911: invokevirtual #648                // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     914: aload_3
+     915: athrow
+    Exception table:
+       from    to  target type
+           4   883   894   Class java/lang/Throwable
+         899   903   906   Class java/lang/Throwable
+
+  private void createShaderModules(net.vulkanmod.vulkan.shader.Pipeline$Builder);
+    Code:
+       0: aload_1
+       1: getfield      #687                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.shadersSrc:Ljava/util/Map;
+       4: getstatic     #691                // Field net/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind.VERTEX_SHADER:Lnet/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind;
+       7: invokeinterface #696,  2          // InterfaceMethod java/util/Map.get:(Ljava/lang/Object;)Ljava/lang/Object;
+      12: checkcast     #698                // class java/lang/String
+      15: astore_2
+      16: ldc_w         #700                // String %s.vsh
+      19: iconst_1
+      20: anewarray     #702                // class java/lang/Object
+      23: dup
+      24: iconst_0
+      25: aload_0
+      26: getfield      #618                // Field name:Ljava/lang/String;
+      29: aastore
+      30: invokestatic  #706                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+      33: aload_2
+      34: getstatic     #691                // Field net/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind.VERTEX_SHADER:Lnet/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind;
+      37: invokestatic  #710                // Method net/vulkanmod/vulkan/shader/SPIRVUtils.compileShader:(Ljava/lang/String;Ljava/lang/String;Lnet/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind;)Lnet/vulkanmod/vulkan/shader/SPIRVUtils$SPIRV;
+      40: astore_3
+      41: aload_1
+      42: getfield      #687                // Field net/vulkanmod/vulkan/shader/Pipeline$Builder.shadersSrc:Ljava/util/Map;
+      45: getstatic     #713                // Field net/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind.FRAGMENT_SHADER:Lnet/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind;
+      48: invokeinterface #696,  2          // InterfaceMethod java/util/Map.get:(Ljava/lang/Object;)Ljava/lang/Object;
+      53: checkcast     #698                // class java/lang/String
+      56: astore        4
+      58: ldc_w         #715                // String %s.fsh
+      61: iconst_1
+      62: anewarray     #702                // class java/lang/Object
+      65: dup
+      66: iconst_0
+      67: aload_0
+      68: getfield      #618                // Field name:Ljava/lang/String;
+      71: aastore
+      72: invokestatic  #706                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+      75: aload         4
+      77: getstatic     #713                // Field net/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind.FRAGMENT_SHADER:Lnet/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind;
+      80: invokestatic  #710                // Method net/vulkanmod/vulkan/shader/SPIRVUtils.compileShader:(Ljava/lang/String;Ljava/lang/String;Lnet/vulkanmod/vulkan/shader/SPIRVUtils$ShaderKind;)Lnet/vulkanmod/vulkan/shader/SPIRVUtils$SPIRV;
+      83: astore        5
+      85: aload_0
+      86: aload_3
+      87: invokevirtual #719                // Method net/vulkanmod/vulkan/shader/SPIRVUtils$SPIRV.bytecode:()Ljava/nio/ByteBuffer;
+      90: invokestatic  #723                // Method createShaderModule:(Ljava/nio/ByteBuffer;)J
+      93: putfield      #98                 // Field vertShaderModule:J
+      96: aload_0
+      97: aload         5
+      99: invokevirtual #719                // Method net/vulkanmod/vulkan/shader/SPIRVUtils$SPIRV.bytecode:()Ljava/nio/ByteBuffer;
+     102: invokestatic  #723                // Method createShaderModule:(Ljava/nio/ByteBuffer;)J
+     105: putfield      #100                // Field fragShaderModule:J
+     108: return
+
+  public void cleanUp();
+    Code:
+       0: getstatic     #608                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+       3: aload_0
+       4: getfield      #98                 // Field vertShaderModule:J
+       7: aconst_null
+       8: invokestatic  #733                // Method org/lwjgl/vulkan/VK10.vkDestroyShaderModule:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+      11: getstatic     #608                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+      14: aload_0
+      15: getfield      #100                // Field fragShaderModule:J
+      18: aconst_null
+      19: invokestatic  #733                // Method org/lwjgl/vulkan/VK10.vkDestroyShaderModule:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+      22: aload_0
+      23: getfield      #124                // Field vertexInputDescription:Lnet/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription;
+      26: invokevirtual #735                // Method net/vulkanmod/vulkan/shader/GraphicsPipeline$VertexInputDescription.cleanUp:()V
+      29: aload_0
+      30: invokevirtual #738                // Method destroyDescriptorSets:()V
+      33: aload_0
+      34: getfield      #96                 // Field graphicsPipelines:Lit/unimi/dsi/fastutil/objects/Object2LongMap;
+      37: invokedynamic #750,  0            // InvokeDynamic #2:accept:()Lit/unimi/dsi/fastutil/objects/ObjectLongBiConsumer;
+      42: invokeinterface #754,  2          // InterfaceMethod it/unimi/dsi/fastutil/objects/Object2LongMap.forEach:(Lit/unimi/dsi/fastutil/objects/ObjectLongBiConsumer;)V
+      47: aload_0
+      48: getfield      #96                 // Field graphicsPipelines:Lit/unimi/dsi/fastutil/objects/Object2LongMap;
+      51: invokeinterface #757,  1          // InterfaceMethod it/unimi/dsi/fastutil/objects/Object2LongMap.clear:()V
+      56: getstatic     #608                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+      59: aload_0
+      60: getfield      #760                // Field descriptorSetLayout:J
+      63: aconst_null
+      64: invokestatic  #763                // Method org/lwjgl/vulkan/VK10.vkDestroyDescriptorSetLayout:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+      67: getstatic     #608                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+      70: aload_0
+      71: getfield      #537                // Field pipelineLayout:J
+      74: aconst_null
+      75: invokestatic  #766                // Method org/lwjgl/vulkan/VK10.vkDestroyPipelineLayout:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+      78: getstatic     #179                // Field PIPELINES:Ljava/util/List;
+      81: aload_0
+      82: invokeinterface #769,  2          // InterfaceMethod java/util/List.remove:(Ljava/lang/Object;)Z
+      87: pop
+      88: invokestatic  #567                // Method net/vulkanmod/vulkan/Renderer.getInstance:()Lnet/vulkanmod/vulkan/Renderer;
+      91: aload_0
+      92: invokevirtual #773                // Method net/vulkanmod/vulkan/Renderer.removeUsedPipeline:(Lnet/vulkanmod/vulkan/shader/Pipeline;)V
+      95: return
+
+  private static org.lwjgl.vulkan.VkVertexInputBindingDescription$Buffer getBindingDescription(com.mojang.blaze3d.vertex.VertexFormat);
+    Code:
+       0: iconst_1
+       1: invokestatic  #778                // Method org/lwjgl/vulkan/VkVertexInputBindingDescription.calloc:(I)Lorg/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer;
+       4: astore_1
+       5: aload_1
+       6: iconst_0
+       7: invokevirtual #781                // Method org/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer.binding:(I)Lorg/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer;
+      10: pop
+      11: aload_1
+      12: aload_0
+      13: invokevirtual #786                // Method com/mojang/blaze3d/vertex/VertexFormat.getVertexSize:()I
+      16: invokevirtual #789                // Method org/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer.stride:(I)Lorg/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer;
+      19: pop
+      20: aload_1
+      21: iconst_0
+      22: invokevirtual #792                // Method org/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer.inputRate:(I)Lorg/lwjgl/vulkan/VkVertexInputBindingDescription$Buffer;
+      25: pop
+      26: aload_1
+      27: areturn
+
+  private static org.lwjgl.vulkan.VkVertexInputAttributeDescription$Buffer getAttributeDescriptions(com.mojang.blaze3d.vertex.VertexFormat);
+    Code:
+       0: aload_0
+       1: invokevirtual #799                // Method com/mojang/blaze3d/vertex/VertexFormat.getElements:()Ljava/util/List;
+       4: astore_1
+       5: aload_1
+       6: invokeinterface #802,  1          // InterfaceMethod java/util/List.size:()I
+      11: istore_2
+      12: iload_2
+      13: invokestatic  #805                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.calloc:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription$Buffer;
+      16: astore_3
+      17: iconst_0
+      18: istore        4
+      20: iconst_0
+      21: istore        5
+      23: iload         5
+      25: iload_2
+      26: if_icmpge     647
+      29: aload_3
+      30: iload         5
+      32: invokevirtual #806                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription$Buffer.get:(I)Lorg/lwjgl/system/Struct;
+      35: checkcast     #26                 // class org/lwjgl/vulkan/VkVertexInputAttributeDescription
+      38: astore        6
+      40: aload         6
+      42: iconst_0
+      43: invokevirtual #809                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.binding:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+      46: pop
+      47: aload         6
+      49: iload         5
+      51: invokevirtual #812                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.location:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+      54: pop
+      55: aload_1
+      56: iload         5
+      58: invokeinterface #815,  2          // InterfaceMethod java/util/List.get:(I)Ljava/lang/Object;
+      63: checkcast     #60                 // class com/mojang/blaze3d/vertex/VertexFormatElement
+      66: astore        7
+      68: aload         7
+      70: invokevirtual #819                // Method com/mojang/blaze3d/vertex/VertexFormatElement.usage:()Lcom/mojang/blaze3d/vertex/VertexFormatElement$Usage;
+      73: astore        8
+      75: aload         7
+      77: invokevirtual #823                // Method com/mojang/blaze3d/vertex/VertexFormatElement.type:()Lcom/mojang/blaze3d/vertex/VertexFormatElement$Type;
+      80: astore        9
+      82: aload         7
+      84: invokevirtual #826                // Method com/mojang/blaze3d/vertex/VertexFormatElement.count:()I
+      87: istore        10
+      89: getstatic     #830                // Field net/vulkanmod/vulkan/shader/GraphicsPipeline$1.$SwitchMap$com$mojang$blaze3d$vertex$VertexFormatElement$Usage:[I
+      92: aload         8
+      94: invokevirtual #833                // Method com/mojang/blaze3d/vertex/VertexFormatElement$Usage.ordinal:()I
+      97: iaload
+      98: tableswitch   { // 1 to 5
+
+                     1: 132
+
+                     2: 234
+
+                     3: 312
+
+                     4: 448
+
+                     5: 470
+               default: 601
+          }
+     132: getstatic     #836                // Field net/vulkanmod/vulkan/shader/GraphicsPipeline$1.$SwitchMap$com$mojang$blaze3d$vertex$VertexFormatElement$Type:[I
+     135: aload         9
+     137: invokevirtual #837                // Method com/mojang/blaze3d/vertex/VertexFormatElement$Type.ordinal:()I
+     140: iaload
+     141: tableswitch   { // 1 to 3
+
+                     1: 168
+
+                     2: 190
+
+                     3: 212
+               default: 231
+          }
+     168: aload         6
+     170: bipush        106
+     172: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     175: pop
+     176: aload         6
+     178: iload         4
+     180: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     183: pop
+     184: iinc          4, 12
+     187: goto          231
+     190: aload         6
+     192: bipush        96
+     194: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     197: pop
+     198: aload         6
+     200: iload         4
+     202: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     205: pop
+     206: iinc          4, 8
+     209: goto          231
+     212: aload         6
+     214: bipush        42
+     216: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     219: pop
+     220: aload         6
+     222: iload         4
+     224: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     227: pop
+     228: iinc          4, 4
+     231: goto          624
+     234: getstatic     #836                // Field net/vulkanmod/vulkan/shader/GraphicsPipeline$1.$SwitchMap$com$mojang$blaze3d$vertex$VertexFormatElement$Type:[I
+     237: aload         9
+     239: invokevirtual #837                // Method com/mojang/blaze3d/vertex/VertexFormatElement$Type.ordinal:()I
+     242: iaload
+     243: lookupswitch  { // 2
+
+                     4: 268
+
+                     5: 290
+               default: 309
+          }
+     268: aload         6
+     270: bipush        37
+     272: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     275: pop
+     276: aload         6
+     278: iload         4
+     280: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     283: pop
+     284: iinc          4, 4
+     287: goto          309
+     290: aload         6
+     292: bipush        98
+     294: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     297: pop
+     298: aload         6
+     300: iload         4
+     302: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     305: pop
+     306: iinc          4, 4
+     309: goto          624
+     312: getstatic     #836                // Field net/vulkanmod/vulkan/shader/GraphicsPipeline$1.$SwitchMap$com$mojang$blaze3d$vertex$VertexFormatElement$Type:[I
+     315: aload         9
+     317: invokevirtual #837                // Method com/mojang/blaze3d/vertex/VertexFormatElement$Type.ordinal:()I
+     320: iaload
+     321: tableswitch   { // 1 to 6
+
+                     1: 360
+
+                     2: 382
+
+                     3: 445
+
+                     4: 445
+
+                     5: 426
+
+                     6: 404
+               default: 445
+          }
+     360: aload         6
+     362: bipush        103
+     364: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     367: pop
+     368: aload         6
+     370: iload         4
+     372: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     375: pop
+     376: iinc          4, 8
+     379: goto          445
+     382: aload         6
+     384: bipush        82
+     386: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     389: pop
+     390: aload         6
+     392: iload         4
+     394: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     397: pop
+     398: iinc          4, 4
+     401: goto          445
+     404: aload         6
+     406: bipush        81
+     408: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     411: pop
+     412: aload         6
+     414: iload         4
+     416: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     419: pop
+     420: iinc          4, 4
+     423: goto          445
+     426: aload         6
+     428: bipush        98
+     430: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     433: pop
+     434: aload         6
+     436: iload         4
+     438: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     441: pop
+     442: iinc          4, 4
+     445: goto          624
+     448: aload         6
+     450: bipush        38
+     452: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     455: pop
+     456: aload         6
+     458: iload         4
+     460: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     463: pop
+     464: iinc          4, 4
+     467: goto          624
+     470: aload         9
+     472: getstatic     #846                // Field com/mojang/blaze3d/vertex/VertexFormatElement$Type.SHORT:Lcom/mojang/blaze3d/vertex/VertexFormatElement$Type;
+     475: if_acmpne     506
+     478: iload         10
+     480: iconst_1
+     481: if_icmpne     506
+     484: aload         6
+     486: bipush        75
+     488: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     491: pop
+     492: aload         6
+     494: iload         4
+     496: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     499: pop
+     500: iinc          4, 2
+     503: goto          624
+     506: aload         9
+     508: getstatic     #849                // Field com/mojang/blaze3d/vertex/VertexFormatElement$Type.INT:Lcom/mojang/blaze3d/vertex/VertexFormatElement$Type;
+     511: if_acmpne     542
+     514: iload         10
+     516: iconst_1
+     517: if_icmpne     542
+     520: aload         6
+     522: bipush        99
+     524: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     527: pop
+     528: aload         6
+     530: iload         4
+     532: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     535: pop
+     536: iinc          4, 4
+     539: goto          624
+     542: aload         9
+     544: getstatic     #852                // Field com/mojang/blaze3d/vertex/VertexFormatElement$Type.FLOAT:Lcom/mojang/blaze3d/vertex/VertexFormatElement$Type;
+     547: if_acmpne     578
+     550: iload         10
+     552: iconst_1
+     553: if_icmpne     578
+     556: aload         6
+     558: bipush        100
+     560: invokevirtual #839                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.format:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     563: pop
+     564: aload         6
+     566: iload         4
+     568: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     571: pop
+     572: iinc          4, 4
+     575: goto          624
+     578: new           #854                // class java/lang/RuntimeException
+     581: dup
+     582: ldc_w         #856                // String Unknown type: %s
+     585: iconst_1
+     586: anewarray     #702                // class java/lang/Object
+     589: dup
+     590: iconst_0
+     591: aload         9
+     593: aastore
+     594: invokestatic  #706                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+     597: invokespecial #857                // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+     600: athrow
+     601: new           #854                // class java/lang/RuntimeException
+     604: dup
+     605: ldc_w         #859                // String Unknown format: %s
+     608: iconst_1
+     609: anewarray     #702                // class java/lang/Object
+     612: dup
+     613: iconst_0
+     614: aload         8
+     616: aastore
+     617: invokestatic  #706                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+     620: invokespecial #857                // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+     623: athrow
+     624: aload         6
+     626: aload_0
+     627: checkcast     #861                // class net/vulkanmod/interfaces/VertexFormatMixed
+     630: iload         5
+     632: invokeinterface #864,  2          // InterfaceMethod net/vulkanmod/interfaces/VertexFormatMixed.getOffset:(I)I
+     637: invokevirtual #842                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription.offset:(I)Lorg/lwjgl/vulkan/VkVertexInputAttributeDescription;
+     640: pop
+     641: iinc          5, 1
+     644: goto          23
+     647: aload_3
+     648: invokevirtual #868                // Method org/lwjgl/vulkan/VkVertexInputAttributeDescription$Buffer.rewind:()Lorg/lwjgl/system/CustomBuffer;
+     651: checkcast     #24                 // class org/lwjgl/vulkan/VkVertexInputAttributeDescription$Buffer
+     654: areturn
+
+  private static void lambda$cleanUp$0(net.vulkanmod.vulkan.shader.PipelineState, long);
+    Code:
+       0: getstatic     #608                // Field net/vulkanmod/vulkan/device/DeviceManager.vkDevice:Lorg/lwjgl/vulkan/VkDevice;
+       3: lload_1
+       4: aconst_null
+       5: invokestatic  #881                // Method org/lwjgl/vulkan/VK10.vkDestroyPipeline:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+       8: return
+}

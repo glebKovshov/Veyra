@@ -1,0 +1,8 @@
+renderDistance:3
+simulationDistance:5
+cloudStatus:2
+maxFps:30
+enableVsync:false
+pauseOnLostFocus:false
+entityDistanceScaling:0.5
+showAutosaveIndicator:false

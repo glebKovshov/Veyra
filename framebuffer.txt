@@ -1,0 +1,567 @@
+﻿Compiled from "Framebuffer.java"
+public class net.vulkanmod.vulkan.framebuffer.Framebuffer {
+  public static final int DEFAULT_FORMAT;
+
+  public final java.lang.String name;
+
+  protected int format;
+
+  protected int depthFormat;
+
+  protected int width;
+
+  protected int height;
+
+  protected boolean linearFiltering;
+
+  protected boolean depthLinearFiltering;
+
+  protected int attachmentCount;
+
+  boolean hasColorAttachment;
+
+  boolean hasDepthAttachment;
+
+  private net.vulkanmod.vulkan.texture.VulkanImage colorAttachment;
+
+  protected net.vulkanmod.vulkan.texture.VulkanImage depthAttachment;
+
+  private int level;
+
+  private final it.unimi.dsi.fastutil.objects.Reference2LongArrayMap<net.vulkanmod.vulkan.framebuffer.RenderPass> renderpassToFramebufferMap;
+
+  protected net.vulkanmod.vulkan.framebuffer.Framebuffer();
+    Code:
+       0: aload_0
+       1: invokespecial #52                 // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: new           #54                 // class it/unimi/dsi/fastutil/objects/Reference2LongArrayMap
+       8: dup
+       9: invokespecial #55                 // Method it/unimi/dsi/fastutil/objects/Reference2LongArrayMap."<init>":()V
+      12: putfield      #57                 // Field renderpassToFramebufferMap:Lit/unimi/dsi/fastutil/objects/Reference2LongArrayMap;
+      15: aload_0
+      16: aconst_null
+      17: putfield      #59                 // Field name:Ljava/lang/String;
+      20: return
+
+  public net.vulkanmod.vulkan.framebuffer.Framebuffer(net.vulkanmod.vulkan.framebuffer.Framebuffer$Builder);
+    Code:
+       0: aload_0
+       1: invokespecial #52                 // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: new           #54                 // class it/unimi/dsi/fastutil/objects/Reference2LongArrayMap
+       8: dup
+       9: invokespecial #55                 // Method it/unimi/dsi/fastutil/objects/Reference2LongArrayMap."<init>":()V
+      12: putfield      #57                 // Field renderpassToFramebufferMap:Lit/unimi/dsi/fastutil/objects/Reference2LongArrayMap;
+      15: aload_0
+      16: aload_1
+      17: getfield      #64                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.name:Ljava/lang/String;
+      20: putfield      #59                 // Field name:Ljava/lang/String;
+      23: aload_0
+      24: aload_1
+      25: getfield      #66                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.format:I
+      28: putfield      #67                 // Field format:I
+      31: aload_0
+      32: aload_1
+      33: getfield      #69                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.depthFormat:I
+      36: putfield      #70                 // Field depthFormat:I
+      39: aload_0
+      40: aload_1
+      41: getfield      #72                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.width:I
+      44: putfield      #73                 // Field width:I
+      47: aload_0
+      48: aload_1
+      49: getfield      #75                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.height:I
+      52: putfield      #76                 // Field height:I
+      55: aload_0
+      56: aload_1
+      57: getfield      #78                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.linearFiltering:Z
+      60: putfield      #79                 // Field linearFiltering:Z
+      63: aload_0
+      64: aload_1
+      65: getfield      #81                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.depthLinearFiltering:Z
+      68: putfield      #82                 // Field depthLinearFiltering:Z
+      71: aload_0
+      72: aload_1
+      73: getfield      #84                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.hasColorAttachment:Z
+      76: putfield      #85                 // Field hasColorAttachment:Z
+      79: aload_0
+      80: aload_1
+      81: getfield      #87                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.hasDepthAttachment:Z
+      84: putfield      #88                 // Field hasDepthAttachment:Z
+      87: aload_1
+      88: getfield      #91                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.createImages:Z
+      91: ifeq          101
+      94: aload_0
+      95: invokevirtual #93                 // Method createImages:()V
+      98: goto          117
+     101: aload_0
+     102: aload_1
+     103: getfield      #95                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     106: putfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     109: aload_0
+     110: aload_1
+     111: getfield      #98                 // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     114: putfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     117: aload_0
+     118: aload_1
+     119: getfield      #101                // Field net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder.level:I
+     122: putfield      #102                // Field level:I
+     125: return
+
+  public void createImages();
+    Code:
+       0: aload_0
+       1: getfield      #85                 // Field hasColorAttachment:Z
+       4: ifeq          78
+       7: aload_0
+       8: aload_0
+       9: getfield      #73                 // Field width:I
+      12: aload_0
+      13: getfield      #76                 // Field height:I
+      16: invokestatic  #106                // Method net/vulkanmod/vulkan/texture/VulkanImage.builder:(II)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      19: aload_0
+      20: getfield      #59                 // Field name:Ljava/lang/String;
+      23: ifnull        45
+      26: ldc           #108                // String %s Color
+      28: iconst_1
+      29: anewarray     #4                  // class java/lang/Object
+      32: dup
+      33: iconst_0
+      34: aload_0
+      35: getfield      #59                 // Field name:Ljava/lang/String;
+      38: aastore
+      39: invokestatic  #113                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+      42: goto          46
+      45: aconst_null
+      46: invokevirtual #117                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setName:(Ljava/lang/String;)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      49: aload_0
+      50: getfield      #67                 // Field format:I
+      53: invokevirtual #121                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setFormat:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      56: bipush        23
+      58: invokevirtual #124                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setUsage:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      61: aload_0
+      62: getfield      #79                 // Field linearFiltering:Z
+      65: invokevirtual #128                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setLinearFiltering:(Z)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      68: iconst_1
+      69: invokevirtual #131                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setClamp:(Z)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      72: invokevirtual #135                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.createVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      75: putfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      78: aload_0
+      79: getfield      #88                 // Field hasDepthAttachment:Z
+      82: ifeq          166
+      85: aload_0
+      86: aload_0
+      87: getfield      #73                 // Field width:I
+      90: aload_0
+      91: getfield      #76                 // Field height:I
+      94: invokestatic  #106                // Method net/vulkanmod/vulkan/texture/VulkanImage.builder:(II)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+      97: aload_0
+      98: getfield      #59                 // Field name:Ljava/lang/String;
+     101: ifnull        123
+     104: ldc           #137                // String %s Depth
+     106: iconst_1
+     107: anewarray     #4                  // class java/lang/Object
+     110: dup
+     111: iconst_0
+     112: aload_0
+     113: getfield      #59                 // Field name:Ljava/lang/String;
+     116: aastore
+     117: invokestatic  #113                // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+     120: goto          124
+     123: aconst_null
+     124: invokevirtual #117                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setName:(Ljava/lang/String;)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+     127: aload_0
+     128: getfield      #70                 // Field depthFormat:I
+     131: invokevirtual #121                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setFormat:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+     134: bipush        39
+     136: invokevirtual #124                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setUsage:(I)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+     139: aload_0
+     140: getfield      #82                 // Field depthLinearFiltering:Z
+     143: invokevirtual #128                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setLinearFiltering:(Z)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+     146: iconst_1
+     147: invokevirtual #131                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.setClamp:(Z)Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;
+     150: invokevirtual #135                // Method net/vulkanmod/vulkan/texture/VulkanImage$Builder.createVulkanImage:()Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     153: putfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+     156: aload_0
+     157: dup
+     158: getfield      #139                // Field attachmentCount:I
+     161: iconst_1
+     162: iadd
+     163: putfield      #139                // Field attachmentCount:I
+     166: return
+
+  public void resize(int, int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: putfield      #73                 // Field width:I
+       5: aload_0
+       6: iload_2
+       7: putfield      #76                 // Field height:I
+      10: aload_0
+      11: invokevirtual #146                // Method cleanUp:()V
+      14: aload_0
+      15: invokevirtual #93                 // Method createImages:()V
+      18: return
+
+  private long createFramebuffer(net.vulkanmod.vulkan.framebuffer.RenderPass);
+    Code:
+       0: invokestatic  #157                // Method org/lwjgl/system/MemoryStack.stackPush:()Lorg/lwjgl/system/MemoryStack;
+       3: astore_2
+       4: aload_0
+       5: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       8: ifnull        40
+      11: aload_0
+      12: getfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      15: ifnull        40
+      18: aload_2
+      19: aload_0
+      20: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      23: invokevirtual #161                // Method net/vulkanmod/vulkan/texture/VulkanImage.getImageView:()J
+      26: aload_0
+      27: getfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      30: invokevirtual #161                // Method net/vulkanmod/vulkan/texture/VulkanImage.getImageView:()J
+      33: invokevirtual #165                // Method org/lwjgl/system/MemoryStack.longs:(JJ)Ljava/nio/LongBuffer;
+      36: astore_3
+      37: goto          70
+      40: aload_0
+      41: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      44: ifnull        62
+      47: aload_2
+      48: aload_0
+      49: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      52: invokevirtual #161                // Method net/vulkanmod/vulkan/texture/VulkanImage.getImageView:()J
+      55: invokevirtual #168                // Method org/lwjgl/system/MemoryStack.longs:(J)Ljava/nio/LongBuffer;
+      58: astore_3
+      59: goto          70
+      62: new           #170                // class java/lang/IllegalStateException
+      65: dup
+      66: invokespecial #171                // Method java/lang/IllegalStateException."<init>":()V
+      69: athrow
+      70: aload_2
+      71: iconst_1
+      72: invokevirtual #177                // Method org/lwjgl/system/MemoryStack.mallocLong:(I)Ljava/nio/LongBuffer;
+      75: astore        4
+      77: aload_2
+      78: invokestatic  #183                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.calloc:(Lorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+      81: astore        5
+      83: aload         5
+      85: invokevirtual #187                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.sType$Default:()Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+      88: pop
+      89: aload         5
+      91: aload_1
+      92: invokevirtual #192                // Method net/vulkanmod/vulkan/framebuffer/RenderPass.getId:()J
+      95: invokevirtual #195                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.renderPass:(J)Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+      98: pop
+      99: aload         5
+     101: aload_0
+     102: getfield      #73                 // Field width:I
+     105: invokevirtual #198                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.width:(I)Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+     108: pop
+     109: aload         5
+     111: aload_0
+     112: getfield      #76                 // Field height:I
+     115: invokevirtual #200                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.height:(I)Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+     118: pop
+     119: aload         5
+     121: iconst_1
+     122: invokevirtual #203                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.layers:(I)Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+     125: pop
+     126: aload         5
+     128: aload_3
+     129: invokevirtual #207                // Method org/lwjgl/vulkan/VkFramebufferCreateInfo.pAttachments:(Ljava/nio/LongBuffer;)Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;
+     132: pop
+     133: invokestatic  #213                // Method net/vulkanmod/vulkan/Vulkan.getVkDevice:()Lorg/lwjgl/vulkan/VkDevice;
+     136: aload         5
+     138: aconst_null
+     139: aload         4
+     141: invokestatic  #219                // Method org/lwjgl/vulkan/VK10.vkCreateFramebuffer:(Lorg/lwjgl/vulkan/VkDevice;Lorg/lwjgl/vulkan/VkFramebufferCreateInfo;Lorg/lwjgl/vulkan/VkAllocationCallbacks;Ljava/nio/LongBuffer;)I
+     144: ifeq          157
+     147: new           #221                // class java/lang/RuntimeException
+     150: dup
+     151: ldc           #223                // String Failed to create framebuffer
+     153: invokespecial #226                // Method java/lang/RuntimeException."<init>":(Ljava/lang/String;)V
+     156: athrow
+     157: aload         4
+     159: iconst_0
+     160: invokevirtual #230                // Method java/nio/LongBuffer.get:(I)J
+     163: lstore        6
+     165: aload_2
+     166: ifnull        173
+     169: aload_2
+     170: invokevirtual #233                // Method org/lwjgl/system/MemoryStack.close:()V
+     173: lload         6
+     175: lreturn
+     176: astore_3
+     177: aload_2
+     178: ifnull        196
+     181: aload_2
+     182: invokevirtual #233                // Method org/lwjgl/system/MemoryStack.close:()V
+     185: goto          196
+     188: astore        4
+     190: aload_3
+     191: aload         4
+     193: invokevirtual #237                // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+     196: aload_3
+     197: athrow
+    Exception table:
+       from    to  target type
+           4   165   176   Class java/lang/Throwable
+         181   185   188   Class java/lang/Throwable
+
+  public void beginRenderPass(org.lwjgl.vulkan.VkCommandBuffer, net.vulkanmod.vulkan.framebuffer.RenderPass, org.lwjgl.system.MemoryStack);
+    Code:
+       0: aload_2
+       1: aload_0
+       2: invokevirtual #252                // Method net/vulkanmod/vulkan/framebuffer/RenderPass.setFramebuffer:(Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;)V
+       5: aload_2
+       6: aload_1
+       7: aload_3
+       8: invokevirtual #256                // Method net/vulkanmod/vulkan/framebuffer/RenderPass.beginDynamicRendering:(Lorg/lwjgl/vulkan/VkCommandBuffer;Lorg/lwjgl/system/MemoryStack;)V
+      11: return
+
+  protected long getFramebufferId(net.vulkanmod.vulkan.framebuffer.RenderPass);
+    Code:
+       0: aload_0
+       1: getfield      #57                 // Field renderpassToFramebufferMap:Lit/unimi/dsi/fastutil/objects/Reference2LongArrayMap;
+       4: aload_1
+       5: aload_0
+       6: aload_1
+       7: invokedynamic #276,  0            // InvokeDynamic #0:getLong:(Lnet/vulkanmod/vulkan/framebuffer/Framebuffer;Lnet/vulkanmod/vulkan/framebuffer/RenderPass;)Lit/unimi/dsi/fastutil/objects/Reference2LongFunction;
+      12: invokevirtual #280                // Method it/unimi/dsi/fastutil/objects/Reference2LongArrayMap.computeIfAbsent:(Ljava/lang/Object;Lit/unimi/dsi/fastutil/objects/Reference2LongFunction;)J
+      15: lreturn
+
+  public org.lwjgl.vulkan.VkViewport$Buffer viewport(org.lwjgl.system.MemoryStack);
+    Code:
+       0: iconst_1
+       1: aload_1
+       2: invokestatic  #286                // Method org/lwjgl/vulkan/VkViewport.malloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+       5: astore_2
+       6: aload_2
+       7: fconst_0
+       8: invokevirtual #290                // Method org/lwjgl/vulkan/VkViewport$Buffer.x:(F)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+      11: pop
+      12: aload_2
+      13: aload_0
+      14: getfield      #76                 // Field height:I
+      17: i2f
+      18: invokevirtual #293                // Method org/lwjgl/vulkan/VkViewport$Buffer.y:(F)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+      21: pop
+      22: aload_2
+      23: aload_0
+      24: getfield      #73                 // Field width:I
+      27: i2f
+      28: invokevirtual #295                // Method org/lwjgl/vulkan/VkViewport$Buffer.width:(F)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+      31: pop
+      32: aload_2
+      33: aload_0
+      34: getfield      #76                 // Field height:I
+      37: ineg
+      38: i2f
+      39: invokevirtual #297                // Method org/lwjgl/vulkan/VkViewport$Buffer.height:(F)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+      42: pop
+      43: aload_2
+      44: fconst_0
+      45: invokevirtual #300                // Method org/lwjgl/vulkan/VkViewport$Buffer.minDepth:(F)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+      48: pop
+      49: aload_2
+      50: fconst_1
+      51: invokevirtual #303                // Method org/lwjgl/vulkan/VkViewport$Buffer.maxDepth:(F)Lorg/lwjgl/vulkan/VkViewport$Buffer;
+      54: pop
+      55: aload_2
+      56: areturn
+
+  public org.lwjgl.vulkan.VkRect2D$Buffer scissor(org.lwjgl.system.MemoryStack);
+    Code:
+       0: iconst_1
+       1: aload_1
+       2: invokestatic  #309                // Method org/lwjgl/vulkan/VkRect2D.malloc:(ILorg/lwjgl/system/MemoryStack;)Lorg/lwjgl/vulkan/VkRect2D$Buffer;
+       5: astore_2
+       6: aload_2
+       7: invokevirtual #313                // Method org/lwjgl/vulkan/VkRect2D$Buffer.offset:()Lorg/lwjgl/vulkan/VkOffset2D;
+      10: iconst_0
+      11: iconst_0
+      12: invokevirtual #319                // Method org/lwjgl/vulkan/VkOffset2D.set:(II)Lorg/lwjgl/vulkan/VkOffset2D;
+      15: pop
+      16: aload_2
+      17: invokevirtual #323                // Method org/lwjgl/vulkan/VkRect2D$Buffer.extent:()Lorg/lwjgl/vulkan/VkExtent2D;
+      20: aload_0
+      21: getfield      #73                 // Field width:I
+      24: aload_0
+      25: getfield      #76                 // Field height:I
+      28: invokevirtual #328                // Method org/lwjgl/vulkan/VkExtent2D.set:(II)Lorg/lwjgl/vulkan/VkExtent2D;
+      31: pop
+      32: aload_2
+      33: areturn
+
+  public void cleanUp();
+    Code:
+       0: aload_0
+       1: iconst_1
+       2: invokevirtual #332                // Method cleanUp:(Z)V
+       5: return
+
+  public void cleanUp(boolean);
+    Code:
+       0: iload_1
+       1: ifeq          32
+       4: aload_0
+       5: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       8: ifnull        18
+      11: aload_0
+      12: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      15: invokevirtual #336                // Method net/vulkanmod/vulkan/texture/VulkanImage.free:()V
+      18: aload_0
+      19: getfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      22: ifnull        32
+      25: aload_0
+      26: getfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+      29: invokevirtual #336                // Method net/vulkanmod/vulkan/texture/VulkanImage.free:()V
+      32: invokestatic  #213                // Method net/vulkanmod/vulkan/Vulkan.getVkDevice:()Lorg/lwjgl/vulkan/VkDevice;
+      35: astore_2
+      36: aload_0
+      37: getfield      #57                 // Field renderpassToFramebufferMap:Lit/unimi/dsi/fastutil/objects/Reference2LongArrayMap;
+      40: invokevirtual #340                // Method it/unimi/dsi/fastutil/objects/Reference2LongArrayMap.values:()Lit/unimi/dsi/fastutil/longs/LongCollection;
+      43: invokeinterface #346,  1          // InterfaceMethod it/unimi/dsi/fastutil/longs/LongCollection.toLongArray:()[J
+      48: astore_3
+      49: invokestatic  #352                // Method net/vulkanmod/vulkan/memory/MemoryManager.getInstance:()Lnet/vulkanmod/vulkan/memory/MemoryManager;
+      52: aload_3
+      53: aload_2
+      54: invokedynamic #362,  0            // InvokeDynamic #1:run:([JLorg/lwjgl/vulkan/VkDevice;)Ljava/lang/Runnable;
+      59: invokevirtual #366                // Method net/vulkanmod/vulkan/memory/MemoryManager.addFrameOp:(Ljava/lang/Runnable;)V
+      62: aload_0
+      63: getfield      #57                 // Field renderpassToFramebufferMap:Lit/unimi/dsi/fastutil/objects/Reference2LongArrayMap;
+      66: invokevirtual #369                // Method it/unimi/dsi/fastutil/objects/Reference2LongArrayMap.clear:()V
+      69: return
+
+  public void setLevel(int);
+    Code:
+       0: aload_0
+       1: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: getfield      #378                // Field net/vulkanmod/vulkan/texture/VulkanImage.mipLevels:I
+       7: iconst_1
+       8: isub
+       9: istore_2
+      10: iload_1
+      11: iload_2
+      12: if_icmple     47
+      15: new           #170                // class java/lang/IllegalStateException
+      18: dup
+      19: ldc_w         #380                // String Requested mip level (%d) greater than color attachments max mip level (%d)
+      22: iconst_2
+      23: anewarray     #4                  // class java/lang/Object
+      26: dup
+      27: iconst_0
+      28: iload_1
+      29: invokestatic  #386                // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+      32: aastore
+      33: dup
+      34: iconst_1
+      35: iload_2
+      36: invokestatic  #386                // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+      39: aastore
+      40: invokevirtual #390                // Method java/lang/String.formatted:([Ljava/lang/Object;)Ljava/lang/String;
+      43: invokespecial #391                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      46: athrow
+      47: aload_0
+      48: iload_1
+      49: putfield      #102                // Field level:I
+      52: return
+
+  public long getDepthImageView();
+    Code:
+       0: aload_0
+       1: getfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: invokevirtual #161                // Method net/vulkanmod/vulkan/texture/VulkanImage.getImageView:()J
+       7: lreturn
+
+  public net.vulkanmod.vulkan.texture.VulkanImage getDepthAttachment();
+    Code:
+       0: aload_0
+       1: getfield      #99                 // Field depthAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: areturn
+
+  public net.vulkanmod.vulkan.texture.VulkanImage getColorAttachment();
+    Code:
+       0: aload_0
+       1: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: areturn
+
+  public long getColorAttachmentView();
+    Code:
+       0: aload_0
+       1: getfield      #96                 // Field colorAttachment:Lnet/vulkanmod/vulkan/texture/VulkanImage;
+       4: aload_0
+       5: getfield      #102                // Field level:I
+       8: invokevirtual #399                // Method net/vulkanmod/vulkan/texture/VulkanImage.getLevelImageView:(I)J
+      11: lreturn
+
+  public int getWidth();
+    Code:
+       0: aload_0
+       1: getfield      #73                 // Field width:I
+       4: ireturn
+
+  public int getHeight();
+    Code:
+       0: aload_0
+       1: getfield      #76                 // Field height:I
+       4: ireturn
+
+  public int getFormat();
+    Code:
+       0: aload_0
+       1: getfield      #67                 // Field format:I
+       4: ireturn
+
+  public int getDepthFormat();
+    Code:
+       0: aload_0
+       1: getfield      #70                 // Field depthFormat:I
+       4: ireturn
+
+  public static net.vulkanmod.vulkan.framebuffer.Framebuffer$Builder builder(int, int, int, boolean);
+    Code:
+       0: new           #7                  // class net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder
+       3: dup
+       4: iload_0
+       5: iload_1
+       6: iload_2
+       7: iload_3
+       8: invokespecial #409                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder."<init>":(IIIZ)V
+      11: areturn
+
+  public static net.vulkanmod.vulkan.framebuffer.Framebuffer$Builder builder(net.vulkanmod.vulkan.texture.VulkanImage, net.vulkanmod.vulkan.texture.VulkanImage);
+    Code:
+       0: new           #7                  // class net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder
+       3: dup
+       4: aload_0
+       5: aload_1
+       6: invokespecial #413                // Method net/vulkanmod/vulkan/framebuffer/Framebuffer$Builder."<init>":(Lnet/vulkanmod/vulkan/texture/VulkanImage;Lnet/vulkanmod/vulkan/texture/VulkanImage;)V
+       9: areturn
+
+  private static void lambda$cleanUp$2(long[], org.lwjgl.vulkan.VkDevice);
+    Code:
+       0: aload_0
+       1: invokestatic  #419                // Method java/util/Arrays.stream:([J)Ljava/util/stream/LongStream;
+       4: aload_1
+       5: invokedynamic #430,  0            // InvokeDynamic #2:accept:(Lorg/lwjgl/vulkan/VkDevice;)Ljava/util/function/LongConsumer;
+      10: invokeinterface #436,  2          // InterfaceMethod java/util/stream/LongStream.forEach:(Ljava/util/function/LongConsumer;)V
+      15: return
+
+  private static void lambda$cleanUp$1(org.lwjgl.vulkan.VkDevice, long);
+    Code:
+       0: aload_0
+       1: lload_1
+       2: aconst_null
+       3: invokestatic  #441                // Method org/lwjgl/vulkan/VK10.vkDestroyFramebuffer:(Lorg/lwjgl/vulkan/VkDevice;JLorg/lwjgl/vulkan/VkAllocationCallbacks;)V
+       6: return
+
+  private long lambda$getFramebufferId$0(net.vulkanmod.vulkan.framebuffer.RenderPass, java.lang.Object);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #445                // Method createFramebuffer:(Lnet/vulkanmod/vulkan/framebuffer/RenderPass;)J
+       5: lreturn
+}
