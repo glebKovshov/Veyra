@@ -195,12 +195,16 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     public boolean hasShadowFragment() {
+        Boolean cached = configuration.shadowFragment();
+        if (cached != null) return cached;
         try {
             for (String programName : SHADOW_PROGRAMS) {
                 if (readRawShader(programPath(programName + ".fsh")).isPresent() && isProgramEnabled(programName)) {
+                    configuration.cacheShadowFragment(true);
                     return true;
                 }
             }
+            configuration.cacheShadowFragment(false);
             return false;
         } catch (IOException exception) {
             return false;

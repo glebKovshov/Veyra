@@ -11,6 +11,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityVertexShaderAdapterTest {
+    @Test
+    void legacyEntityMatricesMoveViewEffectsWithoutApplyingThemTwice() throws Exception {
+        String pack = """
+                #version 120
+                varying vec3 viewPos;
+                void main() {
+                    viewPos = (gl_ModelViewMatrix * gl_Vertex).xyz;
+                    gl_Position = gl_ProjectionMatrix * vec4(viewPos, 1.0);
+                }
+                """;
+        String adapted = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "gbuffers_entities", false).source();
+        assertTrue(adapted.contains("(veyraViewEffects * ModelViewMat)"), adapted);
+        assertTrue(adapted.contains("(ProjMat * veyraViewEffectsInverse)"), adapted);
+        String shadow = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "shadow_entities", false).source();
+        assertFalse(shadow.contains("veyraViewEffects * ModelViewMat"), shadow);
+    }
+
     private static final String NATIVE = """
             #version 460
             layout(location=0) in vec3 Position;

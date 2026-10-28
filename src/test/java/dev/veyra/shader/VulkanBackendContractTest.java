@@ -9,6 +9,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Verify required injection contracts against the pinned backend bytecode without loading a GPU. */
 class VulkanBackendContractTest {
+    @Test void terrainAtlasSamplerHookMatchesPinnedBackend() throws IOException {
+        requiresCall("net/vulkanmod/render/chunk/WorldRenderer", "renderSectionLayer",
+                "net/vulkanmod/vulkan/texture/VulkanImage", "setSampler", "(J)V");
+    }
+
     private static ClassNode read(String name) throws IOException {
         try (var input = VulkanBackendContractTest.class.getClassLoader().getResourceAsStream(name + ".class")) {
             assertNotNull(input, "Pinned VulkanMod class absent: " + name);

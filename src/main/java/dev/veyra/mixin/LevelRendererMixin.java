@@ -25,7 +25,7 @@ public abstract class LevelRendererMixin {
                                         Matrix4f projection, Matrix4f projectionMatrix,
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
-        VeyraRenderer.captureFrameMatrices(modelView, projection, camera.position());
+        VeyraRenderer.captureFrameMatrices(modelView, projection, projectionMatrix, camera.position());
         VeyraRenderer.captureFogColor(fogColor);
         VeyraRenderer.renderBeginCompute(net.minecraft.client.Minecraft.getInstance());
     }

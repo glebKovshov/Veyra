@@ -156,17 +156,18 @@ class EntityFragmentOutputsTest {
 
         String adapted = EntityShaderAdapter.adaptTextFragment(source, "gbuffers_block_translucent");
 
-        assertTrue(adapted.contains("void veyraTextPackMain()"), adapted);
+        assertTrue(adapted.contains("void veyraEntityPackMain()"), adapted);
         assertTrue(adapted.contains("if (color.r < 0.0) return;"), adapted);
         assertTrue(adapted.contains("if (color.g < 0.0) discard;"), adapted);
         assertTrue(adapted.contains("veyraFragColor = vec4(0.0);"), adapted);
-        assertTrue(adapted.contains("veyraTextPackMain();"), adapted);
+        assertTrue(adapted.contains("veyraEntityPackMain();"), adapted);
         assertTrue(adapted.contains("if (veyraFragColor.a < alphaTestRef) discard;"), adapted);
-        assertTrue(adapted.indexOf("veyraTextPackMain();")
+        assertTrue(adapted.indexOf("veyraEntityPackMain();")
                 < adapted.indexOf("if (veyraFragColor.a < alphaTestRef) discard;"), adapted);
 
         String entity = EntityShaderAdapter.adaptFragment(source, "gbuffers_entities");
-        assertFalse(entity.contains("veyraTextPackMain"), entity);
+        assertTrue(entity.contains("veyraEntityPackMain"), entity);
+        assertTrue(entity.contains("if (veyraFragColor.a < alphaTestRef) discard;"), entity);
     }
 
     @Test

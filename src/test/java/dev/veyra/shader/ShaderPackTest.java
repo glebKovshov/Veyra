@@ -39,6 +39,24 @@ class ShaderPackTest {
     }
 
     @Test
+    void shadowPresenceIsCachedPerConfigurationAndRecheckedOnReload() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("shadow-cache/shaders"));
+        Files.writeString(shaders.resolve("shadow.fsh"), "void main() {}\n");
+        ShaderPack pack = ShaderPack.inspect(shaders.getParent());
+        assertNull(pack.configuration().shadowFragment());
+        assertTrue(pack.hasShadowFragment());
+        assertEquals(Boolean.TRUE, pack.configuration().shadowFragment());
+        ShaderPack disabled = pack.configured(java.util.Map.of("program.shadow", "false"), 0);
+        assertFalse(disabled.hasShadowFragment());
+        assertEquals(Boolean.FALSE, disabled.configuration().shadowFragment());
+        Files.delete(shaders.resolve("shadow.fsh"));
+        Files.writeString(shaders.resolve("final.fsh"), "void main() {}\n");
+        assertTrue(pack.hasShadowFragment());
+        assertFalse(pack.configured(java.util.Map.of(), 0).hasShadowFragment());
+        assertTrue(pack.hasShadowFragment());
+    }
+
+    @Test
     void readsDirectoryProgramsInNumericOrder() throws IOException {
         Path shaders = Files.createDirectories(directory.resolve("pack/shaders"));
         for (String file : new String[]{"composite10.fsh", "composite2.fsh", "prepare.fsh", "deferred.fsh", "final.fsh"}) {

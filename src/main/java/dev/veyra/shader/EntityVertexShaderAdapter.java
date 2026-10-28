@@ -210,12 +210,15 @@ final class EntityVertexShaderAdapter {
         source = extension.reset().replaceAll("");
         source = VERSION.matcher(source).replaceAll("");
         source = PRECISION.matcher(source).replaceAll("");
+        boolean shadow = isEntityShadowProgram(programName);
+        String modelView = shadow ? "ModelViewMat" : "(veyraViewEffects * ModelViewMat)";
+        String projection = shadow ? "ProjMat" : "(ProjMat * veyraViewEffectsInverse)";
         source = source.replace("\uFEFF", "")
                 .replaceAll("\\bgl_TextureMatrix\\s*\\[\\s*0\\s*]", "TextureMat")
                 .replaceAll("\\bgl_TextureMatrix\\s*\\[\\s*1\\s*]", Matcher.quoteReplacement(LIGHTMAP_TEXTURE_MATRIX))
                 .replaceAll("\\bgl_ModelViewProjectionMatrix\\b", "(ProjMat * ModelViewMat)")
-                .replaceAll("\\bgl_ModelViewMatrix\\b", "ModelViewMat")
-                .replaceAll("\\bgl_ProjectionMatrix\\b", "ProjMat")
+                .replaceAll("\\bgl_ModelViewMatrix\\b", modelView)
+                .replaceAll("\\bgl_ProjectionMatrix\\b", projection)
                 .replaceAll("\\bftransform\\s*\\(\\s*\\)", "((ProjMat * ModelViewMat) * vec4(Position, 1.0))")
                 .replaceAll("\\btexture2DLod(?:EXT)?\\s*\\(", "textureLod(")
                 .replaceAll("\\btexture2DGrad(?:ARB)?\\s*\\(", "textureGrad(")
@@ -269,13 +272,15 @@ final class EntityVertexShaderAdapter {
                 entityId, blockEntityId, currentRenderedItemId);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(
                 source, programName, fogValuesAlreadyDeclared);
-        ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(fog.source(), programName);
+        String uniformSource = fog.source();
+        if (!shadow) uniformSource = "uniform mat4 veyraViewEffects;\nuniform mat4 veyraViewEffectsInverse;\n" + uniformSource;
+        ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(uniformSource, programName);
         source = uniforms.source();
         if (UNSUPPORTED_UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
             throw new IOException(programName + ".vsh declares an unsupported uniform.");
         }
         if (NORMAL_MATRIX.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
-            source = NORMAL_MATRIX.matcher(source).replaceAll("transpose(inverse(mat3(ModelViewMat)))");
+            source = NORMAL_MATRIX.matcher(source).replaceAll("transpose(inverse(mat3(" + modelView + ")))");
         }
         String uniformBridge = fog.bridge() + uniforms.declarations() + uniforms.macros() + samplers.bridge();
         return new PreparedStage(source, List.copyOf(extensions), uniformBridge,
