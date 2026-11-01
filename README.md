@@ -2,7 +2,7 @@
 
 Veyra is a client-side shader mod for Minecraft 1.21.11 on Fabric with VulkanMod 0.6.8. It runs a supported subset of Iris shader pack programs on VulkanMod.
 
-Download Veyra 0.2.2 from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). This patch supports shader-pack post-processing mipmaps for exposure and reflections, keeps inventory items on vanilla pipelines, and fixes shader resource initialization crashes. See [CHANGELOG.md](CHANGELOG.md) for the changes and [COMPATIBILITY.md](COMPATIBILITY.md) for measured limits; full Iris visual parity remains unverified.
+Download Veyra 0.2.3 from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). This patch fixes mipmapped post-pass sampler bindings so shader packs can sample colortex snapshots for exposure and reflections. It also keeps inventory items on vanilla pipelines and fixes shader resource initialization crashes. See [CHANGELOG.md](CHANGELOG.md) for the changes and [COMPATIBILITY.md](COMPATIBILITY.md) for measured limits; full Iris visual parity remains unverified.
 
 Cloud fragments can sample a pre-cloud copy of scene color through `colortex0` and its documented aliases, Veyra's `noisetex`, or the active Minecraft cloud image through `texture`. Supported cloud samplers accept `texture`, `texture2D`, `textureLod`, legacy `texture2DLod`, and `textureSize`; the scene copy requires a transferable Vulkan color image. When a supported `gbuffers_clouds.vsh` requests UVs or normals, Veyra rebuilds the cloud mesh with per-quad texture coordinates and flat face normals; BSL's `sunVec`, `upVec`, and `eastVec` are also bridged. The cloud vertex adapter also prunes unreachable shared helpers and supports active fog fields, legacy model-view matrices, `texcoord`, and `dist` where VulkanMod provides those values. `examples/cloud-colortex0`, `examples/cloud-texture-inputs`, and `examples/cloud-model-view` exercise synthetic inputs on Lavapipe; they do not establish full third-party pack visuals.
 
@@ -17,7 +17,7 @@ Terrain, entity-family and post programs can sample the completed shadow pass co
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.
-2. Install `veyra-0.2.2+mc1.21.11.jar` from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). Put the mod JAR in the instance mods folder and remove older Veyra JARs. The sources JAR is for development.
+2. Install `veyra-0.2.3+mc1.21.11.jar` from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). Put the mod JAR in the instance mods folder and remove older Veyra JARs. The sources JAR is for development.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
 
