@@ -14,10 +14,12 @@ import org.lwjgl.vulkan.VK11;
 import org.lwjgl.vulkan.VkFormatProperties;
 import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageCopy;
+import org.lwjgl.vulkan.VkImageMemoryBarrier;
 
 /** A sampled copy of a completed scene color image, with the source format and dimensions. */
 public final class VeyraColorTextureSnapshot implements AutoCloseable {
     private final String name;
+    private final boolean mipmapped;
     private VkGpuTexture texture;
     private GpuTextureView view;
     private int width;
@@ -26,7 +28,12 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
     private boolean ready;
 
     public VeyraColorTextureSnapshot(String name) {
+        this(name, false);
+    }
+
+    public VeyraColorTextureSnapshot(String name, boolean mipmapped) {
         this.name = name;
+        this.mipmapped = mipmapped;
     }
 
     public boolean isReady(int width, int height, int format) {
@@ -48,7 +55,9 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         VulkanImage image = VulkanImage.builder(width, height)
                 .setName("Veyra " + name)
                 .setFormat(format)
-                .setUsage(VK10.VK_IMAGE_USAGE_SAMPLED_BIT | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                .setMipLevels(mipmapped ? VulkanMipExtent.levels(width, height) : 1)
+                .setUsage(VK10.VK_IMAGE_USAGE_SAMPLED_BIT | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                        | (mipmapped ? VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0))
                 .createVulkanImage();
         VkGpuTexture createdTexture = device.gpuTextureFromVulkanImage(image);
         GpuTextureView createdView = null;
@@ -78,6 +87,8 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         if (view == null || view.isClosed()) throw new IllegalStateException("The " + name + " view is unavailable.");
         return view;
     }
+
+    public boolean isSampledView(GpuTextureView candidate) { return ready && view == candidate; }
 
     /** Copy the source on VulkanMod's graphics queue and leave the snapshot ready for sampling. */
     public void capture(VulkanImage source) {
@@ -114,6 +125,12 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
                     destination.format, destinationProperties);
             int sourceFeatures = sourceProperties.optimalTilingFeatures();
             int destinationFeatures = destinationProperties.optimalTilingFeatures();
+            if (mipmapped && (destinationFeatures & (VK10.VK_FORMAT_FEATURE_BLIT_SRC_BIT
+                    | VK10.VK_FORMAT_FEATURE_BLIT_DST_BIT | VK10.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+                    != (VK10.VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK10.VK_FORMAT_FEATURE_BLIT_DST_BIT
+                    | VK10.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+                throw new IllegalStateException("The scene color format does not support filtered mipmap blits.");
+            }
             if (source.format == destination.format) {
                 int copyFeatures = VK11.VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK11.VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
                 if ((sourceFeatures & copyFeatures) != copyFeatures) {
@@ -146,6 +163,7 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
                         VK10.VK_FILTER_NEAREST);
             }
             source.transitionImageLayout(stack, commands, previousLayout);
+            if (mipmapped && destination.mipLevels > 1) generateMipmaps(destination, stack);
         }
         transitionToSampling();
     }
@@ -158,8 +176,48 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
                         VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
         }
-        color.setSampler(SamplerManager.getSampler(true, true, 0));
+        color.setSampler(SamplerManager.getSampler(true, true, color.mipLevels - 1));
         ready = true;
+    }
+
+    private static void generateMipmaps(VulkanImage image, MemoryStack stack) {
+        var commands = Renderer.getCommandBuffer();
+        VkImageMemoryBarrier.Buffer barrier = VkImageMemoryBarrier.calloc(1, stack);
+        barrier.sType(VK10.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER).image(image.getId())
+                .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED).dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED);
+        barrier.subresourceRange().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).levelCount(1).layerCount(1);
+        VkImageBlit.Buffer blit = VkImageBlit.calloc(1, stack);
+        blit.srcSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+        blit.dstSubresource().aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1);
+        for (int level = 1; level < image.mipLevels; level++) {
+            barrier.subresourceRange().baseMipLevel(level - 1);
+            barrier.oldLayout(VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL).newLayout(VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+                    .srcAccessMask(VK10.VK_ACCESS_TRANSFER_WRITE_BIT).dstAccessMask(VK10.VK_ACCESS_TRANSFER_READ_BIT);
+            VK10.vkCmdPipelineBarrier(commands, VK10.VK_PIPELINE_STAGE_TRANSFER_BIT, VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0, null, null, barrier);
+            blit.srcSubresource().mipLevel(level - 1);
+            blit.dstSubresource().mipLevel(level);
+            blit.srcOffsets(0).set(0, 0, 0);
+            blit.srcOffsets(1).set(VulkanMipExtent.atLevel(image.width, level - 1),
+                    VulkanMipExtent.atLevel(image.height, level - 1), 1);
+            blit.dstOffsets(0).set(0, 0, 0);
+            blit.dstOffsets(1).set(VulkanMipExtent.atLevel(image.width, level),
+                    VulkanMipExtent.atLevel(image.height, level), 1);
+            VK10.vkCmdBlitImage(commands, image.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    image.getId(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, blit, VK10.VK_FILTER_LINEAR);
+        }
+        for (int level = 0; level < image.mipLevels; level++) {
+            barrier.subresourceRange().baseMipLevel(level);
+            barrier.oldLayout(level == image.mipLevels - 1 ? VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+                            : VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+                    .newLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                    .srcAccessMask(VK10.VK_ACCESS_TRANSFER_READ_BIT | VK10.VK_ACCESS_TRANSFER_WRITE_BIT)
+                    .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
+            VK10.vkCmdPipelineBarrier(commands, VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK10.VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    0, null, null, barrier);
+        }
+        image.setCurrentLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
     @Override

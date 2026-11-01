@@ -3,6 +3,9 @@ package dev.veyra.mixin;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.systems.RenderSystem;
 import dev.veyra.shader.VeyraShadowRenderer;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.vulkan.VeyraNoiseTexture;
@@ -22,6 +25,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = VkRenderPass.class, remap = false)
 public abstract class VkRenderPassMixin {
+    @Inject(method = "bindTexture", at = @At("HEAD"), cancellable = true, remap = false)
+    private void veyra$allowPostMipmapSampling(String name, GpuTextureView view, GpuSampler sampler, CallbackInfo ci) {
+        if (!VeyraRenderer.isPostMipmapView(view)) return;
+        GpuSampler mipSampler = RenderSystem.getSamplerCache().getSampler(AddressMode.CLAMP_TO_EDGE,
+                AddressMode.CLAMP_TO_EDGE, FilterMode.LINEAR, FilterMode.LINEAR, true);
+        if (sampler != mipSampler) {
+            ((VkRenderPass) (Object) this).bindTexture(name, view, mipSampler);
+            ci.cancel();
+        }
+    }
+
     @Inject(method = "setPipeline", at = @At("RETURN"), remap = false)
     private void veyra$bindNoiseSampler(RenderPipeline ignored, CallbackInfo ci) {
         VkRenderPass pass = (VkRenderPass) (Object) this;
@@ -98,7 +112,8 @@ public abstract class VkRenderPassMixin {
 
     @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true, remap = false)
     private RenderPipeline veyra$routeEntityPipeline(RenderPipeline original) {
-        if (!VeyraRenderer.ensureShaderPackTexturesPrepared()) return original;
+        if (VeyraRenderer.isGuiRendering()) return original;
+        if (!VeyraRenderer.shaderPackTexturesReady()) return original;
         RenderPipeline replacement = VeyraRenderer.getHandPipeline(original);
         if (replacement == null) {
             replacement = VeyraRenderer.getSignTextPipeline(original);

@@ -2,7 +2,9 @@ package dev.veyra.mixin;
 
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import dev.veyra.shader.VeyraRenderer;
+import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.renderer.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,6 +14,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin {
+    @Redirect(method = "render", at = @At(value = "INVOKE", target =
+            "Lnet/minecraft/client/gui/render/GuiRenderer;render(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;)V"))
+    private void veyra$renderGuiWithoutWorldShaders(GuiRenderer gui, GpuBufferSlice fogBuffer) {
+        VeyraRenderer.setGuiRendering(true);
+        try {
+            gui.render(fogBuffer);
+        } finally {
+            VeyraRenderer.setGuiRendering(false);
+        }
+    }
+
     @Redirect(method = "renderLevel", at = @At(value = "INVOKE",
             target = "Lcom/mojang/blaze3d/systems/CommandEncoder;clearDepthTexture(Lcom/mojang/blaze3d/textures/GpuTexture;D)V"))
     private void veyra$preserveWorldDepthForHand(CommandEncoder encoder, GpuTexture texture, double depth) {
