@@ -1095,6 +1095,18 @@ public class ShaderCompileSmoke {
     }
 
     private static void compileVertex(long compiler, long options, String source, String name, boolean expected) {
+        if (source.contains("uniform mat4 veyraViewEffects")) {
+            // VulkanMod groups loose uniforms into blocks; the direct shaderc fixture must do the same.
+            source = source.replace("uniform mat4 veyraViewEffects;", "")
+                    .replace("uniform mat4 veyraViewEffectsInverse;", "");
+            int headerEnd = source.indexOf('\n') + 1;
+            source = source.substring(0, headerEnd) + """
+                    layout(set = 0, binding = 31, std140) uniform VeyraCameraEffects {
+                        mat4 veyraViewEffects;
+                        mat4 veyraViewEffectsInverse;
+                    };
+                    """ + source.substring(headerEnd);
+        }
         long result = shaderc_compile_into_spv(compiler, source, shaderc_vertex_shader, name, "main", options);
         try {
             boolean success = shaderc_result_get_compilation_status(result) == shaderc_compilation_status_success;

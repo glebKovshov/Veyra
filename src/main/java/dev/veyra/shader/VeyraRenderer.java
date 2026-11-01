@@ -285,6 +285,7 @@ public final class VeyraRenderer {
     private static final Map<Integer, Identifier> currentColorTargets = new HashMap<>();
     private static final Map<Integer, GeometryColorBinding> geometryColorBindings = new HashMap<>();
     private static final Map<Integer, VeyraColorTextureSnapshot> geometryColorSnapshots = new HashMap<>();
+    private static final Map<Integer, VeyraColorTextureSnapshot> postMipmapSnapshots = new HashMap<>();
     private static final Map<Integer, GeometryColorSnapshotSource> geometryColorSnapshotSources = new HashMap<>();
     private static final Set<Integer> initializedColorTargets = new java.util.HashSet<>();
     private static int colorTargetsLastClearedFrame = -1;
@@ -366,6 +367,7 @@ public final class VeyraRenderer {
     private static boolean cloudPipelineDirty = true;
     private static Boolean previousUniqueOpaqueLayer;
     private static boolean renderingEnabled;
+    private static boolean guiRendering;
     private static volatile boolean directionalShadingDisabled;
     private static ShaderPack oldLightingPack;
     private static boolean oldLighting;
@@ -782,6 +784,8 @@ public final class VeyraRenderer {
                             : matrices.gbufferProjection()).invert();
             case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
             case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
+            case "veyraViewEffects" -> matrices.viewEffects();
+            case "veyraViewEffectsInverse" -> matrices.viewEffectsInverse();
             default -> throw new IllegalArgumentException("Unknown shader pack matrix uniform " + name + ".");
         };
     }
@@ -1324,12 +1328,15 @@ public final class VeyraRenderer {
         }
     }
 
-    public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc projection, Vec3 cameraPosition) {
+    public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc renderedProjection,
+                                            Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
+        if (!prepareShaderPackTextures()) renderingEnabled = false;
         updateDirectionalShading();
         updateFrameClock();
         nextPostPhase = ShaderPassPhase.PREPARE.ordinal();
-        Matrix4f currentModelView = new Matrix4f(modelView);
+        Matrix4f viewEffects = IrisProjectionMatrices.viewEffects(renderedProjection, projection);
+        Matrix4f currentModelView = new Matrix4f(viewEffects).mul(modelView);
         Matrix4f currentProjection = new Matrix4f(projection);
         Matrix4f previousModelView = frameMatricesInitialized
                 ? new Matrix4f(frameMatrices.gbufferModelView()) : new Matrix4f(currentModelView);
@@ -1342,7 +1349,8 @@ public final class VeyraRenderer {
                 currentProjection, new Matrix4f(currentProjection).invert(),
                 previousModelView, previousProjection,
                 shadowModelView, new Matrix4f(shadowModelView).invert(),
-                shadowProjection, new Matrix4f(shadowProjection).invert());
+                shadowProjection, new Matrix4f(shadowProjection).invert(),
+                viewEffects, new Matrix4f(viewEffects).invert());
         frameMatricesInitialized = true;
         updateShaderPackMatrixUniforms(frameMatrices);
 
@@ -1591,6 +1599,9 @@ public final class VeyraRenderer {
         return renderingEnabled && selectedPack().isPresent();
     }
 
+    public static void setGuiRendering(boolean rendering) { guiRendering = rendering; }
+    public static boolean isGuiRendering() { return guiRendering; }
+
     public static void beginHandRendering() {
         int depth = HAND_RENDER_DEPTH.get();
         HAND_RENDER_DEPTH.set(depth + 1);
@@ -1694,6 +1705,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderType routeBlockEntityRenderType(RenderType originalType) {
+        if (guiRendering) return originalType;
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return originalType;
         if (originalType == null) {
             return originalType;
@@ -1762,6 +1774,7 @@ public final class VeyraRenderer {
     }
 
     public static RenderType routeBlockEntityTextRenderType(RenderType originalType) {
+        if (guiRendering) return originalType;
         if (originalType == null || VeyraShadowRenderer.isRendering()
                 || !TEXT_SUBMISSION_CONTEXTS.isBlockEntityText()
                 || !isSignTextPipeline(originalType.pipeline())) {
@@ -1846,7 +1859,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getTerrainPipeline(TerrainRenderType terrainRenderType) {
-        if (!ensureShaderPackTexturesPrepared()) return null;
+        if (!shaderPackTexturesReady()) return null;
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (VeyraShadowRenderer.isRendering()) {
@@ -1900,7 +1913,7 @@ public final class VeyraRenderer {
     }
 
     public static GraphicsPipeline getCloudsPipeline() {
-        if (!ensureShaderPackTexturesPrepared()) return null;
+        if (!shaderPackTexturesReady()) return null;
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return null;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || !pack.hasCloudFragment()) {
@@ -1995,8 +2008,15 @@ public final class VeyraRenderer {
         }
     }
 
-    /** Prepare pack-local texture inputs for packs restored from settings without calling {@code select()}. */
-    public static boolean ensureShaderPackTexturesPrepared() {
+    /** Pipeline selection can run inside atlas render passes and must never upload textures. */
+    public static boolean shaderPackTexturesReady() {
+        if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return true;
+        ShaderPack pack = selectedPack().orElse(null);
+        return pack == null || shaderPackTexturesPreparedFor == pack;
+    }
+
+    /** Prepare restored packs before the world frame graph opens a render pass. */
+    private static boolean prepareShaderPackTextures() {
         if (!renderingEnabled && !VeyraShadowRenderer.isRendering()) return true;
         ShaderPack pack = selectedPack().orElse(null);
         if (pack == null || shaderPackTexturesPreparedFor == pack) return true;
@@ -3167,8 +3187,6 @@ public final class VeyraRenderer {
             }
             ensurePipelines(mainTarget.width, mainTarget.height);
             VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
-            if (phase != ShaderPassPhase.BEGIN && pipelineSet.usesShadowSampler()
-                    && !VeyraShadowRenderer.hasCompletedShadowMap()) return;
             ColorTargetSettings sceneColorSettings = pipelineSet.colorTargetSettings().getOrDefault(
                     0, ColorTargetSettings.defaults(0, mainTarget.width, mainTarget.height));
             ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings.format());
@@ -3184,6 +3202,9 @@ public final class VeyraRenderer {
                 colorTargetsLastClearedFrame = frameCounter;
                 geometryColorSnapshotSources.clear();
             }
+            // Geometry needs allocated, cleared targets even while post-processing waits for the first shadow map.
+            if (phase != ShaderPassPhase.BEGIN && pipelineSet.usesShadowSampler()
+                    && !VeyraShadowRenderer.hasCompletedShadowMap()) return;
             if (framePlan.shaderPasses().isEmpty() && computePrograms.isEmpty()) return;
             if (compute != null || storageBufferResources != null) {
                 if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
@@ -3226,7 +3247,10 @@ public final class VeyraRenderer {
                 }
                 ShaderPass shaderPass = framePlan.shaderPasses().get(event.graphicsIndex());
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
-                prepareSampledTargets(graph, targets, shaderPass.sampledTargets());
+                FramePass sampledTransition = prepareSampledTargets(graph, targets,
+                        shaderPass.sampledTargets(), shaderPass.mipmapInputs());
+                // Mipmap snapshots are reused across programs, so their next write must follow the previous draw.
+                if (!shaderPass.mipmapInputs().isEmpty()) graphOrder.order(sampledTransition);
                 shaderPass.orderInput().bind(graphOrder);
                 try {
                     shaderPass.pass().addToFrame(graph, targets, samplerInfo);
@@ -3344,10 +3368,17 @@ public final class VeyraRenderer {
                 pack.readStorageBufferProperties(), width, height));
     }
 
-    private static void prepareSampledTargets(FrameGraphBuilder graph,
+    private static FramePass prepareSampledTargets(FrameGraphBuilder graph,
             Map<Identifier, ResourceHandle<RenderTarget>> targets, Set<Identifier> sampledTargets) {
+        return prepareSampledTargets(graph, targets, sampledTargets, Map.of());
+    }
+
+    private static FramePass prepareSampledTargets(FrameGraphBuilder graph,
+            Map<Identifier, ResourceHandle<RenderTarget>> targets, Set<Identifier> sampledTargets,
+            Map<Integer, Identifier> mipmapInputs) {
         FramePass transition = graph.addPass("veyra:sampled-image-transitions");
         List<ResourceHandle<RenderTarget>> images = new ArrayList<>();
+        Map<Integer, ResourceHandle<RenderTarget>> mipmapSources = new HashMap<>();
         for (Identifier id : sampledTargets) {
             ResourceHandle<RenderTarget> input = targets.get(id);
             if (input == null) throw new IllegalStateException("Missing sampled render target " + id);
@@ -3356,6 +3387,9 @@ public final class VeyraRenderer {
             ResourceHandle<RenderTarget> ready = transition.readsAndWrites(input);
             targets.put(id, ready);
             images.add(ready);
+            mipmapInputs.forEach((index, target) -> {
+                if (target.equals(id)) mipmapSources.put(index, ready);
+            });
         }
         transition.executes(() -> {
             if (Renderer.getInstance().getBoundRenderPass() != null) Renderer.getInstance().endRenderPass();
@@ -3375,7 +3409,21 @@ public final class VeyraRenderer {
                     }
                 }
             }
+            mipmapSources.forEach((index, handle) -> postMipmapSnapshot(index).capture(
+                    ((VkGpuTexture) handle.get().getColorTexture()).getVulkanImage()));
         });
+        return transition;
+    }
+
+    private static VeyraColorTextureSnapshot postMipmapSnapshot(int index) {
+        return postMipmapSnapshots.computeIfAbsent(index,
+                key -> new VeyraColorTextureSnapshot("post mipmaps colortex" + key, true));
+    }
+
+    public static boolean isPostMipmapView(GpuTextureView view) {
+        if (view == null) return false;
+        for (var snapshot : postMipmapSnapshots.values()) if (snapshot.isSampledView(view)) return true;
+        return false;
     }
 
     private static PipelineSet compilePipelines(ShaderPack pack, int width, int height,
@@ -3492,7 +3540,7 @@ public final class VeyraRenderer {
                 }
             }
             programs.add(new ProgramGroup(source.name(), ShaderPassPhase.forProgram(source.name()),
-                    List.copyOf(outputs)));
+                    List.copyOf(outputs), PostMipmapSamplers.read(source.source())));
         }
 
         for (int index : colorTargetIndices) {
@@ -6996,12 +7044,20 @@ public final class VeyraRenderer {
                     Set<Identifier> sampledTargets = new java.util.LinkedHashSet<>();
                     sampledTargets.add(inputColortex0);
                     List<PostPass.Input> inputs = new ArrayList<>();
-                    inputs.add(new PostPass.TargetInput("In", inputColortex0, false, true));
+                    Map<Integer, Identifier> mipmapInputs = new HashMap<>();
+                    if (group.mipmapSamplers().contains(0)) {
+                        inputs.add(new MipmappedTargetInput("In", 0, inputColortex0));
+                        mipmapInputs.put(0, inputColortex0);
+                    } else inputs.add(new PostPass.TargetInput("In", inputColortex0, false, true));
                     for (int samplerIndex : program.colorSamplers()) {
                         if (samplerIndex == 0) {
                             continue;
                         }
-                        inputs.add(new PostPass.TargetInput(
+                        if (group.mipmapSamplers().contains(samplerIndex)) {
+                            inputs.add(new MipmappedTargetInput(colorTargetInputName(samplerIndex),
+                                    samplerIndex, currentTargets.get(samplerIndex)));
+                            mipmapInputs.put(samplerIndex, currentTargets.get(samplerIndex));
+                        } else inputs.add(new PostPass.TargetInput(
                                 colorTargetInputName(samplerIndex), currentTargets.get(samplerIndex), false, true));
                         sampledTargets.add(currentTargets.get(samplerIndex));
                     }
@@ -7029,7 +7085,7 @@ public final class VeyraRenderer {
                     PostPass pass = new PostPass(program.pipeline(), outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
                     passes.add(new ShaderPass(group.programName(), pass, program,
-                            Set.copyOf(sampledTargets), orderInput));
+                            Set.copyOf(sampledTargets), orderInput, Map.copyOf(mipmapInputs)));
                     if (usesDynamicUniforms(program)) {
                         makeDynamicUniformBuffer(pass, program, width, height);
                     }
@@ -7931,6 +7987,8 @@ public final class VeyraRenderer {
     }
 
     private static void releaseColorTargets() {
+        postMipmapSnapshots.values().forEach(VeyraColorTextureSnapshot::close);
+        postMipmapSnapshots.clear();
         VeyraGeometryTargets.releaseTargets();
         geometryColorSnapshots.values().forEach(VeyraColorTextureSnapshot::close);
         geometryColorSnapshots.clear();
@@ -8392,7 +8450,8 @@ public final class VeyraRenderer {
     private record BeaconBeamPipelineKey(RenderPipeline original, String sourceHash) {
     }
 
-    private record ProgramGroup(String programName, ShaderPassPhase phase, List<PipelineProgram> outputs) {
+    private record ProgramGroup(String programName, ShaderPassPhase phase, List<PipelineProgram> outputs,
+                                Set<Integer> mipmapSamplers) {
     }
 
     private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {
@@ -8407,7 +8466,7 @@ public final class VeyraRenderer {
 
     private record ShaderPass(String programName, PostPass pass, PipelineProgram program,
                               Set<Identifier> sampledTargets,
-                              OrderedPostPassInput orderInput) {
+                              OrderedPostPassInput orderInput, Map<Integer, Identifier> mipmapInputs) {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
@@ -8428,10 +8487,11 @@ public final class VeyraRenderer {
                                  Matrix4f gbufferProjection, Matrix4f gbufferProjectionInverse,
                                  Matrix4f gbufferPreviousModelView, Matrix4f gbufferPreviousProjection,
                                  Matrix4f shadowModelView, Matrix4f shadowModelViewInverse,
-                                 Matrix4f shadowProjection, Matrix4f shadowProjectionInverse) {
+                                 Matrix4f shadowProjection, Matrix4f shadowProjectionInverse,
+                                 Matrix4f viewEffects, Matrix4f viewEffectsInverse) {
         private static final FrameMatrices IDENTITY = new FrameMatrices(
                 new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(),
-                new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f());
+                new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f());
     }
 
     private record CameraPosition(Vector3f position, Vector3i integerPosition, Vector3f fractionalPosition) {
@@ -8564,7 +8624,7 @@ public final class VeyraRenderer {
                                         boolean isMainHand) {
     }
 
-    private record EntityPipelineSpec(String programName, String fragmentSource,
+    record EntityPipelineSpec(String programName, String fragmentSource,
                                       boolean requiresNormal, boolean requiresLightmap,
                                       boolean requiresViewPosition, boolean requiresViewNormal,
                                       boolean shadowPass, boolean handPass, boolean textPipeline,
@@ -8575,25 +8635,32 @@ public final class VeyraRenderer {
                                       VeyraComputePipelineSet customImageResources,
                                       Set<String> customTextureSamplers,
                                       ShaderPackImageBindings.PreparedStage customImageStage,
-                                      ShaderPackImageBindings.PreparedStage shadowFragmentImageStage) {
-        private boolean usesEntityId() {
-            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId")
-                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "entityId");
-        }
-
-        private boolean usesBlockEntityId() {
-            return EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId")
-                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "blockEntityId");
-        }
-
-        private boolean usesCurrentRenderedItemId() {
-            return EntityShaderAdapter.usesEntityIdentifier(
-                    fragmentSource, programName, "currentRenderedItemId")
-                    || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "currentRenderedItemId");
-        }
-
-        private boolean usesIsMainHand() {
-            return handPass && EntityShaderAdapter.requiresMainHandInput(fragmentSource);
+                                      ShaderPackImageBindings.PreparedStage shadowFragmentImageStage,
+                                      boolean usesEntityId, boolean usesBlockEntityId,
+                                      boolean usesCurrentRenderedItemId, boolean usesIsMainHand) {
+        EntityPipelineSpec(String programName, String fragmentSource,
+                           boolean requiresNormal, boolean requiresLightmap,
+                           boolean requiresViewPosition, boolean requiresViewNormal,
+                           boolean shadowPass, boolean handPass, boolean textPipeline,
+                           boolean shadowSamplerAvailable, FragmentOutputs outputLayout,
+                           GeometryBlendSettings blendSettings, Set<Integer> colorInputs,
+                           String vertexSource,
+                           Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                           VeyraComputePipelineSet customImageResources, Set<String> customTextureSamplers,
+                           ShaderPackImageBindings.PreparedStage customImageStage,
+                           ShaderPackImageBindings.PreparedStage shadowFragmentImageStage) {
+            // Source analysis belongs to pack preparation, not every entity submission.
+            this(programName, fragmentSource, requiresNormal, requiresLightmap,
+                    requiresViewPosition, requiresViewNormal, shadowPass, handPass, textPipeline,
+                    shadowSamplerAvailable, outputLayout, blendSettings, colorInputs, vertexSource, vertexVaryings,
+                    customImageResources, customTextureSamplers, customImageStage, shadowFragmentImageStage,
+                    EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "entityId")
+                            || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "entityId"),
+                    EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "blockEntityId")
+                            || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "blockEntityId"),
+                    EntityShaderAdapter.usesEntityIdentifier(fragmentSource, programName, "currentRenderedItemId")
+                            || EntityShaderAdapter.usesEntityIdentifier(vertexSource, programName, "currentRenderedItemId"),
+                    handPass && EntityShaderAdapter.requiresMainHandInput(fragmentSource));
         }
     }
 
@@ -8639,6 +8706,17 @@ public final class VeyraRenderer {
     }
 
     private record BeaconBeamPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
+    }
+
+    private record MipmappedTargetInput(String inputName, int colorIndex, Identifier target) implements PostPass.Input {
+        @Override public String samplerName() { return inputName; }
+        @Override public void addToPass(FramePass pass, Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            pass.reads(targets.get(target));
+        }
+        @Override public GpuTextureView texture(Map<Identifier, ResourceHandle<RenderTarget>> targets) {
+            return postMipmapSnapshot(colorIndex).sampledView();
+        }
+        @Override public boolean bilinear() { return true; }
     }
 
     private record ExternalTextureInput(String samplerName) implements PostPass.Input {

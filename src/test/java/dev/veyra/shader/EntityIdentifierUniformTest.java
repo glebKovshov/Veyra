@@ -5,6 +5,55 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EntityIdentifierUniformTest {
+    @Test
+    void unusedDeclarationsDoNotCreateIdentifierVariants() {
+        String source = """
+                uniform int entityId;
+                uniform int blockEntityId;
+                uniform int currentRenderedItemId;
+                // entityId + blockEntityId + currentRenderedItemId
+                void main() { float entityIdSuffix = 1.0; }
+                """;
+        for (String name : java.util.List.of("entityId", "blockEntityId", "currentRenderedItemId")) {
+            assertFalse(EntityShaderAdapter.usesEntityIdentifier(source, "gbuffers_entities", name));
+            assertTrue(EntityShaderAdapter.usesEntityIdentifier(source + "\nint value = " + name + ";",
+                    "gbuffers_entities", name));
+        }
+        assertFalse(EntityShaderAdapter.usesEntityIdentifier(SOURCE, "gbuffers_basic", "entityId"));
+    }
+
+    @Test
+    void pipelineSpecSnapshotsIdentifierUsageAtPreparation() {
+        var spec = new VeyraRenderer.EntityPipelineSpec("gbuffers_hand",
+                SOURCE + "\nvarying float isMainHand;\n",
+                false, false, false, false, false, true, false, false,
+                null, null, java.util.Set.of(), null, java.util.Map.of(),
+                null, java.util.Set.of(), null, null);
+        assertTrue(spec.usesEntityId());
+        assertTrue(spec.usesBlockEntityId());
+        assertTrue(spec.usesCurrentRenderedItemId());
+        assertTrue(spec.usesIsMainHand());
+        var worldSpec = new VeyraRenderer.EntityPipelineSpec("gbuffers_entities",
+                "uniform int entityId;\nvarying float isMainHand;\n",
+                false, false, false, false, false, false, false, false,
+                null, null, java.util.Set.of(), null, java.util.Map.of(),
+                null, java.util.Set.of(), null, null);
+        assertFalse(worldSpec.usesEntityId());
+        assertFalse(worldSpec.usesIsMainHand());
+    }
+
+    @Test
+    void pipelineSpecKeepsIdentifiersUsedOnlyByTheVertexStage() {
+        var spec = new VeyraRenderer.EntityPipelineSpec("gbuffers_entities",
+                "void main() {}\n",
+                false, false, false, false, false, false, false, false,
+                null, null, java.util.Set.of(), SOURCE, java.util.Map.of(),
+                null, java.util.Set.of(), null, null);
+        assertTrue(spec.usesEntityId());
+        assertTrue(spec.usesBlockEntityId());
+        assertTrue(spec.usesCurrentRenderedItemId());
+    }
+
     private static final String SOURCE = """
             #version 120
             uniform int blockEntityId;

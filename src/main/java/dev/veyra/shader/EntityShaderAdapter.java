@@ -267,14 +267,15 @@ public final class EntityShaderAdapter {
                 false, false, true, vertexVaryings, customTextureSamplers);
     }
 
-    /** Whether the active program declares an Iris-bound entity identifier uniform. */
+    /** Whether the active program declares and references an Iris-bound entity identifier uniform. */
     public static boolean usesEntityIdentifier(String source, String programName, String name) {
         String uncommented = COMMENTS.matcher(source == null ? "" : source).replaceAll("");
         Matcher matcher = ENTITY_IDENTIFIER_UNIFORM.matcher(uncommented);
         while (matcher.find()) {
             if (matcher.group(1).equals(name)
                     && ShaderPackUniformAdapter.isBoundEntityIdentifier(programName, "int", name)) {
-                return true;
+                return Pattern.compile("\\b" + Pattern.quote(name) + "\\b")
+                        .matcher(ENTITY_IDENTIFIER_UNIFORM.matcher(uncommented).replaceAll("")).find();
             }
         }
         return false;
@@ -646,15 +647,19 @@ public final class EntityShaderAdapter {
         if (addShadowPositionOutput) {
             declarations.append("out vec4 position;\n");
         }
+        if (!shadowPass && (addNormalAssignment || addViewPositionAssignment || addViewNormalAssignment)) {
+            appendMatrixUniformIfMissing(declarations, uncommented, "veyraViewEffects");
+        }
         String withDeclarations = source.substring(0, main.start()) + declarations + source.substring(main.start());
         Matcher adaptedMain = MAIN_FUNCTION.matcher(withDeclarations);
         if (!adaptedMain.find()) {
             throw new IOException(programName + " could not add its required vertex outputs.");
         }
         StringBuilder vertexAssignments = new StringBuilder();
+        String modelViewMatrix = shadowPass ? "ModelViewMat" : "(veyraViewEffects * ModelViewMat)";
         if (addNormalAssignment) {
             vertexAssignments.append("normal = normalize(mat3(").append(inverseMatrix)
-                    .append(") * transpose(inverse(mat3(ModelViewMat))) * Normal);\n");
+                    .append(") * transpose(inverse(mat3(").append(modelViewMatrix).append("))) * Normal);\n");
         }
         if (fullBrightLightmap) {
             vertexAssignments.append("lmcoord = vec2(240.0 / 256.0 + 0.03125);\n");
@@ -662,10 +667,11 @@ public final class EntityShaderAdapter {
             vertexAssignments.append("lmcoord = (vec2(UV2) / 256.0) + vec2(0.03125);\n");
         }
         if (addViewPositionAssignment) {
-            vertexAssignments.append("viewPos = (ModelViewMat * vec4(Position, 1.0)).xyz;\n");
+            vertexAssignments.append("viewPos = (").append(modelViewMatrix).append(" * vec4(Position, 1.0)).xyz;\n");
         }
         if (addViewNormalAssignment) {
-            vertexAssignments.append("viewNormal = normalize(transpose(inverse(mat3(ModelViewMat))) * Normal);\n");
+            vertexAssignments.append("viewNormal = normalize(transpose(inverse(mat3(")
+                    .append(modelViewMatrix).append("))) * Normal);\n");
         }
         String adapted = withDeclarations.substring(0, adaptedMain.end()) + vertexAssignments
                 + withDeclarations.substring(adaptedMain.end());
@@ -1222,15 +1228,15 @@ public final class EntityShaderAdapter {
                     + "\n    normal = faceforward(normal, viewPos, normal);"
                     + adapted.substring(fragmentMain.end());
         }
-        if (textPipeline) {
+        if (textPipeline || outputLayout.variables().containsKey(0)) {
             String firstOutput = outputLayout.variables().entrySet().stream()
                     .min(Map.Entry.comparingByKey()).orElseThrow().getValue();
-            adapted = wrapTextAlphaTest(adapted, firstOutput, programName);
+            adapted = wrapAlphaTest(adapted, firstOutput, programName);
         }
         return result.append(adapted).toString();
     }
 
-    private static String wrapTextAlphaTest(String source, String output, String programName) throws IOException {
+    private static String wrapAlphaTest(String source, String output, String programName) throws IOException {
         Matcher main = MAIN_FUNCTION.matcher(ShaderSource.maskBlockAndLineComments(source));
         if (!main.find()) throw new IOException(programName + " has no fragment main function.");
         int start = main.start();
@@ -1238,12 +1244,12 @@ public final class EntityShaderAdapter {
         if (main.find()) throw new IOException(programName + " has multiple fragment main functions.");
         String declaration = source.substring(start, end);
         int name = declaration.indexOf("main");
-        declaration = declaration.substring(0, name) + "veyraTextPackMain"
+        declaration = declaration.substring(0, name) + "veyraEntityPackMain"
                 + declaration.substring(name + "main".length());
         return source.substring(0, start) + declaration + source.substring(end)
                 + "\nvoid main() {\n"
                 + "    " + output + " = vec4(0.0);\n"
-                + "    veyraTextPackMain();\n"
+                + "    veyraEntityPackMain();\n"
                 + "    if (" + output + ".a < alphaTestRef) discard;\n"
                 + "}\n";
     }

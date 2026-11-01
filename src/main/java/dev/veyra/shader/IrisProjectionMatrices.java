@@ -6,6 +6,11 @@ import org.joml.Matrix4fc;
 final class IrisProjectionMatrices {
     private IrisProjectionMatrices() { }
 
+    static Matrix4f viewEffects(Matrix4fc renderedProjection, Matrix4fc projection) {
+        // Minecraft folds camera bob/hurt into projection; Iris packs reconstruct with a perspective-only projection.
+        return new Matrix4f(projection).invert().mul(renderedProjection);
+    }
+
     static Matrix4f fromVulkan(Matrix4fc projection) {
         Matrix4f finite = new Matrix4f(projection);
         // VulkanMod's infinite projection places depth 1 just beyond infinity, reversing sky rays.

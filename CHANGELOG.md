@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.2 - 2026-11-02
+
+- Honor per-pass colortex mipmap requests, generating and sampling mip chains for shader-pack exposure and reflections.
+- Keep GUI and inventory item rendering on vanilla pipelines instead of world shader-pack pipelines.
+- Prepare restored shader-pack textures before world rendering, avoiding uploads inside atlas render passes.
+- Allocate and clear geometry color buffers before waiting for the first completed shadow map.
+- Local development checks: 622 tests passed; runtime visual verification of these fixes remains incomplete.
+
+## 0.2.1 - 2026-10-28
+
+- Analyze entity identifier usage once when preparing pipelines instead of scanning GLSL on every entity submission; skip unused identifier variants and cache shadow-program presence per pack configuration.
+- Keep magnified block textures sharp with shader packs while preserving mipmaps and anisotropic minification; reuse Minecraft's sampler for custom block-atlas aliases.
+- Restore alpha testing after terrain and entity pack fragments, including early returns, so transparent texels do not write opaque color and depth.
+- Move camera bob/hurt transforms from projection into the shader-pack model-view matrices and keep entity vertex and normal transforms consistent with that decomposition.
+- Local JDK 21 checks: 617 tests passed, 104 example shaders processed and 122 direct Vulkan SPIR-V modules compiled; the installed BSL v10.1.8 default source audit passed. The user reported improved frame pacing and texture sharpness. Full visual parity and the intermittent black-screen report remain unverified.
+
 ## 0.2.0 - 2026-10-27
 
 - Preserve OpenGL shadow texture coordinates under VulkanMod's negative-height viewport, including pack vertex stages and native fallback projection; retain shadow face winding after the Y conversion.

@@ -157,6 +157,8 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("gbufferProjectionInverse", "mat4", false),
             new ShaderUniform("gbufferPreviousModelView", "mat4", false),
             new ShaderUniform("gbufferPreviousProjection", "mat4", false),
+            new ShaderUniform("veyraViewEffects", "mat4", false),
+            new ShaderUniform("veyraViewEffectsInverse", "mat4", false),
             new ShaderUniform("shadowModelViewInverse", "mat4", false),
             new ShaderUniform("shadowProjectionInverse", "mat4", false)));
 
@@ -677,16 +679,20 @@ public final class TerrainShaderAdapter {
                 .append(type).append(' ').append(name).append(";\n"));
         bridge += packVaryingDeclarations.toString() + computedVaryingDeclarations;
         boolean initializePackVaryings = !computedVaryingExpressions.isEmpty();
-        if (hasTangentSpaceInputs || initializePackVaryings) {
+        boolean alphaTest = fragmentOutputs.variables().containsKey(0);
+        if (hasTangentSpaceInputs || initializePackVaryings || alphaTest) {
             adapted = renameMainForTerrainInitialization(adapted);
         }
         result.append(bridge).append(adapted);
-        if (hasTangentSpaceInputs || initializePackVaryings) {
+        if (hasTangentSpaceInputs || initializePackVaryings || alphaTest) {
             result.append("\nvoid main() {\n");
             if (hasTangentSpaceInputs) result.append("    veyraInitializeTerrainTangentFrame();\n");
             computedVaryingExpressions.forEach((name, expression) -> result.append("    ")
                     .append(name).append(" = ").append(expression).append(";\n"));
-            result.append("    veyraShaderPackMain();\n}\n");
+            if (alphaTest) result.append("    ").append(outputName).append(" = vec4(0.0);\n");
+            result.append("    veyraShaderPackMain();\n");
+            if (alphaTest) result.append("    if (").append(outputName).append(".a < alphaTestRef) discard;\n");
+            result.append("}\n");
         }
         return result.toString();
     }

@@ -4,6 +4,11 @@ package dev.veyra.vulkan;
 public final class VulkanMipExtent {
     private VulkanMipExtent() { }
 
+    public static int levels(int width, int height) {
+        if (width <= 0 || height <= 0) throw new IllegalArgumentException("Mip dimensions must be positive.");
+        return Integer.SIZE - Integer.numberOfLeadingZeros(Math.max(width, height));
+    }
+
     public static int atLevel(int baseExtent, int level) {
         if (baseExtent <= 0) throw new IllegalArgumentException("Base extent must be positive.");
         if (level < 0) throw new IllegalArgumentException("Mip level must not be negative.");
