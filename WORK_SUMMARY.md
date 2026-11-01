@@ -1891,3 +1891,4 @@ Veyra реализует подмножество Iris/OptiFine shaderpack API �
 - PR #149 merged after all exact-head checks passed: Build #1045, source audit #294, and all 54/54 Graphics smoke #340 jobs. Merge commit: `6cf94438d9765ff3158209a9dcba7e6e4cfb3f3d`.
 - Merged the verified `origin/release/0.2.1+mc1.21.11` head `6cf9443` into the local-only v0.2.3 candidate; integration commit `0459614` carries the release stack alongside the version bump. No remote release ref was pushed.
 - The merge advanced PR #148's head to `6cf9443`. Its Build #1047, source audit #295 and Graphics smoke #341 were queued at the first post-merge check; #148 remains open and needs fresh checks before merge. It is linked to the active thread.
+- Follow-up on the same head: Build #1047 passed at 2026-11-01 22:54 UTC. Source audit #295 is active; the full graphics jobs list reports 8/54 active, 46 queued, and no failures at 22:54 UTC. Do not merge #148 until audit and all graphics fixtures pass.
