@@ -7046,7 +7046,7 @@ public final class VeyraRenderer {
                     List<PostPass.Input> inputs = new ArrayList<>();
                     Map<Integer, Identifier> mipmapInputs = new HashMap<>();
                     if (group.mipmapSamplers().contains(0)) {
-                        inputs.add(new MipmappedTargetInput("InSampler", 0, inputColortex0));
+                        inputs.add(new MipmappedTargetInput("In", 0, inputColortex0));
                         mipmapInputs.put(0, inputColortex0);
                     } else inputs.add(new PostPass.TargetInput("In", inputColortex0, false, true));
                     for (int samplerIndex : program.colorSamplers()) {
@@ -7054,7 +7054,7 @@ public final class VeyraRenderer {
                             continue;
                         }
                         if (group.mipmapSamplers().contains(samplerIndex)) {
-                            inputs.add(new MipmappedTargetInput(colorTargetInputSampler(samplerIndex),
+                            inputs.add(new MipmappedTargetInput(colorTargetInputName(samplerIndex),
                                     samplerIndex, currentTargets.get(samplerIndex)));
                             mipmapInputs.put(samplerIndex, currentTargets.get(samplerIndex));
                         } else inputs.add(new PostPass.TargetInput(
@@ -8708,7 +8708,8 @@ public final class VeyraRenderer {
     private record BeaconBeamPipelineSet(Map<RenderPipeline, RenderPipeline> pipelines) {
     }
 
-    private record MipmappedTargetInput(String samplerName, int colorIndex, Identifier target) implements PostPass.Input {
+    private record MipmappedTargetInput(String inputName, int colorIndex, Identifier target) implements PostPass.Input {
+        @Override public String samplerName() { return inputName; }
         @Override public void addToPass(FramePass pass, Map<Identifier, ResourceHandle<RenderTarget>> targets) {
             pass.reads(targets.get(target));
         }
