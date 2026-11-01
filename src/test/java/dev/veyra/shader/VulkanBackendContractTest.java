@@ -9,6 +9,46 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Verify required injection contracts against the pinned backend bytecode without loading a GPU. */
 class VulkanBackendContractTest {
+    @Test void geometryTargetsAreInitializedBeforeWaitingForShadows() throws IOException {
+        var phase = read("dev/veyra/shader/VeyraRenderer").methods.stream()
+                .filter(method -> method.name.equals("renderPhase")).findFirst().orElseThrow();
+        boolean allocated = false;
+        boolean cleared = false;
+        boolean shadowCheck = false;
+        for (var instruction : phase.instructions) {
+            if (!(instruction instanceof MethodInsnNode call)) continue;
+            if (call.name.equals("ensureColorTargets")) allocated = true;
+            if (call.name.equals("clearColorTargetBuffers")) cleared = true;
+            if (call.name.equals("hasCompletedShadowMap")) {
+                assertTrue(allocated && cleared, "Geometry initialization must precede the shadow readiness return");
+                shadowCheck = true;
+            }
+        }
+        assertTrue(shadowCheck);
+    }
+
+    @Test void pipelineSelectionChecksReadinessAndWorldFramePreparesTextures() throws IOException {
+        requiresCall("dev/veyra/mixin/VkRenderPassMixin", "veyra$routeEntityPipeline",
+                "dev/veyra/shader/VeyraRenderer", "shaderPackTexturesReady", "()Z");
+        requiresCall("dev/veyra/shader/VeyraRenderer", "captureFrameMatrices",
+                "dev/veyra/shader/VeyraRenderer", "prepareShaderPackTextures", "()Z");
+        var readiness = read("dev/veyra/shader/VeyraRenderer").methods.stream()
+                .filter(method -> method.name.equals("shaderPackTexturesReady")).findFirst().orElseThrow();
+        for (var instruction : readiness.instructions) {
+            if (instruction instanceof MethodInsnNode call) {
+                assertFalse(call.owner.startsWith("dev/veyra/vulkan/"), "Readiness check must not touch GPU resources");
+            }
+        }
+    }
+
+    @Test void guiRenderingScopeMatchesMinecraftEntryPoint() throws IOException {
+        requiresCall("net/minecraft/client/renderer/GameRenderer", "render",
+                "net/minecraft/client/gui/render/GuiRenderer", "render",
+                "(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;)V");
+        requiresCall("dev/veyra/mixin/VkRenderPassMixin", "veyra$routeEntityPipeline",
+                "dev/veyra/shader/VeyraRenderer", "isGuiRendering", "()Z");
+    }
+
     @Test void terrainAtlasSamplerHookMatchesPinnedBackend() throws IOException {
         requiresCall("net/vulkanmod/render/chunk/WorldRenderer", "renderSectionLayer",
                 "net/vulkanmod/vulkan/texture/VulkanImage", "setSampler", "(J)V");

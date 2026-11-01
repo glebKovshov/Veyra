@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 - 2026-11-02
+
+- Honor per-pass colortex mipmap requests, generating and sampling mip chains for shader-pack exposure and reflections.
+- Keep GUI and inventory item rendering on vanilla pipelines instead of world shader-pack pipelines.
+- Prepare restored shader-pack textures before world rendering, avoiding uploads inside atlas render passes.
+- Allocate and clear geometry color buffers before waiting for the first completed shadow map.
+- Local development checks: 622 tests passed; runtime visual verification of these fixes remains incomplete.
+
 ## 0.2.1 - 2026-10-28
 
 - Analyze entity identifier usage once when preparing pipelines instead of scanning GLSL on every entity submission; skip unused identifier variants and cache shadow-program presence per pack configuration.
