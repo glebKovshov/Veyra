@@ -16,6 +16,6 @@ Put `veyra-0.2.3+mc1.21.11.jar` in the instance's `mods` folder beside VulkanMod
 ## Validation and limits
 
 - Local RTX 3070 Complementary Reimagined r5.9.3 HIGH lifecycle passed: 360,000 non-black pixels / 137 color buckets, including resize, dimension changes, disable/re-enable and reload.
-- The same Java source passed the local JDK 21 gate: 622 tests, shader validation, example packaging and distributable verification. GitHub's release workflow rebuilds and verifies the versioned artifact before publication.
+- The versioned v0.2.3 candidate passed the local Temurin JDK 21.0.13 gate: 622 tests, shader validation, example packaging, GraphicsSmoke compilation and JAR verification. GitHub's release workflow repeats the checks on the published ref.
 - Publication is gated by the pinned shader-pack source audit, Lavapipe graphics matrix, build/tests, shader compilation and distributable verification.
 - Full Iris visual parity is not certified; see COMPATIBILITY.md for the measured limits.

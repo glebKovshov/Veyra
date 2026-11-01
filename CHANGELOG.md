@@ -3,7 +3,7 @@
 ## 0.2.3 - 2026-11-02
 
 - Fix mipmapped post-pass sampler names: Minecraft appends `Sampler` to each input name, so Veyra now passes the base names expected by shader-pack colortex samplers. This restores the correct Complementary Reimagined HIGH frame with mipmapped colortex inputs.
-- The local RTX 3070 Complementary HIGH lifecycle completed resize, Nether/return, disable/re-enable and resource reload with 360,000 non-black pixels and 137 color buckets. The same Java source passed the forced JDK 21 build/test gate on the release candidate's parent commit; full Iris visual parity remains unverified.
+- The local RTX 3070 Complementary HIGH lifecycle completed resize, Nether/return, disable/re-enable and resource reload with 360,000 non-black pixels and 137 color buckets. The versioned v0.2.3 candidate passed the forced JDK 21 build/test gate: 622 tests, 104 example shaders and 122 Vulkan SPIR-V compilations; full Iris visual parity remains unverified.
 
 ## 0.2.2 - 2026-11-02
 
