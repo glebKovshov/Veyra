@@ -46,6 +46,33 @@ class ShaderPackImageBindingsTest {
         assertTrue(runtime.readStage("gbuffers_terrain.fsh").orElseThrow().contains("floodfill_sampler"));
     }
 
+    @Test void graphicsOnlyImagesEnableAnIsolatedRuntimeSnapshotWithoutComputeStages() throws Exception {
+        var ordinary = ShaderPack.inspect(java.nio.file.Path.of("examples/graphics-custom-image"));
+        assertTrue(ordinary.readImageProperties().images().isEmpty());
+        var runtime = ordinary.withRuntimeFeatures();
+        assertTrue(runtime.activeComputeStageFiles().isEmpty());
+        assertTrue(runtime.configuration().customImages());
+        assertEquals(2, runtime.readImageProperties().images().size());
+        assertFalse(ordinary.configuration().customImages());
+        assertTrue(ordinary.readImageProperties().images().isEmpty());
+        assertSame(runtime, runtime.withRuntimeFeatures());
+        assertDoesNotThrow(runtime::validatePipelineCapabilities);
+        var terrain = ShaderPackImageBindings.prepare("gbuffers_terrain.fsh",
+                runtime.readStage("gbuffers_terrain.fsh").orElseThrow(), runtime.readImageProperties());
+        var post = ShaderPackImageBindings.prepare("final.fsh",
+                runtime.readStage("final.fsh").orElseThrow(), runtime.readImageProperties());
+        assertEquals(java.util.Set.of("voxel_img", "marker_img"),
+                terrain.resources().stream().map(ComputeShaderAdapter.OpaqueResource::imageName)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(2, ShaderPackImageBindings.plan(0, terrain, post).resources().size());
+    }
+
+    @Test void imageFreePackKeepsItsOrdinarySnapshotAndAllocatesNoComputeResources() throws Exception {
+        var ordinary = ShaderPack.inspect(java.nio.file.Path.of("examples/custom-uniforms"));
+        assertSame(ordinary, ordinary.withRuntimeFeatures());
+        assertNull(VeyraComputePipelineSet.compile(ordinary));
+    }
+
     @Test void basicVertexStageCanSampleTheSharedCustomImage() throws Exception {
         var runtime = ShaderPack.inspect(java.nio.file.Path.of("examples/basic-custom-image")).withRuntimeFeatures();
         String source = runtime.readCustomImageStage("gbuffers_basic.vsh").orElseThrow();

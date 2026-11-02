@@ -33,7 +33,6 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
 
     public static VeyraComputePipelineSet compile(ShaderPack pack) throws IOException {
         List<String> files = pack.activeComputeStageFiles();
-        if (files.isEmpty()) return null;
         int shadowMapResolution = pack.readShadowSettings().resolution();
         if (files.stream().anyMatch(file -> isShadowComputeFile(file))
                 && !VeyraDeviceFeatures.supportsShadowVoxelWrites()) {
@@ -62,6 +61,8 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             stage.resources().stream().map(ComputeShaderAdapter.OpaqueResource::imageName)
                     .forEach(graphicsImageNames::add);
         }
+
+        if (files.isEmpty() && graphicsImageNames.isEmpty()) return null;
 
         VeyraComputeResources resources = VeyraComputeResources.create(properties, adapted, graphicsImageNames);
         List<Dispatch> compiled = new ArrayList<>(adapted.size());
@@ -163,9 +164,21 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         return resources.graphicsDescriptors(List.of(binding)).getFirst();
     }
 
-    /** Dispatches all shadow compute programs after the shadow render pass. */
+    /** Makes shadow image writes visible even when no compute stage follows the shadow pass. */
     public void dispatchAfterShadowPass(int renderWidth, int renderHeight) {
         ensureOpen();
+        if (resources.estimatedBytes() > 0) {
+            VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
+            if (!Renderer.isRecording() || commandBuffer == null
+                    || Renderer.getInstance().getBoundRenderPass() != null) {
+                throw new IllegalStateException("Shadow image barriers require an active Vulkan frame outside a render pass.");
+            }
+            VeyraComputePipeline.memoryBarrier(commandBuffer,
+                    VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                    VK_ACCESS_SHADER_WRITE_BIT,
+                    VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        }
         dispatch(stages.stream().filter(stage -> isShadowComputeFile(stage.programName() + ".csh")).toList(),
                 renderWidth, renderHeight);
     }

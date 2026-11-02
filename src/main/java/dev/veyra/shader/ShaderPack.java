@@ -1759,7 +1759,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public ShaderPack withRuntimeFeatures() throws IOException {
         if (configuration.customImages()) return this;
         ShaderPack candidate = inspect(path, new ShaderPackConfiguration(configuration.options(), configuration.dimension(), true));
-        return candidate.activeComputeStageFiles().isEmpty() ? this : candidate;
+        return candidate.activeComputeStageFiles().isEmpty() && candidate.readImageProperties().images().isEmpty()
+                ? this : candidate;
     }
 
     private Set<String> supportedFeatures() {

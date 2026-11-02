@@ -154,7 +154,7 @@ public final class GraphicsSmoke {
             basicCustomImageFixture = fixture.equals("basic-custom-image");
             entityCustomImageFixture = fixture.equals("entity-custom-image");
             entityCustomTextureFixture = fixture.equals("entity-custom-texture");
-            compositeCustomImageFixture = fixture.equals("composite-custom-image")
+            compositeCustomImageFixture = fixture.equals("composite-custom-image") || fixture.equals("graphics-custom-image")
                     || fixture.equals("compute-ssbo-only") || fixture.equals("compute-begin-stage")
                     || fixture.equals("compute-setup-stage") || fixture.equals("compute-shadow-stage")
                     || fixture.equals("begin-fragment-stage");
@@ -169,7 +169,7 @@ public final class GraphicsSmoke {
             damagedBlockVertexFixture = fixture.equals("damagedblock-vertex-execution");
             handVertexFixture = fixture.equals("hand-vertex-execution");
             storageBufferFixture = fixture.equals("storage-buffer-shadow");
-            boolean shadowVoxelImageFixture = fixture.equals("custom-image-compute")
+            boolean shadowVoxelImageFixture = fixture.equals("custom-image-compute") || fixture.equals("graphics-custom-image")
                     || fixture.equals("cloud-custom-image") || fixture.equals("basic-custom-image")
                     || fixture.equals("entity-custom-image") || fixture.equals("composite-custom-image");
             if (storageBufferFixture && !VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled) {
