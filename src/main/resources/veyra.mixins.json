@@ -61,6 +61,7 @@
     "accessor.RendererFramebufferAccessor",
     "accessor.VkGpuTextureAccessor",
     "accessor.NativePipelineRegistryAccessor",
+    "accessor.MemoryManagerAccessor",
     "SwapChainMixin",
     "TextureAtlasMixin",
     "accessor.TextureAtlasAccessor",
