@@ -8277,6 +8277,12 @@ public final class VeyraRenderer {
         }
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            // An unused ping-pong side can stay in TRANSFER_DST across frames; its repeated clears still need ordering.
+            if (image.getCurrentLayout() == VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                VeyraComputePipeline.memoryBarrier(commandBuffer,
+                        VK10.VK_PIPELINE_STAGE_TRANSFER_BIT, VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK10.VK_ACCESS_TRANSFER_WRITE_BIT, VK10.VK_ACCESS_TRANSFER_WRITE_BIT);
+            }
             image.transitionImageLayout(stack, commandBuffer, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             VkClearColorValue clearValue = VkClearColorValue.calloc(stack)
                     .float32(stack.floats(
