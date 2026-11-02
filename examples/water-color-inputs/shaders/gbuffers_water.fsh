@@ -12,11 +12,14 @@ const vec4 colortex7ClearColor = vec4(0.25, 0.5, 0.75, 1.0);
 void main() {
     vec2 uv = gl_FragCoord.xy / vec2(viewWidth, viewHeight);
     vec4 opaque = texture2D(gaux1, uv);
-    vec4 deferred = texture2D(gaux2, uv);
-    vec4 alias = texture2D(colortex5, uv);
+    // Halfway between the first blue and red pixel centers: nearest filtering cannot pass.
+    vec2 filterProbe = vec2(1.0 / viewWidth, uv.y);
+    vec4 deferred = texture2D(gaux2, filterProbe);
+    vec4 alias = texture2D(colortex5, filterProbe);
     vec4 initialized = texture2D(colortex7, uv);
     bool correct = opaque.r > 0.8 && opaque.b < 0.1
-        && deferred.b > 0.8 && deferred.r < 0.1 && abs(alias.b - deferred.b) < 0.01
+        && abs(deferred.r - 0.5) < 0.02 && abs(deferred.b - 0.5) < 0.02
+        && distance(alias, deferred) < 0.01
         && abs(initialized.g - 0.5) < 0.02;
     vec4 signal = correct ? vec4(0.95, 0.02, 0.8, 1.0) : vec4(0.02, 0.8, 0.05, 1.0);
     gl_FragData[0] = signal;

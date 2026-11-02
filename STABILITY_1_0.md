@@ -98,3 +98,28 @@ with matching HIGH/defaults, fixed clocks/scenes and clean Vulkan teardown. Thes
 controls support the input/noise/projection path but are modified diagnostic output,
 not proof of full BSL parity. Cloud marching, masking/composition and intermediate
 history remain to be isolated before the final candidate comparison.
+
+The remaining raw cloud-density difference is now isolated: deferred1 alpha is
+stored in a separate RGBA16F colortex12, then displayed without later processing.
+All 292 modified files match. Raw alpha MAE is 1.148845 full / 3.181418 in sky
+rows 0:130. Mirroring only Iris's Bayer Y coordinate reduces this to 0.000234 /
+0.000649, explaining its sample-phase difference. These intentionally grayscale
+captures fail the unchanged normal color-diversity gate; they are diagnostic data
+with clean Vulkan/teardown, not successful original-pack visual validation.
+
+Actual Iris 1.10.8 RenderTarget enables linear filtering for non-integer color
+attachments. Veyra's shared geometry auxiliary binding forced nearest filtering;
+it now uses clamp-to-edge plus linear for its supported color formats. The existing
+water-color-inputs fixture writes alternating blue/red deferred pixel columns and
+requires their halfway blend through gaux2 and colortex5. Old nearest filtering
+fails with zero marker pixels; corrected filtering passes at 222,757 / zero disabled
+markers, both Vulkan-clean. Original BSL full RGB MAE is now 3.825747 (water rows
+145:360=4.586129), Sildur default remains 4.313471 full / 4.299621 floor across 137
+matched files. Full local build/test/shader checks and BSL lifecycle pass. Cloud
+color/composition and water-reflection differences plus final-candidate repeats
+remain; density agreement alone does not establish full visual parity.
+
+Hosted e68809f Build #1082 and source audit #309 pass. Graphics #355 has 54 successful
+jobs and one dependency-resolution failure before Minecraft launch (geometry-mrt,
+job 125585640665); its raw error is retained. The sampler fix needs a fresh complete
+hosted matrix before release. No validation or readback gate was relaxed.

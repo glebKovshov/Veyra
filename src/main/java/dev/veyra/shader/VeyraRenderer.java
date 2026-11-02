@@ -8107,7 +8107,7 @@ public final class VeyraRenderer {
                 sampledView = target.getColorTextureView();
                 sampledImage = source;
             }
-            sampledImage.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+            sampledImage.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
             VRenderSystem.setShaderTexture(descriptor.imageIdx, sampledView);
             net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx, sampledImage);
             geometryColorBindings.put(descriptor.imageIdx, new GeometryColorBinding(sampledView, sampledImage));
