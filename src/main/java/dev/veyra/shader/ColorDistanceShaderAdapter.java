@@ -63,7 +63,7 @@ public final class ColorDistanceShaderAdapter {
         }
         adapted = PRECISION_DECLARATION.matcher(extensionMatcher.replaceAll("")).replaceAll("");
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, programName);
+                ShaderPackUniformAdapter.extractForSampling(adapted, programName);
         adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM.matcher(adapted).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");

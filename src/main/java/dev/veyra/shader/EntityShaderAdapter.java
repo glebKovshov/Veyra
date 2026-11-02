@@ -888,7 +888,7 @@ public final class EntityShaderAdapter {
         IrisFogUniformAdapter.AdaptedShader fogUniforms = IrisFogUniformAdapter.extract(adapted, programName);
         adapted = fogUniforms.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, programName, entityColorAvailable);
+                ShaderPackUniformAdapter.extractForSampling(adapted, programName, entityColorAvailable);
         adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted)).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");

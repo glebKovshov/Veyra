@@ -814,6 +814,9 @@ public final class VeyraRenderer {
             case "gbufferProjectionInverse" -> IrisProjectionMatrices.fromVulkan(
                     isHandRendering() ? handAdjustedProjection(matrices.gbufferProjection())
                             : matrices.gbufferProjection()).invert();
+            case "veyraSamplingProjection" -> IrisProjectionMatrices.fromVulkan(
+                    isHandRendering() ? handAdjustedProjection(matrices.gbufferProjection()) : matrices.gbufferProjection());
+            case "veyraSamplingPreviousProjection" -> IrisProjectionMatrices.fromVulkan(matrices.gbufferPreviousProjection());
             case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
             case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
             case "veyraViewEffects" -> matrices.viewEffects();

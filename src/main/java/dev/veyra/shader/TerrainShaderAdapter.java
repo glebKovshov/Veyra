@@ -154,6 +154,8 @@ public final class TerrainShaderAdapter {
             new ShaderUniform("textureMatrix", "mat4", false),
             new ShaderUniform("gbufferModelViewInverse", "mat4", false),
             new ShaderUniform("gbufferProjection", "mat4", false),
+            new ShaderUniform("veyraSamplingProjection", "mat4", false),
+            new ShaderUniform("veyraSamplingPreviousProjection", "mat4", false),
             new ShaderUniform("gbufferProjectionInverse", "mat4", false),
             new ShaderUniform("gbufferPreviousModelView", "mat4", false),
             new ShaderUniform("gbufferPreviousProjection", "mat4", false),
@@ -459,7 +461,7 @@ public final class TerrainShaderAdapter {
             uniformMatcher.appendReplacement(withoutShaderPackUniforms, "");
         }
         uniformMatcher.appendTail(withoutShaderPackUniforms);
-        adapted = withoutShaderPackUniforms.toString();
+        adapted = ShaderPackUniformAdapter.samplingProjections(withoutShaderPackUniforms.toString());
         Matcher unsupportedUniform = UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted);
         if (unsupportedUniform.find()) {
             int lineEnd = adapted.indexOf('\n', unsupportedUniform.start());

@@ -214,7 +214,7 @@ public final class TextureColorDistanceShaderAdapter {
         withoutSamplers.append(adapted, samplerCursor, adapted.length());
         adapted = withoutSamplers.toString();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, programName, entityColorAvailable);
+                ShaderPackUniformAdapter.extractForSampling(adapted, programName, entityColorAvailable);
         adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(adapted)).find()) {
             throw new IOException(programName + " has an unsupported uniform declaration.");
