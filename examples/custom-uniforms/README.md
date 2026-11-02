@@ -4,4 +4,6 @@ Place this folder in `shaderpacks/` and select it with F6 in a world at noon. `s
 
 This is an original diagnostic fixture used by the software Vulkan integration matrix.
 
+The helper `veyraHalf` and integer `veyraDayTick` are deliberately declared after consumers. Both terrain and final must receive the current-frame values after dependency ordering; declaration order in shader uniform blocks remains stable.
+
 The final pass also checks live celestial and integer camera vectors followed by scalar fields. This catches post-uniform std140 packing regressions where a scalar must occupy the fourth word after a vec3 or ivec3.

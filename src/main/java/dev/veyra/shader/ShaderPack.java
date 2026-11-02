@@ -483,7 +483,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     /** Reads uniform./variable. definitions from the preprocessed shaders.properties. */
     public CustomUniforms readCustomUniforms() throws IOException {
-        return CustomUniforms.parse(readShader("shaders.properties").orElse(""));
+        CustomUniforms uniforms = CustomUniforms.parse(readShader("shaders.properties").orElse(""));
+        if (!uniforms.circularDefinitions().isEmpty()) {
+            throw new IOException("Circular custom uniform dependencies: "
+                    + String.join(", ", uniforms.circularDefinitions()));
+        }
+        return uniforms;
     }
 
     /** Iris defaults noisetex to 256 square pixels and exposes this shader-pack directive. */
@@ -1230,6 +1235,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public void validatePipelineCapabilities() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         readCustomTextureProperties();
+        readCustomUniforms();
         String required = properties.getProperty("iris.features.required", "").strip();
         Set<String> supportedFeatures = supportedFeatures();
         List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())

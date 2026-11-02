@@ -15,12 +15,12 @@ import java.util.regex.Pattern;
  * OptiFine/Iris {@code uniform.<type>.<name>} and {@code variable.<type>.<name>} definitions from
  * shaders.properties. Expressions are evaluated on the CPU once per frame from Veyra's built-in uniforms.
  *
- * <p>Scalar float/int/bool results are supported. Vector definitions, unknown inputs (for example
- * {@code biome}) and malformed expressions are kept as unavailable with a reason, so programs that declare
+ * <p>Scalar float/int/bool results are supported. Vector definitions, unknown inputs
+ * and malformed expressions are kept as unavailable with a reason, so programs that declare
  * them fail with a clear diagnostic instead of receiving fake values.
  */
 public final class CustomUniforms {
-    public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of(), Map.of());
+    public static final CustomUniforms EMPTY = new CustomUniforms(List.of(), Map.of(), Map.of(), List.of(), List.of());
     /** Built-in scalar inputs an expression may reference; vector inputs are exposed by component. */
     public static final Set<String> BUILT_IN_INPUTS = withIrisExtras(Set.of(
             "biome", "biome_precipitation", "playerMood", "darknessLightFactor", "shadowFade", "velocity", "near", "far", "heldBlockLightValue", "heldBlockLightValue2", "heldItemId", "heldItemId2",
@@ -73,20 +73,18 @@ public final class CustomUniforms {
     private final List<Definition> definitions;
     private final Map<String, String> unavailable;
     private final Map<String, String> irisUnresolved;
+    private final List<String> circularDefinitions;
     // Renderer suppliers look uniforms up on every uniform-buffer update.
-    private final Map<String, Uniform> uniformIndex = new HashMap<>();
+    private final Map<String, Uniform> uniformIndex = new LinkedHashMap<>();
     private final Map<String, Double> values = new HashMap<>();
 
     private CustomUniforms(List<Definition> definitions, Map<String, String> unavailable,
-                           Map<String, String> irisUnresolved) {
+                           Map<String, String> irisUnresolved, List<Uniform> uniforms, List<String> circularDefinitions) {
         this.definitions = definitions;
         this.unavailable = unavailable;
         this.irisUnresolved = irisUnresolved;
-        for (Definition definition : definitions) {
-            if (definition.uniform()) {
-                uniformIndex.put(definition.name(), new Uniform(definition.name(), definition.type()));
-            }
-        }
+        this.circularDefinitions = List.copyOf(circularDefinitions);
+        for (Uniform uniform : uniforms) uniformIndex.put(uniform.name(), uniform);
     }
 
     public static CustomUniforms active() {
@@ -97,12 +95,13 @@ public final class CustomUniforms {
         active = uniforms == null ? EMPTY : uniforms;
     }
 
-    /** Parses preprocessed shaders.properties text, keeping definition order. */
+    /** Parses all definitions before resolving their dependency order, as Iris does. */
     public static CustomUniforms parse(String properties) {
         List<Definition> definitions = new ArrayList<>();
         Map<String, String> unavailable = new LinkedHashMap<>();
         Map<String, String> irisUnresolved = new LinkedHashMap<>();
-        Map<String, Type> known = new HashMap<>();
+        Map<String, Definition> parsed = new LinkedHashMap<>();
+        Set<String> seen = new java.util.HashSet<>();
         for (String line : logicalLines(properties == null ? "" : properties)) {
             Matcher matcher = DEFINITION.matcher(line);
             if (!matcher.matches()) continue;
@@ -110,10 +109,7 @@ public final class CustomUniforms {
             String typeName = matcher.group(2);
             String name = matcher.group(3);
             String source = matcher.group(4).strip();
-            known.remove(name);
-            definitions.removeIf(definition -> definition.name().equals(name));
-            unavailable.remove(name);
-            irisUnresolved.remove(name);
+            if (seen.contains(name)) continue;
             // BSL defines its own expression for shadowFade in shaders.properties. Keep such pack
             // overrides compatible while still exposing Iris' frame value when they are absent.
             if (BUILT_IN_INPUTS.contains(name) && !PACK_OVERRIDABLE.contains(name)) {
@@ -124,31 +120,13 @@ public final class CustomUniforms {
                 unavailable.put(name, typeName + " custom uniforms are not supported yet");
                 continue;
             }
-            if (source.length() > MAX_EXPRESSION_LENGTH || definitions.size() >= MAX_DEFINITIONS) {
+            if (source.length() > MAX_EXPRESSION_LENGTH || seen.size() >= MAX_DEFINITIONS) {
                 unavailable.put(name, "the expression exceeds Veyra's size limit");
                 continue;
             }
             Node expression;
             try {
                 expression = new Parser(source).parse();
-                String missing = expression.missingInput(known.keySet());
-                if (missing != null && (irisUnresolved.containsKey(missing) || missing.startsWith("BIOME_"))) {
-                    // Iris logs "Failed to resolve uniform" and never sets such a uniform, so shaders
-                    // read 0. Vanilla biome constants match Iris exactly (BiomeIds), so an undefined
-                    // BIOME_* constant (Complementary's BIOME_SULFUR_CAVES on 1.21.11) fails in Iris too.
-                    irisUnresolved.put(name, irisUnresolved.containsKey(missing)
-                            ? "it depends on '" + missing + "', which Iris cannot resolve"
-                            : "'" + missing + "' is not a registered vanilla biome");
-                    definitions.add(new Definition(name, Type.valueOf(typeName.toUpperCase(java.util.Locale.ROOT)),
-                            uniform, new Constant(0.0)));
-                    continue;
-                }
-                if (missing != null) {
-                    unavailable.put(name, unavailable.containsKey(missing)
-                            ? "it depends on unavailable '" + missing + "'"
-                            : "input '" + missing + "' is not provided by Veyra");
-                    continue;
-                }
             } catch (IllegalArgumentException exception) {
                 unavailable.put(name, "invalid expression: " + exception.getMessage());
                 continue;
@@ -160,12 +138,65 @@ public final class CustomUniforms {
                 unavailable.put(name, "the built-in " + name + " uniform must remain a float");
                 continue;
             }
-            definitions.add(new Definition(name, type, uniform, expression));
-            known.put(name, type);
+            seen.add(name);
+            unavailable.remove(name);
+            parsed.put(name, new Definition(name, type, uniform, expression));
         }
+        Map<String, Set<String>> inputs = new LinkedHashMap<>();
+        Map<String, Integer> remaining = new HashMap<>();
+        Map<String, List<String>> dependents = new HashMap<>();
+        java.util.ArrayDeque<String> ready = new java.util.ArrayDeque<>();
+        for (Definition definition : parsed.values()) {
+            Set<String> names = new java.util.LinkedHashSet<>();
+            definition.expression().collectInputs(names);
+            inputs.put(definition.name(), names);
+            int count = 0;
+            for (String input : names) {
+                // A pack override may read its own built-in fallback, e.g. velocity.
+                if (!parsed.containsKey(input)
+                        || input.equals(definition.name()) && BUILT_IN_INPUTS.contains(input)) continue;
+                dependents.computeIfAbsent(input, key -> new ArrayList<>()).add(definition.name());
+                count++;
+            }
+            remaining.put(definition.name(), count);
+            if (count == 0) ready.addLast(definition.name());
+        }
+        while (!ready.isEmpty()) {
+            String name = ready.removeFirst();
+            Definition definition = parsed.get(name);
+            String missing = inputs.get(name).stream().filter(input ->
+                    irisUnresolved.containsKey(input)
+                            || !BUILT_IN_INPUTS.contains(input) && BiomeIds.constant(input) == null
+                            && (!parsed.containsKey(input) || unavailable.containsKey(input)))
+                    .findFirst().orElse(null);
+            if (missing == null) {
+                definitions.add(definition);
+            } else if (irisUnresolved.containsKey(missing) || missing.startsWith("BIOME_")) {
+                irisUnresolved.put(name, irisUnresolved.containsKey(missing)
+                        ? "it depends on '" + missing + "', which Iris cannot resolve"
+                        : "'" + missing + "' is not a registered vanilla biome");
+                definitions.add(new Definition(name, definition.type(), definition.uniform(), new Constant(0.0)));
+            } else {
+                unavailable.put(name, unavailable.containsKey(missing)
+                        ? "it depends on unavailable '" + missing + "'"
+                        : "input '" + missing + "' is not provided by Veyra");
+            }
+            for (String dependent : dependents.getOrDefault(name, List.of())) {
+                if (remaining.merge(dependent, -1, Integer::sum) == 0) ready.addLast(dependent);
+            }
+        }
+        remaining.forEach((name, count) -> {
+            if (count > 0) unavailable.put(name, "circular custom uniform dependency involving '" + name + "'");
+        });
         return new CustomUniforms(List.copyOf(definitions), Collections.unmodifiableMap(unavailable),
-                Collections.unmodifiableMap(irisUnresolved));
+                Collections.unmodifiableMap(irisUnresolved), parsed.values().stream()
+                        .filter(definition -> definition.uniform() && !unavailable.containsKey(definition.name()))
+                        .map(definition -> new Uniform(definition.name(), definition.type())).toList(),
+                parsed.keySet().stream().filter(name -> remaining.get(name) > 0).toList());
     }
+
+    /** Cycles and their blocked dependents cannot be evaluated and must reject pack installation. */
+    public List<String> circularDefinitions() { return circularDefinitions; }
 
     /**
      * Definitions that Iris itself cannot resolve, mapped to the reason. Like Iris they stay 0;
@@ -175,10 +206,9 @@ public final class CustomUniforms {
         return irisUnresolved;
     }
 
-    /** Uniforms (not helper variables) that can be supplied to shaders, in definition order. */
+    /** Uniforms in declaration order; only evaluation uses dependency order. */
     public List<Uniform> uniforms() {
-        return definitions.stream().filter(Definition::uniform)
-                .map(definition -> new Uniform(definition.name(), definition.type())).toList();
+        return List.copyOf(uniformIndex.values());
     }
 
     public Uniform uniform(String name) {
@@ -246,8 +276,7 @@ public final class CustomUniforms {
     private interface Node {
         double evaluate(Function<String, Double> inputs, double frameTime);
 
-        /** Returns the first referenced name that is neither built in nor previously defined. */
-        String missingInput(Set<String> defined);
+        void collectInputs(Set<String> inputs);
     }
 
     private record Constant(double value) implements Node {
@@ -255,9 +284,7 @@ public final class CustomUniforms {
             return value;
         }
 
-        public String missingInput(Set<String> defined) {
-            return null;
-        }
+        public void collectInputs(Set<String> inputs) { }
     }
 
     private record Reference(String name) implements Node {
@@ -268,10 +295,7 @@ public final class CustomUniforms {
             return value == null ? 0.0 : value;
         }
 
-        public String missingInput(Set<String> defined) {
-            return defined.contains(name) || BUILT_IN_INPUTS.contains(name) || BiomeIds.constant(name) != null
-                    ? null : name;
-        }
+        public void collectInputs(Set<String> inputs) { inputs.add(name); }
     }
 
     private record Unary(char operator, Node operand) implements Node {
@@ -280,9 +304,7 @@ public final class CustomUniforms {
             return operator == '-' ? -value : value == 0.0 ? 1.0 : 0.0;
         }
 
-        public String missingInput(Set<String> defined) {
-            return operand.missingInput(defined);
-        }
+        public void collectInputs(Set<String> inputs) { operand.collectInputs(inputs); }
     }
 
     private record Binary(String operator, Node left, Node right) implements Node {
@@ -307,9 +329,9 @@ public final class CustomUniforms {
             };
         }
 
-        public String missingInput(Set<String> defined) {
-            String missing = left.missingInput(defined);
-            return missing != null ? missing : right.missingInput(defined);
+        public void collectInputs(Set<String> inputs) {
+            left.collectInputs(inputs);
+            right.collectInputs(inputs);
         }
     }
 
@@ -453,12 +475,8 @@ public final class CustomUniforms {
             return smoother.update(target, frameTime, fadeUp, fadeDown);
         }
 
-        public String missingInput(Set<String> defined) {
-            for (Node argument : arguments) {
-                String missing = argument.missingInput(defined);
-                if (missing != null) return missing;
-            }
-            return null;
+        public void collectInputs(Set<String> inputs) {
+            for (Node argument : arguments) argument.collectInputs(inputs);
         }
     }
 
@@ -468,10 +486,10 @@ public final class CustomUniforms {
                     ? whenTrue.evaluate(inputs, frameTime) : whenFalse.evaluate(inputs, frameTime);
         }
 
-        public String missingInput(Set<String> defined) {
-            String missing = condition.missingInput(defined);
-            if (missing == null) missing = whenTrue.missingInput(defined);
-            return missing != null ? missing : whenFalse.missingInput(defined);
+        public void collectInputs(Set<String> inputs) {
+            condition.collectInputs(inputs);
+            whenTrue.collectInputs(inputs);
+            whenFalse.collectInputs(inputs);
         }
     }
 
@@ -502,7 +520,7 @@ public final class CustomUniforms {
                 if (accept("?")) {
                     Node whenTrue = ternary();
                     expect(":");
-                    return new Ternary(condition, whenTrue, ternary());
+                    return bounded(new Ternary(condition, whenTrue, ternary()));
                 }
                 return condition;
             } finally {
@@ -527,18 +545,37 @@ public final class CustomUniforms {
                 }
                 if (operator == null) return left;
                 position += operator.length();
-                left = new Binary(operator, left, binary(level + 1));
+                left = bounded(new Binary(operator, left, binary(level + 1)));
             }
         }
 
         private Node unary() {
-            if (accept("-")) return new Unary('-', unary());
-            if (accept("+")) return unary();
-            if (peek("!") && !peek("!=")) {
-                position++;
-                return new Unary('!', unary());
+            if (++depth > MAX_DEPTH) throw new IllegalArgumentException("expression is nested too deeply");
+            try {
+                if (accept("-")) return bounded(new Unary('-', unary()));
+                if (accept("+")) return unary();
+                if (peek("!") && !peek("!=")) {
+                    position++;
+                    return bounded(new Unary('!', unary()));
+                }
+                return primary();
+            } finally {
+                depth--;
             }
-            return primary();
+        }
+
+        private Node bounded(Node node) {
+            if (treeDepth(node) > MAX_DEPTH) throw new IllegalArgumentException("expression is nested too deeply");
+            return node;
+        }
+
+        private static int treeDepth(Node node) {
+            if (node instanceof Unary unary) return 1 + treeDepth(unary.operand());
+            if (node instanceof Binary binary) return 1 + Math.max(treeDepth(binary.left()), treeDepth(binary.right()));
+            if (node instanceof Ternary ternary) return 1 + Math.max(treeDepth(ternary.condition()),
+                    Math.max(treeDepth(ternary.whenTrue()), treeDepth(ternary.whenFalse())));
+            if (node instanceof Call call) return 1 + call.arguments.stream().mapToInt(Parser::treeDepth).max().orElse(0);
+            return 1;
         }
 
         private Node primary() {
@@ -567,7 +604,7 @@ public final class CustomUniforms {
                         } while (accept(","));
                         expect(")");
                     }
-                    return new Call(name, arguments);
+                    return bounded(new Call(name, arguments));
                 }
                 return switch (name) {
                     case "true" -> new Constant(1.0);
