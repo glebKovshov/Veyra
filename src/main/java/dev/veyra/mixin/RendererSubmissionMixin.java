@@ -1,5 +1,6 @@
 package dev.veyra.mixin;
 
+import dev.veyra.shader.VeyraComputePipeline;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.framebuffer.SwapChain;
 import org.lwjgl.system.MemoryStack;
@@ -9,7 +10,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.ArrayList;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -18,6 +21,15 @@ public abstract class RendererSubmissionMixin {
     @Shadow private SwapChain swapChain;
     @Shadow private ArrayList<Long> imageAvailableSemaphores;
     @Shadow private static int currentFrame;
+
+    @Inject(method = "beginMainRenderPass", at = @At(value = "INVOKE", target =
+            "Lnet/vulkanmod/vulkan/pass/MainPass;begin(Lorg/lwjgl/vulkan/VkCommandBuffer;Lorg/lwjgl/system/MemoryStack;)V"))
+    private void veyra$makeUploadsVisible(MemoryStack stack, CallbackInfo callback) {
+        // Upload command buffers submit before this graphics buffer, including index-buffer growth.
+        VeyraComputePipeline.memoryBarrier(Renderer.getCommandBuffer(),
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
+    }
 
     @Redirect(method = "flushCmds", at = @At(value = "INVOKE", target =
             "Lorg/lwjgl/vulkan/VK10;vkQueueSubmit(Lorg/lwjgl/vulkan/VkQueue;Lorg/lwjgl/vulkan/VkSubmitInfo;J)I"))
