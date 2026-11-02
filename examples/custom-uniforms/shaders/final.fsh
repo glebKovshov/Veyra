@@ -5,6 +5,7 @@ uniform int framemod8;
 uniform int veyraExpectedFrameMod;
 uniform float veyraScaled;
 uniform float shadowFade;
+uniform float cloudHeight;
 uniform ivec2 atlasSize;
 uniform ivec2 eyeBrightnessSmooth;
 uniform float veyraStill;
@@ -26,7 +27,7 @@ void main() {
             && distance(veyraPair, vec2(0.25, 0.5)) < 0.001
             && distance(veyraTint, vec3(0.25, 0.5, 0.75)) < 0.001 && abs(veyraTintTail - 0.75) < 0.001
             && distance(veyraQuad, vec4(0.25, 0.5, 0.75, 1)) < 0.001;
-    bool custom = vectors && veyraDayTick == 7 && framemod8 == veyraExpectedFrameMod
+    bool custom = abs(cloudHeight - 224.0) < 0.001 && vectors && veyraDayTick == 7 && framemod8 == veyraExpectedFrameMod
             && shadowFade > 0.99 && abs(veyraScaled - 2.0) < 0.001
             && atlasSize.x >= 16 && atlasSize.y >= 16 && eyeBrightnessSmooth.y >= 0 && eyeBrightnessSmooth.y <= 240
             && veyraStill > 0.5

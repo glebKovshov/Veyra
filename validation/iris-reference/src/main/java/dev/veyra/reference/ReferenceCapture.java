@@ -163,6 +163,13 @@ public final class ReferenceCapture implements ClientModInitializer {
             matrices.put("shadowModelView", ((org.joml.Matrix4fc) shadow.getField("MODELVIEW").get(null)).get(new float[16]));
             matrices.put("shadowProjection", ((org.joml.Matrix4fc) shadow.getField("PROJECTION").get(null)).get(new float[16]));
             java.nio.file.Files.writeString(output.resolve("frame-matrices.json"), new com.google.gson.Gson().toJson(matrices));
+            var client = Minecraft.getInstance();
+            float partialTick = client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+            java.nio.file.Files.writeString(output.resolve("frame-environment.json"), new com.google.gson.Gson().toJson(java.util.Map.of(
+                    "cloudHeight", client.gameRenderer.getMainCamera().attributeProbe().getValue(
+                            net.minecraft.world.attribute.EnvironmentAttributes.CLOUD_HEIGHT, partialTick),
+                    "dimensionCloudHeight", client.level.environmentAttributes().getDimensionValue(
+                            net.minecraft.world.attribute.EnvironmentAttributes.CLOUD_HEIGHT))));
         } catch (ReflectiveOperationException | java.io.IOException exception) {
             throw new IllegalStateException("Could not record the Iris comparison matrices", exception);
         }

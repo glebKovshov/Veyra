@@ -133,6 +133,22 @@ def main():
         "enabled_features": (9, (8, ["minecraft:vanilla"])),
         "WorldGenSettings": (10, {"seed": (4, 1), "generate_features": (1, int(natural_world)), "bonus_chest": (1, 0), "dimensions": (10, dimensions)}),
     }
+    if fixture == 'custom-uniforms':
+        # A biome override distinguishes camera attributes from dimension defaults on the GPU.
+        datapack = world / 'datapacks/veyra-cloud-height'
+        biome = datapack / 'data/veyra/worldgen/biome/cloud_height.json'
+        biome.parent.mkdir(parents=True, exist_ok=True)
+        biome.write_text(json.dumps({
+            'attributes': {'minecraft:visual/cloud_height': 224.0, 'minecraft:visual/sky_color': '#78a7ff'},
+            'has_precipitation': True, 'temperature': 0.8, 'downfall': 0.4,
+            'effects': {'water_color': 4159204}, 'carvers': [], 'features': [],
+            'spawners': {}, 'spawn_costs': {},
+        }), encoding='utf-8')
+        (datapack / 'pack.mcmeta').write_text(json.dumps({'pack': {
+            'description': 'Veyra camera cloud-height regression', 'min_format': [94, 1], 'max_format': [94, 1],
+        }}), encoding='utf-8')
+        dimensions['minecraft:overworld'][1]['generator'][1]['settings'][1]['biome'] = (8, 'veyra:cloud_height')
+        data['DataPacks'][1]['Enabled'] = (9, (8, ['vanilla', 'file/veyra-cloud-height']))
     with gzip.open(world / "level.dat", "wb") as output:
         output.write(bytes([10]) + string("") + payload(10, {"Data": (10, data)}))
     pack = root / 'shaderpacks' / fixture

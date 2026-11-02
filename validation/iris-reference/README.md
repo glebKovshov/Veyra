@@ -65,3 +65,12 @@ Both harnesses also save `frame-matrices.json` at the initial capture. Matrices
 are column-major arrays. Model-view and shader-pack shadow matrices can be
 compared directly; Veyra's raw gbuffer projection retains the native depth
 convention and must be converted before comparing it to Iris's OpenGL projection.
+Both harnesses save `frame-environment.json` with camera and dimension cloud
+heights. These may differ in biomes or datapacks that override the camera attribute;
+the shader uniform follows the camera, as in Iris 1.10.8.
+
+For a depth-isolation diagnostic only, add `-PreferenceNativeDepth`. This changes
+the actual camera/GPU projection and captured Iris matrix to Veyra's near-infinite
+depth coefficients in OpenGL coordinates. Require `REFERENCE_DEPTH nativeDepth=true`
+and verify the captured matrix (m22=-1.000000238418579, m32=-0.0999999). Leave this
+option off for the unmodified Iris baseline; label its captures as diagnostics.

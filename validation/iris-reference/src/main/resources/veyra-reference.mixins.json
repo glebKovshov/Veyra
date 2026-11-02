@@ -3,7 +3,7 @@
   "package": "dev.veyra.reference.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "ReferenceMouseMixin", "ReferenceTimerMixin", "ReferenceFrameCounterMixin"
+    "ReferenceMouseMixin", "ReferenceTimerMixin", "ReferenceFrameCounterMixin", "ReferenceProjectionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -3,6 +3,9 @@
 Place this folder in `shaderpacks/` and select it with F6 in a world at noon. `shaders.properties` defines OptiFine/Iris `uniform.*` and `variable.*` expressions (float, int, bool, helper variable, line continuation). Magenta means terrain and `final` received the expected CPU-evaluated values, including the pack-defined `shadowFade` expression and integer override of Veyra's `framemod8`; green means a value was wrong.
 
 This is an original diagnostic fixture used by the software Vulkan integration matrix.
+The generated `custom-uniforms` world includes a biome with cloud height 224,
+distinct from the dimension default. Terrain and final both require that camera
+attribute; the default biome in an ordinary world intentionally produces green.
 
 The helper `veyraHalf` and integer `veyraDayTick` are deliberately declared after consumers. Both terrain and final must receive the current-frame values after dependency ordering; declaration order in shader uniform blocks remains stable.
 

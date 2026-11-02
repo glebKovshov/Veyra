@@ -54,3 +54,30 @@ The large BSL reflection distortion is now traced to inconsistent geometry sampl
 The sampling-projection candidate also passes the complete BSL HIGH natural lifecycle (zero core/sync/teardown diagnostics) and a Sildur wall repeat at RGB MAE 4.305195 overall / 4.261330 floor. The SSBO compute fixture independently passes its GPU projection round-trip, rollback, cross-pack switch and native screenshot equality (230,400 pixels). An identical-settings Iris BSL repeat differs by only 0.081525/255, so the remaining 3.838811 Veyra/Iris difference cannot be dismissed as reference repeatability. Further cloud/sampling analysis and final candidate/release gates remain open. Hosted fea7bf7 passed Build #1074, source audit #305 and Graphics smoke #351 (55/55 jobs); the sampling-projection fix requires its hosted repeat.
 
 Legacy color-buffer directives now share the existing sampler alias table (`gcolor`, `gdepth`, `gnormal`, `composite`, `gaux1..4`) for Format/Clear/ClearColor, including active block-comment const lines, matching [Iris render-target directives](https://github.com/IrisShaders/Iris/blob/0a1fcaae55099356bf53410b4f5302753edb0ffc/common/src/main/java/net/irisshaders/iris/shaderpack/properties/PackRenderTargetDirectives.java). RGB10_A2 now has native packed allocation/size/feature validation and a wide fallback; intermediate readback supports packed 10-bit and RGBA16 UNORM. BSL confirms physical R8=9, RGB10_A2=64 and RGBA16=91 across 40 captured intermediate images with zero Vulkan/teardown errors. The custom-uniform fixture requires physical packed/wide storage for gdepthFormat, then passes rollback/switch/screenshot equality at 222,709 pixels. Local gates pass 666 JUnit tests, seven Python tests, 105 examples / 123 SPIR-V and all 75 pinned audit cases (939 geometry programs, 18 active compute stages, zero source errors). Full BSL lifecycle and a Sildur initial repeat remain clean. BSL natural full RGB MAE is 3.980409/255 (previous 3.838811); this repairs an ignored format contract rather than resolving every residual cloud difference. A modified Iris diagnostic approximating old storage shifts the reference by 1.529868/255; it is not an unmodified parity baseline.
+
+Camera cloud height now follows the actual Iris 1.10.8 supplier: camera environment
+attribute probe at the frame partial tick, rather than the dimension-wide default.
+The custom-uniforms world supplies a biome override of 224 versus dimension 192.33;
+terrain and post both require 224. The final local r3 probe passes rollback,
+cross-pack switching and native/in-frame equality at 222,038 pixels, with zero
+core/sync/teardown errors. Restoring the old supplier makes the capture gate fail;
+that negative control is also Vulkan-clean. Both reference harnesses record the
+camera/dimension cloud heights beside their matrices. Fresh original BSL HIGH
+natural captures report 192.33 in both and full RGB MAE 3.921677/255, so this defect
+does not explain that scene's remaining difference. Native-depth and cloud Bayer-Y
+diagnostics also leave the dominant residual unresolved. Hosted 871fe07 passes
+Build #1078, source audit #307 and all 55 Graphics smoke #353 jobs. The new camera
+attribute change still requires its own hosted checks and final-candidate gates.
+
+The first biome diagnostic waited at Minecraft's experimental-world backup screen
+and recorded two swapchain validation errors. The smoke harness now accepts that
+screen only for its generated custom-uniforms world; both subsequent positive runs
+and the negative control are clean. A lingering-backup-screen reproduction remains
+to determine the original synchronization trigger; do not erase that failed evidence.
+
+A corrected TAA-off diagnostic changes both original-source defaults and the HIGH
+profile in both owned copies; all 292 files match and Iris confirms HIGH (+0 user
+changes). Its full RGB MAE is 3.741655/255, versus 3.921677 with TAA. Turning TAA
+off shifts Veyra by 0.848611 and Iris by 0.805192. This rules out TAA as the sole
+cause; cloud/noise sampling remains to be isolated. The earlier profile-only
+TAA control left Iris on its original defaults and is excluded from conclusions.

@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Exercise a real client/world and measure the fixture's shader output against a baseline. */
@@ -130,6 +131,16 @@ public final class GraphicsSmoke {
             if (client.level != null && client.screen instanceof net.minecraft.client.gui.screens.PauseScreen) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Resuming the unattended validation world from PauseScreen");
                 client.setScreen(null);
+            }
+            if (client.screen instanceof net.minecraft.client.gui.screens.BackupConfirmScreen backup
+                    && Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt")).equals("custom-uniforms")) {
+                // The generated biome datapack makes this disposable regression world experimental.
+                var skip = Component.translatable("selectWorld.backupJoinSkipButton");
+                var button = backup.children().stream()
+                        .filter(child -> child instanceof net.minecraft.client.gui.components.Button candidate
+                                && candidate.getMessage().equals(skip))
+                        .map(child -> (net.minecraft.client.gui.components.Button) child).findFirst().orElseThrow();
+                button.onPress(null);
             }
             if (++ticks > 2400) throw new IllegalStateException("Timed out waiting for the validation world/readback; screen=" + client.screen);
             if (client.level == null || client.player == null || client.screen != null || pending) return;
@@ -514,7 +525,7 @@ public final class GraphicsSmoke {
         try {
             Renderer renderer = Renderer.getInstance();
             renderer.endRenderPass();
-            if (thirdPartyShaderpackFixture && stage == 0) captureComparisonMatrices();
+            if ((thirdPartyShaderpackFixture || customUniformFixture) && stage == 0) captureComparisonMatrices();
             if (thirdPartyShaderpackFixture && VeyraRenderer.isRenderingEnabled()
                     && Boolean.getBoolean("veyra.graphicsSmoke.captureColorTargets")) {
                 targetCaptures = ShaderPackTargetCapture.record();
@@ -1415,6 +1426,20 @@ public final class GraphicsSmoke {
         matrices.put("shadowProjection", dev.veyra.shader.VeyraShadowRenderer.shadowProjection().get(new float[16]));
         Files.createDirectories(output);
         Files.writeString(output.resolve("frame-matrices.json"), new com.google.gson.Gson().toJson(matrices));
+        var client = Minecraft.getInstance();
+        float partialTick = client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        float cameraHeight = client.gameRenderer.getMainCamera().attributeProbe().getValue(
+                net.minecraft.world.attribute.EnvironmentAttributes.CLOUD_HEIGHT, partialTick);
+        var uniformsField = VeyraRenderer.class.getDeclaredField("shaderPackFrameUniforms");
+        uniformsField.setAccessible(true);
+        var uniforms = uniformsField.get(null);
+        var cloudHeightAccessor = uniforms.getClass().getDeclaredMethod("cloudHeight");
+        cloudHeightAccessor.setAccessible(true);
+        float shaderHeight = (float) cloudHeightAccessor.invoke(uniforms);
+        if (shaderHeight != cameraHeight) throw new IllegalStateException("Cloud height differs from camera environment");
+        Files.writeString(output.resolve("frame-environment.json"), new com.google.gson.Gson().toJson(Map.of(
+                "cloudHeight", shaderHeight, "dimensionCloudHeight", client.level.environmentAttributes()
+                        .getDimensionValue(net.minecraft.world.attribute.EnvironmentAttributes.CLOUD_HEIGHT))));
     }
 
     private static boolean advancePackSwitch(Minecraft client, int magenta, int green) {

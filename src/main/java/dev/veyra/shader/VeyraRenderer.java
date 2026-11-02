@@ -7902,8 +7902,8 @@ public final class VeyraRenderer {
         MoonPhase moonPhaseValue = minecraft.level.environmentAttributes()
                 .getDimensionValue(EnvironmentAttributes.MOON_PHASE);
         int moonPhase = moonPhaseValue.index();
-        float cloudHeight = minecraft.level.environmentAttributes()
-                .getDimensionValue(EnvironmentAttributes.CLOUD_HEIGHT);
+        float cloudHeight = minecraft.gameRenderer.getMainCamera().attributeProbe()
+                .getValue(EnvironmentAttributes.CLOUD_HEIGHT, partialTick);
         var endFlashState = minecraft.level.endFlashState();
         float endFlashIntensity = endFlashState == null ? 0.0F : endFlashState.getIntensity(partialTick);
         float currentSunAngle = minecraft.gameRenderer.getMainCamera().attributeProbe()

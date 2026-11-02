@@ -6,6 +6,7 @@ const int gdepthFormat = RGB10_A2;
 const vec4 colortex1ClearColor = vec4(0.0);
 uniform float veyraNoonFade;
 uniform float shadowFade;
+uniform float cloudHeight;
 uniform int veyraDayTick;
 uniform int framemod8;
 uniform int veyraExpectedFrameMod;
@@ -28,7 +29,7 @@ void main() {
             && distance(veyraQuad, vec4(0.25, 0.5, 0.75, 1)) < 0.001;
     vec4 probe = vec4(0.25, 0.5, 0.75, 1.0);
     bool matrices = distance(gbufferProjection * gbufferProjectionInverse * probe, probe) < 0.001;
-    bool custom = matrices && vectors && veyraNoonFade > 0.99 && shadowFade > 0.99 && veyraDayTick == 7
+    bool custom = abs(cloudHeight - 224.0) < 0.001 && matrices && vectors && veyraNoonFade > 0.99 && shadowFade > 0.99 && veyraDayTick == 7
             && framemod8 == veyraExpectedFrameMod && veyraFlag && abs(veyraScaled - 2.0) < 0.001
             && atlasSize.x >= 16 && atlasSize.y >= 16 && velocity >= 0.0 && velocity < 0.05;
     gl_FragData[0] = vec4(0.02, 0.8, 0.05, 1.0);
