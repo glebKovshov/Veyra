@@ -1231,10 +1231,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         readCustomTextureProperties();
         String required = properties.getProperty("iris.features.required", "").strip();
-        Set<String> supportedFeatures = configuration.customImages()
-                ? Set.of("SSBO", "CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of("SSBO");
+        Set<String> supportedFeatures = supportedFeatures();
         List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())
-                .filter(name -> !supportedFeatures.contains(name)).toList();
+                .filter(name -> !supportedFeatures.contains(name.toUpperCase(java.util.Locale.ROOT))).toList();
         if (!unsupportedFeatures.isEmpty()) {
             throw new IOException("This pack requires Iris features not implemented by Veyra: " + String.join(" ", unsupportedFeatures));
         }
@@ -1723,13 +1722,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 ShaderPackOptions.apply(source.get(), configuration.options())));
     }
 
-    /** Reads a compute source with option values applied but leaves feature conditionals for its adapter. */
+    /** Reads a compute source with options and negotiated optional-feature macros applied. */
     public Optional<String> readComputeStage(String fileName) throws IOException {
         if (!fileName.matches("[A-Za-z0-9_]+\\.csh")) throw new IOException("Invalid compute stage name: " + fileName);
         return readCustomImageStage(fileName);
     }
 
-    /** Explicit custom-image preprocessing; ordinary reads retain their existing capability environment. */
+    /** Reads an image-capable stage using this configuration's negotiated feature environment. */
     Optional<String> readCustomImageStage(String fileName) throws IOException {
         if (!fileName.matches("[A-Za-z0-9_]+\\.(?:vsh|fsh|csh)")) throw new IOException("Invalid custom-image stage name: " + fileName);
         String actualFile = programPath(fileName);
@@ -1740,7 +1739,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 included -> readRawShader(included).map(text ->
                         ShaderPackOptions.apply(text, configuration.options())));
         String active = GlslPreprocessor.process(actualFile, expanded,
-                Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1", "IRIS_FEATURE_COMPUTE_SHADERS", "1"));
+                shaderFeatureMacros());
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return Optional.of(IrisUnsetUniforms.apply(active, customUniforms));
@@ -1757,12 +1756,30 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return candidate.activeComputeStageFiles().isEmpty() ? this : candidate;
     }
 
+    private Set<String> supportedFeatures() {
+        return configuration.customImages()
+                ? Set.of("SSBO", "CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of("SSBO");
+    }
+
+    /** Iris exposes every usable feature to properties so a pack can select its optional flags. */
     private Map<String, String> featureOptions(Map<String, String> options) {
-        if (!configuration.customImages()) return options;
         Map<String, String> effective = new java.util.LinkedHashMap<>(options);
-        effective.put("IRIS_FEATURE_CUSTOM_IMAGES", "1");
-        effective.put("IRIS_FEATURE_COMPUTE_SHADERS", "1");
+        supportedFeatures().forEach(feature -> effective.put("IRIS_FEATURE_" + feature, "1"));
         return effective;
+    }
+
+    /** GLSL only receives supported optional flags, not every available or required feature. */
+    private Map<String, String> shaderFeatureMacros() throws IOException {
+        if (configuration.shaderFeatureMacros() != null) return configuration.shaderFeatureMacros();
+        Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        Map<String, String> macros = new java.util.LinkedHashMap<>();
+        for (String feature : properties.getProperty("iris.features.optional", "").strip().split("\\s+")) {
+            if (supportedFeatures().contains(feature.toUpperCase(java.util.Locale.ROOT))) {
+                macros.put("IRIS_FEATURE_" + feature, "1");
+            }
+        }
+        configuration.cacheShaderFeatureMacros(macros);
+        return configuration.shaderFeatureMacros();
     }
 
     private String programPath(String fileName) throws IOException {
@@ -1892,7 +1909,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String cached = configuration.processed(actualFile);
         if (cached != null) return cached;
         String processed = GlslPreprocessor.process(actualFile, ShaderIncludes.expand(actualFile, source,
-                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))), featureOptions(Map.of()));
+                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))), shaderFeatureMacros());
         // Uniforms Iris never sets read their initializer or 0 there; mirror that with constants.
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
