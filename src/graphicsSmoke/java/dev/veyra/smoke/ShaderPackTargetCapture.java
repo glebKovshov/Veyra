@@ -114,10 +114,10 @@ final class ShaderPackTargetCapture {
             case VK_FORMAT_R8_UNORM -> 1;
             case VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_R8G8B8_SNORM -> 3;
             case VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R32_SFLOAT -> 4;
-            case VK_FORMAT_R8G8B8A8_SNORM -> 4;
+            case VK_FORMAT_R8G8B8A8_SNORM, VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> 4;
             case VK_FORMAT_R16_SFLOAT -> 2;
             case VK_FORMAT_R16G16B16_SFLOAT -> 6;
-            case VK_FORMAT_R16G16B16A16_SFLOAT -> 8;
+            case VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16B16A16_UNORM -> 8;
             default -> throw new IOException("Unsupported Veyra colortex readback format " + format + ".");
         };
     }
@@ -154,6 +154,17 @@ final class ShaderPackTargetCapture {
                                 red = snormChannel(MemoryUtil.memGetByte(offset));
                                 green = snormChannel(MemoryUtil.memGetByte(offset + 1));
                                 blue = snormChannel(MemoryUtil.memGetByte(offset + 2));
+                            }
+                            case VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> {
+                                int packed = MemoryUtil.memGetInt(offset);
+                                red = channel((packed & 1023) / 1023.0F);
+                                green = channel(((packed >>> 10) & 1023) / 1023.0F);
+                                blue = channel(((packed >>> 20) & 1023) / 1023.0F);
+                            }
+                            case VK_FORMAT_R16G16B16A16_UNORM -> {
+                                red = channel(Short.toUnsignedInt(MemoryUtil.memGetShort(offset)) / 65535.0F);
+                                green = channel(Short.toUnsignedInt(MemoryUtil.memGetShort(offset + 2)) / 65535.0F);
+                                blue = channel(Short.toUnsignedInt(MemoryUtil.memGetShort(offset + 4)) / 65535.0F);
                             }
                             case VK_FORMAT_B8G8R8A8_UNORM -> {
                                 blue = MemoryUtil.memGetByte(offset) & 255;

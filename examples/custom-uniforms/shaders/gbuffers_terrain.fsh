@@ -1,5 +1,8 @@
 #version 120
 /* RENDERTARGETS:0,1 */
+/*
+const int gdepthFormat = RGB10_A2;
+*/
 const vec4 colortex1ClearColor = vec4(0.0);
 uniform float veyraNoonFade;
 uniform float shadowFade;

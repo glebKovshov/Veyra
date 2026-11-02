@@ -63,14 +63,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final String DAMAGED_BLOCK_PROGRAM = "gbuffers_damagedblock";
     private static final int MAX_COLOR_TARGET_INDEX = 15;
     private static final Pattern GLSL_COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
+    private static final String COLOR_TARGET_NAME = "(colortex\\d+|" + String.join("|", GeometryColorSamplers.LEGACY) + ")";
     private static final Pattern COLOR_TARGET_CLEAR = Pattern.compile(
-            "(?m)\\bconst\\s+bool\\s+colortex(\\d+)Clear\\s*=\\s*(true|false)\\s*;");
+            "(?m)^[\\t ]*const\\s+bool\\s+" + COLOR_TARGET_NAME + "Clear\\s*=\\s*(true|false)\\s*;");
     private static final Pattern COLOR_TARGET_CLEAR_COLOR = Pattern.compile(
-            "(?is)\\bconst\\s+vec4\\s+colortex(\\d+)ClearColor\\s*=\\s*vec4\\s*\\(([^)]*)\\)\\s*;");
+            "(?ims)^[\\t ]*const\\s+vec4\\s+" + COLOR_TARGET_NAME + "ClearColor\\s*=\\s*vec4\\s*\\(([^)]*)\\)\\s*;");
     private static final Pattern COLOR_TARGET_FORMAT = Pattern.compile(
-            "(?m)\\bconst\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
-    private static final Pattern COLOR_TARGET_FORMAT_BLOCK_COMMENT = Pattern.compile(
-            "(?s)/\\*(.*?)\\*/");
+            "(?m)^[\\t ]*const\\s+int\\s+" + COLOR_TARGET_NAME + "Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
     private static final Pattern COLOR_TARGET_SIZE_PROPERTY = Pattern.compile("^size\\.buffer\\.colortex(\\d+)$");
     private static final Pattern READONLY_QUALIFIER = Pattern.compile("\\breadonly\\b");
     private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.ofEntries(
@@ -78,6 +77,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             Map.entry("RGB8", VK10.VK_FORMAT_R8G8B8_UNORM),
             Map.entry("RGB8_SNORM", VK10.VK_FORMAT_R8G8B8_SNORM),
             Map.entry("RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM),
+            Map.entry("RGB10_A2", VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32),
             Map.entry("RGBA8_SNORM", VK10.VK_FORMAT_R8G8B8A8_SNORM),
             Map.entry("RGBA16", VK10.VK_FORMAT_R16G16B16A16_UNORM),
             Map.entry("R16F", VK10.VK_FORMAT_R16_SFLOAT),
@@ -340,8 +340,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 continue;
             }
             String expanded = expandIncludes(fileName, source.get());
-            parseColorTargetSettings(GLSL_COMMENTS.matcher(expanded).replaceAll(""), parsed, fileName);
-            parseCommentedColorTargetFormats(expanded, parsed, fileName);
+            parseColorTargetSettings(expanded.replaceAll("(?m)//[^\\r\\n]*", ""), parsed, fileName);
         }
 
         Optional<String> propertiesSource = readShader("shaders.properties");
@@ -601,7 +600,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                                                  String sourceFile) throws IOException {
         Matcher clearMatcher = COLOR_TARGET_CLEAR.matcher(source);
         while (clearMatcher.find()) {
-            int index = Integer.parseInt(clearMatcher.group(1));
+            int index = colorTargetIndex(clearMatcher.group(1));
             if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
                 continue;
             }
@@ -617,7 +616,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
         Matcher colorMatcher = COLOR_TARGET_CLEAR_COLOR.matcher(source);
         while (colorMatcher.find()) {
-            int index = Integer.parseInt(colorMatcher.group(1));
+            int index = colorTargetIndex(colorMatcher.group(1));
             if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
                 continue;
             }
@@ -633,21 +632,14 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
         Matcher formatMatcher = COLOR_TARGET_FORMAT.matcher(source);
         while (formatMatcher.find()) {
-            setColorTargetFormat(settings, Integer.parseInt(formatMatcher.group(1)),
+            setColorTargetFormat(settings, colorTargetIndex(formatMatcher.group(1)),
                     formatMatcher.group(2), sourceFile);
         }
     }
 
-    private static void parseCommentedColorTargetFormats(String source,
-                                                        Map<Integer, MutableColorTargetSettings> settings,
-                                                        String sourceFile) throws IOException {
-        Matcher comments = COLOR_TARGET_FORMAT_BLOCK_COMMENT.matcher(source);
-        while (comments.find()) {
-            Matcher formats = COLOR_TARGET_FORMAT.matcher(comments.group(1).replaceAll("(?m)//[^\\r\\n]*", ""));
-            while (formats.find()) {
-                setColorTargetFormat(settings, Integer.parseInt(formats.group(1)), formats.group(2), sourceFile);
-            }
-        }
+    private static int colorTargetIndex(String name) {
+        name = name.toLowerCase(java.util.Locale.ROOT);
+        return name.startsWith("colortex") ? Integer.parseInt(name.substring(8)) : GeometryColorSamplers.LEGACY.indexOf(name);
     }
 
     private static void setColorTargetFormat(Map<Integer, MutableColorTargetSettings> settings,

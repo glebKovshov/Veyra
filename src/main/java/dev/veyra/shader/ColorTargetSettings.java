@@ -15,6 +15,7 @@ record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, in
             case VK10.VK_FORMAT_R8G8B8_UNORM -> "RGB8";
             case VK10.VK_FORMAT_R8G8B8_SNORM -> "RGB8_SNORM";
             case VK10.VK_FORMAT_R8G8B8A8_UNORM -> "RGBA8";
+            case VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> "RGB10_A2";
             case VK10.VK_FORMAT_R8G8B8A8_SNORM -> "RGBA8_SNORM";
             case VK10.VK_FORMAT_R16G16B16A16_UNORM -> "RGBA16";
             case VK10.VK_FORMAT_R16_SFLOAT -> "R16F";
@@ -32,6 +33,7 @@ record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, in
             case VK10.VK_FORMAT_R8G8B8_UNORM, VK10.VK_FORMAT_R8G8B8_SNORM -> 3;
             case VK10.VK_FORMAT_R8G8B8A8_UNORM,
                     VK10.VK_FORMAT_R8G8B8A8_SNORM,
+                    VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32,
                     VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32,
                     VK10.VK_FORMAT_R32_SFLOAT -> 4;
             case VK10.VK_FORMAT_R16G16B16A16_UNORM -> 8;

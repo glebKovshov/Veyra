@@ -9,3 +9,5 @@ The helper `veyraHalf` and integer `veyraDayTick` are deliberately declared afte
 The final pass also checks live celestial and integer camera vectors followed by scalar fields. This catches post-uniform std140 packing regressions where a scalar must occupy the fourth word after a vec3 or ivec3.
 
 The terrain signal also requires `gbufferProjection * gbufferProjectionInverse` to preserve a probe vector, catching mixed native/screen-space projection suppliers.
+
+The legacy `gdepthFormat` directive requests `RGB10_A2` storage for colortex1; the GPU test verifies the selected physical format before testing rollback and pack switching.

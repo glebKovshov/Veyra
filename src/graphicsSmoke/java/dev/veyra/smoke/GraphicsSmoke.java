@@ -58,7 +58,7 @@ public final class GraphicsSmoke {
             currentRenderedItemFixture, glintVertexFixture,
             glintMrtFixture, shadowColorMrtFixture, shadowColorMrtLifecycleFixture, basicVertexFixture, basicCustomImageFixture,
             entityCustomImageFixture, entityCustomTextureFixture,
-            compositeCustomImageFixture,
+            compositeCustomImageFixture, customUniformFixture,
             skyBasicVertexFixture, skyTexturedStageFixture,
             beaconBeamFixture, texturedDefaultAttributesFixture, blockVertexFixture,
             damagedBlockVertexFixture, handVertexFixture, weatherVertexFixture, particleVertexFixture,
@@ -149,6 +149,7 @@ public final class GraphicsSmoke {
                 thirdPartyPack = pack;
                 applyThirdPartyProfile(pack);
             }
+            customUniformFixture = fixture.equals("custom-uniforms");
             cloudSceneColorFixture = fixture.equals("cloud-colortex0");
             cloudFixture = cloudSceneColorFixture || fixture.equals("cloud-texture-inputs")
                     || fixture.equals("cloud-model-view") || fixture.equals("cloud-custom-image");
@@ -539,6 +540,12 @@ public final class GraphicsSmoke {
                     && !entityCustomTextureFixture
                     && !storageBufferFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
+            if (customUniformFixture && captureActive && packSwitchPhase != 1) {
+                int targetFormat = VeyraRenderer.geometryColorAttachment(1).format;
+                if (targetFormat != VK_FORMAT_A2B10G10R10_UNORM_PACK32 && targetFormat != VK_FORMAT_R16G16B16A16_SFLOAT)
+                    throw new IllegalStateException("The legacy gdepthFormat directive was not applied: Vulkan format " + targetFormat);
+                LoggerFactory.getLogger("veyra-graphics-smoke").info("Legacy gdepthFormat physical storage: {}", targetFormat);
+            }
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),
                         dev.veyra.shader.CustomUniforms.active().floatValue(custom.name()), dev.veyra.shader.CustomUniforms.active().intValue(custom.name()));

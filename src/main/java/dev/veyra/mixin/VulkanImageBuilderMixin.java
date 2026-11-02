@@ -20,10 +20,11 @@ abstract class VulkanImageBuilderMixin {
                     value = "INVOKE",
                     target = "Lnet/vulkanmod/vulkan/texture/VulkanImage$Builder;formatSize(I)I"),
             remap = false)
-    private static int veyra$supportRgba16Unorm(int format) {
+    private static int veyra$supportPackColorFormats(int format) {
         if (format == VK10.VK_FORMAT_R16G16B16A16_UNORM) {
             return 8;
         }
+        if (format == VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32) return 4;
         return formatSize(format);
     }
 }
