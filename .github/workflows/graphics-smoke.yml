@@ -195,6 +195,8 @@ jobs:
           assert result['musicVolume'] == 0.0, 'Unattended client music must remain muted'
           assert result['masterVolume'] == 0.0 and result['allSoundVolumesMuted'] is True
           assert result['silentAudioBackend'] is True, 'Unattended clients must use a non-output audio backend'
+          if '${{ matrix.fixture }}' == 'skybasic-vertex-execution':
+              assert result['activeSkyHorizonPixels'] >= 1000, 'The shader sky must cover the horizon gap below the vanilla disc'
           if '${{ matrix.fixture }}' in ('custom-uniforms', 'compute-ssbo-only', 'graphics-custom-image'):
               assert result['failedReplacementPassed'] is True, 'Invalid replacement must retain the active pack and resource owners'
               assert result['packSwitchPassed'] is True, 'Switching to a distinct pack and back must restore rendering and storage allocation'

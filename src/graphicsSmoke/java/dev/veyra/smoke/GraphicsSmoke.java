@@ -36,6 +36,7 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static boolean failedReplacementPassed;
     private static int nativeReadbackMagentaPixels;
+    private static int activeSkyHorizonPixels;
     private static final boolean packSwitchProbe = Boolean.getBoolean("veyra.graphicsSmoke.packSwitch");
     private static int packSwitchPhase;
     private static ShaderPack packBeforeSwitch;
@@ -377,6 +378,7 @@ public final class GraphicsSmoke {
             }
             client.options.hideGui = !itemFixture;
             client.player.setXRot(thirdPartyNaturalScene ? 15.0F : thirdPartyShaderpackFixture ? -2.0F
+                    : skyBasicVertexFixture ? 0.0F
                     : entityFixture || beaconBeamFixture ? 15.0F
                     : damagedBlockVertexFixture ? 20.0F
                     : cloudFixture || skyBasicVertexFixture || skyTexturedStageFixture ? -60.0F : 35.0F);
@@ -711,6 +713,7 @@ public final class GraphicsSmoke {
         int nonBlackPixels = 0;
         int colorBuckets = 0;
         int switchGreenPixels = 0;
+        int skyHorizonPixels = 0;
         boolean[] colors = new boolean[512];
         try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
@@ -761,6 +764,8 @@ public final class GraphicsSmoke {
                 if (packSwitchProbe && (pixel >> 16 & 255) < 24 && (pixel >> 8 & 255) > 220 && (pixel & 255) < 24)
                     switchGreenPixels++;
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
+                if (skyBasicVertexFixture && y >= image.getHeight() / 2 - 4 && y < image.getHeight() / 2
+                        && red > 90 && blue > 75 && red > green * 1.4 && blue > green * 1.3) skyHorizonPixels++;
                 if (Math.max(red, Math.max(green, blue)) > 12) {
                     nonBlackPixels++;
                     int bucket = ((red >>> 5) << 6) | ((green >>> 5) << 3) | (blue >>> 5);
@@ -788,6 +793,7 @@ public final class GraphicsSmoke {
             int nonBlackPixelCount = nonBlackPixels;
             int colorBucketCount = colorBuckets;
             int switchGreenCount = switchGreenPixels;
+            int skyHorizonCount = skyHorizonPixels;
             completion = () -> {
                 if (packSwitchProbe && active && stage == 0 && advancePackSwitch(client, count, switchGreenCount)) return;
                 if (thirdPartyShaderpackFixture) {
@@ -928,6 +934,7 @@ public final class GraphicsSmoke {
                         return;
                     }
                     activePixels = count;
+                    if (skyBasicVertexFixture) activeSkyHorizonPixels = skyHorizonCount;
                     if (normalAtlasAnimatedFixture && (stage == 0 || stage == 2)) {
                         if (stage == 0) {
                             animatedPbrMagentaFirst = count;
@@ -1092,9 +1099,9 @@ public final class GraphicsSmoke {
                                 ? new IllegalStateException("The terrain vertex main did not clip its magenta geometry: active="
                                 + activePixels + ", disabled=" + count) : null;
                     } else if (skyBasicVertexFixture) {
-                        failure = activePixels < 2000 || count * 4 >= activePixels
+                        failure = activePixels < 2000 || activeSkyHorizonPixels < 1000 || count * 4 >= activePixels
                                 ? new IllegalStateException("The sky-basic vertex-stage signal was absent or unchanged: active="
-                                + activePixels + ", disabled=" + count) : null;
+                                + activePixels + ", horizon=" + activeSkyHorizonPixels + ", disabled=" + count) : null;
                     } else {
                         failure = activePixels < minPixels || count * 4 >= activePixels
                                 || geometryMidTexCoordFixture && activeOppositeMidTexCoordPixels < 2000
@@ -1485,6 +1492,7 @@ public final class GraphicsSmoke {
                     + ",\"failedReplacementPassed\":" + failedReplacementPassed
                     + ",\"packSwitchPassed\":" + packSwitchPassed
                     + ",\"nativeReadbackMagentaPixels\":" + nativeReadbackMagentaPixels
+                    + ",\"activeSkyHorizonPixels\":" + activeSkyHorizonPixels
                     + ",\"fixedAnimationClock\":" + Boolean.getBoolean("veyra.reference.fixedClock")
                     + ",\"masterVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER)
                     + ",\"allSoundVolumesMuted\":" + java.util.Arrays.stream(net.minecraft.sounds.SoundSource.values())
