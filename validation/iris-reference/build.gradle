@@ -27,6 +27,7 @@ loom {
             runDir = project.findProperty('referenceRunDir')?.toString() ?: 'run'
             programArgs '--width', '640', '--height', '360', '--quickPlaySingleplayer', 'VeyraValidation'
             vmArgs "-Dveyra.reference.output=${file(project.findProperty('referenceOutput') ?: 'build/reference').absolutePath}"
+            if (project.hasProperty('referenceFixedClock')) vmArgs '-Dveyra.reference.fixedClock=true'
         }
     }
 }

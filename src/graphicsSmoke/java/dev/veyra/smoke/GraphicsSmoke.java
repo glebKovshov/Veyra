@@ -35,6 +35,7 @@ public final class GraphicsSmoke {
     private static boolean setupComputeFixture, setupResizePassed;
     private static boolean pending, finished, requested, captureActive;
     private static boolean failedReplacementPassed;
+    private static int nativeReadbackMagentaPixels;
     private static String expectedReplacementError = "";
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
@@ -662,6 +663,20 @@ public final class GraphicsSmoke {
                     if (completedBasicMrt != null) completedBasicMrt.scheduleFree();
                 }
             });
+            if (active && Boolean.getBoolean("veyra.graphicsSmoke.failedReplacement")) {
+                net.minecraft.client.Screenshot.takeScreenshot(client.getMainRenderTarget(), image -> {
+                    try (image) {
+                        int matches = 0;
+                        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
+                            int pixel = image.getPixel(x, y);
+                            if ((pixel >> 16 & 255) > 220 && (pixel >> 8 & 255) < 24 && (pixel & 255) > 180) matches++;
+                        }
+                        if (matches < 10000)
+                            throw new IllegalStateException("Native screenshot lost the active shader frame: " + matches);
+                        nativeReadbackMagentaPixels = matches;
+                    }
+                });
+            }
         } catch (Throwable failure) {
             if (computeProbe != null) computeProbe.close();
             targetCaptures.forEach(ShaderPackTargetCapture.Capture::close);
@@ -1397,6 +1412,8 @@ public final class GraphicsSmoke {
                     + ",\"cursorMode\":" + org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
                     + ",\"musicVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC)
                     + ",\"failedReplacementPassed\":" + failedReplacementPassed
+                    + ",\"nativeReadbackMagentaPixels\":" + nativeReadbackMagentaPixels
+                    + ",\"fixedAnimationClock\":" + Boolean.getBoolean("veyra.reference.fixedClock")
                     + ",\"masterVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER)
                     + ",\"allSoundVolumesMuted\":" + java.util.Arrays.stream(net.minecraft.sounds.SoundSource.values())
                             .allMatch(category -> client.options.getSoundSourceVolume(category) == 0.0F)

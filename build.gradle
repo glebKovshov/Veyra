@@ -257,6 +257,9 @@ loom {
             if (project.hasProperty('graphicsSmokeFailedReplacement')) {
                 vmArgs '-Dveyra.graphicsSmoke.failedReplacement=true'
             }
+            if (project.hasProperty('graphicsSmokeFixedClock')) {
+                vmArgs '-Dveyra.reference.fixedClock=true'
+            }
         }
     }
 }

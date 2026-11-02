@@ -1,5 +1,7 @@
 package dev.veyra.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import dev.veyra.shader.VeyraComputePipeline;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.framebuffer.SwapChain;
@@ -22,6 +24,23 @@ public abstract class RendererSubmissionMixin {
     @Shadow private ArrayList<Long> imageAvailableSemaphores;
     @Shadow private static int currentFrame;
     @Unique private boolean veyra$acquireConsumed;
+    @Unique private boolean veyra$resumingFlushedPass;
+
+    @WrapMethod(method = "flushCmds")
+    private void veyra$preserveFlushedColor(Operation<Void> original) {
+        boolean previous = veyra$resumingFlushedPass;
+        veyra$resumingFlushedPass = true;
+        try { original.call(); }
+        finally { veyra$resumingFlushedPass = previous; }
+    }
+
+    @Redirect(method = "beginMainRenderPass", at = @At(value = "INVOKE", target =
+            "Lnet/vulkanmod/vulkan/pass/MainPass;begin(Lorg/lwjgl/vulkan/VkCommandBuffer;Lorg/lwjgl/system/MemoryStack;)V"))
+    private void veyra$loadColorAfterFlush(net.vulkanmod.vulkan.pass.MainPass pass,
+            org.lwjgl.vulkan.VkCommandBuffer commands, MemoryStack stack) {
+        if (veyra$resumingFlushedPass) pass.rebindMainTarget();
+        else pass.begin(commands, stack);
+    }
 
     @Inject(method = "beginFrame", at = @At(value = "INVOKE", target =
             "Lorg/lwjgl/vulkan/KHRSwapchain;vkAcquireNextImageKHR(Lorg/lwjgl/vulkan/VkDevice;JJJJLjava/nio/IntBuffer;)I"))

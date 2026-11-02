@@ -60,6 +60,7 @@
     "PipelineDescriptorLayoutMixin",
     "RendererGeometryTargetsMixin",
     "RendererSubmissionMixin",
+    "ImageUtilReadbackMixin",
     "accessor.PipelineStateAccessor",
     "accessor.RendererFramebufferAccessor",
     "accessor.VkGpuTextureAccessor",

@@ -100,7 +100,7 @@ permissions:
 jobs:
   lavapipe-feature-baseline:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
       - name: Install Lavapipe validation probe dependencies
@@ -108,6 +108,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y mesa-vulkan-drivers libvulkan-dev glslang-tools
           bash scripts/install_vulkan_validation_layer.sh
+      - name: Share the pinned validation layer with the graphics matrix
+        uses: actions/upload-artifact@v7
+        with:
+          name: vulkan-validation-1.4.363.0-${{ github.run_id }}
+          path: ${{ runner.temp }}/veyra-vulkan-validation-1.4.363.0
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
       - name: Compile minimal vertex storage-buffer and storage-image pipelines
         run: |
           glslangValidator -V scripts/lavapipe_feature_probe.vert -o "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
@@ -125,6 +133,7 @@ jobs:
           "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv" --storage-image --vulkanmod-pnext
 
   lavapipe-client:
+    needs: lavapipe-feature-baseline
     strategy:
       fail-fast: false
       matrix:
@@ -140,6 +149,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
+      - name: Restore the pinned validation layer
+        uses: actions/download-artifact@v8
+        with:
+          name: vulkan-validation-1.4.363.0-${{ github.run_id }}
+          path: ${{ runner.temp }}/veyra-vulkan-validation-1.4.363.0
       - name: Install software Vulkan and validation layers
         run: |
           sudo apt-get update -qq
@@ -183,6 +197,8 @@ jobs:
           assert result['silentAudioBackend'] is True, 'Unattended clients must use a non-output audio backend'
           if '${{ matrix.fixture }}' in ('custom-uniforms', 'compute-ssbo-only', 'graphics-custom-image'):
               assert result['failedReplacementPassed'] is True, 'Invalid replacement must retain the active pack and resource owners'
+              assert result['nativeReadbackMagentaPixels'] > 10000, 'Native screenshot must preserve the active shader frame'
+              assert result['nativeReadbackMagentaPixels'] == result['activeMagentaPixels'], 'Native and in-frame readback must retain the same marker pixels'
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
           # Keep full diagnostics and gate both frame execution and device teardown.

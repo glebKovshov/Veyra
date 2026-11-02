@@ -42,6 +42,15 @@ records the actual position, rotation, time and floor block; compare these with
 Veyra's scene evidence before comparing images. Keep separate fresh worlds so
 one renderer's saves cannot alter the other's initial state.
 
+For an animation-phase comparison, add `-PgraphicsSmokeFixedClock` to Veyra's
+`runGraphicsSmoke` command and `-PreferenceFixedClock` to this client's command.
+Both test-only harnesses then use frameTimeCounter=8 seconds, frameTime=1/30
+second and frameCounter=160. Require the `REFERENCE_CLOCK` lines from both
+clients, including Iris's separate frame-counter line. This also fixes TAA's
+jitter phase; retain normal-clock lifecycle runs as independent evidence for
+continuous animation and resource stability. The production JAR has no clock
+override.
+
 All reference launches use OpenAL's `null` backend, master/category volume zero,
 and a test-only mixin that cancels mouse capture. The log must show `No Output`
 and `REFERENCE_INPUT mouseGrabbed=false cursorMode=212993 ... masterVolume=0 ...
