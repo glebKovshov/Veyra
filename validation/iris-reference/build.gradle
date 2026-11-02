@@ -1,0 +1,35 @@
+plugins { id 'fabric-loom' version '1.16.3' }
+
+version = '1.0.0'
+group = 'dev.veyra.reference'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://api.modrinth.com/maven' }
+}
+
+dependencies {
+    minecraft 'com.mojang:minecraft:1.21.11'
+    mappings loom.officialMojangMappings()
+    modImplementation 'net.fabricmc:fabric-loader:0.18.4'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.140.0+1.21.11'
+    modRuntimeOnly 'maven.modrinth:iris:1.10.8+1.21.11-fabric'
+    modRuntimeOnly 'maven.modrinth:sodium:mc1.21.11-0.8.14-fabric'
+    runtimeOnly 'org.anarres:jcpp:1.4.14'
+    runtimeOnly 'io.github.douira:glsl-transformer:3.0.0-pre3'
+    runtimeOnly 'org.antlr:antlr4-runtime:4.13.1'
+}
+
+loom {
+    runs {
+        client {
+            environmentVariable 'ALSOFT_DRIVERS', 'null'
+            runDir = project.findProperty('referenceRunDir')?.toString() ?: 'run'
+            programArgs '--width', '640', '--height', '360', '--quickPlaySingleplayer', 'VeyraValidation'
+            vmArgs "-Dveyra.reference.output=${file(project.findProperty('referenceOutput') ?: 'build/reference').absolutePath}"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach { it.options.release = 21 }
+java { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }

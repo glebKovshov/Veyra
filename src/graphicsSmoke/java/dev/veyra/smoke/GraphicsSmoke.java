@@ -40,7 +40,7 @@ public final class GraphicsSmoke {
     private static final java.util.Map<String, List<ShaderPackTargetCapture.Capture>> intermediateTargetCaptures =
             new java.util.LinkedHashMap<>();
     private static boolean entityFixtureStarted, vanillaBaseline, thirdPartyShaderpackFixture, thirdPartyScenePrepared,
-            thirdPartyLifecycleFixture, thirdPartyProfileApplied, cloudFixture, cloudSceneColorFixture,
+            thirdPartyLifecycleFixture, thirdPartyProfileApplied, thirdPartyNaturalScene, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
             geometryMidTexCoordFixture, terrainMaterialFixture, terrainVertexExecutionFixture,
             terrainVertexVaryingsFixture, waterMaterialFixture,
@@ -69,6 +69,7 @@ public final class GraphicsSmoke {
             animatedPbrFirstRequestedFrameSlot = -1, animatedPbrSecondRequestedFrameSlot = -1,
             activeSkySunPixels, activeSkyMoonPixels, disabledSkySunPixels, disabledSkyMoonPixels;
     private static String thirdPartyProfile = "";
+    private static volatile int thirdPartySurfaceHeight = Integer.MIN_VALUE;
     private static String skipReason = "";
     private static int thirdPartyNonBlackPixels, thirdPartyColorBuckets;
     private static int thirdPartyInitialWidth, thirdPartyInitialHeight;
@@ -109,8 +110,10 @@ public final class GraphicsSmoke {
                     || org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
                     != org.lwjgl.glfw.GLFW.GLFW_CURSOR_NORMAL)
                 throw new IllegalStateException("Validation client grabbed the desktop cursor");
-            if (client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC) != 0.0F)
-                client.options.getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.MUSIC).set(0.0);
+            for (var category : net.minecraft.sounds.SoundSource.values()) {
+                if (client.options.getSoundSourceVolume(category) != 0.0F)
+                    client.options.getSoundSourceOptionInstance(category).set(0.0);
+            }
             if (completion != null) {
                 Runnable ready = completion; completion = null; ready.run();
                 if (finished) return;
@@ -124,7 +127,8 @@ public final class GraphicsSmoke {
             worldTicks++;
             String fixture = Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt"));
             vanillaBaseline = fixture.equals("vanilla-baseline");
-            thirdPartyShaderpackFixture = fixture.equals("third-party-shaderpack");
+            thirdPartyNaturalScene = fixture.equals("third-party-natural-world");
+            thirdPartyShaderpackFixture = fixture.equals("third-party-shaderpack") || thirdPartyNaturalScene;
             thirdPartyLifecycleFixture = thirdPartyShaderpackFixture
                     && Boolean.getBoolean("veyra.graphicsSmoke.thirdPartyLifecycle");
             if (thirdPartyShaderpackFixture && !thirdPartyProfileApplied) {
@@ -293,6 +297,17 @@ public final class GraphicsSmoke {
                     var world = server.overworld();
                     world.setDayTime(1000L);
                     world.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.ADVANCE_TIME, false, server);
+                    if (thirdPartyNaturalScene) {
+                        thirdPartySurfaceHeight = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, 0, 0);
+                        client.execute(() -> {
+                            client.player.getAbilities().flying = true;
+                            client.player.onUpdateAbilities();
+                            client.getConnection().sendCommand("tp @s 0 " + (thirdPartySurfaceHeight + 2) + " 0");
+                        });
+                        LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                                "Natural scene: seed=1 surfaceHeight={} dayTime=1000", thirdPartySurfaceHeight);
+                        return;
+                    }
                     for (int x = -12; x <= 12; x++) for (int z = -12; z <= 12; z++) {
                         var block = Math.floorMod(x * 3 + z, 7) == 0
                                 ? net.minecraft.world.level.block.Blocks.SANDSTONE.defaultBlockState()
@@ -345,32 +360,36 @@ public final class GraphicsSmoke {
                     client.execute(() -> client.getConnection().sendCommand("tp @s 0 72 0"));
                 });
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                        "Prepared the real shaderpack fixture with daylight, a mixed block field, a lit material wall and a sign.");
+                        thirdPartyNaturalScene ? "Prepared natural shaderpack fixture with seed=1 and fixed daylight."
+                                : "Prepared the real shaderpack fixture with daylight, a mixed block field, a lit material wall and a sign.");
             }
             if (damagedBlockVertexFixture && damagedBlockPosition != null
                     && client.level.getBlockState(damagedBlockPosition).isSolid()) {
                 client.levelRenderer.destroyBlockProgress(-9876, damagedBlockPosition, 6);
             }
             client.options.hideGui = !itemFixture;
-            client.player.setXRot(thirdPartyShaderpackFixture ? -2.0F
+            client.player.setXRot(thirdPartyNaturalScene ? 15.0F : thirdPartyShaderpackFixture ? -2.0F
                     : entityFixture || beaconBeamFixture ? 15.0F
                     : damagedBlockVertexFixture ? 20.0F
                     : cloudFixture || skyBasicVertexFixture || skyTexturedStageFixture ? -60.0F : 35.0F);
-            client.player.setYRot(thirdPartyShaderpackFixture ? 0.0F : 45.0F);
+            client.player.setYRot(thirdPartyNaturalScene ? 135.0F : thirdPartyShaderpackFixture ? 0.0F : 45.0F);
             if (vanillaBaseline && worldTicks >= 240) {
                 if (VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().isPresent())
                     throw new IllegalStateException("Vanilla baseline unexpectedly selected a shaderpack");
                 pending = true; requested = true; captureActive = false;
             } else if (!vanillaBaseline && thirdPartyShaderpackFixture && stage == 0 && worldTicks >= 160) {
                 if (thirdPartyLifecycleFixture) requireThirdPartyActive("initial profile capture");
-                var fixtureFloor = new net.minecraft.core.BlockPos(0, 70, 0);
+                if (thirdPartyNaturalScene && thirdPartySurfaceHeight == Integer.MIN_VALUE) return;
+                var fixtureFloor = new net.minecraft.core.BlockPos(0, thirdPartyNaturalScene ? thirdPartySurfaceHeight - 1 : 70, 0);
                 var fixtureFloorState = client.level.getBlockState(fixtureFloor);
                 var fixtureWall = new net.minecraft.core.BlockPos(0, 71, 8);
                 var fixtureWallState = client.level.getBlockState(fixtureWall);
                 if (Math.abs(client.player.getX() - 0.5) > 0.25
-                        || client.player.getY() < 70.9 || client.player.getY() > 72.25
+                        || client.player.getY() < (thirdPartyNaturalScene ? thirdPartySurfaceHeight + 1.9 : 70.9)
+                        || client.player.getY() > (thirdPartyNaturalScene ? thirdPartySurfaceHeight + 2.25 : 72.25)
                         || Math.abs(client.player.getZ() - 0.5) > 0.25 || client.level.getDayTime() != 1000L
-                        || fixtureFloorState.isAir() || !fixtureWallState.is(net.minecraft.world.level.block.Blocks.OAK_SIGN)) {
+                        || fixtureFloorState.isAir()
+                        || !thirdPartyNaturalScene && !fixtureWallState.is(net.minecraft.world.level.block.Blocks.OAK_SIGN)) {
                     if (worldTicks >= 400) {
                         throw new IllegalStateException("The real shaderpack capture scene is not ready: pos="
                                 + client.player.position() + ", dayTime=" + client.level.getDayTime()
@@ -1272,7 +1291,8 @@ public final class GraphicsSmoke {
                 }
                 case 2 -> {
                     thirdPartyNetherPassed = true;
-                    client.getConnection().sendCommand("execute in minecraft:overworld run tp @s 0 72 0");
+                    client.getConnection().sendCommand("execute in minecraft:overworld run tp @s 0 "
+                            + (thirdPartyNaturalScene ? thirdPartySurfaceHeight + 2 : 72) + " 0");
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
                             "Shaderpack Nether profile passed; returning to Overworld");
                     stage = 3;
@@ -1348,6 +1368,10 @@ public final class GraphicsSmoke {
                     + "\",\"mouseGrabbed\":" + client.mouseHandler.isMouseGrabbed()
                     + ",\"cursorMode\":" + org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
                     + ",\"musicVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC)
+                    + ",\"masterVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER)
+                    + ",\"allSoundVolumesMuted\":" + java.util.Arrays.stream(net.minecraft.sounds.SoundSource.values())
+                            .allMatch(category -> client.options.getSoundSourceVolume(category) == 0.0F)
+                    + ",\"silentAudioBackend\":" + "null".equals(System.getenv("ALSOFT_DRIVERS"))
                     + ",\"activeMagentaPixels\":" + activePixels
                     + ",\"activeEntityNormalFallbackRedPixels\":" + activeEntityNormalFallbackRedPixels
                     + ",\"disabledEntityNormalFallbackRedPixels\":" + disabledEntityNormalFallbackRedPixels
@@ -1365,6 +1389,8 @@ public final class GraphicsSmoke {
                     + ",\"skipReason\":\"" + escapedSkipReason + "\""
                     + ",\"thirdPartyProfile\":\"" + profile + "\",\"thirdPartyNonBlackPixels\":" + thirdPartyNonBlackPixels
                     + ",\"thirdPartyColorBuckets\":" + thirdPartyColorBuckets
+                    + ",\"thirdPartyNaturalScene\":" + thirdPartyNaturalScene
+                    + ",\"thirdPartySurfaceHeight\":" + (thirdPartyNaturalScene ? thirdPartySurfaceHeight : 0)
                     + ",\"shadowMrtReenabledPixels\":" + reenabledShadowMrtPixels
                     + ",\"lifecycleInitialWidth\":" + lifecycleInitialWidth
                     + ",\"lifecycleInitialHeight\":" + lifecycleInitialHeight

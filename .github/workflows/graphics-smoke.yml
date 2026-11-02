@@ -176,6 +176,8 @@ jobs:
           assert result['mouseGrabbed'] is False, 'Unattended client captured the desktop cursor'
           assert result['cursorMode'] == 0x34001, 'GLFW cursor must remain in normal mode'
           assert result['musicVolume'] == 0.0, 'Unattended client music must remain muted'
+          assert result['masterVolume'] == 0.0 and result['allSoundVolumesMuted'] is True
+          assert result['silentAudioBackend'] is True, 'Unattended clients must use a non-output audio backend'
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
           # Keep full diagnostics and gate both frame execution and device teardown.

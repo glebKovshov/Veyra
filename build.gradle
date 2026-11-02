@@ -234,6 +234,7 @@ loom {
     runs {
         graphicsSmoke {
             client()
+            environmentVariable 'ALSOFT_DRIVERS', 'null'
             source = sourceSets.graphicsSmoke
             runDir = project.findProperty('graphicsSmokeRunDir')?.toString() ?: 'run-graphics-smoke'
             def graphicsSmokeOutput = project.findProperty('graphicsSmokeOutputDir')?.toString()

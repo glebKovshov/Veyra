@@ -11,6 +11,7 @@ import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkRenderPass;
 import net.vulkanmod.render.engine.VkTextureView;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
+import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import net.vulkanmod.vulkan.texture.VulkanImage;
@@ -88,6 +89,8 @@ public final class VeyraNoiseTexture {
             return;
         }
         requireReady();
+        // Terrain's later bindShaderTextures call copies this cache over the indexed images.
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, view);
         VTextureSelector.bindTexture(descriptor.imageIdx, texture.getVulkanImage());
     }
 
@@ -146,6 +149,14 @@ public final class VeyraNoiseTexture {
     }
 
     private static void closeResources(GpuTextureView oldView, VkGpuTexture oldTexture) {
+        if (oldView != null) {
+            for (int slot = 0; slot < VTextureSelector.SIZE; slot++) {
+                if (VRenderSystem.getShaderTexture(slot) == oldView)
+                    VRenderSystem.setShaderTexture(slot, null);
+                if (oldTexture != null && VTextureSelector.getImage(slot) == oldTexture.getVulkanImage())
+                    VTextureSelector.bindTexture(slot, VTextureSelector.getWhiteTexture());
+            }
+        }
         if (oldView != null && !oldView.isClosed()) oldView.close();
         if (oldTexture != null && !oldTexture.isClosed()) oldTexture.close();
     }

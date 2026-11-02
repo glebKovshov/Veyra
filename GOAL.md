@@ -4,7 +4,7 @@ User request (2026-11-02): study weaknesses, compare with Iris shaderpacks, fini
 
 Continue from main `0110146` (v0.2.3 tag at `ca95278`). Preserve existing implementations and validation fixtures. Keep user-local `logs/` untouched.
 
-User launch preference: all unattended Veyra and Iris clients must leave the desktop cursor ungrabbed and music muted.
+User launch preference: all unattended Veyra and Iris clients must leave the desktop cursor ungrabbed and ALL audio muted (master/category volume 0 and a non-output OpenAL backend).
 
 ## Required outcome
 

@@ -42,6 +42,27 @@ public abstract class RendererSubmissionMixin {
     }
 
     @Unique
+    private static VkSubmitInfo withAcquireWaitStages(VkSubmitInfo original, long semaphore, MemoryStack stack) {
+        var stages = stack.mallocInt(original.waitSemaphoreCount());
+        for (int i = 0; i < original.waitSemaphoreCount(); i++) {
+            stages.put(i, original.pWaitSemaphores().get(i) == semaphore
+                    ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT : original.pWaitDstStageMask().get(i));
+        }
+        return VkSubmitInfo.malloc(stack).set(original).pWaitDstStageMask(stages);
+    }
+
+    @Redirect(method = "submitFrame", at = @At(value = "INVOKE", target =
+            "Lorg/lwjgl/vulkan/VK10;vkQueueSubmit(Lorg/lwjgl/vulkan/VkQueue;Lorg/lwjgl/vulkan/VkSubmitInfo;J)I"))
+    private int veyra$waitBeforeSwapchainTransitions(VkQueue queue, VkSubmitInfo submission, long fence) {
+        if (!swapChain.isAcquired()) return vkQueueSubmit(queue, submission, fence);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            // Acquisition must also precede swapchain layout transitions outside color attachment output.
+            return vkQueueSubmit(queue, withAcquireWaitStages(submission,
+                    imageAvailableSemaphores.get(currentFrame), stack), fence);
+        }
+    }
+
+    @Unique
     private static VkSubmitInfo withAcquireDependency(VkSubmitInfo original, long semaphore, MemoryStack stack) {
         int count = original.waitSemaphoreCount();
         var waits = stack.mallocLong(count + 1);

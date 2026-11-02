@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "veyra_iris_reference",
+  "version": "1.0.0",
+  "name": "Veyra Iris reference capture",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.veyra.reference.ReferenceCapture"
+    ]
+  },
+  "depends": {
+    "fabricloader": "*",
+    "fabric-api": "*",
+    "minecraft": "1.21.11"
+  },
+  "mixins": [
+    "veyra-reference.mixins.json"
+  ]
+}
