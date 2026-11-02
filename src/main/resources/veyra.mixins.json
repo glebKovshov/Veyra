@@ -50,6 +50,7 @@
     "accessor.RenderTypeAccessor",
     "accessor.RenderTargetAccessor",
     "VkGpuDeviceMixin",
+    "VkGpuBufferMixin",
     "accessor.ShaderCompilationKeyAccessor",
     "DeviceManagerMixin",
     "VTextureSelectorMixin",
