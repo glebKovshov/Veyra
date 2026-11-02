@@ -260,6 +260,7 @@ loom {
             if (project.hasProperty('graphicsSmokeFixedClock')) {
                 vmArgs '-Dveyra.reference.fixedClock=true'
             }
+            if (project.hasProperty('graphicsSmokePackSwitch')) vmArgs '-Dveyra.graphicsSmoke.packSwitch=true'
         }
     }
 }

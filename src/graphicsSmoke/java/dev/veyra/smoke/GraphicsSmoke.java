@@ -36,6 +36,11 @@ public final class GraphicsSmoke {
     private static boolean pending, finished, requested, captureActive;
     private static boolean failedReplacementPassed;
     private static int nativeReadbackMagentaPixels;
+    private static final boolean packSwitchProbe = Boolean.getBoolean("veyra.graphicsSmoke.packSwitch");
+    private static int packSwitchPhase;
+    private static ShaderPack packBeforeSwitch;
+    private static long storageBytesBeforeSwitch;
+    private static boolean packSwitchPassed;
     private static String expectedReplacementError = "";
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
@@ -409,6 +414,7 @@ public final class GraphicsSmoke {
                 requested = true;
                 captureActive = true;
             } else if (!vanillaBaseline && !thirdPartyShaderpackFixture && stage == 0 && worldTicks >= 160) {
+                if (packSwitchProbe && packSwitchPhase > 0 && worldTicks < baselineAt) return;
                 if (Boolean.getBoolean("veyra.graphicsSmoke.failedReplacement") && !failedReplacementPassed)
                     verifyFailedReplacement(client);
                 if (!VeyraRenderer.isRenderingEnabled()
@@ -519,7 +525,7 @@ public final class GraphicsSmoke {
                 throw new IllegalStateException("Surface image does not support frame readback");
             // These fixtures validate their diagnostic signal in the presented colortex0 image.
             // The entity feedback fixture also writes colortex4, but does not use it as its signal.
-            var auxiliary = VeyraRenderer.isRenderingEnabled() && !cloudFixture && !geometryViewSpaceFixture
+            var auxiliary = VeyraRenderer.isRenderingEnabled() && packSwitchPhase != 1 && !cloudFixture && !geometryViewSpaceFixture
                     && !geometryMidTexCoordFixture && !terrainMaterialFixture && !waterMaterialFixture
                     && !terrainVertexExecutionFixture && !terrainVertexVaryingsFixture
                     && !entityColorFeedbackFixture && !currentRenderedItemFixture && !glintVertexFixture
@@ -663,7 +669,7 @@ public final class GraphicsSmoke {
                     if (completedBasicMrt != null) completedBasicMrt.scheduleFree();
                 }
             });
-            if (active && Boolean.getBoolean("veyra.graphicsSmoke.failedReplacement")) {
+            if (active && packSwitchPhase != 1 && Boolean.getBoolean("veyra.graphicsSmoke.failedReplacement")) {
                 net.minecraft.client.Screenshot.takeScreenshot(client.getMainRenderTarget(), image -> {
                     try (image) {
                         int matches = 0;
@@ -703,6 +709,7 @@ public final class GraphicsSmoke {
         int basicMrtPixels = 0;
         int nonBlackPixels = 0;
         int colorBuckets = 0;
+        int switchGreenPixels = 0;
         boolean[] colors = new boolean[512];
         try (image; glintMrtImage; basicMrtImage) {
             Files.createDirectories(output);
@@ -730,6 +737,7 @@ public final class GraphicsSmoke {
                     : setupComputeFixture && active && stage == 2 ? "setup-resized.png"
                     : active ? "mrt-active.png" : "shaders-disabled.png";
             image.writeToFile(output.resolve(imageName));
+            if (packSwitchProbe && active) image.writeToFile(output.resolve("pack-switch-" + packSwitchPhase + ".png"));
             if (glintMrtImage != null) {
                 glintMrtImage.writeToFile(output.resolve("glint-mrt-colortex4.png"));
                 for (int y = 0; y < glintMrtImage.getHeight(); y++) for (int x = 0; x < glintMrtImage.getWidth(); x++) {
@@ -749,6 +757,8 @@ public final class GraphicsSmoke {
             }
             for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
                 int pixel = image.getPixel(x, y);
+                if (packSwitchProbe && (pixel >> 16 & 255) < 24 && (pixel >> 8 & 255) > 220 && (pixel & 255) < 24)
+                    switchGreenPixels++;
                 int red = (pixel >>> 16) & 255, green = (pixel >>> 8) & 255, blue = pixel & 255;
                 if (Math.max(red, Math.max(green, blue)) > 12) {
                     nonBlackPixels++;
@@ -776,7 +786,9 @@ public final class GraphicsSmoke {
             int basicMrtPixelCount = basicMrtPixels;
             int nonBlackPixelCount = nonBlackPixels;
             int colorBucketCount = colorBuckets;
+            int switchGreenCount = switchGreenPixels;
             completion = () -> {
+                if (packSwitchProbe && active && stage == 0 && advancePackSwitch(client, count, switchGreenCount)) return;
                 if (thirdPartyShaderpackFixture) {
                     thirdPartyNonBlackPixels = nonBlackPixelCount;
                     thirdPartyColorBuckets = colorBucketCount;
@@ -1373,6 +1385,47 @@ public final class GraphicsSmoke {
         return frame == null ? -1 : frame.frameSlot();
     }
 
+    private static boolean advancePackSwitch(Minecraft client, int magenta, int green) {
+        try {
+            if (packSwitchPhase == 2) {
+                var storage = VeyraStorageBufferResources.active();
+                if (magenta < 10000 || storage == null || storage.allocatedBytes() != storageBytesBeforeSwitch)
+                    throw new IllegalStateException("Returning to the original pack lost its pixels or storage allocation");
+                packSwitchPassed = true;
+                return false;
+            }
+            ShaderPack next;
+            if (packSwitchPhase == 0) {
+                if (magenta < 10000) throw new IllegalStateException("The original pack has no marker before switching");
+                packBeforeSwitch = VeyraRenderer.selectedPack().orElseThrow();
+                var storage = VeyraStorageBufferResources.active();
+                storageBytesBeforeSwitch = storage == null ? 0 : storage.allocatedBytes();
+                var path = Files.createTempDirectory(client.gameDirectory.toPath().resolve("shaderpacks"), "switch-pack-");
+                var shaders = Files.createDirectory(path.resolve("shaders"));
+                Files.writeString(shaders.resolve("final.fsh"), "#version 120\nuniform sampler2D colortex0;\nvarying vec2 texcoord;\nvoid main(){gl_FragColor=vec4(texture2D(colortex0,texcoord).r*0.001,1,0,1);}\n");
+                dev.veyra.VeyraClient.shaderPacks.refresh();
+                next = ShaderPack.inspect(path);
+            } else {
+                if (green < 10000 || magenta > 100) throw new IllegalStateException("The replacement pack did not draw its distinct green frame");
+                next = packBeforeSwitch;
+            }
+            var previousOwner = VeyraStorageBufferResources.active();
+            String selected = VeyraRenderer.select(next);
+            if (!selected.startsWith("Enabled ") || !VeyraRenderer.getLastError().isEmpty()
+                    || !VeyraRenderer.selectedPack().orElseThrow().path().equals(next.path())
+                    || previousOwner != null && VeyraStorageBufferResources.active() == previousOwner)
+                throw new IllegalStateException("Cross-pack selection did not replace its resource owner: " + selected);
+            expectedReplacementError = "";
+            packSwitchPhase++;
+            baselineAt = worldTicks + 80;
+            pending = false;
+            return true;
+        } catch (Exception failure) {
+            finish(client, failure, -1);
+            return true;
+        }
+    }
+
     private static void verifyFailedReplacement(Minecraft client) throws java.io.IOException {
         var selected = VeyraRenderer.selectedPack().orElseThrow();
         var uniforms = dev.veyra.shader.CustomUniforms.active();
@@ -1412,6 +1465,7 @@ public final class GraphicsSmoke {
                     + ",\"cursorMode\":" + org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
                     + ",\"musicVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC)
                     + ",\"failedReplacementPassed\":" + failedReplacementPassed
+                    + ",\"packSwitchPassed\":" + packSwitchPassed
                     + ",\"nativeReadbackMagentaPixels\":" + nativeReadbackMagentaPixels
                     + ",\"fixedAnimationClock\":" + Boolean.getBoolean("veyra.reference.fixedClock")
                     + ",\"masterVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER)

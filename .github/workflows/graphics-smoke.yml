@@ -181,7 +181,7 @@ jobs:
             extra_args+=('-PgraphicsSmokeComputeProbe=true')
           fi
           if [[ '${{ matrix.fixture }}' =~ ^(custom-uniforms|compute-ssbo-only|graphics-custom-image)$ ]]; then
-            extra_args+=('-PgraphicsSmokeFailedReplacement=true')
+            extra_args+=('-PgraphicsSmokeFailedReplacement=true' '-PgraphicsSmokePackSwitch=true')
           fi
           timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke "${extra_args[@]}" 2>&1 | tee graphics-client.log
       - name: Verify real frame readback and validation output
@@ -197,6 +197,7 @@ jobs:
           assert result['silentAudioBackend'] is True, 'Unattended clients must use a non-output audio backend'
           if '${{ matrix.fixture }}' in ('custom-uniforms', 'compute-ssbo-only', 'graphics-custom-image'):
               assert result['failedReplacementPassed'] is True, 'Invalid replacement must retain the active pack and resource owners'
+              assert result['packSwitchPassed'] is True, 'Switching to a distinct pack and back must restore rendering and storage allocation'
               assert result['nativeReadbackMagentaPixels'] > 10000, 'Native screenshot must preserve the active shader frame'
               assert result['nativeReadbackMagentaPixels'] == result['activeMagentaPixels'], 'Native and in-frame readback must retain the same marker pixels'
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
