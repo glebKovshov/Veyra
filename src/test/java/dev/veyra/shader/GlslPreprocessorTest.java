@@ -7,6 +7,30 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GlslPreprocessorTest {
+    @Test void irisBufferAndPbrMacrosSelectTheSupportedShaderBranch() throws IOException {
+        String processed = GlslPreprocessor.process("final.fsh", """
+                #version 330
+                #if MAX_COLOR_BUFFERS == 16 && defined(MC_NORMAL_MAP) && defined(MC_SPECULAR_MAP)
+                uniform sampler2D colortex15;
+                void main() { gl_FragColor = texture(colortex15, vec2(0.5)); }
+                #else
+                #error missing Iris buffer or PBR macros
+                #endif
+                """);
+        assertTrue(processed.contains("sampler2D colortex15"));
+    }
+
+    @Test void irisBufferAndPbrMacrosAlsoApplyToProperties() throws IOException {
+        String processed = GlslPreprocessor.properties("""
+                #if MAX_COLOR_BUFFERS == 16 && defined(MC_NORMAL_MAP) && defined(MC_SPECULAR_MAP)
+                screen=SUPPORTED
+                #else
+                screen=FALLBACK
+                #endif
+                """, Map.of());
+        assertEquals("SUPPORTED", ShaderPackOptions.loadProperties(processed).getProperty("screen"));
+    }
+
     @Test void removesInactiveUnsupportedInterfaces() throws IOException {
         String source = "#version 120\n#define QUALITY 2\n#if QUALITY > 1\nvarying vec2 texcoord;\n#else\nuniform samplerCube unsupported;\n#endif\nvoid main(){gl_FragColor=vec4(QUALITY);}\n";
         String processed = GlslPreprocessor.process("test.fsh", source);

@@ -1,0 +1,29 @@
+# Veyra 1.0.0 readiness
+
+Baseline: main `0110146`, Veyra 0.2.3 / Minecraft 1.21.11 / VulkanMod 0.6.8. This backlog does not claim 1.0.0 readiness.
+
+| Area | Current evidence | Gap / next action |
+| --- | --- | --- |
+| Preprocessor | Iris exports MAX_COLOR_BUFFERS, MC_NORMAL_MAP, MC_SPECULAR_MAP; Veyra omitted these despite implementing the capabilities. Current Iris source allows 32 color buffers; Veyra allows 16 targets and 8 simultaneous outputs. | Initial fix advertises Veyra's actual limit (16) and PBR macros in GLSL/properties with branch-selection tests. Audit changed branches; expansion to 32 requires runtime and adapter work. |
+| Feature negotiation | ShaderPack validates SSBO and feature-on custom images/compute; feature macros only cover images/compute | Compare required/optional declarations, macro preprocessing and runtime device checks together. Do not advertise unsupported features. |
+| Custom uniforms | CustomUniforms supports float/int/bool and rejects vec2/3/4 | Compare Iris vector expressions, then integrate parsing, dependency handling, evaluation and uniform-buffer layout. |
+| Stages and images | Geometry/tessellation and several graphics storage-image routes are explicitly rejected | Determine pinned-profile requirements; implement required paths and preserve clear rejection diagnostics. |
+| Visual parity | Historical generated-scene tests retain lighting/water/color differences; audit records have visualValidation=false | Repeat matched comparisons on the current candidate; diagnose matrices, color formats, blending, sampling and pass ordering. Include natural-world scenes. |
+| Lifecycle | Selected RTX lifecycle evidence and 54 synthetic graphics fixtures exist | Repeat final-candidate lifecycle, Vulkan validation, failed-pack rollback and repeated reload/resize ownership checks. |
+| Release | v0.2.3 passed 622 JUnit and 5 Python tests and its publication gates | Baseline evidence is not evidence for new changes. 1.0.0 needs its own final-candidate gates and downloaded-artifact verification. |
+
+## Iris sources
+
+Source comparison pinned to Iris Minecraft 1.21.11 commit `0a1fcaae55099356bf53410b4f5302753edb0ffc` (resolved 2026-11-02). Historical Iris 1.10.8 capture artifacts must be distinguished from this source revision:
+
+- [StandardMacros](https://github.com/IrisShaders/Iris/blob/1.21.11/common/src/main/java/net/irisshaders/iris/gl/shader/StandardMacros.java)
+- [FeatureFlags](https://github.com/IrisShaders/Iris/blob/1.21.11/common/src/main/java/net/irisshaders/iris/features/FeatureFlags.java)
+- [ProgramSet](https://github.com/IrisShaders/Iris/blob/1.21.11/common/src/main/java/net/irisshaders/iris/shaderpack/programs/ProgramSet.java)
+- [Feature flag contract](https://shaders.properties/current/reference/shadersproperties/flags/)
+- [Pinned Iris color buffer limit](https://github.com/IrisShaders/Iris/blob/0a1fcaae55099356bf53410b4f5302753edb0ffc/common/src/main/java/net/irisshaders/iris/gl/IrisLimits.java)
+
+## Release gate
+
+Require passing unit/tooling/shader tests, source/profile audits, graphics fixtures and lifecycle checks. Supported pack/profile captures must be reproducible, with remaining Iris differences explained. Rejected features must fail before installing an incomplete replacement pipeline. Compile success or a non-black screenshot alone is insufficient.
+
+Keep 0.2.3 metadata during development. Use feature/stable-1.0.0 for integration: pushing release/** automatically publishes after its gates, so select 1.0.0 metadata only after readiness is proven.

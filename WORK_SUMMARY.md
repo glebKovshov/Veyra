@@ -1,3 +1,11 @@
+## 2026-11-02: integrated 1.0.0 development
+
+- New user goal: inspect weaknesses, compare Iris shaderpacks, finish stable 1.0.0 and send a substantial integrated package. Created GOAL.md and STABILITY_1_0.md to preserve requirements and distinguish historical smoke evidence from final release validation.
+- Created feature/stable-1.0.0 from current origin/main 0110146. Existing user logs/ remain untouched. No release ref or version bump was pushed.
+- Compared Iris 1.21.11 StandardMacros and FeatureFlags with Veyra. Identified missing MAX_COLOR_BUFFERS and PBR macros, incomplete optional-feature negotiation, rejected vector custom uniforms and remaining graphics/visual validation gaps.
+- First compatibility fix: export MAX_COLOR_BUFFERS=16, MC_NORMAL_MAP and MC_SPECULAR_MAP through the shared GLSL/properties environment. Added shader and properties branch-selection regressions. JDK 21 gate passed 624 JUnit tests (0 failures/errors/skips), 104 examples / 122 SPIR-V, build, example packaging and GraphicsSmoke compilation; 5 Python tests passed. Two existing GameRendererMixin mapping warnings remain. Full pinned source/profile audit is running; GPU comparisons are pending. This is not a 1.0.0 release.
+- Pinned the Iris source comparison to 1.21.11 commit 0a1fcaae55099356bf53410b4f5302753edb0ffc. Its IrisLimits allows 32 color buffers, while Veyra currently supports 16 targets / 8 outputs; the new macro reports the actual Veyra capability. The tracked historical audit has 75 rows, 864 accepted geometry fragments, 0 source errors and 18 device-capability errors without a Vulkan device; it must not be confused with fresh GPU evidence.
+
 ## Current consolidated beta.31 PR state - 2026-10-22
 
 - PR #84 is closed without merge. PR #85 preserves its commits, targets `main`, remains draft, and is mergeable. The release branch head before this docs sync was `91570ff`; no code change was needed for the compatibility status correction.
