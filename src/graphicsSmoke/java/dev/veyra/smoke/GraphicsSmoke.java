@@ -511,6 +511,7 @@ public final class GraphicsSmoke {
         try {
             Renderer renderer = Renderer.getInstance();
             renderer.endRenderPass();
+            if (thirdPartyShaderpackFixture && stage == 0) captureComparisonMatrices();
             if (thirdPartyShaderpackFixture && VeyraRenderer.isRenderingEnabled()
                     && Boolean.getBoolean("veyra.graphicsSmoke.captureColorTargets")) {
                 targetCaptures = ShaderPackTargetCapture.record();
@@ -1383,6 +1384,23 @@ public final class GraphicsSmoke {
         var frame = dev.veyra.shader.PbrAnimationClock.animatedSpriteFrames(atlas).get(
                 net.minecraft.resources.Identifier.withDefaultNamespace("block/grass_block_top"));
         return frame == null ? -1 : frame.frameSlot();
+    }
+
+    private static void captureComparisonMatrices() throws ReflectiveOperationException, java.io.IOException {
+        var field = VeyraRenderer.class.getDeclaredField("frameMatrices");
+        field.setAccessible(true);
+        var frame = field.get(null);
+        var matrices = new java.util.LinkedHashMap<String, float[]>();
+        for (String name : List.of("gbufferModelView", "gbufferProjection")) {
+            var accessor = frame.getClass().getDeclaredMethod(name);
+            accessor.setAccessible(true);
+            var matrix = (org.joml.Matrix4fc) accessor.invoke(frame);
+            matrices.put(name, matrix.get(new float[16]));
+        }
+        matrices.put("shadowModelView", dev.veyra.shader.VeyraShadowRenderer.shadowModelView().get(new float[16]));
+        matrices.put("shadowProjection", dev.veyra.shader.VeyraShadowRenderer.shadowProjection().get(new float[16]));
+        Files.createDirectories(output);
+        Files.writeString(output.resolve("frame-matrices.json"), new com.google.gson.Gson().toJson(matrices));
     }
 
     private static boolean advancePackSwitch(Minecraft client, int magenta, int green) {

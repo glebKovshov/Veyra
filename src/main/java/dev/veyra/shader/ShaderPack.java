@@ -88,7 +88,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
     private static final Pattern SHADOW_SETTING = Pattern.compile(
-            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowNearPlane|shadowFarPlane|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
+            "(?m)^[\\t ]*const\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowNearPlane|shadowFarPlane|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
     private static final Pattern NOISE_TEXTURE_RESOLUTION = Pattern.compile(
             "\\bconst\\s+int\\s+noiseTextureResolution\\s*=\\s*([+-]?\\d+)\\s*;");
     private static final Pattern EYE_BRIGHTNESS_HALF_LIFE = Pattern.compile(
@@ -398,8 +398,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (source.isEmpty()) {
                 continue;
             }
-            String uncommented = GLSL_COMMENTS.matcher(expandIncludes(fileName, source.get())).replaceAll("");
-            Matcher matcher = SHADOW_SETTING.matcher(uncommented);
+            // Iris reads line-start const directives even inside block comments (for example Sildur's sun path).
+            String directives = expandIncludes(fileName, source.get()).replaceAll("(?m)//[^\\r\\n]*", "");
+            Matcher matcher = SHADOW_SETTING.matcher(directives);
             while (matcher.find()) {
                 values.putIfAbsent(matcher.group(2), matcher.group(3).trim());
             }

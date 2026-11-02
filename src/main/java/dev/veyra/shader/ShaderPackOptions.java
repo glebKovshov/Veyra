@@ -57,7 +57,9 @@ public final class ShaderPackOptions {
         Set<String> conflicts = new LinkedHashSet<>();
         List<String> diagnostics = new ArrayList<>();
         for (String source : sources.values()) {
-            for (String line : ShaderSource.maskBlockComments(source).split("\\R")) {
+            String[] raw = source.split("\\R"), masked = ShaderSource.maskBlockComments(source).split("\\R");
+            for (int i = 0; i < masked.length; i++) {
+                String line = CONST.matcher(raw[i]).matches() ? raw[i] : masked[i];
                 Option option = parseLine(line, referenced);
                 if (option == null || conflicts.contains(option.name())) continue;
                 Option previous = found.putIfAbsent(option.name(), option);
@@ -189,7 +191,7 @@ public final class ShaderPackOptions {
         String[] originals = source.split("\\n", -1), lines = masked.split("\\n", -1);
         for (int i = 0; i < lines.length; i++) {
             Matcher define = DEFINE.matcher(lines[i].replace("\r", ""));
-            Matcher constant = CONST.matcher(lines[i].replace("\r", ""));
+            Matcher constant = CONST.matcher(originals[i].replace("\r", ""));
             if (define.matches() && values.containsKey(define.group(3))) {
                 String value = values.get(define.group(3));
                 String raw = define.group(4) == null ? "" : define.group(4).strip();

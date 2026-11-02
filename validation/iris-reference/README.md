@@ -60,3 +60,8 @@ Archive hashes, shader-tree hashes, selected profile/options, client logs and
 captures are evidence to retain with the comparison. This runner does not claim
 pixel identity: animation timing, render backend and renderer settings can affect
 the frame. It captures a controlled initial scene, not an Iris lifecycle test.
+
+Both harnesses also save `frame-matrices.json` at the initial capture. Matrices
+are column-major arrays. Model-view and shader-pack shadow matrices can be
+compared directly; Veyra's raw gbuffer projection retains the native depth
+convention and must be converted before comparing it to Iris's OpenGL projection.

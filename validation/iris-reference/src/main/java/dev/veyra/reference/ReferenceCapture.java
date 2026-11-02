@@ -138,6 +138,7 @@ public final class ReferenceCapture implements ClientModInitializer {
             captured = true;
             File output = new File(System.getProperty("veyra.reference.output", "reference"));
             output.mkdirs();
+            captureComparisonMatrices(output.toPath());
             Screenshot.takeScreenshot(client.getMainRenderTarget(), image -> {
                 try (image) {
                     image.writeToFile(new File(output, "iris-reference-initial.png"));
@@ -146,6 +147,24 @@ public final class ReferenceCapture implements ClientModInitializer {
                 }
                 client.execute(client::stop);
             });
+        }
+    }
+
+    private static void captureComparisonMatrices(java.nio.file.Path output) {
+        try {
+            var stateClass = Class.forName("net.irisshaders.iris.uniforms.CapturedRenderingState");
+            var state = stateClass.getField("INSTANCE").get(null);
+            var matrices = new java.util.LinkedHashMap<String, float[]>();
+            for (String name : java.util.List.of("GbufferModelView", "GbufferProjection")) {
+                var matrix = (org.joml.Matrix4fc) stateClass.getMethod("get" + name).invoke(state);
+                matrices.put(Character.toLowerCase(name.charAt(0)) + name.substring(1), matrix.get(new float[16]));
+            }
+            var shadow = Class.forName("net.irisshaders.iris.shadows.ShadowRenderer");
+            matrices.put("shadowModelView", ((org.joml.Matrix4fc) shadow.getField("MODELVIEW").get(null)).get(new float[16]));
+            matrices.put("shadowProjection", ((org.joml.Matrix4fc) shadow.getField("PROJECTION").get(null)).get(new float[16]));
+            java.nio.file.Files.writeString(output.resolve("frame-matrices.json"), new com.google.gson.Gson().toJson(matrices));
+        } catch (ReflectiveOperationException | java.io.IOException exception) {
+            throw new IllegalStateException("Could not record the Iris comparison matrices", exception);
         }
     }
 }
