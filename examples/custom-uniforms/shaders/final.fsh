@@ -14,9 +14,16 @@ uniform int veyraExpectedWorldTime;
 uniform ivec3 cameraPositionInt;
 uniform float viewWidth;
 varying vec2 texcoord;
+uniform vec2 veyraPair;
+uniform vec3 veyraTint;
+uniform float veyraTintTail;
+uniform vec4 veyraQuad;
 void main() {
     // The post pass must receive the same per-frame values as terrain, including ivec2 built-ins.
-    bool custom = veyraDayTick == 7 && framemod8 == veyraExpectedFrameMod
+    bool vectors = distance(veyraPair, vec2(0.25, 0.5)) < 0.001
+            && distance(veyraTint, vec3(0.25, 0.5, 0.75)) < 0.001 && abs(veyraTintTail - 0.75) < 0.001
+            && distance(veyraQuad, vec4(0.25, 0.5, 0.75, 1)) < 0.001;
+    bool custom = vectors && veyraDayTick == 7 && framemod8 == veyraExpectedFrameMod
             && shadowFade > 0.99 && abs(veyraScaled - 2.0) < 0.001
             && atlasSize.x >= 16 && atlasSize.y >= 16 && eyeBrightnessSmooth.y >= 0 && eyeBrightnessSmooth.y <= 240
             && veyraStill > 0.5

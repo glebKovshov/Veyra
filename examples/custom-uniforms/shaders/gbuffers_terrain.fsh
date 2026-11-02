@@ -10,8 +10,15 @@ uniform bool veyraFlag;
 uniform float veyraScaled;
 uniform ivec2 atlasSize;
 uniform float velocity;
+uniform vec2 veyraPair;
+uniform vec3 veyraTint;
+uniform float veyraTintTail;
+uniform vec4 veyraQuad;
 void main() {
-    bool custom = veyraNoonFade > 0.99 && shadowFade > 0.99 && veyraDayTick == 7
+    bool vectors = distance(veyraPair, vec2(0.25, 0.5)) < 0.001
+            && distance(veyraTint, vec3(0.25, 0.5, 0.75)) < 0.001 && abs(veyraTintTail - 0.75) < 0.001
+            && distance(veyraQuad, vec4(0.25, 0.5, 0.75, 1)) < 0.001;
+    bool custom = vectors && veyraNoonFade > 0.99 && shadowFade > 0.99 && veyraDayTick == 7
             && framemod8 == veyraExpectedFrameMod && veyraFlag && abs(veyraScaled - 2.0) < 0.001
             && atlasSize.x >= 16 && atlasSize.y >= 16 && velocity >= 0.0 && velocity < 0.05;
     gl_FragData[0] = vec4(0.02, 0.8, 0.05, 1.0);

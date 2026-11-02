@@ -43,7 +43,7 @@ class CustomUniformsTest {
     @Test
     void parsesUniformsInOrderAndKeepsHelperVariablesPrivate() {
         CustomUniforms uniforms = CustomUniforms.parse(BSL_STYLE);
-        assertEquals(List.of("timeAngle", "shadowFade", "timeBrightness", "blindFactor", "isDesert", "isCold", "framemod8", "underwater"),
+        assertEquals(List.of("timeAngle", "shadowFade", "timeBrightness", "blindFactor", "isDesert", "isCold", "framemod8", "underwater", "skyTint"),
                 uniforms.uniforms().stream().map(CustomUniforms.Uniform::name).toList());
         assertNull(uniforms.uniform("tAmin"));
         assertEquals(CustomUniforms.Type.INT, uniforms.uniform("framemod8").type());
@@ -70,7 +70,7 @@ class CustomUniformsTest {
     }
 
     @Test
-    void reportsUnavailableInputsVectorsAndDependents() {
+    void reportsUnavailableInputsAndDependents() {
         CustomUniforms uniforms = CustomUniforms.parse(BSL_STYLE);
         // biome is an Iris input; numeric ids work, unknown BIOME_* names stay unavailable.
         assertNotNull(uniforms.uniform("isDesert"));
@@ -89,7 +89,8 @@ class CustomUniformsTest {
         unregistered.evaluate(Map.of("biome", 3.0)::get, 0.05);
         assertEquals(0.0F, unregistered.floatValue("x"));
         assertEquals(7, unregistered.intValue("y"));
-        assertTrue(uniforms.unavailableReason("skyTint").contains("vec3"));
+        assertEquals(CustomUniforms.Type.VEC3, uniforms.uniform("skyTint").type());
+        assertNull(uniforms.unavailableReason("skyTint"));
         CustomUniforms dependent = CustomUniforms.parse("variable.float.a=lightning\nuniform.float.b=a * 2.0\n");
         assertTrue(dependent.unavailableReason("b").contains("unavailable 'a'"));
         assertNull(uniforms.unavailableReason("shadowFade"));

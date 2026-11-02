@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  * OptiFine/Iris {@code uniform.<type>.<name>} and {@code variable.<type>.<name>} definitions from
  * shaders.properties. Expressions are evaluated on the CPU once per frame from Veyra's built-in uniforms.
  *
- * <p>Scalar float/int/bool results are supported. Vector definitions, unknown inputs
+ * <p>Scalar float/int/bool and float vec2/3/4 results are supported. Unknown inputs
  * and malformed expressions are kept as unavailable with a reason, so programs that declare
  * them fail with a clear diagnostic instead of receiving fake values.
  */
@@ -47,10 +47,11 @@ public final class CustomUniforms {
             Pattern.DOTALL);
     private static final int MAX_EXPRESSION_LENGTH = 16 * 1024;
     private static final int MAX_DEFINITIONS = 1024;
+    private static final Map<String, Integer> BUILT_IN_WIDTHS = Map.copyOf(inputWidths());
     private static volatile CustomUniforms active = EMPTY;
 
     public enum Type {
-        FLOAT("float"), INT("int"), BOOL("bool");
+        FLOAT("float"), INT("int"), BOOL("bool"), VEC2("vec2"), VEC3("vec3"), VEC4("vec4");
 
         private final String glsl;
 
@@ -61,6 +62,8 @@ public final class CustomUniforms {
         public String glsl() {
             return glsl;
         }
+
+        public int components() { return glsl.startsWith("vec") ? glsl.charAt(3) - '0' : 1; }
     }
 
     /** A uniform exposed to shaders. */
@@ -76,7 +79,27 @@ public final class CustomUniforms {
     private final List<String> circularDefinitions;
     // Renderer suppliers look uniforms up on every uniform-buffer update.
     private final Map<String, Uniform> uniformIndex = new LinkedHashMap<>();
-    private final Map<String, Double> values = new HashMap<>();
+    private final Map<String, Value> values = new HashMap<>();
+
+    private record Value(double scalar, double[] vector) {
+        static Value scalar(double value) { return new Value(value, null); }
+        static Value vector(double[] values) { return new Value(0, values); }
+        int size() { return vector == null ? 1 : vector.length; }
+        double component(int index) { return vector == null ? scalar : vector[index]; }
+    }
+
+    private static Map<String, Integer> inputWidths() {
+        Map<String, Integer> widths = new HashMap<>();
+        for (String name : BUILT_IN_INPUTS) {
+            widths.put(name, 1);
+            int dot = name.lastIndexOf('.');
+            if (dot > 0 && name.length() == dot + 2) {
+                int component = "xyzw".indexOf(name.charAt(dot + 1));
+                if (component >= 0) widths.merge(name.substring(0, dot), component + 1, Math::max);
+            }
+        }
+        return widths;
+    }
 
     private CustomUniforms(List<Definition> definitions, Map<String, String> unavailable,
                            Map<String, String> irisUnresolved, List<Uniform> uniforms, List<String> circularDefinitions) {
@@ -112,12 +135,9 @@ public final class CustomUniforms {
             if (seen.contains(name)) continue;
             // BSL defines its own expression for shadowFade in shaders.properties. Keep such pack
             // overrides compatible while still exposing Iris' frame value when they are absent.
-            if (BUILT_IN_INPUTS.contains(name) && !PACK_OVERRIDABLE.contains(name)) {
+            if ((BUILT_IN_WIDTHS.containsKey(name) || IrisUnsetUniforms.IRIS_SET_UNIFORMS.contains(name))
+                    && !PACK_OVERRIDABLE.contains(name)) {
                 unavailable.put(name, "it would replace a built-in uniform");
-                continue;
-            }
-            if (typeName.startsWith("vec")) {
-                unavailable.put(name, typeName + " custom uniforms are not supported yet");
                 continue;
             }
             if (source.length() > MAX_EXPRESSION_LENGTH || seen.size() >= MAX_DEFINITIONS) {
@@ -133,8 +153,8 @@ public final class CustomUniforms {
             }
             Type type = Type.valueOf(typeName.toUpperCase(java.util.Locale.ROOT));
             if (PACK_OVERRIDABLE.contains(name)
-                    && !IrisExtraUniforms.VEYRA_COMPATIBILITY_UNIFORMS.contains(name)
-                    && type != Type.FLOAT) {
+                    && (type.components() > 1 || !IrisExtraUniforms.VEYRA_COMPATIBILITY_UNIFORMS.contains(name)
+                    && type != Type.FLOAT)) {
                 unavailable.put(name, "the built-in " + name + " uniform must remain a float");
                 continue;
             }
@@ -142,6 +162,19 @@ public final class CustomUniforms {
             unavailable.remove(name);
             parsed.put(name, new Definition(name, type, uniform, expression));
         }
+        Map<String, Integer> widths = new HashMap<>(BUILT_IN_WIDTHS);
+        parsed.forEach((name, definition) -> widths.put(name, definition.type().components()));
+        for (Definition definition : parsed.values()) {
+            try {
+                int width = expressionWidth(definition.expression(), widths);
+                if (width != definition.type().components()) throw new IllegalArgumentException(
+                        "expression has " + width + " components but " + definition.type().glsl() + " requires "
+                                + definition.type().components());
+            } catch (IllegalArgumentException exception) {
+                unavailable.put(definition.name(), "invalid expression: " + exception.getMessage());
+            }
+        }
+        parsed.entrySet().removeIf(entry -> unavailable.containsKey(entry.getKey()));
         Map<String, Set<String>> inputs = new LinkedHashMap<>();
         Map<String, Integer> remaining = new HashMap<>();
         Map<String, List<String>> dependents = new HashMap<>();
@@ -149,6 +182,13 @@ public final class CustomUniforms {
         for (Definition definition : parsed.values()) {
             Set<String> names = new java.util.LinkedHashSet<>();
             definition.expression().collectInputs(names);
+            Set<String> dependencies = new java.util.LinkedHashSet<>();
+            for (String input : names) {
+                int dot = input.lastIndexOf('.');
+                String base = dot > 0 ? input.substring(0, dot) : input;
+                dependencies.add(widths.getOrDefault(base, 1) > 1 ? base : input);
+            }
+            names = dependencies;
             inputs.put(definition.name(), names);
             int count = 0;
             for (String input : names) {
@@ -166,7 +206,7 @@ public final class CustomUniforms {
             Definition definition = parsed.get(name);
             String missing = inputs.get(name).stream().filter(input ->
                     irisUnresolved.containsKey(input)
-                            || !BUILT_IN_INPUTS.contains(input) && BiomeIds.constant(input) == null
+                            || !BUILT_IN_WIDTHS.containsKey(input) && BiomeIds.constant(input) == null
                             && (!parsed.containsKey(input) || unavailable.containsKey(input)))
                     .findFirst().orElse(null);
             if (missing == null) {
@@ -175,7 +215,9 @@ public final class CustomUniforms {
                 irisUnresolved.put(name, irisUnresolved.containsKey(missing)
                         ? "it depends on '" + missing + "', which Iris cannot resolve"
                         : "'" + missing + "' is not a registered vanilla biome");
-                definitions.add(new Definition(name, definition.type(), definition.uniform(), new Constant(0.0)));
+                Node zero = definition.type().components() == 1 ? new Constant(0.0)
+                        : new Call(definition.type().glsl(), Collections.nCopies(definition.type().components(), new Constant(0)));
+                definitions.add(new Definition(name, definition.type(), definition.uniform(), zero));
             } else {
                 unavailable.put(name, unavailable.containsKey(missing)
                         ? "it depends on unavailable '" + missing + "'"
@@ -222,35 +264,73 @@ public final class CustomUniforms {
 
     /** Re-evaluates all definitions. {@code inputs} returns null for unknown names. */
     public synchronized void evaluate(Function<String, Double> inputs, double frameTimeSeconds) {
-        Map<String, Double> scope = new HashMap<>();
-        Function<String, Double> resolver = name -> {
-            Double local = scope.get(name);
-            return local != null ? local : inputs.apply(name);
+        Map<String, Value> scope = new HashMap<>();
+        Map<String, Integer> builtIns = BUILT_IN_WIDTHS;
+        Function<String, Value> resolver = name -> {
+            Value local = scope.get(name);
+            if (local != null) return local;
+            int dot = name.lastIndexOf('.');
+            if (dot > 0 && scope.containsKey(name.substring(0, dot))) {
+                Value vector = scope.get(name.substring(0, dot));
+                return Value.scalar(vector.component(componentIndex(name.substring(dot + 1))));
+            }
+            if (dot > 0 && builtIns.getOrDefault(name.substring(0, dot), 1) > 1) {
+                String base = name.substring(0, dot);
+                Double value = inputs.apply(base + "." + "xyzw".charAt(componentIndex(name.substring(dot + 1))));
+                return Value.scalar(value == null ? 0 : value);
+            }
+            int width = builtIns.getOrDefault(name, 1);
+            if (width > 1) {
+                double[] vector = new double[width];
+                for (int i = 0; i < width; i++) {
+                    Double value = inputs.apply(name + "." + "xyzw".charAt(i));
+                    vector[i] = value == null ? 0 : value;
+                }
+                return Value.vector(vector);
+            }
+            Double value = inputs.apply(name);
+            return Value.scalar(value == null ? 0 : value);
         };
         for (Definition definition : definitions) {
-            double value;
+            Value evaluated;
             try {
-                value = definition.expression().evaluate(resolver, frameTimeSeconds);
+                evaluated = definition.expression().evaluate(resolver, frameTimeSeconds);
             } catch (ArithmeticException exception) {
-                value = 0.0;
+                evaluated = definition.type().components() == 1 ? Value.scalar(0)
+                        : Value.vector(new double[definition.type().components()]);
             }
-            value = switch (definition.type()) {
-                case FLOAT -> Double.isFinite(value) ? value : 0.0;
-                case INT -> Double.isFinite(value) ? (double) (int) value : 0.0;
-                case BOOL -> value != 0.0 ? 1.0 : 0.0;
+            double value = evaluated.scalar();
+            Value result = switch (definition.type()) {
+                case VEC2, VEC3, VEC4 -> {
+                    double[] vector = evaluated.vector().clone();
+                    for (int i = 0; i < vector.length; i++) vector[i] = Float.isFinite((float) vector[i]) ? (float) vector[i] : 0;
+                    yield Value.vector(vector);
+                }
+                case FLOAT -> Value.scalar(Double.isFinite(value) ? value : 0.0);
+                case INT -> Value.scalar(Double.isFinite(value) ? (double) (int) value : 0.0);
+                case BOOL -> Value.scalar(value != 0.0 ? 1.0 : 0.0);
             };
-            scope.put(definition.name(), value);
+            scope.put(definition.name(), result);
         }
         values.clear();
         values.putAll(scope);
     }
 
     public synchronized float floatValue(String name) {
-        return values.getOrDefault(name, 0.0).floatValue();
+        return (float) values.getOrDefault(name, Value.scalar(0)).scalar();
     }
 
     public synchronized int intValue(String name) {
-        return values.getOrDefault(name, 0.0).intValue();
+        return (int) values.getOrDefault(name, Value.scalar(0)).scalar();
+    }
+
+    /** Copies one frame's vector atomically; missing names clear old GPU supplier values after a pack switch. */
+    public synchronized void copyVector(String name, float[] destination) {
+        java.util.Arrays.fill(destination, 0);
+        Value value = values.get(name);
+        if (value == null || value.vector() == null) return;
+        if (destination.length < value.size()) throw new IllegalArgumentException("Vector destination is too small");
+        for (int i = 0; i < value.size(); i++) destination[i] = (float) value.component(i);
     }
 
     private static List<String> logicalLines(String text) {
@@ -273,47 +353,156 @@ public final class CustomUniforms {
         return lines;
     }
 
+    private static int componentIndex(String accessor) {
+        return switch (accessor) {
+            case "x", "r", "s", "0" -> 0;
+            case "y", "g", "t", "1" -> 1;
+            case "z", "b", "p", "2" -> 2;
+            case "w", "a", "q", "3" -> 3;
+            default -> throw new IllegalArgumentException("unsupported vector accessor '" + accessor + "'");
+        };
+    }
+
+    private static int sameWidth(int a, int b) {
+        if (a != b) throw new IllegalArgumentException("vector dimensions do not match: " + a + " and " + b);
+        return a;
+    }
+
+    private static void scalarWidth(int width) {
+        if (width != 1) throw new IllegalArgumentException("this operation requires a scalar, got vec" + width);
+    }
+
+    /** Validate dimensions before any frame evaluation; unsupported overloads never silently read zero. */
+    private static int expressionWidth(Node node, Map<String, Integer> widths) {
+        if (node instanceof Constant) return 1;
+        if (node instanceof Reference reference) {
+            Integer width = widths.get(reference.name());
+            if (width != null) return width;
+            int dot = reference.name().lastIndexOf('.');
+            if (dot > 0 && widths.containsKey(reference.name().substring(0, dot))) {
+                int size = widths.get(reference.name().substring(0, dot));
+                int index = componentIndex(reference.name().substring(dot + 1));
+                if (size == 1 || index >= size) throw new IllegalArgumentException("component outside vec" + size);
+            }
+            return 1;
+        }
+        if (node instanceof Access access) {
+            int width = expressionWidth(access.vector(), widths);
+            if (width == 1 || access.index() >= width) throw new IllegalArgumentException("component outside vec" + width);
+            return 1;
+        }
+        if (node instanceof Unary unary) {
+            int width = expressionWidth(unary.operand(), widths);
+            if (unary.operator() == '!') scalarWidth(width);
+            return width;
+        }
+        if (node instanceof Binary binary) {
+            int width = sameWidth(expressionWidth(binary.left(), widths), expressionWidth(binary.right(), widths));
+            if (Set.of("==", "!=").contains(binary.operator())) return 1;
+            if (!Set.of("+", "-", "*", "/").contains(binary.operator())) scalarWidth(width);
+            return width;
+        }
+        if (node instanceof Ternary ternary) {
+            scalarWidth(expressionWidth(ternary.condition(), widths));
+            return sameWidth(expressionWidth(ternary.whenTrue(), widths), expressionWidth(ternary.whenFalse(), widths));
+        }
+        Call call = (Call) node;
+        List<Integer> args = call.arguments.stream().map(argument -> expressionWidth(argument, widths)).toList();
+        if (call.name.startsWith("vec")) {
+            args.forEach(CustomUniforms::scalarWidth);
+            return call.resultWidth;
+        }
+        if (call.name.equals("if")) {
+            int width = args.getLast();
+            for (int i = 0; i + 1 < args.size(); i += 2) {
+                scalarWidth(args.get(i));
+                sameWidth(width, args.get(i + 1));
+            }
+            if (width > 1 && args.size() != 3) throw new IllegalArgumentException("vector if requires three arguments");
+            return call.resultWidth = width;
+        }
+        int width = args.isEmpty() ? 1 : args.getFirst();
+        if (args.stream().anyMatch(size -> size > 1)) {
+            if (!Set.of("abs", "floor", "ceil", "min", "max", "clamp").contains(call.name)
+                    || Set.of("min", "max").contains(call.name) && args.size() != 2) {
+                throw new IllegalArgumentException("no float vector overload for '" + call.name + "'");
+            }
+            for (int size : args) sameWidth(width, size);
+        }
+        return call.resultWidth = width;
+    }
+
     private interface Node {
-        double evaluate(Function<String, Double> inputs, double frameTime);
+        Value evaluate(Function<String, Value> inputs, double frameTime);
 
         void collectInputs(Set<String> inputs);
     }
 
     private record Constant(double value) implements Node {
-        public double evaluate(Function<String, Double> inputs, double frameTime) {
-            return value;
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
+            return Value.scalar(value);
         }
 
         public void collectInputs(Set<String> inputs) { }
     }
 
     private record Reference(String name) implements Node {
-        public double evaluate(Function<String, Double> inputs, double frameTime) {
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
             Integer constant = BiomeIds.constant(name);
-            if (constant != null) return constant;
-            Double value = inputs.apply(name);
-            return value == null ? 0.0 : value;
+            if (constant != null) return Value.scalar(constant);
+            return inputs.apply(name);
         }
 
         public void collectInputs(Set<String> inputs) { inputs.add(name); }
     }
 
+    private record Access(Node vector, int index) implements Node {
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
+            return Value.scalar(vector.evaluate(inputs, frameTime).component(index));
+        }
+        public void collectInputs(Set<String> inputs) { vector.collectInputs(inputs); }
+    }
+
     private record Unary(char operator, Node operand) implements Node {
-        public double evaluate(Function<String, Double> inputs, double frameTime) {
-            double value = operand.evaluate(inputs, frameTime);
-            return operator == '-' ? -value : value == 0.0 ? 1.0 : 0.0;
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
+            Value value = operand.evaluate(inputs, frameTime);
+            if (value.size() == 1) return Value.scalar(operator == '-' ? -value.scalar() : value.scalar() == 0 ? 1 : 0);
+            double[] result = value.vector().clone();
+            for (int i = 0; i < result.length; i++) result[i] = -result[i];
+            return Value.vector(result);
         }
 
         public void collectInputs(Set<String> inputs) { operand.collectInputs(inputs); }
     }
 
     private record Binary(String operator, Node left, Node right) implements Node {
-        public double evaluate(Function<String, Double> inputs, double frameTime) {
-            double a = left.evaluate(inputs, frameTime);
-            if (operator.equals("&&")) return a != 0.0 && right.evaluate(inputs, frameTime) != 0.0 ? 1.0 : 0.0;
-            if (operator.equals("||")) return a != 0.0 || right.evaluate(inputs, frameTime) != 0.0 ? 1.0 : 0.0;
-            double b = right.evaluate(inputs, frameTime);
-            return switch (operator) {
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
+            Value first = left.evaluate(inputs, frameTime);
+            double a = first.scalar();
+            if (operator.equals("&&")) return Value.scalar(a != 0 && right.evaluate(inputs, frameTime).scalar() != 0 ? 1 : 0);
+            if (operator.equals("||")) return Value.scalar(a != 0 || right.evaluate(inputs, frameTime).scalar() != 0 ? 1 : 0);
+            Value second = right.evaluate(inputs, frameTime);
+            if (first.size() > 1) {
+                if (operator.equals("==") || operator.equals("!=")) {
+                    boolean equal = java.util.Arrays.equals(first.vector(), second.vector());
+                    return Value.scalar(equal == operator.equals("==") ? 1 : 0);
+                }
+                double[] result = new double[first.size()];
+                for (int i = 0; i < result.length; i++) {
+                    double x = first.component(i), y = second.component(i);
+                    result[i] = switch (operator) {
+                        case "+" -> x + y;
+                        case "-" -> x - y;
+                        case "*" -> x * y;
+                        case "/" -> y == 0 ? 0 : x / y;
+                        default -> throw new IllegalStateException(operator);
+                    };
+                    result[i] = (float) result[i];
+                }
+                return Value.vector(result);
+            }
+            double b = second.scalar();
+            return Value.scalar(switch (operator) {
                 case "+" -> a + b;
                 case "-" -> a - b;
                 case "*" -> a * b;
@@ -326,7 +515,7 @@ public final class CustomUniforms {
                 case "==" -> a == b ? 1.0 : 0.0;
                 case "!=" -> a != b ? 1.0 : 0.0;
                 default -> throw new IllegalStateException(operator);
-            };
+            });
         }
 
         public void collectInputs(Set<String> inputs) {
@@ -339,12 +528,14 @@ public final class CustomUniforms {
         private final String name;
         private final List<Node> arguments;
         private final IrisSmoothedFloat smoother = new IrisSmoothedFloat(1.0, 1.0);
+        private int resultWidth = 1;
 
         Call(String name, List<Node> arguments) {
             this.name = name;
             this.arguments = arguments;
             int count = arguments.size();
             boolean valid = switch (name) {
+                case "vec2", "vec3", "vec4" -> count == name.charAt(3) - '0';
                 case "sin", "cos", "tan", "asin", "acos", "abs", "floor", "ceil", "exp", "exp2", "exp10", "log2",
                      "log10", "frac", "fract", "sqrt", "signum", "sign", "round", "torad", "todeg", "radians",
                      "degrees" -> count == 1;
@@ -361,20 +552,47 @@ public final class CustomUniforms {
                 default -> throw new IllegalArgumentException("unknown function '" + name + "'");
             };
             if (!valid) throw new IllegalArgumentException("wrong argument count for '" + name + "'");
+            if (name.startsWith("vec")) resultWidth = name.charAt(3) - '0';
         }
 
-        private double arg(int index, Function<String, Double> inputs, double frameTime) {
-            return arguments.get(index).evaluate(inputs, frameTime);
+        private double arg(int index, Function<String, Value> inputs, double frameTime) {
+            return arguments.get(index).evaluate(inputs, frameTime).scalar();
         }
 
-        public double evaluate(Function<String, Double> inputs, double frameTime) {
-            switch (name) {
-                case "if": {
-                    for (int i = 0; i + 1 < arguments.size(); i += 2) {
-                        if (arg(i, inputs, frameTime) != 0.0) return arg(i + 1, inputs, frameTime);
-                    }
-                    return arg(arguments.size() - 1, inputs, frameTime);
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
+            if (name.startsWith("vec")) {
+                double[] result = new double[resultWidth];
+                for (int i = 0; i < result.length; i++) result[i] = (float) arg(i, inputs, frameTime);
+                return Value.vector(result);
+            }
+            if (name.equals("if")) {
+                for (int i = 0; i + 1 < arguments.size(); i += 2) {
+                    if (arg(i, inputs, frameTime) != 0) return arguments.get(i + 1).evaluate(inputs, frameTime);
                 }
+                return arguments.getLast().evaluate(inputs, frameTime);
+            }
+            if (resultWidth > 1) {
+                List<Value> args = arguments.stream().map(argument -> argument.evaluate(inputs, frameTime)).toList();
+                double[] result = new double[resultWidth];
+                for (int i = 0; i < result.length; i++) {
+                    double a = args.getFirst().component(i);
+                    result[i] = switch (name) {
+                        case "abs" -> Math.abs(a);
+                        case "floor" -> Math.floor(a);
+                        case "ceil" -> Math.ceil(a);
+                        case "min" -> Math.min(a, args.get(1).component(i));
+                        case "max" -> Math.max(a, args.get(1).component(i));
+                        case "clamp" -> Math.max(args.get(1).component(i), Math.min(args.get(2).component(i), a));
+                        default -> throw new IllegalStateException(name);
+                    };
+                }
+                return Value.vector(result);
+            }
+            return Value.scalar(evaluateScalar(inputs, frameTime));
+        }
+
+        private double evaluateScalar(Function<String, Value> inputs, double frameTime) {
+            switch (name) {
                 case "in": {
                     double value = arg(0, inputs, frameTime);
                     for (int i = 1; i < arguments.size(); i++) {
@@ -466,7 +684,7 @@ public final class CustomUniforms {
          * fade follows the value immediately. A constant first argument is OptiFine's state id; each call
          * site keeps its own state here, so the id is not needed to separate them.
          */
-        private double smooth(Function<String, Double> inputs, double frameTime) {
+        private double smooth(Function<String, Value> inputs, double frameTime) {
             int offset = arguments.size() >= 2 && arguments.getFirst() instanceof Constant ? 1 : 0;
             double target = arg(offset, inputs, frameTime);
             int fades = arguments.size() - offset - 1;
@@ -481,8 +699,8 @@ public final class CustomUniforms {
     }
 
     private record Ternary(Node condition, Node whenTrue, Node whenFalse) implements Node {
-        public double evaluate(Function<String, Double> inputs, double frameTime) {
-            return condition.evaluate(inputs, frameTime) != 0.0
+        public Value evaluate(Function<String, Value> inputs, double frameTime) {
+            return condition.evaluate(inputs, frameTime).scalar() != 0.0
                     ? whenTrue.evaluate(inputs, frameTime) : whenFalse.evaluate(inputs, frameTime);
         }
 
@@ -570,6 +788,7 @@ public final class CustomUniforms {
         }
 
         private static int treeDepth(Node node) {
+            if (node instanceof Access access) return 1 + treeDepth(access.vector());
             if (node instanceof Unary unary) return 1 + treeDepth(unary.operand());
             if (node instanceof Binary binary) return 1 + Math.max(treeDepth(binary.left()), treeDepth(binary.right()));
             if (node instanceof Ternary ternary) return 1 + Math.max(treeDepth(ternary.condition()),
@@ -583,7 +802,7 @@ public final class CustomUniforms {
             if (accept("(")) {
                 Node inner = ternary();
                 expect(")");
-                return inner;
+                return postfix(inner);
             }
             if (position >= source.length()) throw new IllegalArgumentException("unexpected end of expression");
             char c = source.charAt(position);
@@ -604,16 +823,26 @@ public final class CustomUniforms {
                         } while (accept(","));
                         expect(")");
                     }
-                    return bounded(new Call(name, arguments));
+                    return postfix(bounded(new Call(name, arguments)));
                 }
-                return switch (name) {
+                return postfix(switch (name) {
                     case "true" -> new Constant(1.0);
                     case "false" -> new Constant(0.0);
                     case "pi", "PI" -> new Constant(Math.PI);
                     default -> new Reference(name);
-                };
+                });
             }
             throw new IllegalArgumentException("unexpected '" + c + "' at " + position);
+        }
+
+        private Node postfix(Node node) {
+            while (accept(".")) {
+                skipWhitespace();
+                int start = position;
+                while (position < source.length() && Character.isLetterOrDigit(source.charAt(position))) position++;
+                node = bounded(new Access(node, componentIndex(source.substring(start, position))));
+            }
+            return node;
         }
 
         private Node number() {
