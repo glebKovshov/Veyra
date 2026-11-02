@@ -34,6 +34,8 @@ public final class GraphicsSmoke {
     private static int lifecycleInitialWidth, lifecycleInitialHeight;
     private static boolean setupComputeFixture, setupResizePassed;
     private static boolean pending, finished, requested, captureActive;
+    private static boolean failedReplacementPassed;
+    private static String expectedReplacementError = "";
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
     private static final Set<String> capturedTargetStages = new java.util.HashSet<>();
@@ -406,7 +408,10 @@ public final class GraphicsSmoke {
                 requested = true;
                 captureActive = true;
             } else if (!vanillaBaseline && !thirdPartyShaderpackFixture && stage == 0 && worldTicks >= 160) {
-                if (!VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.getLastError().isEmpty())
+                if (Boolean.getBoolean("veyra.graphicsSmoke.failedReplacement") && !failedReplacementPassed)
+                    verifyFailedReplacement(client);
+                if (!VeyraRenderer.isRenderingEnabled()
+                        || !VeyraRenderer.getLastError().equals(expectedReplacementError))
                     throw new IllegalStateException("Shader pipeline failed: " + VeyraRenderer.getLastError());
                 if (cloudSceneColorFixture && !VeyraRenderer.hasCapturedCloudSceneColor())
                     throw new IllegalStateException("The cloud scene-color sampler was not captured before drawing clouds");
@@ -1353,6 +1358,29 @@ public final class GraphicsSmoke {
         return frame == null ? -1 : frame.frameSlot();
     }
 
+    private static void verifyFailedReplacement(Minecraft client) throws java.io.IOException {
+        var selected = VeyraRenderer.selectedPack().orElseThrow();
+        var uniforms = dev.veyra.shader.CustomUniforms.active();
+        var storage = VeyraStorageBufferResources.active();
+        long bytes = storage == null ? 0 : storage.allocatedBytes();
+        var path = Files.createTempDirectory(client.gameDirectory.toPath().resolve("shaderpacks"), "invalid-replacement-");
+        var shaders = Files.createDirectory(path.resolve("shaders"));
+        Files.writeString(shaders.resolve("shaders.properties"), "uniform.float.rollbackProbe=1\nbufferObject.0=4096\n");
+        Files.writeString(shaders.resolve("gbuffers_terrain.fsh"),
+                "#version 120\nvoid main(){gl_FragColor=vec4(veyraRollbackUndefined());}\n");
+        String response = VeyraRenderer.select(ShaderPack.inspect(path));
+        expectedReplacementError = VeyraRenderer.getLastError();
+        if (!response.startsWith("Shader compile failed:") || expectedReplacementError.isEmpty()
+                || !VeyraRenderer.isRenderingEnabled() || VeyraRenderer.selectedPack().orElse(null) != selected
+                || dev.veyra.shader.CustomUniforms.active() != uniforms
+                || VeyraStorageBufferResources.active() != storage
+                || storage != null && storage.allocatedBytes() != bytes)
+            throw new IllegalStateException("A failed replacement changed the active pack or its resource owners: " + response);
+        failedReplacementPassed = true;
+        LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                "Rejected the invalid replacement and retained the active pack, uniforms and {} storage-buffer bytes; capturing its next frame", bytes);
+    }
+
     private static void finish(Minecraft client, Throwable failure, int baseline) {
         if (finished) return;
         finished = true;
@@ -1368,6 +1396,7 @@ public final class GraphicsSmoke {
                     + "\",\"mouseGrabbed\":" + client.mouseHandler.isMouseGrabbed()
                     + ",\"cursorMode\":" + org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
                     + ",\"musicVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC)
+                    + ",\"failedReplacementPassed\":" + failedReplacementPassed
                     + ",\"masterVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER)
                     + ",\"allSoundVolumesMuted\":" + java.util.Arrays.stream(net.minecraft.sounds.SoundSource.values())
                             .allMatch(category -> client.options.getSoundSourceVolume(category) == 0.0F)

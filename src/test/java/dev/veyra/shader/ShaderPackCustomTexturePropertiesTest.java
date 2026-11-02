@@ -9,6 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShaderPackCustomTexturePropertiesTest {
     @Test
+    void loadsTheGlobalNoiseAssetWithoutAddingItToProgramSamplerDeclarations() throws Exception {
+        var properties = ShaderPackCustomTextureProperties.parse("texture.noise=tex/noise.png\n");
+        assertEquals("tex/noise.png", properties.noiseTexture());
+        assertTrue(properties.allTexturePaths().contains("tex/noise.png"));
+        assertTrue(properties.samplersForProgram("gbuffers_water").isEmpty());
+        assertTrue(properties.samplersForProgram("composite").isEmpty());
+        assertThrows(java.io.IOException.class, () -> ShaderPackCustomTextureProperties.parse("texture.noise= \n"));
+    }
+
+    @Test
     void recognizesTheDynamicBlockAtlasAlias() throws Exception {
         ShaderPackCustomTextureProperties properties = ShaderPackCustomTextureProperties.parse("""
                 customTexture.textureAtlas = minecraft:textures/atlas/blocks.png

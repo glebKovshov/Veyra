@@ -254,6 +254,9 @@ loom {
             if (project.hasProperty('graphicsSmokeThirdPartyLifecycle')) {
                 vmArgs '-Dveyra.graphicsSmoke.thirdPartyLifecycle=true'
             }
+            if (project.hasProperty('graphicsSmokeFailedReplacement')) {
+                vmArgs '-Dveyra.graphicsSmoke.failedReplacement=true'
+            }
         }
     }
 }

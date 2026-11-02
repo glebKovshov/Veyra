@@ -21,23 +21,34 @@ public abstract class RendererSubmissionMixin {
     @Shadow private SwapChain swapChain;
     @Shadow private ArrayList<Long> imageAvailableSemaphores;
     @Shadow private static int currentFrame;
+    @Unique private boolean veyra$acquireConsumed;
+
+    @Inject(method = "beginFrame", at = @At(value = "INVOKE", target =
+            "Lorg/lwjgl/vulkan/KHRSwapchain;vkAcquireNextImageKHR(Lorg/lwjgl/vulkan/VkDevice;JJJJLjava/nio/IntBuffer;)I"))
+    private void veyra$resetAcquisition(CallbackInfo callback) {
+        veyra$acquireConsumed = false;
+    }
 
     @Inject(method = "beginMainRenderPass", at = @At(value = "INVOKE", target =
             "Lnet/vulkanmod/vulkan/pass/MainPass;begin(Lorg/lwjgl/vulkan/VkCommandBuffer;Lorg/lwjgl/system/MemoryStack;)V"))
     private void veyra$makeUploadsVisible(MemoryStack stack, CallbackInfo callback) {
         // Upload command buffers submit before this graphics buffer, including index-buffer growth.
         VeyraComputePipeline.memoryBarrier(Renderer.getCommandBuffer(),
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
+                veyra$acquireConsumed ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT : VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                veyra$acquireConsumed ? VK_ACCESS_MEMORY_WRITE_BIT : VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
     }
 
     @Redirect(method = "flushCmds", at = @At(value = "INVOKE", target =
             "Lorg/lwjgl/vulkan/VK10;vkQueueSubmit(Lorg/lwjgl/vulkan/VkQueue;Lorg/lwjgl/vulkan/VkSubmitInfo;J)I"))
     private int veyra$waitForAcquiredImage(VkQueue queue, VkSubmitInfo submission, long fence) {
-        if (!swapChain.isAcquired()) return vkQueueSubmit(queue, submission, fence);
+        if (!swapChain.isAcquired() || veyra$acquireConsumed) return vkQueueSubmit(queue, submission, fence);
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            return vkQueueSubmit(queue, withAcquireDependency(submission,
+            int result = vkQueueSubmit(queue, withAcquireDependency(submission,
                     imageAvailableSemaphores.get(currentFrame), stack), fence);
+            if (result == VK_SUCCESS) veyra$acquireConsumed = true;
+            return result;
         }
     }
 
@@ -57,9 +68,28 @@ public abstract class RendererSubmissionMixin {
         if (!swapChain.isAcquired()) return vkQueueSubmit(queue, submission, fence);
         try (MemoryStack stack = MemoryStack.stackPush()) {
             // Acquisition must also precede swapchain layout transitions outside color attachment output.
-            return vkQueueSubmit(queue, withAcquireWaitStages(submission,
-                    imageAvailableSemaphores.get(currentFrame), stack), fence);
+            long acquired = imageAvailableSemaphores.get(currentFrame);
+            return vkQueueSubmit(queue, veyra$acquireConsumed
+                    ? withoutAcquireDependency(submission, acquired, stack)
+                    : withAcquireWaitStages(submission, acquired, stack), fence);
         }
+    }
+
+    @Unique
+    private static VkSubmitInfo withoutAcquireDependency(VkSubmitInfo original, long semaphore, MemoryStack stack) {
+        int count = original.waitSemaphoreCount();
+        var waits = stack.mallocLong(count);
+        var stages = stack.mallocInt(count);
+        for (int i = 0; i < count; i++) {
+            if (original.pWaitSemaphores().get(i) == semaphore) continue;
+            waits.put(original.pWaitSemaphores().get(i));
+            stages.put(original.pWaitDstStageMask().get(i));
+        }
+        waits.flip();
+        stages.flip();
+        return VkSubmitInfo.malloc(stack).set(original)
+                .pWaitSemaphores(waits.hasRemaining() ? waits : null).waitSemaphoreCount(waits.remaining())
+                .pWaitDstStageMask(stages.hasRemaining() ? stages : null);
     }
 
     @Unique
@@ -73,12 +103,8 @@ public abstract class RendererSubmissionMixin {
         }
         waits.put(count, semaphore);
         stages.put(count, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-        int signalCount = original.signalSemaphoreCount();
-        var signals = stack.mallocLong(signalCount + 1);
-        for (int i = 0; i < signalCount; i++) signals.put(i, original.pSignalSemaphores().get(i));
-        // The flush consumes acquisition and relays it so VulkanMod's final submit can still present.
-        signals.put(signalCount, semaphore);
+        // The first flush consumes acquisition; its fence wait completes before recording resumes.
         return VkSubmitInfo.malloc(stack).set(original).pWaitSemaphores(waits)
-                .waitSemaphoreCount(count + 1).pWaitDstStageMask(stages).pSignalSemaphores(signals);
+                .waitSemaphoreCount(count + 1).pWaitDstStageMask(stages);
     }
 }

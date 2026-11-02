@@ -35,10 +35,24 @@ public final class VeyraShaderPackTextures {
     private VeyraShaderPackTextures() {
     }
 
+    static synchronized UploadedTexture noiseTexture(ShaderPack pack) {
+        try {
+            String resource = pack.readCustomTextureProperties().noiseTexture();
+            if (resource == null) return null;
+            UploadedTexture texture = TEXTURES.get(new Key(pack.path().toAbsolutePath().normalize(), normalizeResourcePath(resource)));
+            if (texture == null || texture.texture().isClosed() || texture.view().isClosed())
+                throw new IllegalStateException("The selected shaderpack noise texture was not prepared: " + resource);
+            return texture;
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not resolve the selected shaderpack noise texture", failure);
+        }
+    }
+
     /** Load pack-local texture assets before its pipelines can become active. */
     public static synchronized void prepare(ShaderPack pack) throws IOException {
         Path packPath = pack.path().toAbsolutePath().normalize();
         ShaderPackCustomTextureProperties properties = pack.readCustomTextureProperties();
+        if (properties.noiseTexture() != null) normalizeResourcePath(properties.noiseTexture());
         for (String resourcePath : properties.allTexturePaths()) {
             if (ShaderPackCustomTextureProperties.isMinecraftBlockAtlas(resourcePath)
                     || resourcePath.startsWith("minecraft:")) {
@@ -246,6 +260,7 @@ public final class VeyraShaderPackTextures {
     }
 
     private static void retire(UploadedTexture texture) {
+        VeyraNoiseTexture.detachBindings(texture.view(), texture.texture());
         if (texture.view() != null && !texture.view().isClosed()) texture.view().close();
         if (texture.texture() != null && !texture.texture().isClosed()) texture.texture().close();
         if (texture.sampler() != null) texture.sampler().close();
@@ -264,5 +279,5 @@ public final class VeyraShaderPackTextures {
 
     private record FilterSettings(boolean blur, boolean clamp) { }
 
-    private record UploadedTexture(String fingerprint, VkGpuTexture texture, VkTextureView view, GpuSampler sampler) { }
+    record UploadedTexture(String fingerprint, VkGpuTexture texture, VkTextureView view, GpuSampler sampler) { }
 }
