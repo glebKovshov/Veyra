@@ -69,11 +69,18 @@ diagnostics also leave the dominant residual unresolved. Hosted 871fe07 passes
 Build #1078, source audit #307 and all 55 Graphics smoke #353 jobs. The new camera
 attribute change still requires its own hosted checks and final-candidate gates.
 
-The first biome diagnostic waited at Minecraft's experimental-world backup screen
-and recorded two swapchain validation errors. The smoke harness now accepts that
-screen only for its generated custom-uniforms world; both subsequent positive runs
-and the negative control are clean. A lingering-backup-screen reproduction remains
-to determine the original synchronization trigger; do not erase that failed evidence.
+The experimental-world backup-screen errors are reproduced by holding that screen
+for 20 ticks. LoadingOverlay clears the last presented swapchain texture through
+VkCommandEncoder's standalone command path while no image is acquired. The shared
+encoder mixin now begins a normal Renderer frame for a swapchain clear outside
+recording, then substitutes the newly acquired frame's main color texture. The
+native inRenderPass validation and offscreen clear paths retain their behavior.
+The GPU fixture requires that screen delay and guards swapchain image transitions.
+Its corrected probe passes rollback/cross-pack/native screenshot checks at 222,800
+pixels, with zero core/sync/teardown errors. The ordinary vanilla baseline and full
+normal-clock BSL natural lifecycle are also clean. Full JDK 21 build/test/SPIR-V,
+seven Python tests and explicit JAR verification pass; hosted verification of the
+new fix remains required. Keep the original failing logs as negative evidence.
 
 A corrected TAA-off diagnostic changes both original-source defaults and the HIGH
 profile in both owned copies; all 292 files match and Iris confirms HIGH (+0 user
@@ -81,3 +88,13 @@ changes). Its full RGB MAE is 3.741655/255, versus 3.921677 with TAA. Turning TA
 off shifts Veyra by 0.848611 and Iris by 0.805192. This rules out TAA as the sole
 cause; cloud/noise sampling remains to be isolated. The earlier profile-only
 TAA control left Iris on its original defaults and is excluded from conclusions.
+
+Direct noise sampling clarifies the remaining scope: a final-pass tiled noisetex
+probe differs by 35.432714/255 before accounting for screen UV origin and only
+0.014103 after reflecting screen Y. A second probe reconstructs the world ray using
+both inverse projection and inverse model-view, then samples the original noise
+PNG from that ray. Across 292 matched modified files it differs by 0.020457/255,
+with matching HIGH/defaults, fixed clocks/scenes and clean Vulkan teardown. These
+controls support the input/noise/projection path but are modified diagnostic output,
+not proof of full BSL parity. Cloud marching, masking/composition and intermediate
+history remain to be isolated before the final candidate comparison.

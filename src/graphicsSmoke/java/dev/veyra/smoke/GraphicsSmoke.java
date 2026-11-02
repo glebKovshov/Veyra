@@ -33,6 +33,7 @@ import java.util.Set;
 public final class GraphicsSmoke {
     private static int ticks, worldTicks, stage, activePixels, baselineAt, disabledPixels, reenabledShadowMrtPixels;
     private static int lifecycleInitialWidth, lifecycleInitialHeight;
+    private static int backupScreenTicks;
     private static boolean setupComputeFixture, setupResizePassed;
     private static boolean pending, finished, requested, captureActive;
     private static boolean failedReplacementPassed;
@@ -134,7 +135,9 @@ public final class GraphicsSmoke {
             }
             if (client.screen instanceof net.minecraft.client.gui.screens.BackupConfirmScreen backup
                     && Files.readString(client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt")).equals("custom-uniforms")) {
-                // The generated biome datapack makes this disposable regression world experimental.
+                // Exercise the experimental-world screen before entering the disposable biome world.
+                if (++backupScreenTicks < 20) return;
+                LoggerFactory.getLogger("veyra-graphics-smoke").info("Backup screen exercised for {} ticks", backupScreenTicks);
                 var skip = Component.translatable("selectWorld.backupJoinSkipButton");
                 var button = backup.children().stream()
                         .filter(child -> child instanceof net.minecraft.client.gui.components.Button candidate
@@ -552,6 +555,7 @@ public final class GraphicsSmoke {
                     && !storageBufferFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             if (customUniformFixture && captureActive && packSwitchPhase != 1) {
+                if (backupScreenTicks < 20) throw new IllegalStateException("The experimental-world backup screen was not exercised");
                 int targetFormat = VeyraRenderer.geometryColorAttachment(1).format;
                 if (targetFormat != VK_FORMAT_A2B10G10R10_UNORM_PACK32 && targetFormat != VK_FORMAT_R16G16B16A16_SFLOAT)
                     throw new IllegalStateException("The legacy gdepthFormat directive was not applied: Vulkan format " + targetFormat);

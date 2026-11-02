@@ -6,6 +6,8 @@ This is an original diagnostic fixture used by the software Vulkan integration m
 The generated `custom-uniforms` world includes a biome with cloud height 224,
 distinct from the dimension default. Terrain and final both require that camera
 attribute; the default biome in an ordinary world intentionally produces green.
+The smoke runner holds the experimental-world backup screen for 20 ticks before
+continuing, covering loading-overlay clears between nested frames.
 
 The helper `veyraHalf` and integer `veyraDayTick` are deliberately declared after consumers. Both terrain and final must receive the current-frame values after dependency ordering; declaration order in shader uniform blocks remains stable.
 
