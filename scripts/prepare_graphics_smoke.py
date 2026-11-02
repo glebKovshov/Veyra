@@ -211,7 +211,7 @@ def main():
             for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
                 normal_png(textures / f'block/{sprite}_n.png')
         extra_options = 'resourcePacks:["vanilla","file/veyra-material-fixture"]\n'
-    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
+    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nsoundCategory_music:0.0\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
     print(f"Prepared original Minecraft 1.21.11 flat world and {fixture} fixture")
 
 

@@ -105,6 +105,12 @@ public final class GraphicsSmoke {
     public static void tick(Minecraft client) {
         if (!Boolean.getBoolean("veyra.graphicsSmoke") || finished) return;
         try {
+            if (client.mouseHandler.isMouseGrabbed()
+                    || org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
+                    != org.lwjgl.glfw.GLFW.GLFW_CURSOR_NORMAL)
+                throw new IllegalStateException("Validation client grabbed the desktop cursor");
+            if (client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC) != 0.0F)
+                client.options.getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.MUSIC).set(0.0);
             if (completion != null) {
                 Runnable ready = completion; completion = null; ready.run();
                 if (finished) return;
@@ -1338,7 +1344,11 @@ public final class GraphicsSmoke {
             String escapedSkipReason = skipReason.replace("\\", "\\\\").replace("\"", "\\\"");
             String status = failure != null ? "failed" : skipReason.isEmpty() ? "passed" : "skipped";
             Files.writeString(output.resolve("result.json"), "{\"status\":\"" + status
-                    + "\",\"renderer\":\"" + renderer + "\",\"activeMagentaPixels\":" + activePixels
+                    + "\",\"renderer\":\"" + renderer
+                    + "\",\"mouseGrabbed\":" + client.mouseHandler.isMouseGrabbed()
+                    + ",\"cursorMode\":" + org.lwjgl.glfw.GLFW.glfwGetInputMode(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR)
+                    + ",\"musicVolume\":" + client.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC)
+                    + ",\"activeMagentaPixels\":" + activePixels
                     + ",\"activeEntityNormalFallbackRedPixels\":" + activeEntityNormalFallbackRedPixels
                     + ",\"disabledEntityNormalFallbackRedPixels\":" + disabledEntityNormalFallbackRedPixels
                     + ",\"animatedPbrFramesChanged\":" + animatedPbrFramesChanged

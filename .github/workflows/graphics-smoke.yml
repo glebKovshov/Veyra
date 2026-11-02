@@ -173,6 +173,9 @@ jobs:
           import json,pathlib,re
           result=json.loads(pathlib.Path('build/reports/graphics-smoke/result.json').read_text())
           print(json.dumps(result,indent=2))
+          assert result['mouseGrabbed'] is False, 'Unattended client captured the desktop cursor'
+          assert result['cursorMode'] == 0x34001, 'GLFW cursor must remain in normal mode'
+          assert result['musicVolume'] == 0.0, 'Unattended client music must remain muted'
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
           # Keep full diagnostics and gate both frame execution and device teardown.
