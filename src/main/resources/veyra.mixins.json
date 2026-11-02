@@ -57,6 +57,7 @@
     "GraphicsPipelineMixin",
     "PipelineDescriptorLayoutMixin",
     "RendererGeometryTargetsMixin",
+    "RendererSubmissionMixin",
     "accessor.PipelineStateAccessor",
     "accessor.RendererFramebufferAccessor",
     "accessor.VkGpuTextureAccessor",

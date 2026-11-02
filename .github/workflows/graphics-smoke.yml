@@ -146,7 +146,9 @@ jobs:
           sudo apt-get install -y mesa-vulkan-drivers vulkan-tools xvfb libglfw3 libflite1
           bash scripts/install_vulkan_validation_layer.sh
       - name: Prepare original validation world
-        run: python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
+        run: |
+          python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
+          printf '%s\n' 'khronos_validation.validate_sync = true' 'khronos_validation.enable_message_limit = false' > run-graphics-smoke/vk_layer_settings.txt
       - name: Launch Minecraft with software Vulkan
         shell: bash
         env:
@@ -154,6 +156,7 @@ jobs:
           XDG_SESSION_TYPE: x11
           ALSOFT_DRIVERS: 'null'
           VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+          VK_LAYER_SETTINGS_PATH: ${{ github.workspace }}/run-graphics-smoke
         run: |
           set -o pipefail
           export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
@@ -172,9 +175,8 @@ jobs:
           print(json.dumps(result,indent=2))
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
-          # Minecraft/VulkanMod 0.6.8 reports process-wide teardown objects after disconnect.
-          # Preserve the full shutdown tail because Object Tracking handle lines follow VUIDs.
-          # Runtime rendering remains separately gated.
+          # Keep full diagnostics and gate both frame execution and device teardown.
+          # Current Khronos versions can report all leaked children in a single aggregate list.
           marker='Stopping singleplayer server as player logged out'
           shutdown=text.find(marker)
           assert shutdown >= 0, 'The smoke client did not shut down its validation world cleanly'
@@ -187,6 +189,7 @@ jobs:
           print(f'Runtime validation errors: {len(runtime_errors)}')
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
+          assert not teardown_errors, 'Vulkan device teardown reported validation errors; inspect the uploaded log'
           fixture='${{ matrix.fixture }}'
           shadow_voxel_image_fixtures={'custom-image-compute','graphics-custom-image','cloud-custom-image','basic-custom-image','entity-custom-image','composite-custom-image'}
           if fixture in shadow_voxel_image_fixtures and result['status']=='skipped':
