@@ -3,10 +3,32 @@ package dev.veyra.shader;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.time.Duration;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 class ShaderPackLocalUniformRenamerTest {
+    @Test
+    void scansLargeHeadersOnceForUniformReadsWithoutShadowing() {
+        var uniforms = IntStream.range(0, 300).mapToObj(i -> "uniform" + i).toList();
+        String source = ("// " + "padding".repeat(100) + "\n").repeat(1200)
+                + "void main() { float sum = 0.0;\n"
+                + String.join("\n", uniforms.stream().map(name -> "sum += " + name + ";").toList()) + "\n}";
+        assertTimeout(Duration.ofSeconds(2), () -> assertEquals(source,
+                ShaderPackLocalUniformRenamer.renameShadowingLocals(source, uniforms)));
+    }
+
+    @Test
+    void checksNewAliasesAgainstLaterUniforms() {
+        String adapted = ShaderPackLocalUniformRenamer.renameShadowingLocals(
+                "void main() { float far = 1.0; use(far); }", List.of("far", "veyraLocalFar"));
+        assertTrue(adapted.contains("float veyraLocalVeyraLocalFar = 1.0;"), adapted);
+        assertTrue(adapted.contains("use(veyraLocalVeyraLocalFar);"), adapted);
+    }
+
     @Test
     void renamesParametersAndKeepsGlobalUniformUsesOutsideTheirFunction() {
         String source = """

@@ -1,5 +1,19 @@
 # Veyra 1.0.0 readiness
 
+## 2026-11-03 loading-cost follow-up
+
+The 12f1c56 Reimagined HIGH full lifecycle passes strict Vulkan and teardown gates,
+but takes 9m32s. Render-thread samples show repeated GLSL declaration scans. The
+local-uniform renamer now collects possible declaration names in one pass before
+checking aliases, refreshing that set only after a real rewrite. On an 850,405-char
+header with 300 uniform reads, the standalone unchanged-output check takes 35.4ms
+instead of 3959.9ms on the same JDK 21 process setup. This is a synthetic scan
+measurement, not a game loading-time or FPS claim. A 560-case differential corpus
+has identical output hashes before/after, and the regression tests cover large
+headers and aliases that shadow later uniform names. The current combined working
+tree passes 670 JUnit tests, 105 examples / 123 SPIR-V and packaging. Pinned audit
+and GPU lifecycle repeats are running; primary RGB changes are still uncommitted.
+
 Baseline: main `0110146`, Veyra 0.2.3 / Minecraft 1.21.11 / VulkanMod 0.6.8. This backlog does not claim 1.0.0 readiness.
 
 | Area | Current evidence | Gap / next action |
