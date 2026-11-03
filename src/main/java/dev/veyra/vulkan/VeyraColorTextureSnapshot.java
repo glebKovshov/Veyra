@@ -226,10 +226,7 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         ready = false;
         if (view != null && !view.isClosed()) view.close();
         view = null;
-        if (texture != null && !texture.isClosed()) {
-            VeyraColorTargetViews.forget(texture.getVulkanImage());
-            texture.close();
-        }
+        if (texture != null && !texture.isClosed()) texture.close();
         texture = null;
         width = 0;
         height = 0;

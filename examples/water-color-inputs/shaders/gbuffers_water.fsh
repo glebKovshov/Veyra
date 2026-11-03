@@ -20,6 +20,7 @@ void main() {
     bool correct = opaque.r > 0.8 && opaque.b < 0.1
         && abs(deferred.r - 0.5) < 0.02 && abs(deferred.b - 0.5) < 0.02
         && deferred.a > 0.99
+        && deferred.g < 0.01
         && distance(alias, deferred) < 0.01
         && abs(initialized.g - 0.5) < 0.02;
     vec4 signal = correct ? vec4(0.95, 0.02, 0.8, 1.0) : vec4(0.02, 0.8, 0.05, 1.0);

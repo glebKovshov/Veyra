@@ -4,11 +4,18 @@ import net.vulkanmod.vulkan.texture.VulkanImage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArgs;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import static org.lwjgl.vulkan.VK10.*;
 
 @Mixin(value = VulkanImage.class, remap = false)
 public abstract class VulkanImageLayoutMixin {
+    @Inject(method = "free", at = @At("HEAD"))
+    private void veyra$retireSampledViews(CallbackInfo callback) {
+        dev.veyra.vulkan.VeyraColorTargetViews.forget((VulkanImage) (Object) this);
+    }
+
     @ModifyArgs(method = "transitionLayout(Lorg/lwjgl/system/MemoryStack;Lorg/lwjgl/vulkan/VkCommandBuffer;"
             + "Lnet/vulkanmod/vulkan/texture/VulkanImage;IIIIIII)V", remap = false,
             at = @At(value = "INVOKE", target =

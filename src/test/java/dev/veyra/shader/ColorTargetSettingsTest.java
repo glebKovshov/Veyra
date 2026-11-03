@@ -10,8 +10,9 @@ class ColorTargetSettingsTest {
     void rgbStorageFallbackPreservesOpaqueAlphaAndTargetSettings() {
         for (int rgb : new int[]{VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_R8G8B8_SNORM,
                 VK_FORMAT_R16G16B16_SFLOAT, VK_FORMAT_B10G11R11_UFLOAT_PACK32}) {
-            var fallback = new ColorTargetSettings(false, 0x12345678, 640, 360, rgb)
-                    .withStorageFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+            var requested = new ColorTargetSettings(false, 0x12345678, 640, 360, rgb);
+            assertTrue(requested.opaqueAlpha());
+            var fallback = requested.withStorageFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
             assertTrue(fallback.opaqueAlpha());
             assertEquals(VK_FORMAT_R16G16B16A16_SFLOAT, fallback.format());
             assertFalse(fallback.clearEachFrame());

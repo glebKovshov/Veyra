@@ -59,4 +59,8 @@ public final class VeyraColorTargetViews {
         views.values().forEach(view -> MemoryManager.getInstance()
                 .addFrameOp(() -> vkDestroyImageView(device, view, null)));
     }
+
+    public static synchronized void clear() {
+        for (VulkanImage image : java.util.List.copyOf(opaqueAlphaViews.keySet())) forget(image);
+    }
 }
