@@ -1,7 +1,8 @@
 #version 120
-/* RENDERTARGETS:0,1 */
+/* RENDERTARGETS:0,1,2 */
 /*
 const int gdepthFormat = RGB10_A2;
+const int colortex2Format = R11F_G11F_B10F;
 */
 const vec4 colortex1ClearColor = vec4(0.0);
 uniform float veyraNoonFade;
@@ -34,4 +35,5 @@ void main() {
             && atlasSize.x >= 16 && atlasSize.y >= 16 && velocity >= 0.0 && velocity < 0.05;
     gl_FragData[0] = vec4(0.02, 0.8, 0.05, 1.0);
     gl_FragData[1] = custom ? vec4(0.95, 0.02, 0.8, 1.0) : vec4(0.02, 0.8, 0.05, 1.0);
+    gl_FragData[2] = vec4(1.00390625, 1.00390625, 1.0078125, 0.25);
 }

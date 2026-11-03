@@ -1,0 +1,76 @@
+{
+  "productionCommit": "0b94709",
+  "metadataVersion": "0.2.3+mc1.21.11",
+  "status": "unversioned candidate; hosted/release gates and visual analysis remain open",
+  "scope": "Original matched pack sources/options, fixed clocks/camera/time. Generated material-wall scenes except BSL natural ocean. Not whole-pack or arbitrary-GPU certification. Wrong-profile Iris Unbound HIGH capture is excluded.",
+  "cases": [
+    {
+      "pack": "reimagined",
+      "profile": "HIGH",
+      "matchedShaderFiles": 426,
+      "veyraReport": "stable10-renamer-workingtree-veyra-reimagined-high",
+      "irisReport": "stable10-candidate-12f1c56-iris-reimagined-high",
+      "veyraPngSha256": "efa4d0fa26dc329d376c76a011900d30becbc8d2dcb4b6861c9361ddce31827e",
+      "irisPngSha256": "0c0f698e667c960060207646126e1741c0b2fa45eb271a1fcf0393bcce367bfa",
+      "rgbMae255": {
+        "full": 3.842572,
+        "wall": 4.151868,
+        "floor": 2.616056
+      },
+      "lifecyclePassed": true,
+      "vulkanCoreSyncTeardownErrors": 0,
+      "storageBufferBytes": 0
+    },
+    {
+      "pack": "unbound",
+      "profile": "COMPLEMENTARY",
+      "matchedShaderFiles": 426,
+      "veyraReport": "stable10-candidate-0b94709-veyra-unbound-complementary",
+      "irisReport": "stable10-candidate-0b94709-iris-unbound-complementary-matched",
+      "veyraPngSha256": "39a19d4c015b7c53993ea631fa17ea6a11e00fd942228f112c27febc57facee9",
+      "irisPngSha256": "36483fe8517695e8e46f249103c68aa900deebdec184fb3c4bd79637dbb6525c",
+      "rgbMae255": {
+        "full": 3.985754,
+        "wall": 4.188968,
+        "floor": 2.277741
+      },
+      "lifecyclePassed": true,
+      "vulkanCoreSyncTeardownErrors": 0,
+      "storageBufferBytes": 810549248
+    },
+    {
+      "pack": "sildur",
+      "profile": "__DEFAULT__",
+      "matchedShaderFiles": 137,
+      "veyraReport": "stable10-candidate-0b94709-veyra-sildur-default",
+      "irisReport": "stable10-candidate-0b94709-iris-sildur-default",
+      "veyraPngSha256": "cb7dab320958fce2c37d8ae791593aba6618bfc1bdac322c3e2ced694c88e503",
+      "irisPngSha256": "ef690c2bd1825dd59d687221ca4f8ddec49908e0aeb47e4009daf87f523427a3",
+      "rgbMae255": {
+        "full": 4.25249,
+        "wall": 2.515145,
+        "floor": 4.367145
+      },
+      "lifecyclePassed": true,
+      "vulkanCoreSyncTeardownErrors": 0,
+      "storageBufferBytes": 0
+    },
+    {
+      "pack": "bsl",
+      "profile": "HIGH",
+      "matchedShaderFiles": 292,
+      "veyraReport": "stable10-candidate-0b94709-veyra-bsl-natural",
+      "irisReport": "stable10-candidate-0b94709-iris-bsl-natural",
+      "veyraPngSha256": "a929a50dce50bc52fc425f302119d0bb67149fa24ca232c84865ffd8b69f71c9",
+      "irisPngSha256": "13deb2c6678d4ae892bd5eae6606173b0d3030efafa979010ff320794925ce88",
+      "rgbMae255": {
+        "full": 3.851555,
+        "wall": 4.601561,
+        "floor": 2.274635
+      },
+      "lifecyclePassed": true,
+      "vulkanCoreSyncTeardownErrors": 0,
+      "storageBufferBytes": 0
+    }
+  ]
+}

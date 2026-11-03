@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — 1.0.0 candidate
+
+- Match supported Iris capability macros and optional-feature negotiation; resolve forward scalar/vector uniform dependencies, reject cycles, bound expressions and restore uniform registrations when packs change.
+- Support graphics-only custom images and custom noise textures with selected-pack ownership and explicit shadow-write visibility.
+- Correct current/previous sampling projections, draw the Iris-style horizon, honor block-comment settings and legacy render-target aliases, and obtain cloud height from the camera environment.
+- Preserve packed/wide render-target formats, linear auxiliary-color filtering, and opaque RGB sampling through physical RGBA fallbacks, including the main scene and mipmapped snapshots.
+- Use native `R11F_G11F_B10F` storage when device capabilities permit it, preserving packed precision and memory size; retain the wide fallback on unsupported devices.
+- Fix clear/upload/depth/index dependencies, swapchain acquisition during loading overlays, screenshot readback ordering, and native resource cleanup. Retire derived views when images/swapchains are released.
+- Avoid repeated declaration scans for uniform-only shader headers. Add rollback, cross-pack switching, screenshot equality and strict Vulkan teardown regressions.
+- Gate publication on audit-tool tests and verify checksums and metadata after downloading the published assets. Final candidate and publication gates remain pending; this entry does not announce a release.
+
 ## 0.2.3 - 2026-11-02
 
 - Fix mipmapped post-pass sampler names: Minecraft appends `Sampler` to each input name, so Veyra now passes the base names expected by shader-pack colortex samplers. This restores the correct Complementary Reimagined HIGH frame with mipmapped colortex inputs.

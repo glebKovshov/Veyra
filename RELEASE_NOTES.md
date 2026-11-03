@@ -1,21 +1,25 @@
-# Veyra 0.2.3+mc1.21.11
+# Veyra 1.0.0 release preparation
 
-Patch release for Minecraft 1.21.11 and VulkanMod 0.6.8.
+Unpublished candidate for Minecraft 1.21.11 and VulkanMod 0.6.8. Production metadata remains 0.2.3 until the final stability gates pass.
 
 ## Changes
 
-- Fix mipmapped post-pass sampler bindings so Minecraft resolves colortex snapshots to the expected shader-pack samplers. This restores normal rendering when Complementary Reimagined HIGH requests colortex mipmaps for exposure and reflections.
-- Retain the 0.2.2 fixes for GUI/inventory pipelines and shader-resource initialization.
+- Fix Iris capability negotiation and scalar/vector custom-uniform dependencies, including forward references, cycle rejection and registry restoration when switching packs.
+- Support graphics-only custom images and custom noise textures with explicit ownership and synchronization.
+- Correct reflection sampling projections, horizon coverage, camera cloud height, active block-comment settings and legacy color-target directives.
+- Preserve packed/wide storage, including native `R11F_G11F_B10F` on supported devices, filtered color inputs and RGB alpha semantics in primary/auxiliary targets and mipmapped snapshots.
+- Fix loading-overlay swapchain acquisition, clear/upload/depth/index dependencies, screenshot readback ordering and resource/view cleanup.
+- Reduce repeated GLSL declaration scans and extend GPU regressions for invalid replacement, switching packs and native screenshot equality.
 
 ## Installation
 
 Requires Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
 
-Put `veyra-0.2.3+mc1.21.11.jar` in the instance's `mods` folder beside VulkanMod and remove older Veyra JARs. The sources JAR is for development. Press F6 to select and configure a shader pack.
+The eventual release will provide the install JAR, a sources JAR, an example-packs ZIP and `SHA256SUMS.txt`. Use the install JAR beside VulkanMod, remove older Veyra JARs, and press F6 to select/configure a shader pack. Shaderpack archives are not redistributed or modified by Veyra.
 
 ## Validation and limits
 
-- Local RTX 3070 Complementary Reimagined r5.9.3 HIGH lifecycle passed: 360,000 non-black pixels / 137 color buckets, including resize, dimension changes, disable/re-enable and reload.
-- The versioned v0.2.3 candidate passed the local Temurin JDK 21.0.13 gate: 622 tests, shader validation, example packaging, GraphicsSmoke compilation and JAR verification. GitHub's release workflow repeats the checks on the published ref.
-- Publication is gated by the pinned shader-pack source audit, Lavapipe graphics matrix, build/tests, shader compilation and distributable verification.
-- Full Iris visual parity is not certified; see COMPATIBILITY.md for the measured limits.
+- Current local production-code checks pass 671 JUnit tests, seven Python tests, 105 example sources / 123 Vulkan SPIR-V compilations, packaging and JAR verification. The pinned source audit passes 75 profile/dimension cases, 939 geometry programs and 18 active compute stages. Source acceptance does not establish runtime visuals.
+- All four selected profiles completed RTX 3070 lifecycles with zero Vulkan core/sync/teardown errors on the 0b94709 baseline. The native packed-HDR follow-up passes BSL's full lifecycle and the focused rollback/switch/readback fixture; the remaining three repeats, hosted checks and release-ref checks are pending. See STABILITY_1_0.md and WORK_SUMMARY.md for exact evidence.
+- Publication requires the source audit, Lavapipe graphics matrix, build/tests, shader compilation and distributable verification. The publication workflow also downloads its assets and verifies checksums and JAR contents.
+- Veyra supports a checked subset of Iris programs, with 16 color targets and explicit unsupported-feature diagnostics. World rendering still uses VulkanMod's native primary attachment, so HDR range/quantization across world/post boundaries can differ from Iris. Full visual parity and arbitrary pack/profile/GPU compatibility are not certified. See COMPATIBILITY.md for remaining rendering differences and measured limits.

@@ -16,3 +16,5 @@ The final pass also checks live celestial and integer camera vectors followed by
 The terrain signal also requires `gbufferProjection * gbufferProjectionInverse` to preserve a probe vector, catching mixed native/screen-space projection suppliers.
 
 The legacy `gdepthFormat` directive requests `RGB10_A2` storage for colortex1; the GPU test verifies the selected physical format before testing rollback and pack switching.
+
+Colortex2 requests `R11F_G11F_B10F` and receives HDR values between its representable steps. The final pass requires the expected packed rounding (or the checked wide fallback) and opaque RGB alpha. The harness requires native packed storage whenever the device advertises filtered sampled color-attachment support, so silently widening a supported format fails this fixture.

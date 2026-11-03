@@ -24,7 +24,8 @@ abstract class VulkanImageBuilderMixin {
         if (format == VK10.VK_FORMAT_R16G16B16A16_UNORM) {
             return 8;
         }
-        if (format == VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32) return 4;
+        if (format == VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32
+                || format == VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32) return 4;
         return formatSize(format);
     }
 }

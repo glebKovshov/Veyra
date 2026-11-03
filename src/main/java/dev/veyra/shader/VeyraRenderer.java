@@ -3752,6 +3752,7 @@ public final class VeyraRenderer {
 
     private static boolean vulkanModColorTargetFormat(int format) {
         return format == VK10.VK_FORMAT_R8_UNORM
+                || format == VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32
                 || format == VK10.VK_FORMAT_R8G8B8A8_UNORM
                 || format == VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32
                 || format == VK10.VK_FORMAT_R16_SFLOAT

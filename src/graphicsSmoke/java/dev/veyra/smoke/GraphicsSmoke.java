@@ -560,6 +560,17 @@ public final class GraphicsSmoke {
                 if (targetFormat != VK_FORMAT_A2B10G10R10_UNORM_PACK32 && targetFormat != VK_FORMAT_R16G16B16A16_SFLOAT)
                     throw new IllegalStateException("The legacy gdepthFormat directive was not applied: Vulkan format " + targetFormat);
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Legacy gdepthFormat physical storage: {}", targetFormat);
+                int hdrFormat = VeyraRenderer.geometryColorAttachment(2).format;
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    var properties = org.lwjgl.vulkan.VkFormatProperties.calloc(stack);
+                    vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, VK_FORMAT_B10G11R11_UFLOAT_PACK32, properties);
+                    int required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
+                            | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+                    int expected = (properties.optimalTilingFeatures() & required) == required
+                            ? VK_FORMAT_B10G11R11_UFLOAT_PACK32 : VK_FORMAT_R16G16B16A16_SFLOAT;
+                    if (hdrFormat != expected) throw new IllegalStateException("R11F_G11F_B10F did not use supported storage: " + hdrFormat);
+                }
+                LoggerFactory.getLogger("veyra-graphics-smoke").info("R11F_G11F_B10F physical storage: {}", hdrFormat);
             }
             for (var custom : dev.veyra.shader.CustomUniforms.active().uniforms()) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Custom uniform {} ({}) = {} / {}", custom.name(), custom.type(),

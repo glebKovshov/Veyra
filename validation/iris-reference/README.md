@@ -26,6 +26,13 @@ Veyra only. For other profiles, resolve inherited profile options and save their
 values in Iris's `shaderpacks/<pack-name>.txt`; verify the resulting Iris profile
 and option changes rather than assuming that Veyra's marker configures Iris.
 
+For a fresh single-pack Veyra run, its `veyra/options/*.properties` file contains
+the actual non-default overrides. Copy that file to the Iris pack's adjacent
+`shaderpacks/<pack-name>.txt` before starting Iris. An empty override set is
+correct only when the requested profile already matches the source defaults.
+For Unbound COMPLEMENTARY, require `Profile: COMPLEMENTARY (+0 options changed by user)`;
+an Iris `Profile: HIGH` frame must be excluded even when all shader files match.
+
 Run the installed Gradle 9.4.0 executable (replace `gradle` below with its path):
 
 ```powershell

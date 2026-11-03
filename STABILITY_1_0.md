@@ -1,5 +1,21 @@
 # Veyra 1.0.0 readiness
 
+## Current completion audit
+
+Completed baseline: `0b94709`; the native packed-HDR follow-up is undergoing final repeats. Development metadata is still 0.2.3; no 1.0.0 tag or release has been created.
+
+| Requirement | Authoritative evidence | Current state |
+| --- | --- | --- |
+| Unit, tooling, shader and package checks | `build/reports/candidate-0b94709-unit-results/`, `build/renamer-full-gate.log`, explicit `scripts/verify_jar.py` run | 670 JUnit / seven Python tests, 105 sources / 123 SPIR-V, packaging and JAR checks pass. |
+| Pinned source/profile acceptance | `build/reports/stable10-renamer-source-audit/` | 75 cases, 939 geometry programs, 18 active compute stages, no rejected stages. |
+| Reimagined HIGH paired rendering and lifecycle | `stable10-renamer-workingtree-veyra-reimagined-high/` and `stable10-candidate-12f1c56-iris-reimagined-high/` | Production source hashes match; all lifecycle flags and strict zero-error Vulkan/teardown checks pass. Matched Iris comparison is recorded. |
+| Unbound COMPLEMENTARY, Sildur defaults and BSL HIGH natural | `build/candidate-0b94709-remaining.log`, corrected Unbound Iris report, `validation/stable-1.0-candidate.json` | All three baseline lifecycles pass. Matched references require the actual profile/clock/capture; wrong-profile Unbound HIGH is excluded. |
+| Native packed-HDR follow-up | `build/reports/native-r11-unit-results/`, `stable10-native-r11-source-audit/`, `stable10-native-r11-custom-uniforms/`, `build/native-r11-candidate.log` | 671 tests, 75 audit cases and the GPU packed-format/rollback/switch/readback probe pass. BSL full lifecycle is Vulkan/teardown-clean; other profile repeats are running. |
+| Rollback, cross-pack switching and native readback | Current hosted graphics matrix plus local RGB round-trip reports | Local probes pass; hosted candidate results still required. |
+| Full hosted build/source/graphics gates | PR #152 checks on the candidate head | In progress at the latest verified read. Missing or failed jobs cannot be counted as passes. |
+| Explain visual differences and define release scope | Matched captures, `validation/iris-bsl-phase-analysis.json`, COMPATIBILITY.md | Full parity is not certified; the residual BSL composition/reflection gap remains under analysis. |
+| Versioned release and downloaded-asset verification | Release workflow, tag, downloaded checksums and JAR metadata | Not started. Select 1.0.0 metadata only after readiness is established. |
+
 ## 2026-11-03 loading-cost follow-up
 
 The 12f1c56 Reimagined HIGH full lifecycle passes strict Vulkan and teardown gates,

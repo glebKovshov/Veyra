@@ -114,7 +114,8 @@ final class ShaderPackTargetCapture {
             case VK_FORMAT_R8_UNORM -> 1;
             case VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_R8G8B8_SNORM -> 3;
             case VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R32_SFLOAT -> 4;
-            case VK_FORMAT_R8G8B8A8_SNORM, VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> 4;
+            case VK_FORMAT_R8G8B8A8_SNORM, VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+                    VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> 4;
             case VK_FORMAT_R16_SFLOAT -> 2;
             case VK_FORMAT_R16G16B16_SFLOAT -> 6;
             case VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16B16A16_UNORM -> 8;
@@ -154,6 +155,13 @@ final class ShaderPackTargetCapture {
                                 red = snormChannel(MemoryUtil.memGetByte(offset));
                                 green = snormChannel(MemoryUtil.memGetByte(offset + 1));
                                 blue = snormChannel(MemoryUtil.memGetByte(offset + 2));
+                            }
+                            case VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> {
+                                int packed = MemoryUtil.memGetInt(offset);
+                                // These unsigned fields share binary16's exponent; align their mantissas.
+                                red = channel(Float.float16ToFloat((short) ((packed & 2047) << 4)));
+                                green = channel(Float.float16ToFloat((short) (((packed >>> 11) & 2047) << 4)));
+                                blue = channel(Float.float16ToFloat((short) ((packed >>> 22) << 5)));
                             }
                             case VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> {
                                 int packed = MemoryUtil.memGetInt(offset);
