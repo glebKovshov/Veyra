@@ -11,8 +11,11 @@ instead of 3959.9ms on the same JDK 21 process setup. This is a synthetic scan
 measurement, not a game loading-time or FPS claim. A 560-case differential corpus
 has identical output hashes before/after, and the regression tests cover large
 headers and aliases that shadow later uniform names. The current combined working
-tree passes 670 JUnit tests, 105 examples / 123 SPIR-V and packaging. Pinned audit
-and GPU lifecycle repeats are running; primary RGB changes are still uncommitted.
+tree passes 670 JUnit tests, 105 examples / 123 SPIR-V and packaging. The pinned
+audit passes all 75 cases. Primary RGB changes are committed as 0b94709, whose
+production source hashes match the completed strict-zero-error Reimagined HIGH
+lifecycle repeat. Unbound, Sildur and BSL candidate comparisons/lifecycles are
+running sequentially; final hosted and release gates remain open.
 
 Baseline: main `0110146`, Veyra 0.2.3 / Minecraft 1.21.11 / VulkanMod 0.6.8. This backlog does not claim 1.0.0 readiness.
 
