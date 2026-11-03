@@ -33,6 +33,7 @@
     "VkRenderPassMixin",
     "VulkanCloudRendererMixin",
     "VkCommandEncoderMixin",
+    "ImageDescriptorMixin",
     "VulkanImageBuilderMixin",
     "VulkanFramebufferMipMixin",
     "VulkanImageLayoutMixin",

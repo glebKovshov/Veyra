@@ -123,3 +123,26 @@ Hosted e68809f Build #1082 and source audit #309 pass. Graphics #355 has 54 succ
 jobs and one dependency-resolution failure before Minecraft launch (geometry-mrt,
 job 125585640665); its raw error is retained. The sampler fix needs a fresh complete
 hosted matrix before release. No validation or readback gate was relaxed.
+
+RGB storage fallbacks now retain their logical channel contract: sampling RGB8,
+RGB8_SNORM, RGB16F or R11F_G11F_B10F through an RGBA attachment returns alpha one,
+regardless of fragment output alpha. Only sampled descriptors use the swizzled
+view; attachment and storage-image views retain their native layout. Pass-start
+snapshots inherit the contract, including all mip levels; resize/replacement and
+pack disable retire extra views after the frame fence. The extended water fixture
+deliberately writes alpha zero and checks geometry reads and mip-level-1 post reads.
+The old path has zero markers and fails; the corrected RTX 3070 run has 222,757
+active / zero disabled markers. Both have zero core/sync/teardown errors.
+
+The local gate now passes 668 JUnit tests, seven Python tests, 105 example sources /
+123 SPIR-V compilations, packaging and explicit JAR verification. Original BSL HIGH
+natural repeat has 292 byte-identical shader files versus Iris, matching fixed
+clocks and clean validation. Its full RGB MAE is 3.865272/255 (water rows 145:360:
+4.652299); this is a channel-contract correction, not a claim that the residual
+visual gap is solved. The full normal-clock BSL natural lifecycle also passes
+resize, Nether/Overworld return, disable/re-enable and resource reload, with zero
+core/sync/teardown diagnostics. The pinned audit passes all 75 cases, 939 geometry
+fragments and 18 active compute stages. Reports: build/reports/stable10-rgb-alpha-*/.
+The RGB fixture also passes rollback, cross-pack round-trip and native screenshot
+equality with clean teardown; CI now requires these probes for water-color-inputs.
+Hosted final-head checks and remaining final-candidate pack comparisons are pending.

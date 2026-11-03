@@ -180,7 +180,7 @@ jobs:
           if [[ '${{ matrix.fixture }}' == 'terrain-vertex-varyings' ]]; then
             extra_args+=('-PgraphicsSmokeComputeProbe=true')
           fi
-          if [[ '${{ matrix.fixture }}' =~ ^(custom-uniforms|compute-ssbo-only|graphics-custom-image)$ ]]; then
+          if [[ '${{ matrix.fixture }}' =~ ^(custom-uniforms|compute-ssbo-only|graphics-custom-image|water-color-inputs)$ ]]; then
             extra_args+=('-PgraphicsSmokeFailedReplacement=true' '-PgraphicsSmokePackSwitch=true')
           fi
           timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke "${extra_args[@]}" 2>&1 | tee graphics-client.log
@@ -197,7 +197,7 @@ jobs:
           assert result['silentAudioBackend'] is True, 'Unattended clients must use a non-output audio backend'
           if '${{ matrix.fixture }}' == 'skybasic-vertex-execution':
               assert result['activeSkyHorizonPixels'] >= 1000, 'The shader sky must cover the horizon gap below the vanilla disc'
-          if '${{ matrix.fixture }}' in ('custom-uniforms', 'compute-ssbo-only', 'graphics-custom-image'):
+          if '${{ matrix.fixture }}' in ('custom-uniforms', 'compute-ssbo-only', 'graphics-custom-image', 'water-color-inputs'):
               assert result['failedReplacementPassed'] is True, 'Invalid replacement must retain the active pack and resource owners'
               assert result['packSwitchPassed'] is True, 'Switching to a distinct pack and back must restore rendering and storage allocation'
               assert result['nativeReadbackMagentaPixels'] > 10000, 'Native screenshot must preserve the active shader frame'

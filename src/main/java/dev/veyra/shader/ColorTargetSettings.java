@@ -3,7 +3,18 @@ package dev.veyra.shader;
 import org.lwjgl.vulkan.VK10;
 
 /** Clear and storage settings for one Iris-compatible colortex buffer. */
-record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, int height, int format) {
+record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, int height, int format,
+                           boolean opaqueAlpha) {
+    ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, int height, int format) {
+        this(clearEachFrame, clearColor, width, height, format, false);
+    }
+
+    ColorTargetSettings withStorageFormat(int storageFormat) {
+        boolean rgb = format == VK10.VK_FORMAT_R8G8B8_UNORM || format == VK10.VK_FORMAT_R8G8B8_SNORM
+                || format == VK10.VK_FORMAT_R16G16B16_SFLOAT || format == VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+        return new ColorTargetSettings(clearEachFrame, clearColor, width, height, storageFormat, opaqueAlpha || rgb);
+    }
+
     static ColorTargetSettings defaults(int index, int width, int height) {
         return new ColorTargetSettings(true, index == 1 ? 0xFFFFFFFF : 0x00000000,
                 width, height, VK10.VK_FORMAT_R8G8B8A8_UNORM);

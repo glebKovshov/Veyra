@@ -3224,7 +3224,7 @@ public final class VeyraRenderer {
             VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
             ColorTargetSettings sceneColorSettings = pipelineSet.colorTargetSettings().getOrDefault(
                     0, ColorTargetSettings.defaults(0, mainTarget.width, mainTarget.height));
-            ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings.format());
+            ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings);
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
             FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
@@ -3726,8 +3726,7 @@ public final class VeyraRenderer {
                     if ((properties.optimalTilingFeatures() & requiredFeatures) != requiredFeatures) {
                         throw unsupportedColorTargetFormat(index, target.format());
                     }
-                    settings.put(index, new ColorTargetSettings(target.clearEachFrame(), target.clearColor(),
-                            target.width(), target.height(), fallbackFormat));
+                    settings.put(index, target.withStorageFormat(fallbackFormat));
                     VeyraClient.LOGGER.info("Shader pack colortex{} uses {}; this Vulkan device uses compatible {} storage.",
                             index, ColorTargetSettings.formatName(target.format()),
                             ColorTargetSettings.formatName(fallbackFormat));
@@ -8007,27 +8006,36 @@ public final class VeyraRenderer {
         return projectionBuffer;
     }
 
-    private static void ensureSwapTargets(int width, int height, int format) {
+    private static void ensureSwapTargets(int width, int height, ColorTargetSettings settings) {
         if (swapTargetA == null) {
             swapTargetA = new TextureTarget("Veyra shader pack swap A", width, height, false);
         } else if (swapTargetA.width != width || swapTargetA.height != height) {
+            forgetColorTargetViews(swapTargetA);
             swapTargetA.resize(width, height);
         }
         if (swapTargetB == null) {
             swapTargetB = new TextureTarget("Veyra shader pack swap B", width, height, false);
         } else if (swapTargetB.width != width || swapTargetB.height != height) {
+            forgetColorTargetViews(swapTargetB);
             swapTargetB.resize(width, height);
         }
-        ensureTargetFormat(swapTargetA, "Veyra shader pack swap A", format);
-        ensureTargetFormat(swapTargetB, "Veyra shader pack swap B", format);
+        ensureTargetFormat(swapTargetA, "Veyra shader pack swap A", settings.format(), settings.opaqueAlpha());
+        ensureTargetFormat(swapTargetB, "Veyra shader pack swap B", settings.format(), settings.opaqueAlpha());
+    }
+
+    private static void forgetColorTargetViews(RenderTarget target) {
+        if (target.getColorTexture() instanceof VkGpuTexture texture && !texture.isClosed())
+            dev.veyra.vulkan.VeyraColorTargetViews.forget(texture.getVulkanImage());
     }
 
     private static void releaseSwapTargets() {
         if (swapTargetA != null) {
+            forgetColorTargetViews(swapTargetA);
             swapTargetA.destroyBuffers();
             swapTargetA = null;
         }
         if (swapTargetB != null) {
+            forgetColorTargetViews(swapTargetB);
             swapTargetB.destroyBuffers();
             swapTargetB = null;
         }
@@ -8047,6 +8055,8 @@ public final class VeyraRenderer {
         });
         geometryColorBindings.clear();
         colorTargets.values().forEach(pair -> {
+            forgetColorTargetViews(pair.targetA());
+            forgetColorTargetViews(pair.targetB());
             pair.targetA().destroyBuffers();
             pair.targetB().destroyBuffers();
         });
@@ -8156,26 +8166,30 @@ public final class VeyraRenderer {
                                              ColorTargetSettings settings) {
         boolean changed = false;
         if (target.width != settings.width() || target.height != settings.height()) {
+            forgetColorTargetViews(target);
             target.resize(settings.width(), settings.height());
             changed = true;
         }
         changed |= ensureTargetFormat(target, "Veyra shader pack colortex" + index + " " + side,
-                settings.format());
+                settings.format(), settings.opaqueAlpha());
         return changed;
     }
 
-    private static boolean ensureTargetFormat(RenderTarget target, String name, int format) {
+    private static boolean ensureTargetFormat(RenderTarget target, String name, int format, boolean opaqueAlpha) {
         GpuTexture colorTexture = target.getColorTexture();
         if (!(colorTexture instanceof VkGpuTexture vulkanTexture)) {
             throw new IllegalStateException("VulkanMod did not create a Vulkan texture for " + name + ".");
         }
+        boolean changed = false;
         if (vulkanTexture.getVulkanImage().format != format
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             replaceColorTargetTexture(target, name, format);
-            return true;
+            changed = true;
         }
-        return false;
+        dev.veyra.vulkan.VeyraColorTargetViews.register(
+                ((VkGpuTexture) target.getColorTexture()).getVulkanImage(), opaqueAlpha);
+        return changed;
     }
 
     private static void replaceColorTargetTexture(RenderTarget target, String name, int format) {
@@ -8231,6 +8245,8 @@ public final class VeyraRenderer {
             oldView.close();
         }
         if (oldTexture != null && !oldTexture.isClosed()) {
+            if (oldTexture instanceof VkGpuTexture oldVulkanTexture)
+                dev.veyra.vulkan.VeyraColorTargetViews.forget(oldVulkanTexture.getVulkanImage());
             oldTexture.close();
         }
     }

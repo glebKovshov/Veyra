@@ -100,6 +100,7 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         int destinationFormat = sampledFormat(source.format);
         ensure(source.width, source.height, destinationFormat);
         VulkanImage destination = image();
+        VeyraColorTargetViews.inherit(source, destination);
         if ((destination.usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             throw new IllegalStateException("The " + name + " image does not support transfer writes.");
         }
@@ -225,7 +226,10 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         ready = false;
         if (view != null && !view.isClosed()) view.close();
         view = null;
-        if (texture != null && !texture.isClosed()) texture.close();
+        if (texture != null && !texture.isClosed()) {
+            VeyraColorTargetViews.forget(texture.getVulkanImage());
+            texture.close();
+        }
         texture = null;
         width = 0;
         height = 0;
