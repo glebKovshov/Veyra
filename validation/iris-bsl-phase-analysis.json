@@ -1,0 +1,41 @@
+{
+  "candidateCommit": "12f1c56b9d7eef96b08563208f93c29bb06ac804",
+  "pack": "BSL 10.1.8 HIGH",
+  "fixture": "seed=1 natural ocean, 640x360, dayTime=1000, fixed frameCounter=160 / frameTimeCounter=8",
+  "scope": "Only original is an unmodified Iris comparison. Other references modify Iris Bayer Y inputs while retaining original final output, profile, world and camera. These diagnostics do not certify parity or justify rewriting arbitrary shader screen coordinates.",
+  "veyraReport": "stable10-rgb-alpha-veyra-bsl-natural",
+  "veyraPngSha256": "e6b298eb8a4cd03d3d85bbbe69a877d1a63278df62e4e6a79563c35eec378832",
+  "cases": {
+    "original": {
+      "referenceReport": "stable10-fixed-clock-iris-bsl-natural",
+      "referencePngSha256": "ca442daa6984e6caa6153aed6222cfa1a6fc14e896f689188dab060207af9e88",
+      "rgbMae255ByRows": {
+        "0:360": 3.865272,
+        "0:130": 2.473826,
+        "145:360": 4.652299,
+        "250:360": 2.275545
+      }
+    },
+    "cloud-bayer-y": {
+      "referenceReport": "stable10-bsl-cloud-phase-iris-bsl-natural",
+      "referencePngSha256": "aba40d8a88747d7a71900b4ddf824acae367839d39b7bbb7345e747c6cfd5085",
+      "rgbMae255ByRows": {
+        "0:360": 3.760101,
+        "0:130": 2.220829,
+        "145:360": 4.629179,
+        "250:360": 2.25572
+      }
+    },
+    "all-bayer-y": {
+      "referenceReport": "stable10-bsl-all-bayer-phase-iris-bsl-natural",
+      "referencePngSha256": "695ecddac50a44c86185a342b504dbb6f11d9500d01e06527ba6eae340f17e06",
+      "rgbMae255ByRows": {
+        "0:360": 3.761924,
+        "0:130": 2.217993,
+        "145:360": 4.634477,
+        "250:360": 2.255554
+      }
+    }
+  },
+  "conclusion": "Cloud RGB and density diagnostics agree after aligning Bayer Y, but the original final-frame difference is not explained by Bayer phase alone; composition/history/geometry inputs still need isolation."
+}
