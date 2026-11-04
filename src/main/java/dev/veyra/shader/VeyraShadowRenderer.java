@@ -10,6 +10,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.veyra.VeyraClient;
 import dev.veyra.mixin.accessor.CameraAccessor;
+import dev.veyra.mixin.accessor.VulkanWorldRendererAccessor;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -84,6 +85,8 @@ public final class VeyraShadowRenderer {
     private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
     private static boolean rendering;
     private static boolean renderingFeatures;
+    private static boolean preserveIndirectCommands;
+    private static boolean selectingShadowSections;
     private static boolean shadowMapCompleted;
     private static boolean warnedAboutNonRecordingFrame;
     private static boolean warnedAboutUnavailableShadowMap;
@@ -165,6 +168,16 @@ public final class VeyraShadowRenderer {
 
     public static boolean isRendering() {
         return rendering;
+    }
+
+    /** True while VulkanMod's section graph is being rebuilt for the shadow frustum. */
+    public static boolean isSelectingShadowSections() {
+        return selectingShadowSections;
+    }
+
+    /** True while the main section graph is restored after this frame's shadow terrain draws. */
+    public static boolean preservesIndirectCommands() {
+        return preserveIndirectCommands;
     }
 
     public static boolean isRenderingFeatures() {
@@ -382,6 +395,26 @@ public final class VeyraShadowRenderer {
         return isWithinShadowRenderDistance(blockPos.getX() + 0.5, blockPos.getY() + 0.5, blockPos.getZ() + 0.5);
     }
 
+    /**
+     * Selects terrain sections for the shadow map from the shadow frustum alone, as Iris does with
+     * Sodium: the graph is rebuilt every frame and camera occlusion culling is disabled. VulkanMod's
+     * smart/advanced culling only follows sections visible from the camera, which drops casters
+     * hidden behind terrain or outside the view even though their shadows fall into the frame.
+     */
+    private static void setupShadowSections(Minecraft minecraft, WorldRenderer worldRenderer, Camera camera,
+                                            Frustum shadowFrustum, boolean spectator) {
+        boolean smartCull = minecraft.smartCull;
+        try {
+            minecraft.smartCull = false;
+            selectingShadowSections = true;
+            ((VulkanWorldRendererAccessor) worldRenderer).veyra$setGraphNeedsUpdate(true);
+            worldRenderer.setupRenderer(camera, shadowFrustum, false, spectator);
+        } finally {
+            selectingShadowSections = false;
+            minecraft.smartCull = smartCull;
+        }
+    }
+
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
                               Matrix4f mainCullProjection, DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -432,18 +465,22 @@ public final class VeyraShadowRenderer {
             float shadowDistance = shadowSettings.distance();
             Matrix4f shaderPackShadowProjection = IrisShadowMatrices.createProjection(
                     shadowDistance, shadowSettings.nearPlane(), shadowSettings.farPlane());
-            Matrix4f shadowCullProjection = IrisShadowMatrices.createProjection(
-                    shadowDistance, 0.1F, shadowDistance * 2.0F);
+            // Cull against the whole depth range the map is drawn with. The light view sits at the camera,
+            // so the pack's near plane (-100.05 by default) reaches toward the sun. A cull range starting
+            // at +0.1 dropped every caster between the player and the light outside the 8-block camera
+            // cube: overhead trees and terrain at noon, and long shadows toward a low sun.
+            Matrix4f shadowCullProjection = new Matrix4f(shaderPackShadowProjection);
             Matrix4f shadowProjection = IrisShadowMatrices.createVulkanProjection(
                     shadowDistance, shadowSettings.nearPlane(), shadowSettings.farPlane());
             VeyraShadowRenderer.shadowModelView.set(shadowModelView);
             VeyraShadowRenderer.shadowProjection.set(shaderPackShadowProjection);
             updateShadowMatrixUniformBuffers();
+            VeyraRenderer.refreshShadowMatrices(shadowModelView, shaderPackShadowProjection);
             // Resources must exist and be cleared before the first shadow draw, including a lazy pack load.
             VeyraRenderer.prepareShadowTerrainPipelines();
             clearAdditionalShadowColors();
 
-            // VulkanMod expands the culling frustum in vanilla clip space; reserve ZO depth for drawing.
+            // VulkanMod culls in vanilla OpenGL clip space, so this is the -1..1 projection; draws use the 0..1 one.
             Frustum shadowFrustum = shadowSettings.hasDistanceRenderLimit()
                     ? new DistanceLimitedFrustum(shadowModelView, shadowCullProjection, cameraPosition,
                             shadowSettings.distanceRenderLimit())
@@ -454,7 +491,7 @@ public final class VeyraShadowRenderer {
             entityShadowFrustum.prepare(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             ((CameraAccessor) (Object) camera).veyra$setRotation(shadowView.yaw(), shadowView.pitch());
             cameraRotationChanged = true;
-            worldRenderer.setupRenderer(camera, shadowFrustum, false, spectator);
+            setupShadowSections(minecraft, worldRenderer, camera, shadowFrustum, spectator);
             VeyraRenderer.clearShadowCustomImages();
             renderer.beginRenderPass(renderPass, framebuffer);
             shadowRenderPassStarted = true;
@@ -509,9 +546,15 @@ public final class VeyraShadowRenderer {
             if (cameraRotationChanged) {
                 ((CameraAccessor) (Object) camera).veyra$setRotation(originalYaw, originalPitch);
                 try {
+                    // Rebuild the camera graph even if the shadow view rotation was within VulkanMod's
+                    // 2-degree reuse threshold, and append to the shadow pass's indirect commands.
+                    ((VulkanWorldRendererAccessor) worldRenderer).veyra$setGraphNeedsUpdate(true);
+                    preserveIndirectCommands = true;
                     worldRenderer.setupRenderer(camera, mainFrustum, false, spectator);
                 } catch (Exception exception) {
                     VeyraClient.LOGGER.error("Could not restore VulkanMod's main chunk frustum after shadow rendering.", exception);
+                } finally {
+                    preserveIndirectCommands = false;
                 }
             }
             if (depthTextureView != null) {

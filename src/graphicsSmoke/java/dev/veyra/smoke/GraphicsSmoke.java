@@ -41,6 +41,9 @@ public final class GraphicsSmoke {
     private static int nativeReadbackMagentaPixels;
     private static int activeSkyHorizonPixels;
     private static final boolean packSwitchProbe = Boolean.getBoolean("veyra.graphicsSmoke.packSwitch");
+    /** Diagnostic: native screenshots of consecutive ticks of the still third-party scene before its capture. */
+    private static final int frameSequence = Integer.getInteger("veyra.graphicsSmoke.frameSequence", 0);
+    private static int frameSequenceCaptured;
     private static int packSwitchPhase;
     private static ShaderPack packBeforeSwitch;
     private static long storageBytesBeforeSwitch;
@@ -51,6 +54,7 @@ public final class GraphicsSmoke {
     private static final Set<String> capturedTargetStages = new java.util.HashSet<>();
     private static final java.util.Map<String, List<ShaderPackTargetCapture.Capture>> intermediateTargetCaptures =
             new java.util.LinkedHashMap<>();
+    private static boolean shadowSunwardCasterFixture, sunwardCasterPlaced;
     private static boolean entityFixtureStarted, vanillaBaseline, thirdPartyShaderpackFixture, thirdPartyScenePrepared,
             thirdPartyLifecycleFixture, thirdPartyProfileApplied, thirdPartyNaturalScene, cloudFixture, cloudSceneColorFixture,
             geometryViewSpaceFixture,
@@ -183,6 +187,7 @@ public final class GraphicsSmoke {
             glintVertexFixture = fixture.equals("glint-vertex-execution");
             glintMrtFixture = fixture.equals("glint-mrt-outputs");
             shadowColorEntityFixture = fixture.equals("shadow-color-entity");
+            shadowSunwardCasterFixture = fixture.equals("shadow-sunward-caster");
             shadowColorMrtLifecycleFixture = fixture.equals("shadow-color-mrt-lifecycle");
             setupComputeFixture = fixture.equals("compute-setup-stage");
             shadowColorMrtFixture = fixture.equals("shadow-color-mrt") || shadowColorMrtLifecycleFixture;
@@ -311,6 +316,21 @@ public final class GraphicsSmoke {
                         }
                     } catch (Throwable failure) { entityFixtureFailure = failure; }
                 });
+            }
+            if (shadowSunwardCasterFixture && !sunwardCasterPlaced && worldTicks >= 20
+                    && client.getSingleplayerServer() != null) {
+                sunwardCasterPlaced = true;
+                var server = client.getSingleplayerServer();
+                var center = net.minecraft.core.BlockPos.containing(client.player.getX(), client.player.getY() + 30.0,
+                        client.player.getZ());
+                server.execute(() -> {
+                    // Noon light comes straight down: this slab lies two sections toward the sun from the
+                    // camera and outside its view, so only a light-volume cull keeps it in the map.
+                    for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++) for (int y = 0; y < 2; y++)
+                        server.overworld().setBlock(center.offset(x, y, z),
+                                net.minecraft.world.level.block.Blocks.GOLD_BLOCK.defaultBlockState(), 3);
+                });
+                LoggerFactory.getLogger("veyra-graphics-smoke").info("Placed the sunward shadow caster at {}", center);
             }
             if (entityFixtureFailure != null) throw new IllegalStateException("Entity material fixture setup failed", entityFixtureFailure);
             if (thirdPartyShaderpackFixture && !thirdPartyScenePrepared && worldTicks >= 20
@@ -555,7 +575,7 @@ public final class GraphicsSmoke {
                     && !skyTexturedStageFixture && !blockVertexFixture && !damagedBlockVertexFixture && !handVertexFixture
                     && !weatherVertexFixture && !particleVertexFixture && !texturedDefaultAttributesFixture
                     && !entityCustomTextureFixture
-                    && !storageBufferFixture
+                    && !storageBufferFixture && !shadowSunwardCasterFixture
                     ? VeyraRenderer.geometryColorAttachment(1) : null;
             if (customUniformFixture && captureActive && packSwitchPhase != 1) {
                 if (backupScreenTicks < 20) throw new IllegalStateException("The experimental-world backup screen was not exercised");
@@ -846,6 +866,18 @@ public final class GraphicsSmoke {
                                 nonBlackPixelCount, colorBucketCount, count);
                         return;
                     }
+                    if (frameSequenceCaptured < frameSequence) {
+                        // Diagnostic sequence of the still scene: keep each readback and request the next frame.
+                        try {
+                            Files.copy(output.resolve("third-party-pack-active.png"),
+                                    output.resolve(String.format("sequence-%02d.png", frameSequenceCaptured++)),
+                                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        } catch (java.io.IOException exception) {
+                            throw new java.io.UncheckedIOException(exception);
+                        }
+                        pending = false;
+                        return;
+                    }
                     Throwable failure = !thirdPartyProfileApplied || !VeyraRenderer.isRenderingEnabled()
                             || !VeyraRenderer.getLastError().isEmpty()
                             ? new IllegalStateException("The real shaderpack/profile was no longer active: "
@@ -1062,7 +1094,7 @@ public final class GraphicsSmoke {
                     int minPixels = currentRenderedItemFixture || blockVertexFixture || entityCustomImageFixture
                             || entityCustomTextureFixture
                             || damagedBlockVertexFixture || handVertexFixture || weatherVertexFixture || particleVertexFixture
-                            || texturedDefaultAttributesFixture ? 100 : 2000;
+                            || texturedDefaultAttributesFixture || shadowSunwardCasterFixture ? 100 : 2000;
                     Throwable failure;
                     if (normalAtlasAnimatedFixture) {
                         disabledAnimatedPbrMagenta = count;

@@ -1363,6 +1363,19 @@ public final class VeyraRenderer {
         }
     }
 
+    /**
+     * Publishes the shadow matrices of the map drawn in this frame. Frame matrices are captured at the
+     * start of the level render, before the shadow pass computes this frame's light view, so post and
+     * composite programs would otherwise project with the previous frame's shadow matrices. While the
+     * camera moves that shifts their shadow lookups by one frame of motion, and by a whole snapping
+     * interval whenever the light view steps, which shows as shadows jumping and flickering.
+     */
+    public static void refreshShadowMatrices(Matrix4fc shadowModelView, Matrix4fc shadowProjection) {
+        frameMatrices = frameMatrices.withShadow(new Matrix4f(shadowModelView), new Matrix4f(shadowProjection));
+        FrameUniforms frame = shaderPackFrameUniforms;
+        if (frame != FrameUniforms.ZERO) shaderPackFrameUniforms = frame.withMatrices(frameMatrices);
+    }
+
     public static void captureFrameMatrices(Matrix4fc modelView, Matrix4fc renderedProjection,
                                             Matrix4fc projection, Vec3 cameraPosition) {
         synchronizeWorld();
@@ -8541,6 +8554,15 @@ public final class VeyraRenderer {
         private static final FrameUniforms ZERO = new FrameUniforms(0.0F, 0.0F, 0,
                 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0, 0, 0, 0, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0,
                 false, false, false, false, false, false, false, FrameMatrices.IDENTITY, CameraUniforms.ZERO);
+
+
+        FrameUniforms withMatrices(FrameMatrices replacement) {
+            return new FrameUniforms(frameTimeCounter, frameTime, frameCounter, sunAngle, shadowFade, rainStrength,
+                    wetness, thunderStrength, worldTime, worldDay, moonPhase, bedrockLevel, cloudHeight,
+                    endFlashIntensity, eyeAltitude, screenBrightness, blindness, nightVision, darknessFactor,
+                    isEyeInWater, isSpectator, isSneaking, isSprinting, isOnGround, isHurt, isInvisible, isBurning,
+                    replacement, camera);
+        }
     }
 
     private record FrameMatrices(Matrix4f gbufferModelView, Matrix4f gbufferModelViewInverse,
@@ -8549,6 +8571,13 @@ public final class VeyraRenderer {
                                  Matrix4f shadowModelView, Matrix4f shadowModelViewInverse,
                                  Matrix4f shadowProjection, Matrix4f shadowProjectionInverse,
                                  Matrix4f viewEffects, Matrix4f viewEffectsInverse) {
+        FrameMatrices withShadow(Matrix4f modelView, Matrix4f projection) {
+            return new FrameMatrices(gbufferModelView, gbufferModelViewInverse, gbufferProjection,
+                    gbufferProjectionInverse, gbufferPreviousModelView, gbufferPreviousProjection,
+                    new Matrix4f(modelView), new Matrix4f(modelView).invert(),
+                    new Matrix4f(projection), new Matrix4f(projection).invert(), viewEffects, viewEffectsInverse);
+        }
+
         private static final FrameMatrices IDENTITY = new FrameMatrices(
                 new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(),
                 new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f(), new Matrix4f());

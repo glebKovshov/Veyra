@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.TextureFilteringMethod;
 import net.vulkanmod.render.chunk.WorldRenderer;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.memory.buffer.IndirectBuffer;
 import net.vulkanmod.vulkan.pass.MainPass;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.texture.SamplerManager;
@@ -42,7 +43,23 @@ public abstract class WorldRendererMixin {
                                        CallbackInfo ci) {
         if (renderType == TerrainRenderType.TRANSLUCENT && !VeyraShadowRenderer.isRendering()) {
             VeyraRenderer.captureDepthTex1();
+            // Iris copies depthtex2 here too (beginHand, before translucents and deferred): all opaque
+            // depth without the hand. Captured at the end of the world render instead, deferred programs
+            // read the previous frame's depth with translucents, which breaks depth comparisons against
+            // depthtex0 whenever TAA jitter or the camera moves (Sildur's shadows vanish and flicker).
+            VeyraRenderer.captureDepthTex2();
             VeyraRenderer.renderDeferred(net.minecraft.client.Minecraft.getInstance());
+        }
+    }
+
+    @Redirect(method = "setupRenderer", at = @At(value = "INVOKE", target =
+            "Lnet/vulkanmod/vulkan/memory/buffer/IndirectBuffer;reset()V"), remap = false)
+    private void veyra$keepShadowIndirectCommands(IndirectBuffer buffer) {
+        // The shadow pass records indirect terrain draws into this frame's host-visible buffer before
+        // the main graph is restored. Resetting here would let the main pass overwrite those commands
+        // before submission, so the shadow map would draw the camera's sections instead of its own.
+        if (!VeyraShadowRenderer.preservesIndirectCommands()) {
+            buffer.reset();
         }
     }
 

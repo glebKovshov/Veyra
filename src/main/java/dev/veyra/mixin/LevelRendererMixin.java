@@ -42,13 +42,4 @@ public abstract class LevelRendererMixin {
         VeyraShadowRenderer.render(camera, modelView, projection, projectionMatrix, deltaTracker, state);
         VeyraRenderer.renderPrepare(net.minecraft.client.Minecraft.getInstance());
     }
-
-    @Inject(method = "renderLevel", at = @At("RETURN"))
-    private void veyra$captureDepthTex2(GraphicsResourceAllocator allocator, DeltaTracker deltaTracker,
-                                        boolean renderBlockOutline, Camera camera, Matrix4f modelView,
-                                        Matrix4f projection, Matrix4f projectionMatrix,
-                                        GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
-                                        CallbackInfo ci) {
-        VeyraRenderer.captureDepthTex2();
-    }
 }

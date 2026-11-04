@@ -261,6 +261,8 @@ loom {
                 vmArgs '-Dveyra.reference.fixedClock=true'
             }
             if (project.hasProperty('graphicsSmokePackSwitch')) vmArgs '-Dveyra.graphicsSmoke.packSwitch=true'
+            if (project.hasProperty('graphicsSmokeFreezeClock')) vmArgs "-Dveyra.graphicsSmoke.freezeClock=${project.property('graphicsSmokeFreezeClock')}"
+            if (project.hasProperty('graphicsSmokeFrameSequence')) vmArgs "-Dveyra.graphicsSmoke.frameSequence=${project.property('graphicsSmokeFrameSequence')}"
         }
     }
 }

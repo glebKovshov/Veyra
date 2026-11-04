@@ -18,6 +18,10 @@ public abstract class GraphicsClockMixin {
 
     @Inject(method = "updateFrameClock", at = @At("RETURN"))
     private static void veyra$fixComparisonClock(CallbackInfo ci) {
+        // Diagnostic: freeze a single clock uniform to isolate which one a visual change follows.
+        String freeze = System.getProperty("veyra.graphicsSmoke.freezeClock", "");
+        if (freeze.equals("frameCounter")) frameCounter = 160;
+        if (freeze.equals("frameTimeCounter")) frameTimeCounter = 8.0F;
         if (!Boolean.getBoolean("veyra.reference.fixedClock")) return;
         frameTimeCounter = 8.0F;
         frameTime = 1.0F / 30.0F;
