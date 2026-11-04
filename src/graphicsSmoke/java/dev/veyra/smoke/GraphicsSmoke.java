@@ -34,7 +34,8 @@ public final class GraphicsSmoke {
     private static int ticks, worldTicks, stage, activePixels, baselineAt, disabledPixels, reenabledShadowMrtPixels;
     private static int lifecycleInitialWidth, lifecycleInitialHeight;
     private static int backupScreenTicks;
-    private static boolean setupComputeFixture, setupResizePassed;
+    private static boolean setupComputeFixture, setupResizePassed, surfaceLossRecovered;
+    private static int surfaceLossProbeState;
     private static boolean pending, finished, requested, captureActive;
     private static boolean failedReplacementPassed;
     private static int nativeReadbackMagentaPixels;
@@ -450,6 +451,7 @@ public final class GraphicsSmoke {
                 requested = true;
                 captureActive = true;
             } else if (thirdPartyLifecycleFixture && stage >= 1 && worldTicks >= baselineAt) {
+                if (stage == 1 && surfaceLossProbeHolding()) return;
                 if (stage == 2) {
                     if (!client.level.dimension().equals(net.minecraft.world.level.Level.NETHER)) return;
                     if (VeyraRenderer.selectedPack().map(pack -> pack.configuration().dimension() != -1).orElse(true)) {
@@ -477,6 +479,7 @@ public final class GraphicsSmoke {
             } else if (!vanillaBaseline && !thirdPartyShaderpackFixture
                     && (stage == 1 || stage == 2) && worldTicks >= baselineAt
                     && !(normalAtlasAnimatedFixture && stage == 2)) {
+                if (setupComputeFixture && stage == 2 && surfaceLossProbeHolding()) return;
                 pending = true;
                 requested = true; captureActive = (skyTexturedStageFixture || shadowColorMrtFixture
                         || setupComputeFixture) && stage == 2;
@@ -578,6 +581,12 @@ public final class GraphicsSmoke {
             }
             LoggerFactory.getLogger("veyra-graphics-smoke").info("Frame evidence: active={} main={} auxiliary={}",
                     captureActive, Long.toHexString(source.getId()), auxiliary == null ? "disabled" : Long.toHexString(auxiliary.getId()));
+            var surface = renderer.getSwapChain();
+            LoggerFactory.getLogger("veyra-graphics-smoke").info(
+                    "Capture surface: stage={} extent={}x{} hasImages={} acquired={} iconified={} source={}x{} format={}",
+                    stage, surface.getWidth(), surface.getHeight(), surface.hasImages(), surface.isAcquired(),
+                    org.lwjgl.glfw.GLFW.glfwGetWindowAttrib(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_ICONIFIED),
+                    source.width, source.height, source.format);
             int width = source.width, height = source.height, format = source.format;
             if (format != VK_FORMAT_B8G8R8A8_UNORM && format != VK_FORMAT_B8G8R8A8_SRGB
                     && format != VK_FORMAT_R8G8B8A8_UNORM && format != VK_FORMAT_R8G8B8A8_SRGB)
@@ -870,6 +879,7 @@ public final class GraphicsSmoke {
                             finish(client, new IllegalStateException("Setup fixture window did not resize"), -1);
                             return;
                         }
+                        requireRecoveredSurface(frameWidth, frameHeight);
                         setupResizePassed = true;
                     }
                     if (storageBufferFixture && count < 2000) {
@@ -1285,6 +1295,39 @@ public final class GraphicsSmoke {
         return resources;
     }
 
+    /**
+     * After a resize settles, make one swapchain recreation observe a 0x0 surface without any later
+     * window event. Returns true while the probe still owns the frame loop.
+     */
+    private static boolean surfaceLossProbeHolding() {
+        if (surfaceLossProbeState == 2) return false;
+        if (surfaceLossProbeState == 0) {
+            SurfaceLossProbe.arm();
+            Renderer.scheduleSwapChainUpdate();
+            surfaceLossProbeState = 1;
+            baselineAt = worldTicks + 40;
+            LoggerFactory.getLogger("veyra-graphics-smoke").info("Surface-loss probe armed after resize");
+            return true;
+        }
+        if (!SurfaceLossProbe.applied())
+            throw new IllegalStateException("The surface-loss probe did not reach a swapchain recreation");
+        surfaceLossProbeState = 2;
+        return false;
+    }
+
+    private static void requireRecoveredSurface(int frameWidth, int frameHeight) {
+        if (surfaceLossProbeState != 2) throw new IllegalStateException("The surface-loss probe did not run before capture");
+        var swap = Renderer.getInstance().getSwapChain();
+        var depth = Renderer.getInstance().getMainPass().getDepthAttachment();
+        if (!swap.hasImages() || swap.getWidth() != frameWidth || swap.getHeight() != frameHeight
+                || depth.getWidth(0) != frameWidth || depth.getHeight(0) != frameHeight) {
+            throw new IllegalStateException("The swapchain did not recover from a 0x0 surface: hasImages=" + swap.hasImages()
+                    + ", swapchain=" + swap.getWidth() + "x" + swap.getHeight() + ", frame=" + frameWidth + "x" + frameHeight
+                    + ", mainDepth=" + depth.getWidth(0) + "x" + depth.getHeight(0));
+        }
+        surfaceLossRecovered = true;
+    }
+
     private static void completeThirdPartyLifecycleCapture(Minecraft client, int frameWidth, int frameHeight,
                                                             boolean active, int nonBlackPixels, int colorBuckets,
                                                             int diagnosticPixels) {
@@ -1354,6 +1397,7 @@ public final class GraphicsSmoke {
                                 + ", SSBO viewport=" + (resources == null ? "not declared"
                                 : resources.viewWidth() + "x" + resources.viewHeight()));
                     }
+                    requireRecoveredSurface(frameWidth, frameHeight);
                     thirdPartyResizePassed = true;
                     client.getConnection().sendCommand("execute in minecraft:the_nether run tp @s 0 80 0");
                     LoggerFactory.getLogger("veyra-graphics-smoke").info(
@@ -1568,6 +1612,7 @@ public final class GraphicsSmoke {
                     + ",\"lifecycleInitialWidth\":" + lifecycleInitialWidth
                     + ",\"lifecycleInitialHeight\":" + lifecycleInitialHeight
                     + ",\"setupResizePassed\":" + setupResizePassed
+                    + ",\"surfaceLossRecovered\":" + surfaceLossRecovered
                     + ",\"activeOppositeMidTexCoordPixels\":" + activeOppositeMidTexCoordPixels
                     + ",\"activeCurrentRenderedItemGreenPixels\":" + activeCurrentRenderedItemGreenPixels
                     + ",\"disabledMagentaPixels\":" + baseline

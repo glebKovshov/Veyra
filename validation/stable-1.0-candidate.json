@@ -72,5 +72,62 @@
       "vulkanCoreSyncTeardownErrors": 0,
       "storageBufferBytes": 0
     }
-  ]
+  ],
+  "nativePackedHdrCandidate": {
+    "productionCommit": "859b05aa75dcb2a71979748564504614542a2bf9",
+    "status": "BSL, Reimagined and Unbound completed; Sildur repeat and hosted gates pending",
+    "completedCases": [
+      {
+        "pack": "bsl",
+        "profile": "HIGH",
+        "matchedShaderFiles": 292,
+        "veyraReport": "stable10-native-r11-candidate-veyra-bsl-natural",
+        "irisReport": "stable10-candidate-0b94709-iris-bsl-natural",
+        "veyraPngSha256": "334938501a63ab7115f8d288e9e7122283b48c80aa4dffe8534b8889e19e4a7e",
+        "irisPngSha256": "13deb2c6678d4ae892bd5eae6606173b0d3030efafa979010ff320794925ce88",
+        "rgbMae255": {
+          "full": 3.664253,
+          "wall": 4.232466,
+          "floor": 2.512746
+        },
+        "lifecyclePassed": true,
+        "vulkanCoreSyncTeardownErrors": 0
+      },
+      {
+        "pack": "reimagined",
+        "profile": "HIGH",
+        "matchedShaderFiles": 426,
+        "veyraReport": "stable10-native-r11-r2-veyra-reimagined-high",
+        "irisReport": "stable10-candidate-12f1c56-iris-reimagined-high",
+        "veyraPngSha256": "bc5745488fd3101d5877b1b063fbd6b93546cd035991bd3bf94b6043e712096a",
+        "irisPngSha256": "0c0f698e667c960060207646126e1741c0b2fa45eb271a1fcf0393bcce367bfa",
+        "rgbMae255": {
+          "full": 4.046052,
+          "wall": 4.142578,
+          "floor": 3.033845
+        },
+        "lifecyclePassed": true,
+        "vulkanCoreSyncTeardownErrors": 0
+      },
+      {
+        "pack": "unbound",
+        "profile": "COMPLEMENTARY",
+        "matchedShaderFiles": 426,
+        "veyraReport": "stable10-native-r11-r2-veyra-unbound-complementary",
+        "irisReport": "stable10-candidate-0b94709-iris-unbound-complementary-matched",
+        "veyraPngSha256": "e9b2497d8a5de4e5c3a8a62c0115de447491cf301dda9adfdbe2ce0bb5fd31e8",
+        "irisPngSha256": "36483fe8517695e8e46f249103c68aa900deebdec184fb3c4bd79637dbb6525c",
+        "rgbMae255": {
+          "full": 4.188138,
+          "wall": 4.276588,
+          "floor": 2.521321
+        },
+        "lifecyclePassed": true,
+        "vulkanCoreSyncTeardownErrors": 0
+      }
+    ],
+    "pendingProfiles": [
+      "sildur __DEFAULT__"
+    ]
+  }
 }

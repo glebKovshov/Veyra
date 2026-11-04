@@ -69,6 +69,7 @@
     "accessor.NativePipelineRegistryAccessor",
     "accessor.MemoryManagerAccessor",
     "SwapChainMixin",
+    "RendererSurfaceRecoveryMixin",
     "TextureAtlasMixin",
     "accessor.TextureAtlasAccessor",
     "accessor.TextureAtlasSpriteAccessor",
