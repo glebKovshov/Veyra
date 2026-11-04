@@ -188,6 +188,41 @@ class BasicVertexShaderAdapterTest {
     }
 
     @Test
+    void mapsDeclaredIrisCoreAttributesToTheNativeLeashAndLineFormats() throws IOException {
+        String declarations = """
+                #version 400 compatibility
+                flat out vec4 tint;
+                out vec2 light;
+                in vec4 vaColor;
+                in vec3 vaPosition;
+                in ivec2 vaUV2;
+                %s
+                void main() {
+                    tint = vaColor;
+                    light = vec2(vaUV2);
+                    gl_Position = vec4(vaPosition, 1.0);
+                }
+                """;
+        BasicVertexShaderAdapter.AdaptedStage leash = BasicVertexShaderAdapter.adaptStage(
+                NATIVE_LEASH_VERTEX, declarations.formatted(""), "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH);
+        assertTrue(leash.source().contains("#define vaColor Color"));
+        assertTrue(leash.source().contains("#define vaUV2 UV2"));
+        assertFalse(leash.source().contains("in vec4 vaColor;"));
+        assertFalse(leash.source().contains("in ivec2 vaUV2;"));
+
+        BasicVertexShaderAdapter.AdaptedStage line = BasicVertexShaderAdapter.adaptStage(
+                NATIVE_LINE_VERTEX, declarations.formatted("in vec3 vaNormal;"), "gbuffers_line",
+                BasicVertexShaderAdapter.Format.LINE);
+        assertTrue(line.source().contains("#define vaUV2 ivec2(240, 240)"));
+        assertFalse(line.source().contains("in vec3 vaNormal;"));
+
+        IOException wrongType = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
+                NATIVE_LEASH_VERTEX, declarations.formatted("").replace("in vec4 vaColor;", "in vec3 vaColor;"),
+                "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH));
+        assertTrue(wrongType.getMessage().contains("must be declared as vec4"));
+    }
+
+    @Test
     void executesAnExplicitCoreProfileLineVertexStageOnce() throws IOException {
         BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.adaptStage(
                 NATIVE_LINE_VERTEX, """

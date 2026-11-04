@@ -37,6 +37,11 @@ public final class ShaderPackAudit {
     }
 
     public static void main(String[] args) throws Exception {
+        // No Vulkan device exists offline. Model one with the optional features Veyra enables when present,
+        // so capability validation reaches every program instead of stopping at the first device check.
+        dev.veyra.vulkan.VeyraDeviceFeatures.independentBlendEnabled = true;
+        dev.veyra.vulkan.VeyraDeviceFeatures.vertexPipelineStoresAndAtomicsEnabled = true;
+        dev.veyra.vulkan.VeyraDeviceFeatures.shaderStorageImageExtendedFormatsEnabled = true;
         seedVanillaBiomeIds();
         String vulkanModCloudVertex = readVulkanModCloudVertex();
         int dimension = 0;

@@ -1709,7 +1709,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         if (vertex.isPresent()) {
             Map<String, TerrainVertexShaderAdapter.PackVarying> outputs =
                     BasicVertexShaderAdapter.describeVaryings(programName, vertex.get(), format);
-            TextureColorDistanceShaderAdapter.adaptFragment(fragment, programName, outputs);
+            TextureColorDistanceShaderAdapter.adaptFragment(fragment, programName, outputs, true, true,
+                    IrisRenderStages.forSkyFormat(format));
         } else {
             ColorDistanceShaderAdapter.adaptFragment(fragment, programName, format == BasicVertexShaderAdapter.Format.LEASH);
         }

@@ -238,6 +238,39 @@ public class ShaderCompileSmoke {
                     }
                     """, "gbuffers_line", BasicVertexShaderAdapter.Format.LINE);
             compileVertex(compiler, options, basicLineVertex.source(), "basic-line-vertex-adapter", true);
+            // Iris core-profile packs (Photon) declare the va* attributes themselves.
+            var coreLeashVertex = BasicVertexShaderAdapter.adaptStage(nativeLeashVertex, """
+                    #version 400 compatibility
+                    out vec2 light_levels;
+                    flat out vec4 tint;
+                    in vec4 vaColor;
+                    in ivec2 vaUV2;
+                    void main() {
+                        light_levels = vec2(vaUV2) / 240.0;
+                        tint = vaColor;
+                        gl_Position = ftransform();
+                    }
+                    """, "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH);
+            compileVertex(compiler, options, coreLeashVertex.source(), "basic-leash-core-attributes", true);
+            var coreLineVertex = BasicVertexShaderAdapter.adaptStage(nativeLineVertex, """
+                    #version 400 compatibility
+                    out vec2 light_levels;
+                    flat out vec4 tint;
+                    in vec4 vaColor;
+                    in vec3 vaPosition;
+                    in vec3 vaNormal;
+                    in ivec2 vaUV2;
+                    uniform mat4 projectionMatrix;
+                    uniform mat4 modelViewMatrix;
+                    uniform int renderStage;
+                    void main() {
+                        light_levels = vec2(vaUV2) / 240.0;
+                        tint = vaColor;
+                        float width = renderStage == MC_RENDER_STAGE_OUTLINE ? 3.0 : 2.0;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(vaPosition + vaNormal * width, 1.0);
+                    }
+                    """, "gbuffers_line", BasicVertexShaderAdapter.Format.LINE);
+            compileVertex(compiler, options, coreLineVertex.source(), "basic-line-core-attributes", true);
             Path basicFixture = Path.of("examples/basic-vertex-execution/shaders");
             String basicPackVertexSource = GlslPreprocessor.process("gbuffers_basic.vsh",
                     Files.readString(basicFixture.resolve("gbuffers_basic.vsh")));

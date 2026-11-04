@@ -112,7 +112,11 @@ final class IrisRenderStages {
             case STARS -> Stage.STARS.ordinal();
             case SUNRISE_SUNSET -> Stage.SUNSET.ordinal();
             case SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> Stage.BLOCK_ENTITIES.ordinal();
-            case LEASH, LINE, LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER -> null;
+            // Iris draws leashes inside the entity pass. Veyra replaces the native line pipelines that draw the
+            // block outline, so lines take Iris' OUTLINE stage; debug lines sharing them get outline styling.
+            case LEASH -> Stage.ENTITIES.ordinal();
+            case LINE -> Stage.OUTLINE.ordinal();
+            case LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER -> null;
         };
     }
 

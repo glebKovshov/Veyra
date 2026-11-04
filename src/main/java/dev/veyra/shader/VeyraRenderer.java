@@ -6089,7 +6089,7 @@ public final class VeyraRenderer {
                 if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                 fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
                         source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
-                        true);
+                        true, IrisRenderStages.forSkyFormat(format));
             } else {
                 fragmentSource = ColorDistanceShaderAdapter.adaptFragment(
                         source, programName, isLeashPipeline(original));

@@ -53,7 +53,9 @@ final class BasicVertexShaderAdapter {
             "\\b(vaNormal|Normal|UV2|LineWidth)\\b");
     private static final Pattern UNSUPPORTED_WEATHER_INPUT = Pattern.compile(
             "\\b(vaNormal|Normal|LineWidth)\\b");
-    private static final Pattern UNSUPPORTED_SIGN_TEXT_INPUT = Pattern.compile("\\b(LineWidth)\\b");
+    private static final Pattern CORE_MATRIX_UNIFORM = Pattern.compile(
+            "(?m)^[\\t ]*uniform\\s+mat4\\s+(?:projectionMatrix|modelViewMatrix)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    private static final Pattern UNSUPPORTED_SIGN_TEXT_INPUT =Pattern.compile("\\b(LineWidth)\\b");
     private static final Pattern TEXTURE_MATRIX = Pattern.compile("\\bgl_TextureMatrix\\s*\\[\\s*(\\d+)\\s*]");
     private static final Pattern FOG_COORD = Pattern.compile("\\bgl_FogFragCoord\\b");
     private static final Pattern UNSUPPORTED_UNIFORM = Pattern.compile(
@@ -207,6 +209,8 @@ final class BasicVertexShaderAdapter {
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
         source = UnreachableGlslFunctions.removeUnreachable(source, "main");
         source = UnusedUniformDeclarations.removeUnused(source);
+        // Iris replaces the core-profile matrices; the native input bridge maps them to ProjMat and ModelViewMat.
+        source = CORE_MATRIX_UNIFORM.matcher(source).replaceAll("");
         source = IrisRenderStages.bindUniform(source, IrisRenderStages.forSkyFormat(format), programName);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION.matcher(source);
@@ -428,8 +432,10 @@ final class BasicVertexShaderAdapter {
                         : "vec4(0.5, 0.5, 0.0, 1.0)";
         String coreInputs = (hasTextureCoordinate(format) ? "#define vaUV0 UV0\n" : "")
                 + (hasNormalInput(format) ? "#define vaNormal Normal\n" : "")
-                + (format == Format.LEASH || format == Format.WEATHER || format == Format.SIGN_TEXT
-                ? "#define vaUV2 UV2\n" : "");
+                + (hasColorInput(format) ? "#define vaColor Color\n" : "")
+                + (hasLightmapInput(format) ? "#define vaUV2 UV2\n"
+                : format == Format.LINE || format == Format.SIGN_TEXT_FULLBRIGHT
+                ? "#define vaUV2 ivec2(240, 240)\n" : "");
         return """
                 vec3 veyraVertexOffset = vec3(0.0);
                 #define gl_Vertex %s
@@ -523,6 +529,31 @@ final class BasicVertexShaderAdapter {
 
     private static boolean hasNormalInput(Format format) {
         return format == Format.LINE;
+    }
+
+    private static boolean hasColorInput(Format format) {
+        return switch (format) {
+            case SKY, STARS, SKY_TEXTURED, TEXTURED -> false;
+            default -> true;
+        };
+    }
+
+    private static boolean hasLightmapInput(Format format) {
+        return format == Format.LEASH || format == Format.WEATHER || format == Format.SIGN_TEXT;
+    }
+
+    /** Iris core-profile attributes the native input bridge supplies for this format, with their declared types. */
+    private static String coreAttributeType(Format format, String name) {
+        return switch (name) {
+            case "vaPosition" -> "vec3";
+            case "vaColor" -> hasColorInput(format) ? "vec4" : null;
+            case "vaUV0" -> hasTextureCoordinate(format) ? "vec2" : null;
+            case "vaNormal" -> hasNormalInput(format) ? "vec3" : null;
+            // Lines and fullbright text carry no lightmap element; the bridge uses gl_MultiTexCoord1's 240.
+            case "vaUV2" -> hasLightmapInput(format) || format == Format.LINE
+                    || format == Format.SIGN_TEXT_FULLBRIGHT ? "ivec2" : null;
+            default -> null;
+        };
     }
 
     private static String parserSafeOutput(String macro, int location, String interpolation, String type, String name) {
@@ -638,7 +669,15 @@ final class BasicVertexShaderAdapter {
             String withoutDeclaration = masked.substring(0, matcher.start()) + " ".repeat(matcher.end() - matcher.start())
                     + masked.substring(matcher.end());
             boolean used = Pattern.compile("\\b" + Pattern.quote(name) + "\\b").matcher(withoutDeclaration).find();
-            if (used) {
+            String coreType = coreAttributeType(format, name);
+            if (coreType != null && !coreType.equals(type)) {
+                throw new IOException(programName + ".vsh input '" + name + "' must be declared as " + coreType + ".");
+            }
+            if (coreType != null) {
+                // The native input bridge defines this Iris core attribute from Minecraft's own vertex element.
+                cleaned.append(source, copiedThrough, matcher.start());
+                copiedThrough = matcher.end();
+            } else if (used) {
                 String defaultAttribute = nativeDefaultAttribute(format, type, name, programName);
                 if (defaultAttribute == null) {
                     throw new IOException(programName + ".vsh vertex input '" + name
