@@ -1,5 +1,7 @@
 package dev.veyra.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import dev.veyra.mixin.accessor.PipelineStateAccessor;
 import dev.veyra.VeyraClient;
 import dev.veyra.vulkan.VeyraDeviceFeatures;
@@ -10,6 +12,8 @@ import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.vulkanmod.vulkan.Vulkan;
 import net.vulkanmod.vulkan.framebuffer.RenderPass;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
+import net.vulkanmod.vulkan.shader.DescriptorSets;
+import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.PipelineState;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
@@ -31,9 +35,26 @@ import java.nio.LongBuffer;
 import java.util.Set;
 
 @Mixin(value = GraphicsPipeline.class, remap = false)
-public abstract class GraphicsPipelineMixin implements VeyraPipelinePassCache {
+public abstract class GraphicsPipelineMixin extends Pipeline implements VeyraPipelinePassCache {
     @Shadow @Final private Object2LongMap<PipelineState> graphicsPipelines;
     private static long veyra$firstGraphicsPipelineDevice;
+
+    protected GraphicsPipelineMixin(String name) { super(name); }
+
+    @WrapOperation(method = "<init>", at = @At(value = "INVOKE", target =
+            "Lnet/vulkanmod/vulkan/shader/GraphicsPipeline;createShaderModules(Lnet/vulkanmod/vulkan/shader/Pipeline$Builder;)V"))
+    private void veyra$releaseFailedShaderConstruction(GraphicsPipeline pipeline, Pipeline.Builder builder,
+                                                       Operation<Void> original) {
+        try {
+            original.call(pipeline, builder);
+        } catch (RuntimeException | Error failure) {
+            // Layouts already exist, but descriptor pools and the registry entry have not been created.
+            descriptorSets = new DescriptorSets[0];
+            try { pipeline.cleanUp(); }
+            catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+            throw failure;
+        }
+    }
 
     @Redirect(method = "createGraphicsPipeline", at = @At(value = "INVOKE", target =
             "Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;frontFace(I)Lorg/lwjgl/vulkan/VkPipelineRasterizationStateCreateInfo;"))

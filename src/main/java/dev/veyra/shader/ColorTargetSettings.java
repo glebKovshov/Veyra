@@ -3,7 +3,21 @@ package dev.veyra.shader;
 import org.lwjgl.vulkan.VK10;
 
 /** Clear and storage settings for one Iris-compatible colortex buffer. */
-record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, int height, int format) {
+record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, int height, int format,
+                           boolean opaqueAlpha) {
+    ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, int height, int format) {
+        this(clearEachFrame, clearColor, width, height, format, rgbFormat(format));
+    }
+
+    ColorTargetSettings withStorageFormat(int storageFormat) {
+        return new ColorTargetSettings(clearEachFrame, clearColor, width, height, storageFormat, opaqueAlpha);
+    }
+
+    private static boolean rgbFormat(int format) {
+        return format == VK10.VK_FORMAT_R8G8B8_UNORM || format == VK10.VK_FORMAT_R8G8B8_SNORM
+                || format == VK10.VK_FORMAT_R16G16B16_SFLOAT || format == VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+    }
+
     static ColorTargetSettings defaults(int index, int width, int height) {
         return new ColorTargetSettings(true, index == 1 ? 0xFFFFFFFF : 0x00000000,
                 width, height, VK10.VK_FORMAT_R8G8B8A8_UNORM);
@@ -15,6 +29,7 @@ record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, in
             case VK10.VK_FORMAT_R8G8B8_UNORM -> "RGB8";
             case VK10.VK_FORMAT_R8G8B8_SNORM -> "RGB8_SNORM";
             case VK10.VK_FORMAT_R8G8B8A8_UNORM -> "RGBA8";
+            case VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> "RGB10_A2";
             case VK10.VK_FORMAT_R8G8B8A8_SNORM -> "RGBA8_SNORM";
             case VK10.VK_FORMAT_R16G16B16A16_UNORM -> "RGBA16";
             case VK10.VK_FORMAT_R16_SFLOAT -> "R16F";
@@ -32,6 +47,7 @@ record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, in
             case VK10.VK_FORMAT_R8G8B8_UNORM, VK10.VK_FORMAT_R8G8B8_SNORM -> 3;
             case VK10.VK_FORMAT_R8G8B8A8_UNORM,
                     VK10.VK_FORMAT_R8G8B8A8_SNORM,
+                    VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32,
                     VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32,
                     VK10.VK_FORMAT_R32_SFLOAT -> 4;
             case VK10.VK_FORMAT_R16G16B16A16_UNORM -> 8;

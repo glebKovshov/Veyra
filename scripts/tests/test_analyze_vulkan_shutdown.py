@@ -143,6 +143,45 @@ class VulkanShutdownAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "did not match the expected handle format"):
                 analyze(root)
 
+    def test_maps_modern_aggregate_diagnostic_and_deduplicates_with_legacy_messages(self):
+        log = (
+            "Stopping singleplayer server as player logged out\n"
+            "Validation Error: [ VUID-vkDestroyDevice-device-05137 ]\n"
+            "vkDestroyDevice(): VkDevice 0x1 has 3 leaked objects that have not been destroyed.\n"
+            "VkBuffer 0x000A,\n VkImage 0xb, VkDescriptorSet 0x10\n\nObjects: 1\n    [0] VkDevice 0x1\n"
+            "Validation Error: [ VUID-vkDestroyDevice-device-05137 ]\n"
+            "VkBuffer 0xa has not been destroyed.\n"
+        )
+        formats = (log, log.replace("0x10\n\nObjects: 1", "0x10.\nThe Vulkan spec states: device children must be destroyed.\nObjects: 1"))
+        for encoding, formatted in ((encoding, formatted) for encoding in ("utf-8", "utf-16") for formatted in formats):
+            with self.subTest(encoding=encoding, formatted=formatted), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                self.make_artifact(root, formatted)
+                (root / "graphics-client.log").write_text(formatted, encoding=encoding)
+                report = analyze(root)
+                self.assertEqual(report["validationErrorHeaders"], 2)
+                self.assertEqual(report["undestroyedDiagnosticOccurrences"], 4)
+                self.assertEqual(report["uniqueUndestroyedObjects"], 3)
+                self.assertEqual(report["unmappedByKind"], {})
+                self.assertEqual({entry["kind"] for entry in report["mapped"]},
+                                 {"VkBuffer", "VkImage", "VkDescriptorSet"})
+
+    def test_rejects_incomplete_or_unrecognized_aggregate_diagnostics(self):
+        prefix = "Stopping singleplayer server as player logged out\n"
+        for diagnostic in (
+            "vkDestroyDevice(): VkDevice 0x1 has 2 leaked objects that have not been destroyed.\n"
+            "VkBuffer 0xa\nObjects: 1\n",
+            "vkDestroyDevice(): VkDevice 0x1 has 1 leaked objects that have not been destroyed.\n"
+            "VkBuffer not-a-handle\nObjects: 1\n",
+            "vkDestroyDevice(): VkDevice 0x1 has 1 leaked objects that have not been destroyed.\nVkBuffer 0xa\n",
+            "Unknown header: leaked objects that have not been destroyed\nVkBuffer 0xa\n",
+        ):
+            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                self.make_artifact(root, prefix + diagnostic)
+                with self.assertRaisesRegex(ValueError, "[Aa]ggregate"):
+                    analyze(root)
+
 
 if __name__ == "__main__":
     unittest.main()

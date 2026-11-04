@@ -133,7 +133,7 @@ public final class ComputeShaderAdapter {
 
         IrisFogUniformAdapter.AdaptedShader fogStage = IrisFogUniformAdapter.extract(
                 withLayouts.toString(), fileName, true);
-        ShaderPackUniformAdapter.AdaptedShader uniformStage = ShaderPackUniformAdapter.extract(
+        ShaderPackUniformAdapter.AdaptedShader uniformStage = ShaderPackUniformAdapter.extractForSampling(
                 fogStage.source(), fileName);
         Map<String, ShaderPackUniformAdapter.UniformField> uniformFields = new LinkedHashMap<>();
         fogStage.fields().forEach(field -> uniformFields.put(field.name(), field));

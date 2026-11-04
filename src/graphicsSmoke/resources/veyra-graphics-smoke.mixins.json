@@ -2,6 +2,24 @@
   "required": true,
   "package": "dev.veyra.smoke.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["GraphicsSmokeMixin", "GraphicsFrameMixin", "GraphicsDeferredTargetCaptureMixin", "GraphicsDescriptorsMixin", "GraphicsImageLayoutMixin", "GraphicsShutdownMixin", "GraphicsMemoryFlushMixin", "GraphicsMemoryAccessor", "GraphicsNativePipelineAccessor", "GraphicsDescriptorPoolAccessor", "GraphicsVariantsAccessor"],
-  "injectors": {"defaultRequire": 1}
+  "client": [
+    "GraphicsSmokeMixin",
+    "GraphicsMouseMixin",
+    "GraphicsClockMixin",
+    "GraphicsFrameMixin",
+    "GraphicsDeferredTargetCaptureMixin",
+    "GraphicsDescriptorsMixin",
+    "GraphicsTerrainTexturesMixin",
+    "GraphicsImageLayoutMixin",
+    "GraphicsShutdownMixin",
+    "GraphicsMemoryFlushMixin",
+    "GraphicsMemoryAccessor",
+    "GraphicsNativePipelineAccessor",
+    "GraphicsDescriptorPoolAccessor",
+    "GraphicsVariantsAccessor",
+    "GraphicsSwapchainMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

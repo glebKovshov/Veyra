@@ -11,6 +11,7 @@ import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkRenderPass;
 import net.vulkanmod.render.engine.VkTextureView;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
+import net.vulkanmod.vulkan.VRenderSystem;
 import net.vulkanmod.vulkan.memory.MemoryManager;
 import net.vulkanmod.vulkan.texture.VTextureSelector;
 import net.vulkanmod.vulkan.texture.VulkanImage;
@@ -88,26 +89,32 @@ public final class VeyraNoiseTexture {
             return;
         }
         requireReady();
-        VTextureSelector.bindTexture(descriptor.imageIdx, texture.getVulkanImage());
+        var selectedView = view();
+        // Terrain's later bindShaderTextures call copies this cache over the indexed images.
+        VRenderSystem.setShaderTexture(descriptor.imageIdx, selectedView);
+        VTextureSelector.bindTexture(descriptor.imageIdx, ((VkGpuTexture) selectedView.texture()).getVulkanImage());
     }
 
     public static synchronized void bind(VkRenderPass renderPass) {
         requireReady();
-        renderPass.bindTexture(SAMPLER_NAME, view, sampler);
+        renderPass.bindTexture(SAMPLER_NAME, view(), sampler());
     }
 
     public static synchronized boolean hasTexture() {
+        if (customTexture() != null) return true;
         return texture != null && !texture.isClosed() && view != null && !view.isClosed();
     }
 
     public static synchronized GpuTextureView view() {
         requireReady();
-        return view;
+        var custom = customTexture();
+        return custom == null ? view : custom.view();
     }
 
     public static synchronized GpuSampler sampler() {
         requireReady();
-        return sampler;
+        var custom = customTexture();
+        return custom == null ? sampler : custom.sampler();
     }
 
     public static synchronized int size() {
@@ -115,9 +122,14 @@ public final class VeyraNoiseTexture {
     }
 
     private static void requireReady() {
-        if (!hasTexture() || sampler == null) {
+        if (customTexture() == null && (!hasTexture() || sampler == null)) {
             throw new IllegalStateException("The Iris noisetex sampler was used before its Vulkan texture was prepared.");
         }
+    }
+
+    private static VeyraShaderPackTextures.UploadedTexture customTexture() {
+        // Resolve the installed pack so failed candidates cannot replace its noisetex.
+        return dev.veyra.shader.VeyraRenderer.selectedPack().map(VeyraShaderPackTextures::noiseTexture).orElse(null);
     }
 
     public static synchronized void close() {
@@ -146,7 +158,19 @@ public final class VeyraNoiseTexture {
     }
 
     private static void closeResources(GpuTextureView oldView, VkGpuTexture oldTexture) {
+        detachBindings(oldView, oldTexture);
         if (oldView != null && !oldView.isClosed()) oldView.close();
         if (oldTexture != null && !oldTexture.isClosed()) oldTexture.close();
+    }
+
+    static void detachBindings(GpuTextureView oldView, VkGpuTexture oldTexture) {
+        if (oldView != null) {
+            for (int slot = 0; slot < VTextureSelector.SIZE; slot++) {
+                if (VRenderSystem.getShaderTexture(slot) == oldView)
+                    VRenderSystem.setShaderTexture(slot, null);
+                if (oldTexture != null && VTextureSelector.getImage(slot) == oldTexture.getVulkanImage())
+                    VTextureSelector.bindTexture(slot, VTextureSelector.getWhiteTexture());
+            }
+        }
     }
 }

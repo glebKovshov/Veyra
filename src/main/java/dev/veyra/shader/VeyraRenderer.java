@@ -89,6 +89,7 @@ import net.vulkanmod.vulkan.texture.VulkanImage;
 import net.vulkanmod.vulkan.util.MappedBuffer;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Vector2f;
 import org.joml.Vector2i;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
@@ -104,6 +105,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.FloatBuffer;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -120,6 +123,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -523,7 +527,20 @@ public final class VeyraRenderer {
     }
 
     /** VulkanMod resolves uniform block members by name; custom names read the latest evaluated value. */
-    private static void registerCustomUniforms() {
+    private static final List<Runnable> customUniformRestorations = new ArrayList<>();
+
+    private static <T> void registerCustomUniform(Map<String, Supplier<T>> registry, String name, Supplier<T> supplier) {
+        Supplier<T> previous = registry.put(name, supplier);
+        customUniformRestorations.add(() -> {
+            if (registry.get(name) != supplier) return;
+            if (previous == null) registry.remove(name);
+            else registry.put(name, previous);
+        });
+    }
+
+    static void registerCustomUniforms() {
+        for (int i = customUniformRestorations.size() - 1; i >= 0; i--) customUniformRestorations.get(i).run();
+        customUniformRestorations.clear();
         // Both activation paths end here; report definitions that stay 0 the way Iris warns about them.
         CustomUniforms.active().irisUnresolved().forEach((name, reason) -> VeyraClient.LOGGER.warn(
                 "Custom uniform '{}' stays 0 because Iris cannot resolve it either: {}.", name, reason));
@@ -534,20 +551,35 @@ public final class VeyraRenderer {
                 // Iris' framemod helpers are floats by default, but packs can declare an int/bool override;
                 // VulkanMod needs the integer map entry too, and this supplier preserves the built-in fallback.
                 if (uniform.type() != CustomUniforms.Type.FLOAT) {
-                    Uniforms.vec1i_uniformMap.put(name, () -> shaderPackIntUniform(name));
+                    registerCustomUniform(Uniforms.vec1i_uniformMap, name, () -> shaderPackIntUniform(name));
                     if (uniform.type() == CustomUniforms.Type.BOOL) {
-                        Uniforms.vec1i_uniformMap.put("veyra_" + name,
+                        registerCustomUniform(Uniforms.vec1i_uniformMap, "veyra_" + name,
                                 () -> shaderPackIntUniform(name));
                     }
                 }
                 continue;
             }
-            if (uniform.type() == CustomUniforms.Type.FLOAT) {
-                Uniforms.vec1f_uniformMap.put(name, () -> CustomUniforms.active().floatValue(name));
+            if (uniform.type().components() > 1) {
+                int width = uniform.type().components();
+                // GC owns this buffer; MappedBuffer(int) allocates native memory without a matching free API.
+                MappedBuffer buffer = MappedBuffer.createFromBuffer(ByteBuffer.allocateDirect(16).order(ByteOrder.nativeOrder()));
+                float[] components = new float[width];
+                Supplier<MappedBuffer> supplier = () -> {
+                    CustomUniforms.active().copyVector(name, components);
+                    for (int i = 0; i < width; i++) buffer.putFloat(i * Float.BYTES, components[i]);
+                    return buffer;
+                };
+                registerCustomUniform(switch (width) {
+                    case 2 -> Uniforms.vec2f_uniformMap;
+                    case 3 -> Uniforms.vec3f_uniformMap;
+                    default -> Uniforms.vec4f_uniformMap;
+                }, name, supplier);
+            } else if (uniform.type() == CustomUniforms.Type.FLOAT) {
+                registerCustomUniform(Uniforms.vec1f_uniformMap, name, () -> CustomUniforms.active().floatValue(name));
             } else {
-                Uniforms.vec1i_uniformMap.put(name, () -> CustomUniforms.active().intValue(name));
+                registerCustomUniform(Uniforms.vec1i_uniformMap, name, () -> CustomUniforms.active().intValue(name));
                 if (uniform.type() == CustomUniforms.Type.BOOL) {
-                    Uniforms.vec1i_uniformMap.put("veyra_" + name,
+                    registerCustomUniform(Uniforms.vec1i_uniformMap, "veyra_" + name,
                             () -> CustomUniforms.active().intValue(name));
                 }
             }
@@ -782,6 +814,9 @@ public final class VeyraRenderer {
             case "gbufferProjectionInverse" -> IrisProjectionMatrices.fromVulkan(
                     isHandRendering() ? handAdjustedProjection(matrices.gbufferProjection())
                             : matrices.gbufferProjection()).invert();
+            case "veyraSamplingProjection" -> IrisProjectionMatrices.fromVulkan(
+                    isHandRendering() ? handAdjustedProjection(matrices.gbufferProjection()) : matrices.gbufferProjection());
+            case "veyraSamplingPreviousProjection" -> IrisProjectionMatrices.fromVulkan(matrices.gbufferPreviousProjection());
             case "gbufferPreviousModelView" -> matrices.gbufferPreviousModelView();
             case "gbufferPreviousProjection" -> matrices.gbufferPreviousProjection();
             case "veyraViewEffects" -> matrices.viewEffects();
@@ -3189,7 +3224,10 @@ public final class VeyraRenderer {
             VeyraComputePipelineSet compute = terrainPipelineSet == null ? null : terrainPipelineSet.compute();
             ColorTargetSettings sceneColorSettings = pipelineSet.colorTargetSettings().getOrDefault(
                     0, ColorTargetSettings.defaults(0, mainTarget.width, mainTarget.height));
-            ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings.format());
+            ensureSwapTargets(mainTarget.width, mainTarget.height, sceneColorSettings);
+            if (mainTarget.getColorTexture() instanceof VkGpuTexture sceneTexture)
+                dev.veyra.vulkan.VeyraColorTargetViews.register(
+                        sceneTexture.getVulkanImage(), sceneColorSettings.opaqueAlpha());
             ensureColorTargets(mainTarget.width, mainTarget.height, pipelineSet.colorTargetIndices(),
                     pipelineSet.colorTargetSettings());
             FramePlan framePlan = pipelineSet.framePlan(phase, currentColorTargets);
@@ -3691,8 +3729,7 @@ public final class VeyraRenderer {
                     if ((properties.optimalTilingFeatures() & requiredFeatures) != requiredFeatures) {
                         throw unsupportedColorTargetFormat(index, target.format());
                     }
-                    settings.put(index, new ColorTargetSettings(target.clearEachFrame(), target.clearColor(),
-                            target.width(), target.height(), fallbackFormat));
+                    settings.put(index, target.withStorageFormat(fallbackFormat));
                     VeyraClient.LOGGER.info("Shader pack colortex{} uses {}; this Vulkan device uses compatible {} storage.",
                             index, ColorTargetSettings.formatName(target.format()),
                             ColorTargetSettings.formatName(fallbackFormat));
@@ -3708,13 +3745,16 @@ public final class VeyraRenderer {
                     VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
             case VK10.VK_FORMAT_R16G16B16_SFLOAT -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
             case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
+            case VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32 -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
             default -> 0;
         };
     }
 
     private static boolean vulkanModColorTargetFormat(int format) {
         return format == VK10.VK_FORMAT_R8_UNORM
+                || format == VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32
                 || format == VK10.VK_FORMAT_R8G8B8A8_UNORM
+                || format == VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32
                 || format == VK10.VK_FORMAT_R16_SFLOAT
                 || format == VK10.VK_FORMAT_R16G16B16A16_UNORM
                 || format == VK10.VK_FORMAT_R16G16B16A16_SFLOAT
@@ -3786,7 +3826,7 @@ public final class VeyraRenderer {
         CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
         if (custom != null && (!SUPPORTED_UNIFORMS.contains(uniform)
                 || CustomUniforms.PACK_OVERRIDABLE.contains(uniform))) {
-            return custom.type() == CustomUniforms.Type.FLOAT ? "float" : "int";
+            return custom.type() == CustomUniforms.Type.BOOL ? "int" : custom.type().glsl();
         }
         if (!SUPPORTED_UNIFORMS.contains(uniform)) {
             return null;
@@ -7784,10 +7824,20 @@ public final class VeyraRenderer {
         return result.toString();
     }
 
-    private static UniformValue customUniformValue(String uniform) {
+    static UniformValue customUniformValue(String uniform) {
         CustomUniforms.Uniform custom = CustomUniforms.active().uniform(uniform);
         if (custom == null) {
             throw new IllegalArgumentException("Unknown shader pack uniform " + uniform + ".");
+        }
+        if (custom.type().components() > 1) {
+            float[] vector = new float[custom.type().components()];
+            CustomUniforms.active().copyVector(uniform, vector);
+            return switch (custom.type()) {
+                case VEC2 -> new UniformValue.Vec2Uniform(new Vector2f(vector));
+                case VEC3 -> new ShaderPackVec3Uniform(new Vector3f(vector));
+                case VEC4 -> new UniformValue.Vec4Uniform(new Vector4f(vector));
+                default -> throw new IllegalStateException(custom.type().glsl());
+            };
         }
         return custom.type() == CustomUniforms.Type.FLOAT
                 ? new UniformValue.FloatUniform(CustomUniforms.active().floatValue(uniform))
@@ -7855,8 +7905,8 @@ public final class VeyraRenderer {
         MoonPhase moonPhaseValue = minecraft.level.environmentAttributes()
                 .getDimensionValue(EnvironmentAttributes.MOON_PHASE);
         int moonPhase = moonPhaseValue.index();
-        float cloudHeight = minecraft.level.environmentAttributes()
-                .getDimensionValue(EnvironmentAttributes.CLOUD_HEIGHT);
+        float cloudHeight = minecraft.gameRenderer.getMainCamera().attributeProbe()
+                .getValue(EnvironmentAttributes.CLOUD_HEIGHT, partialTick);
         var endFlashState = minecraft.level.endFlashState();
         float endFlashIntensity = endFlashState == null ? 0.0F : endFlashState.getIntensity(partialTick);
         float currentSunAngle = minecraft.gameRenderer.getMainCamera().attributeProbe()
@@ -7960,7 +8010,7 @@ public final class VeyraRenderer {
         return projectionBuffer;
     }
 
-    private static void ensureSwapTargets(int width, int height, int format) {
+    private static void ensureSwapTargets(int width, int height, ColorTargetSettings settings) {
         if (swapTargetA == null) {
             swapTargetA = new TextureTarget("Veyra shader pack swap A", width, height, false);
         } else if (swapTargetA.width != width || swapTargetA.height != height) {
@@ -7971,8 +8021,8 @@ public final class VeyraRenderer {
         } else if (swapTargetB.width != width || swapTargetB.height != height) {
             swapTargetB.resize(width, height);
         }
-        ensureTargetFormat(swapTargetA, "Veyra shader pack swap A", format);
-        ensureTargetFormat(swapTargetB, "Veyra shader pack swap B", format);
+        ensureTargetFormat(swapTargetA, "Veyra shader pack swap A", settings.format(), settings.opaqueAlpha());
+        ensureTargetFormat(swapTargetB, "Veyra shader pack swap B", settings.format(), settings.opaqueAlpha());
     }
 
     private static void releaseSwapTargets() {
@@ -8004,6 +8054,7 @@ public final class VeyraRenderer {
             pair.targetB().destroyBuffers();
         });
         colorTargets.clear();
+        dev.veyra.vulkan.VeyraColorTargetViews.clear();
         initializedColorTargets.clear();
         colorTargetsLastClearedFrame = -1;
         currentColorTargets.clear();
@@ -8060,7 +8111,7 @@ public final class VeyraRenderer {
                 sampledView = target.getColorTextureView();
                 sampledImage = source;
             }
-            sampledImage.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, false, 0));
+            sampledImage.setSampler(net.vulkanmod.vulkan.texture.SamplerManager.getSampler(true, true, 0));
             VRenderSystem.setShaderTexture(descriptor.imageIdx, sampledView);
             net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx, sampledImage);
             geometryColorBindings.put(descriptor.imageIdx, new GeometryColorBinding(sampledView, sampledImage));
@@ -8113,22 +8164,25 @@ public final class VeyraRenderer {
             changed = true;
         }
         changed |= ensureTargetFormat(target, "Veyra shader pack colortex" + index + " " + side,
-                settings.format());
+                settings.format(), settings.opaqueAlpha());
         return changed;
     }
 
-    private static boolean ensureTargetFormat(RenderTarget target, String name, int format) {
+    private static boolean ensureTargetFormat(RenderTarget target, String name, int format, boolean opaqueAlpha) {
         GpuTexture colorTexture = target.getColorTexture();
         if (!(colorTexture instanceof VkGpuTexture vulkanTexture)) {
             throw new IllegalStateException("VulkanMod did not create a Vulkan texture for " + name + ".");
         }
+        boolean changed = false;
         if (vulkanTexture.getVulkanImage().format != format
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             replaceColorTargetTexture(target, name, format);
-            return true;
+            changed = true;
         }
-        return false;
+        dev.veyra.vulkan.VeyraColorTargetViews.register(
+                ((VkGpuTexture) target.getColorTexture()).getVulkanImage(), opaqueAlpha);
+        return changed;
     }
 
     private static void replaceColorTargetTexture(RenderTarget target, String name, int format) {
@@ -8235,6 +8289,12 @@ public final class VeyraRenderer {
         }
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            // An unused ping-pong side can stay in TRANSFER_DST across frames; its repeated clears still need ordering.
+            if (image.getCurrentLayout() == VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                VeyraComputePipeline.memoryBarrier(commandBuffer,
+                        VK10.VK_PIPELINE_STAGE_TRANSFER_BIT, VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK10.VK_ACCESS_TRANSFER_WRITE_BIT, VK10.VK_ACCESS_TRANSFER_WRITE_BIT);
+            }
             image.transitionImageLayout(stack, commandBuffer, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             VkClearColorValue clearValue = VkClearColorValue.calloc(stack)
                     .float32(stack.floats(

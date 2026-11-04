@@ -17,6 +17,7 @@ on:
       - 'examples/terrain-vertex-execution/**'
       - 'examples/terrain-vertex-varyings/**'
       - 'examples/custom-image-compute/**'
+      - 'examples/graphics-custom-image/**'
       - 'examples/cloud-custom-image/**'
       - 'examples/basic-custom-image/**'
       - 'examples/entity-custom-image/**'
@@ -63,6 +64,7 @@ on:
       - 'examples/terrain-vertex-execution/**'
       - 'examples/terrain-vertex-varyings/**'
       - 'examples/custom-image-compute/**'
+      - 'examples/graphics-custom-image/**'
       - 'examples/cloud-custom-image/**'
       - 'examples/basic-custom-image/**'
       - 'examples/entity-custom-image/**'
@@ -98,7 +100,7 @@ permissions:
 jobs:
   lavapipe-feature-baseline:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
       - name: Install Lavapipe validation probe dependencies
@@ -106,6 +108,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y mesa-vulkan-drivers libvulkan-dev glslang-tools
           bash scripts/install_vulkan_validation_layer.sh
+      - name: Share the pinned validation layer with the graphics matrix
+        uses: actions/upload-artifact@v7
+        with:
+          name: vulkan-validation-1.4.363.0-${{ github.run_id }}
+          path: ${{ runner.temp }}/veyra-vulkan-validation-1.4.363.0
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
       - name: Compile minimal vertex storage-buffer and storage-image pipelines
         run: |
           glslangValidator -V scripts/lavapipe_feature_probe.vert -o "$RUNNER_TEMP/lavapipe_feature_probe.vert.spv"
@@ -123,12 +133,13 @@ jobs:
           "$RUNNER_TEMP/lavapipe_feature_probe" "$RUNNER_TEMP/lavapipe_feature_probe_image.vert.spv" --storage-image --vulkanmod-pnext
 
   lavapipe-client:
+    needs: lavapipe-feature-baseline
     strategy:
       fail-fast: false
       matrix:
-        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, compute-ssbo-only, compute-begin-stage, compute-setup-stage, compute-shadow-stage, begin-fragment-stage, storage-buffer-shadow, water-block-id, water-opaque-depth, water-color-inputs, normal-atlas, normal-atlas-animated, normal-entity, normal-entity-missing, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-mrt, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
+        fixture: [geometry-mrt, entity-mrt, entity-colortex-feedback, entity-vertex-execution, block-vertex-execution, damagedblock-vertex-execution, hand-vertex-execution, geometry-view-space, geometry-mid-texcoord, terrain-block-id, terrain-vertex-execution, terrain-vertex-varyings, custom-image-compute, graphics-custom-image, cloud-custom-image, basic-custom-image, entity-custom-image, composite-custom-image, compute-ssbo-only, compute-begin-stage, compute-setup-stage, compute-shadow-stage, begin-fragment-stage, storage-buffer-shadow, water-block-id, water-opaque-depth, water-color-inputs, normal-atlas, normal-atlas-animated, normal-entity, normal-entity-missing, specular-atlas, specular-entity, shadow-color-terrain, shadow-color-mrt, shadow-color-entity, water-shadow-depth-terrain, water-shadow-depth-entity, water-post-shadow-inputs, custom-uniforms, cloud-colortex0, cloud-texture-inputs, cloud-model-view, current-rendered-item-id, glint-vertex-execution, glint-mrt-outputs, basic-vertex-execution, skybasic-vertex-execution, skytextured-stage-variants, beaconbeam-vertex-execution, weather-vertex-execution, particles-translucent-vertex-execution, textured-default-vertex-attributes, vanilla-baseline]
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 26
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -138,13 +149,37 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
+      - name: Restore the pinned validation layer
+        uses: actions/download-artifact@v8
+        with:
+          name: vulkan-validation-1.4.363.0-${{ github.run_id }}
+          path: ${{ runner.temp }}/veyra-vulkan-validation-1.4.363.0
       - name: Install software Vulkan and validation layers
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y mesa-vulkan-drivers vulkan-tools xvfb libglfw3 libflite1
           bash scripts/install_vulkan_validation_layer.sh
+      - name: Resolve and compile the graphics harness
+        # Dependency downloads from Maven repositories occasionally time out or return 403 across
+        # this wide matrix. Retry only those resolution failures, before Minecraft starts; any
+        # compile error or a third resolution failure still fails the job.
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon graphicsSmokeClasses > gradle-resolve.log 2>&1; then
+              tail -n 3 gradle-resolve.log
+              exit 0
+            fi
+            cat gradle-resolve.log
+            grep -Eq 'Could not (resolve|GET|HEAD|download)|Read timed out|Connect timed out' gradle-resolve.log || exit 1
+            echo "::warning::Dependency resolution failed on attempt $attempt; retrying"
+            sleep $((attempt * 30))
+          done
+          exit 1
       - name: Prepare original validation world
-        run: python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
+        run: |
+          python3 scripts/prepare_graphics_smoke.py --fixture '${{ matrix.fixture }}'
+          printf '%s\n' 'khronos_validation.validate_sync = true' 'khronos_validation.enable_message_limit = false' > run-graphics-smoke/vk_layer_settings.txt
       - name: Launch Minecraft with software Vulkan
         shell: bash
         env:
@@ -152,6 +187,7 @@ jobs:
           XDG_SESSION_TYPE: x11
           ALSOFT_DRIVERS: 'null'
           VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+          VK_LAYER_SETTINGS_PATH: ${{ github.workspace }}/run-graphics-smoke
         run: |
           set -o pipefail
           export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
@@ -161,6 +197,9 @@ jobs:
           if [[ '${{ matrix.fixture }}' == 'terrain-vertex-varyings' ]]; then
             extra_args+=('-PgraphicsSmokeComputeProbe=true')
           fi
+          if [[ '${{ matrix.fixture }}' =~ ^(custom-uniforms|compute-ssbo-only|graphics-custom-image|water-color-inputs)$ ]]; then
+            extra_args+=('-PgraphicsSmokeFailedReplacement=true' '-PgraphicsSmokePackSwitch=true')
+          fi
           timeout 11m xvfb-run -a ./gradlew --no-daemon runGraphicsSmoke "${extra_args[@]}" 2>&1 | tee graphics-client.log
       - name: Verify real frame readback and validation output
         run: |
@@ -168,11 +207,22 @@ jobs:
           import json,pathlib,re
           result=json.loads(pathlib.Path('build/reports/graphics-smoke/result.json').read_text())
           print(json.dumps(result,indent=2))
+          assert result['mouseGrabbed'] is False, 'Unattended client captured the desktop cursor'
+          assert result['cursorMode'] == 0x34001, 'GLFW cursor must remain in normal mode'
+          assert result['musicVolume'] == 0.0, 'Unattended client music must remain muted'
+          assert result['masterVolume'] == 0.0 and result['allSoundVolumesMuted'] is True
+          assert result['silentAudioBackend'] is True, 'Unattended clients must use a non-output audio backend'
+          if '${{ matrix.fixture }}' == 'skybasic-vertex-execution':
+              assert result['activeSkyHorizonPixels'] >= 1000, 'The shader sky must cover the horizon gap below the vanilla disc'
+          if '${{ matrix.fixture }}' in ('custom-uniforms', 'compute-ssbo-only', 'graphics-custom-image', 'water-color-inputs'):
+              assert result['failedReplacementPassed'] is True, 'Invalid replacement must retain the active pack and resource owners'
+              assert result['packSwitchPassed'] is True, 'Switching to a distinct pack and back must restore rendering and storage allocation'
+              assert result['nativeReadbackMagentaPixels'] > 10000, 'Native screenshot must preserve the active shader frame'
+              assert result['nativeReadbackMagentaPixels'] == result['activeMagentaPixels'], 'Native and in-frame readback must retain the same marker pixels'
           text=pathlib.Path('graphics-client.log').read_text(errors='replace')
           errors=re.findall(r'.*(?:VUID-|Validation Error|VK_ERROR_DEVICE_LOST).*',text)
-          # Minecraft/VulkanMod 0.6.8 reports process-wide teardown objects after disconnect.
-          # Preserve the full shutdown tail because Object Tracking handle lines follow VUIDs.
-          # Runtime rendering remains separately gated.
+          # Keep full diagnostics and gate both frame execution and device teardown.
+          # Current Khronos versions can report all leaked children in a single aggregate list.
           marker='Stopping singleplayer server as player logged out'
           shutdown=text.find(marker)
           assert shutdown >= 0, 'The smoke client did not shut down its validation world cleanly'
@@ -185,8 +235,9 @@ jobs:
           print(f'Runtime validation errors: {len(runtime_errors)}')
           print(f'Process teardown validation diagnostics: {len(teardown_errors)} (preserved in artifact)')
           assert not runtime_errors, 'Vulkan validation errors occurred before Minecraft shutdown; inspect the uploaded log'
+          assert not teardown_errors, 'Vulkan device teardown reported validation errors; inspect the uploaded log'
           fixture='${{ matrix.fixture }}'
-          shadow_voxel_image_fixtures={'custom-image-compute','cloud-custom-image','basic-custom-image','entity-custom-image','composite-custom-image'}
+          shadow_voxel_image_fixtures={'custom-image-compute','graphics-custom-image','cloud-custom-image','basic-custom-image','entity-custom-image','composite-custom-image'}
           if fixture in shadow_voxel_image_fixtures and result['status']=='skipped':
               assert (not result['vertexPipelineStoresAndAtomicsEnabled']
                       or not result['shaderStorageImageExtendedFormatsEnabled']), result
@@ -208,6 +259,7 @@ jobs:
                       < result['activeEntityNormalFallbackRedPixels']), result
           if fixture == 'compute-setup-stage' and result['status']=='passed':
               assert result['setupResizePassed'] is True, result
+              assert result['surfaceLossRecovered'] is True, result
           if fixture == 'normal-atlas-animated' and result['status']=='passed':
               assert result['animatedPbrFramesChanged'] is True, result
               assert result['animatedPbrFirstRequestedFrameSlot'] in (0, 1), result

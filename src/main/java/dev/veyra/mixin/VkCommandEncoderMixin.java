@@ -1,12 +1,15 @@
 package dev.veyra.mixin;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.shader.VeyraShadowRenderer;
 import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
 import net.vulkanmod.render.engine.VkCommandEncoder;
+import net.vulkanmod.render.engine.VkGpuTexture;
 import net.vulkanmod.render.engine.VkRenderPass;
+import net.vulkanmod.vulkan.Renderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -15,6 +18,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = VkCommandEncoder.class, remap = false)
 public abstract class VkCommandEncoderMixin {
+    @ModifyVariable(method = "clearColorTexture", argsOnly = true, at = @At(value = "INVOKE",
+            target = "Lnet/vulkanmod/vulkan/Renderer;isRecording()Z"))
+    private GpuTexture veyra$acquireBeforeSwapchainClear(GpuTexture original) {
+        if (Renderer.isRecording() || !(original instanceof VkGpuTexture texture)) return original;
+        var renderer = Renderer.getInstance();
+        var swapChain = renderer == null ? null : renderer.getSwapChain();
+        if (swapChain == null || !swapChain.getImages().contains(texture.getVulkanImage())) return original;
+        // Loading overlays can clear after a nested frame was presented; reacquire before touching its image.
+        renderer.beginFrame();
+        return renderer.getMainPass().getColorAttachment();
+    }
+
     @Inject(method = "trySetup", at = @At("HEAD"), remap = false)
     private void veyra$bindShaderPackTextures(VkRenderPass pass, CallbackInfoReturnable<Boolean> cir) {
         RenderPipeline pipeline = pass.getPipeline();

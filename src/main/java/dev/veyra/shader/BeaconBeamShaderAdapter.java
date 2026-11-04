@@ -77,7 +77,7 @@ public final class BeaconBeamShaderAdapter {
         samplerMatcher.appendTail(withoutSamplers);
         adapted = withoutSamplers.toString();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, "gbuffers_beaconbeam");
+                ShaderPackUniformAdapter.extractForSampling(adapted, "gbuffers_beaconbeam");
         adapted = shaderPackUniforms.source();
         if (UNSUPPORTED_UNIFORM_DECLARATION.matcher(adapted).find()) {
             throw new IOException("gbuffers_beaconbeam has an unsupported uniform declaration.");

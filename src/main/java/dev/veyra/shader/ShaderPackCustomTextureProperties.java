@@ -10,7 +10,8 @@ import java.util.Set;
 /** Parsed Iris custom textures and OptiFine-style program-scoped {@code texture.*} inputs. */
 public record ShaderPackCustomTextureProperties(
         Map<String, String> textures,
-        Map<String, Map<String, String>> scopedTextures) {
+        Map<String, Map<String, String>> scopedTextures,
+        String noiseTexture) {
     private static final String BLOCK_ATLAS = "minecraft:textures/atlas/blocks.png";
     private static final Set<String> PROGRAM_STAGES = Set.of(
             "begin", "gbuffers", "prepare", "deferred", "composite", "final");
@@ -27,7 +28,13 @@ public record ShaderPackCustomTextureProperties(
         Properties properties = ShaderPackOptions.loadProperties(source);
         Map<String, String> textures = new LinkedHashMap<>();
         Map<String, Map<String, String>> scopedTextures = new LinkedHashMap<>();
+        String noiseTexture = null;
         for (String key : properties.stringPropertyNames().stream().sorted().toList()) {
+            if (key.equals("texture.noise")) {
+                noiseTexture = properties.getProperty(key).strip();
+                if (noiseTexture.isEmpty()) throw new IOException("Shader-pack texture.noise has an empty resource path.");
+                continue;
+            }
             String scope = null;
             String sampler;
             if (key.startsWith("customTexture.")) {
@@ -53,7 +60,7 @@ public record ShaderPackCustomTextureProperties(
                 scopedTextures.computeIfAbsent(scope, ignored -> new LinkedHashMap<>()).put(sampler, texture);
             }
         }
-        return new ShaderPackCustomTextureProperties(textures, scopedTextures);
+        return new ShaderPackCustomTextureProperties(textures, scopedTextures, noiseTexture);
     }
 
     public boolean usesMinecraftBlockAtlas(String sampler) {
@@ -84,6 +91,7 @@ public record ShaderPackCustomTextureProperties(
 
     public Set<String> allTexturePaths() {
         Set<String> paths = new java.util.LinkedHashSet<>(textures.values());
+        if (noiseTexture != null) paths.add(noiseTexture);
         scopedTextures.values().forEach(values -> paths.addAll(values.values()));
         return Collections.unmodifiableSet(paths);
     }

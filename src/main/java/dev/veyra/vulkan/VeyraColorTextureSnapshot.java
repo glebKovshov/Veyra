@@ -100,6 +100,7 @@ public final class VeyraColorTextureSnapshot implements AutoCloseable {
         int destinationFormat = sampledFormat(source.format);
         ensure(source.width, source.height, destinationFormat);
         VulkanImage destination = image();
+        VeyraColorTargetViews.inherit(source, destination);
         if ((destination.usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             throw new IllegalStateException("The " + name + " image does not support transfer writes.");
         }

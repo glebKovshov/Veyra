@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 - 2026-11-04
+
+- Match supported Iris capability macros and optional-feature negotiation; resolve forward scalar/vector uniform dependencies, reject cycles, bound expressions and restore uniform registrations when packs change.
+- Support graphics-only custom images and custom noise textures with selected-pack ownership and explicit shadow-write visibility.
+- Correct current/previous sampling projections, draw the Iris-style horizon, honor block-comment settings and legacy render-target aliases, and obtain cloud height from the camera environment.
+- Preserve packed/wide render-target formats, linear auxiliary-color filtering, and opaque RGB sampling through physical RGBA fallbacks, including the main scene and mipmapped snapshots.
+- Use native `R11F_G11F_B10F` storage when device capabilities permit it, preserving packed precision and memory size; retain the wide fallback on unsupported devices.
+- Fix clear/upload/depth/index dependencies, swapchain acquisition during loading overlays, screenshot readback ordering, and native resource cleanup. Retire derived views when images/swapchains are released.
+- Recover when a resize or restore reaches VulkanMod while the window surface is still 0x0. VulkanMod would keep a 10x10 placeholder main pass without a swapchain until another window event, and destroy the old swapchain image views a second time at shutdown. Veyra now retries recreation while the window is visible and non-empty, and drops the already destroyed views at final cleanup.
+- Avoid repeated declaration scans for uniform-only shader headers. Add rollback, cross-pack switching, screenshot equality and strict Vulkan teardown regressions.
+- Gate publication on audit-tool tests and verify checksums and metadata after downloading the published assets. Retry only network dependency-resolution failures before hosted graphics clients start.
+- Validation: 672 JUnit and seven Python tests, 105 example sources / 123 SPIR-V, the 75-case pinned source audit, and matched Veyra/Iris lifecycles for the four pinned profiles with zero Vulkan core/sync/teardown diagnostics. Pixel parity with Iris is not certified; see COMPATIBILITY.md.
+
 ## 0.2.3 - 2026-11-02
 
 - Fix mipmapped post-pass sampler names: Minecraft appends `Sampler` to each input name, so Veyra now passes the base names expected by shader-pack colortex samplers. This restores the correct Complementary Reimagined HIGH frame with mipmapped colortex inputs.

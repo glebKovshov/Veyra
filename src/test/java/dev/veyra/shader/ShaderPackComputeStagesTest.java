@@ -115,6 +115,31 @@ class ShaderPackComputeStagesTest {
     }
 
     @Test
+    void readsBlockCommentShadowDirectivesLikeIrisButIgnoresInactiveAndLineCommentedSettings(@TempDir Path root) throws Exception {
+        Path shaders = Files.createDirectories(root.resolve("shaders"));
+        Files.writeString(shaders.resolve("gbuffers_textured.fsh"), """
+                #version 120
+                #if 0
+                /*
+                const float sunPathRotation = 70.0;
+                */
+                #endif
+                // const float sunPathRotation = 20.0;
+                /*
+                const float sunPathRotation = -40.0; // [-40.0 40.0]
+                const float shadowDistance = 110.0;
+                */
+                void main() { gl_FragColor = vec4(1.0); }
+                """);
+        var pack = ShaderPack.inspect(root);
+        var settings = pack.readShadowSettings();
+        assertEquals(-40.0F, settings.sunPathRotation());
+        assertEquals(110.0F, settings.distance());
+        assertEquals(40.0F, pack.configured(java.util.Map.of("sunPathRotation", "40.0"), 0)
+                .readShadowSettings().sunPathRotation());
+    }
+
+    @Test
     void acceptsPreShadowComputeFixtureWithOrderedComponents() throws Exception {
         var pack = ShaderPack.inspect(Path.of("examples/compute-shadow-stage")).withRuntimeFeatures();
 

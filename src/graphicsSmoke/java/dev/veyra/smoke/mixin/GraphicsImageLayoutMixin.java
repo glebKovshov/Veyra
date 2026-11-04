@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-/** Trace unexpected layout changes on the sampled MRT image; test-only and excluded from the mod JAR. */
+/** Guard swapchain ownership and trace MRT layout changes; test-only and excluded from the mod JAR. */
 @Mixin(value = VulkanImage.class, remap = false)
 public abstract class GraphicsImageLayoutMixin {
     @Unique private static int veyra$loggedTransitions;
@@ -24,6 +24,16 @@ public abstract class GraphicsImageLayoutMixin {
             at = @At("HEAD"), remap = false)
     private static void veyra$traceMrtTransitions(org.lwjgl.system.MemoryStack stack, VkCommandBuffer commands,
             VulkanImage image, int newLayout, CallbackInfo ci) {
+        if (image != null && image.getCurrentLayout() != newLayout) {
+            var renderer = net.vulkanmod.vulkan.Renderer.getInstance();
+            var swap = renderer == null ? null : renderer.getSwapChain();
+            if (swap != null && swap.hasImages() && swap.getImages().contains(image)
+                    && (!swap.isAcquired() || image != swap.getColorAttachment())) {
+                throw new IllegalStateException("Swapchain transition requires the current acquired image: image="
+                        + Long.toHexString(image.getId()) + ", current=" + Long.toHexString(swap.getColorAttachment().getId())
+                        + ", acquired=" + swap.isAcquired());
+            }
+        }
         if (!Boolean.getBoolean("veyra.graphicsSmoke") || veyra$loggedTransitions >= 40
                 || image == null || !"Veyra shader pack colortex1 A / Color".equals(image.name)
                 || image.getCurrentLayout() == newLayout

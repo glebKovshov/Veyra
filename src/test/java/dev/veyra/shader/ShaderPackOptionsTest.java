@@ -10,6 +10,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ShaderPackOptionsTest {
     @TempDir Path root;
+    @Test void editsConstDirectiveOptionsInBlockCommentsWithoutExposingCommentedDefines() throws IOException {
+        String source = """
+                /*
+                const float sunPathRotation = -40.0; // [-40.0 0.0 40.0]
+                #define COMMENTED_QUALITY 1 // [1 2]
+                */
+                """;
+        var options = ShaderPackOptions.parse(Map.of("gbuffers_textured.fsh", source), "", "");
+        assertEquals(java.util.Set.of("sunPathRotation"), options.options().keySet());
+        var changed = options.validate(Map.of("sunPathRotation", "40.0"));
+        String applied = ShaderPackOptions.apply(source, changed);
+        assertTrue(applied.contains("const float sunPathRotation = 40.0;"));
+        assertTrue(applied.contains("#define COMMENTED_QUALITY 1"));
+    }
+
     private final String source = "#define QUALITY 2 // Quality [0 1 2 3]\n//#define BLOOM // Bloom\n#ifdef BLOOM\n#endif\nconst float shadowDistance = 128.0; // [64.0 128.0 256.0]\n";
     @Test void discoversOptionsProfilesScreensAndLabels() throws IOException {
         var options = ShaderPackOptions.parse(Map.of("common", source),

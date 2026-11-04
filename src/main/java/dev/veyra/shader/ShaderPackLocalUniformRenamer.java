@@ -22,21 +22,25 @@ final class ShaderPackLocalUniformRenamer {
                     + "(?!(?:return|if|else|for|while|switch|case|discard|break|continue|do)\\b)"
                     + "[A-Za-z_][A-Za-z0-9_]*+\\s++");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final Pattern POSSIBLE_DECLARATION = Pattern.compile(LOCAL_DECLARATION_PREFIX.pattern()
+            + "(?<name>[A-Za-z_][A-Za-z0-9_]*+)\\b(?=\\s*+(?:=|;|,|\\)|\\[))");
     private static final ConcurrentMap<String, Pattern> LOCAL_DECLARATIONS = new ConcurrentHashMap<>();
 
     private ShaderPackLocalUniformRenamer() {
     }
 
     static String renameShadowingLocals(String source, List<String> uniforms) {
+        if (uniforms.isEmpty()) return source;
         String result = source;
+        Set<String> candidates = declarationNames(result);
         for (String uniform : uniforms) {
-            if (!containsIdentifier(result, uniform)) continue;
+            if (!candidates.contains(uniform)) continue;
             Pattern declaration = localDeclaration(uniform);
-            // Most shader-pack uniforms do not shadow a local in a given pass. Check the raw
-            // source first so those names avoid allocating and scanning a full comment mask.
-            if (!declaration.matcher(result).find()) continue;
+            String previous = result;
             result = renameShadowingLocal(result, uniform, declaration);
             result = renameShadowingGlobal(result, uniform, declaration);
+            // A generated alias can itself match a later uniform name.
+            if (!result.equals(previous)) candidates = declarationNames(result);
         }
         return result;
     }
@@ -142,21 +146,11 @@ final class ShaderPackLocalUniformRenamer {
                         + "(?<name>" + Pattern.quote(uniform) + ")\\b(?=\\s*+(?:=|;|,|\\)|\\[))"));
     }
 
-    private static boolean containsIdentifier(String source, String name) {
-        if (name.isEmpty()) return false;
-        int cursor = 0;
-        while ((cursor = source.indexOf(name, cursor)) >= 0) {
-            int end = cursor + name.length();
-            boolean leftBoundary = cursor == 0 || !isIdentifierPart(source.charAt(cursor - 1));
-            boolean rightBoundary = end == source.length() || !isIdentifierPart(source.charAt(end));
-            if (leftBoundary && rightBoundary) return true;
-            cursor++;
-        }
-        return false;
-    }
-
-    private static boolean isIdentifierPart(char character) {
-        return character == '_' || Character.isLetterOrDigit(character);
+    private static Set<String> declarationNames(String source) {
+        Set<String> names = new HashSet<>();
+        Matcher matcher = POSSIBLE_DECLARATION.matcher(source);
+        while (matcher.find()) names.add(matcher.group("name"));
+        return names;
     }
 
     private static String uniqueAlias(String source, String uniform) {

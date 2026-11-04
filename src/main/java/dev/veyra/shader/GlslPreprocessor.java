@@ -37,6 +37,9 @@ final class GlslPreprocessor {
         macros.put("IS_IRIS", "1");
         macros.put("VEYRA", "200");
         macros.put("IRIS_TAG_SUPPORT", "2");
+        macros.put("MAX_COLOR_BUFFERS", "16");
+        macros.put("MC_NORMAL_MAP", "1");
+        macros.put("MC_SPECULAR_MAP", "1");
         macros.putAll(IrisRenderStages.macros());
         macros.putAll(BiomeIds.defines());
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);

@@ -372,7 +372,7 @@ public final class CloudShaderAdapter {
         SceneColorInput sceneColorInput = sceneColorInput(adapted, customImageSamplers);
         adapted = sceneColorInput.source();
         ShaderPackUniformAdapter.AdaptedShader shaderPackUniforms =
-                ShaderPackUniformAdapter.extract(adapted, "gbuffers_clouds");
+                ShaderPackUniformAdapter.extractForSampling(adapted, "gbuffers_clouds");
         adapted = shaderPackUniforms.source();
         Map<String, Integer> samplerBindings = new java.util.LinkedHashMap<>();
         int nextImageBinding = firstImageBinding;

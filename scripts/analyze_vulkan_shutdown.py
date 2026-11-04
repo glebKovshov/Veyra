@@ -14,6 +14,11 @@ OBJECT_DIAGNOSTIC = re.compile(
     r"\b(Vk[A-Za-z0-9_]+)\s+(0x[0-9a-fA-F]+)(?:\[[^\]]*\])?\s+has not been destroyed\b"
 )
 VALIDATION_ERROR = re.compile(r"Validation Error:\s*\[\s*([^\]]+)\s*\]")
+AGGREGATE_DIAGNOSTIC = re.compile(
+    r"vkDestroyDevice\(\):\s+VkDevice\s+0x[0-9a-fA-F]+\s+has\s+(\d+)\s+"
+    r"leaked objects that have not been destroyed\."
+)
+OBJECT_HANDLE = re.compile(r"\b(Vk[A-Za-z0-9_]+)\s+(0x[0-9a-fA-F]+)\b")
 
 
 def _find_exactly_one(root, name):
@@ -23,19 +28,46 @@ def _find_exactly_one(root, name):
     return matches[0]
 
 
+def _read_log(path):
+    data = path.read_bytes()
+    encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8"
+    return data.decode(encoding, errors="replace")
+
+
 def _diagnostics(root):
     logs = [path for path in root.rglob("graphics-client.log") if path.is_file()]
     if len(logs) > 1:
         raise ValueError(f"Expected at most one graphics-client.log under {root}, found {len(logs)}")
     if logs:
-        text = logs[0].read_text(errors="replace")
+        text = _read_log(logs[0])
         shutdown = text.find(SHUTDOWN_MARKER)
         if shutdown < 0:
             raise ValueError(f"{logs[0]} has no clean-shutdown marker")
         # The complete shutdown tail contains the Object Tracking lines that follow each VUID.
         return text[shutdown:]
 
-    return _find_exactly_one(root, "teardown-validation-log.txt").read_text(errors="replace")
+    return _read_log(_find_exactly_one(root, "teardown-validation-log.txt"))
+
+
+def _undestroyed_objects(text):
+    mentions = OBJECT_DIAGNOSTIC.findall(text)
+    unparsed = text.count("has not been destroyed") - len(mentions)
+    if unparsed:
+        raise ValueError(f"{unparsed} device-child diagnostic(s) did not match the expected handle format")
+    headers = list(AGGREGATE_DIAGNOSTIC.finditer(text))
+    if text.count("leaked objects that have not been destroyed") != len(headers):
+        raise ValueError("Unrecognized aggregate device-child diagnostic")
+    for header in headers:
+        tail = text[header.end():]
+        end = re.search(r"\n\s*(?:Objects:\s*\d+|The Vulkan spec states:)", tail)
+        if end is None:
+            raise ValueError("Aggregate device-child diagnostic has no object-list terminator")
+        listing = tail[:end.start()]
+        objects = OBJECT_HANDLE.findall(listing)
+        if OBJECT_HANDLE.sub("", listing).strip(" \t\r\n,.") or len(objects) != int(header.group(1)):
+            raise ValueError("Aggregate device-child count or handle format does not match its object list")
+        mentions.extend(objects)
+    return mentions
 
 
 def _handle(value):
@@ -69,12 +101,7 @@ def analyze(root):
                     owners[("VkDescriptorSet", _handle(descriptor))] = owner
 
     text = _diagnostics(root)
-    mentions = OBJECT_DIAGNOSTIC.findall(text)
-    unparsed_mentions = text.count("has not been destroyed") - len(mentions)
-    if unparsed_mentions:
-        raise ValueError(
-            f"{unparsed_mentions} device-child diagnostic(s) did not match the expected handle format"
-        )
+    mentions = _undestroyed_objects(text)
 
     # Normalize hexadecimal handles so harmless zero-padding/case changes still map to registry entries.
     missing = {(kind, _handle(handle)) for kind, handle in mentions}

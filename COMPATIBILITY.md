@@ -1,5 +1,37 @@
 # Shaderpack compatibility
 
+## 1.0 scope
+
+Veyra translates a checked subset of Iris shaderpack programs to VulkanMod; it does not run Iris itself. The pinned comparison source is Iris Minecraft 1.21.11 commit `0a1fcaae55099356bf53410b4f5302753edb0ffc`, while the capture harness uses Iris 1.10.8 with Sodium 0.8.14. Keep source-contract comparisons separate from those runtime versions.
+
+| Contract | Veyra 1.0 | Remaining boundary |
+| --- | --- | --- |
+| Color targets | 16 logical buffers; up to eight simultaneous outputs; legacy aliases, packed/wide storage and RGB alpha semantics | Pinned Iris exposes [32 buffers](https://github.com/IrisShaders/Iris/blob/0a1fcaae55099356bf53410b4f5302753edb0ffc/common/src/main/java/net/irisshaders/iris/gl/IrisLimits.java). More than 16 is unsupported. |
+| Color sampling | Linear/clamp auxiliary color inputs, per-pass mipmaps, snapshots inherit logical RGB channels | Same-image geometry feedback uses a deterministic pass-start snapshot; arbitrary OpenGL feedback behavior is not reproduced. |
+| Primary world color | Post ping-pong and auxiliary buffers can use native packed HDR storage | World rendering and copies between world/post phases still pass through VulkanMod's native main attachment; HDR range/quantization can differ from Iris even when post targets preserve the requested format. |
+| Custom expressions | Scalar and float vec2/3/4 dependency ordering, forward references, cycle rejection and std140 buffers | Unsupported matrix/integer-vector expressions and overloads are rejected. |
+| Programs/resources | Checked geometry vertex subsets, post/compute families, custom textures/noise, SSBOs and supported graphics images | Geometry/tessellation stages and unsupported native inputs/routes fail with diagnostics. Hardware storage features are checked separately. |
+| Lifecycle | Failed-replacement rollback, pack switching, resize, dimension changes, disable/re-enable and reload have focused GPU fixtures | A passed synthetic fixture does not certify arbitrary pack profiles, worlds or GPUs. |
+
+Veyra 1.0.0 was gated on Complementary Reimagined r5.9.3 HIGH, Complementary Unbound r5.9.3 COMPLEMENTARY, BSL 10.1.8 HIGH (natural ocean scene) and Sildur v2.02 Extreme defaults. On the final production commit `e804e2d`, each profile passed a matched Iris 1.10.8 capture (identical shader files and options, fixed clocks) and a full Veyra lifecycle under Khronos core/synchronization validation with a clean teardown audit. RGB MAE against Iris is 4.08, 4.24, 3.64 and 3.13 of 255 respectively; see [the comparison manifest](validation/stable-1.0-candidate.json). Historical results below retain their original scope.
+
+Pixel equality with Iris is not certified. BSL diagnostic controls reproduce cloud color/density after aligning Bayer Y phase, but changing that phase alone does not remove the full-frame composition/reflection difference. Read [the measured controls](validation/iris-bsl-phase-analysis.json) as diagnostics, not stock shaderpack certification. Hardware validation currently covers an RTX 3070 and the hosted Lavapipe matrix; other physical GPUs remain unverified.
+
+### What the Iris comparison found
+
+These are individual controlled findings from the development series, not additive improvements or a whole-pack parity score. Exact revisions, input checks and negative controls are recorded in WORK_SUMMARY.md.
+
+| Weakness | Effect and correction | Evidence and boundary |
+| --- | --- | --- |
+| Capability branches and custom uniforms | Missing macros, optional-feature leakage, dependency ordering and std140 layout could select wrong paths or reject valid pack code. Supported flags and scalar/float-vector expressions now have checked contracts and restore their registries on replacement. | Unit/source audits and mixed geometry/post GPU probes verify the supported expressions; they do not add unsupported matrix/integer-vector overloads. |
+| Camera and projection conventions | Native forward projection paired with a screen-space inverse distorted BSL reflections. Current/previous sampling projections now use the same convention; native vertex clip output remains separate. | The GPU forward/inverse probe has a failing old-matrix control. A matched natural BSL frame improved from 9.027627 to 3.838811 RGB MAE during that fix; later format changes have their own measurements. |
+| Environment and sky geometry | Ignored custom noise, dimension-only cloud height and a missing Iris-style horizon changed the sky/water inputs. The loader now honors the pack PNG, probes camera attributes and draws the horizon cone. | World-ray/noise diagnostics agree within 0.020457/255; the horizon fixture rejects the old geometry. These controls establish inputs, not final-frame equality. |
+| Constant directives | Stripping active block-comment constants ignored Sildur's sunPathRotation=-40 and removed the expected wall shadow. Constants and legacy buffer aliases now follow the active directive contract. | Matched Sildur floor MAE fell from 21.368712 to 4.300185 in that controlled fix. Subsequent original default-profile captures remain separate measurements. |
+| Color storage and sampling | Nearest auxiliary sampling, lost RGB alpha and unnecessary packed-HDR widening changed shader inputs. Linear/clamp color inputs, sampled alpha-one views and supported native packed formats now preserve these contracts. | Old nearest/RGB controls fail the same marker gate; corrected rollback/switch/native readback fixtures pass. Wider storage remains a capability fallback, not pixel-equivalent precision. |
+| Vulkan ownership and synchronization | Early-only depth barriers, upload visibility, nested-frame acquisition and incomplete cleanup caused validation failures or stale resources during loading/reload. The shared native hooks and frame-fenced retirement cover those boundaries. | Core/sync/teardown checks are required for baseline, focused fixtures and selected-profile lifecycles. A non-black frame alone cannot pass them. |
+
+Remaining differences have identifiable renderer boundaries: screen-origin-dependent sampling phases, requested storage precision and VulkanMod's native primary attachment at world/post boundaries. The Bayer and storage controls quantify contributions without claiming that they explain every remaining pixel. Water/reflection and temporal/composition differences remain visible in the original matched frames. Unsupported native inputs/stages, more than 16 logical color buffers and arbitrary profile/GPU combinations remain outside the verified contract; 1.0 must state those limits rather than imply full Iris equivalence.
+
 ## 0.2.0 validation on merged main `c242eb8` - 2026-10-27
 
 VulkanMod uses a negative-height viewport. Shadow pack vertices now compensate clip Y before rasterization so the resulting image retains the OpenGL texture coordinates used by pack receivers. The native fallback shadow projection makes the same conversion, and shadow pipelines preserve their previous face winding. Shadow comparison emulation also preserves the pack's supplied reference without adding a fixed depth bias.

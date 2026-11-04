@@ -15,6 +15,24 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IrisUniformParityTest {
+    @Test
+    void samplingStagesUseScreenProjectionWhileVertexStagesKeepNativeClipProjection() throws IOException {
+        String source = """
+                uniform mat4 gbufferProjection;
+                uniform mat4 gbufferProjectionInverse;
+                uniform mat4 gbufferPreviousProjection;
+                void main() { vec4 p = gbufferProjection * gbufferProjectionInverse * vec4(1.0);
+                    p += gbufferPreviousProjection * vec4(1.0); }
+                """;
+        var fragment = ShaderPackUniformAdapter.extractForSampling(source, "gbuffers_water");
+        assertTrue(fragment.source().contains("veyraSamplingProjection * gbufferProjectionInverse"));
+        assertTrue(fragment.declarations().contains("uniform mat4 veyraSamplingPreviousProjection;"));
+        assertTrue(fragment.fields().stream().anyMatch(field -> field.name().equals("veyraSamplingProjection")));
+        var vertex = ShaderPackUniformAdapter.extract(source, "gbuffers_water");
+        assertTrue(vertex.source().contains("gbufferProjection * gbufferProjectionInverse"));
+        assertFalse(vertex.declarations().contains("veyraSampling"));
+    }
+
     @AfterEach
     void reset() {
         CustomUniforms.activate(CustomUniforms.EMPTY);

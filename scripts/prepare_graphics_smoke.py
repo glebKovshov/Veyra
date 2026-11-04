@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create an original flat test world; no third-party world or shaderpack is redistributed."""
+"""Create an original test world; no third-party world or shaderpack is redistributed."""
 import gzip
 import pathlib
 import shutil
@@ -71,7 +71,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'compute-ssbo-only', 'compute-begin-stage', 'compute-setup-stage', 'compute-shadow-stage', 'begin-fragment-stage', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-atlas-animated', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'vanilla-baseline'], default='geometry-mrt')
+    parser.add_argument('--fixture', choices=['geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'graphics-custom-image', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'compute-ssbo-only', 'compute-begin-stage', 'compute-setup-stage', 'compute-shadow-stage', 'begin-fragment-stage', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-atlas-animated', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'third-party-natural-world', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
     parser.add_argument('--shaderpack-name', default='')
@@ -79,7 +79,8 @@ def main():
                         help='Declared profile name, or __DEFAULT__ for unmodified pack defaults')
     arguments = parser.parse_args()
     fixture = arguments.fixture
-    third_party = fixture == 'third-party-shaderpack'
+    natural_world = fixture == 'third-party-natural-world'
+    third_party = fixture in {'third-party-shaderpack', 'third-party-natural-world'}
     if third_party:
         if arguments.shaderpack_archive is None or not arguments.shaderpack_archive.is_file():
             parser.error('--shaderpack-archive must identify an existing ZIP for third-party-shaderpack')
@@ -90,7 +91,7 @@ def main():
     layers = [(1, 'minecraft:bedrock'), (3, 'minecraft:dirt'), (1, 'minecraft:grass_block')]
     if fixture.startswith('water-'):
         layers.append((1, 'minecraft:water'))
-    spawn_y = -58 if fixture.startswith('water-') else -59
+    spawn_y = 200 if natural_world else -58 if fixture.startswith('water-') else -59
     root = arguments.root
     world = root / "saves/VeyraValidation"
     world.mkdir(parents=True, exist_ok=True)
@@ -113,6 +114,11 @@ def main():
             "biome_source": (10, {"type": (8, "minecraft:the_end")}),
         })}),
     }
+    if natural_world:
+        dimensions["minecraft:overworld"][1]["generator"] = (10, {
+            "type": (8, "minecraft:noise"), "settings": (8, "minecraft:overworld"),
+            "biome_source": (10, {"type": (8, "minecraft:multi_noise"), "preset": (8, "minecraft:overworld")}),
+        })
     data = {
         "DataVersion": (3, 4671),
         "Version": (10, {"Name": (8, "1.21.11"), "Id": (3, 4671), "Series": (8, "main"), "Snapshot": (1, 0)}),
@@ -125,8 +131,24 @@ def main():
         "GameRules": (10, {name: (8, "false") for name in ["doDaylightCycle", "doWeatherCycle", "doMobSpawning"]}),
         "DataPacks": (10, {"Enabled": (9, (8, ["vanilla"])), "Disabled": (9, (8, []))}),
         "enabled_features": (9, (8, ["minecraft:vanilla"])),
-        "WorldGenSettings": (10, {"seed": (4, 1), "generate_features": (1, 0), "bonus_chest": (1, 0), "dimensions": (10, dimensions)}),
+        "WorldGenSettings": (10, {"seed": (4, 1), "generate_features": (1, int(natural_world)), "bonus_chest": (1, 0), "dimensions": (10, dimensions)}),
     }
+    if fixture == 'custom-uniforms':
+        # A biome override distinguishes camera attributes from dimension defaults on the GPU.
+        datapack = world / 'datapacks/veyra-cloud-height'
+        biome = datapack / 'data/veyra/worldgen/biome/cloud_height.json'
+        biome.parent.mkdir(parents=True, exist_ok=True)
+        biome.write_text(json.dumps({
+            'attributes': {'minecraft:visual/cloud_height': 224.0, 'minecraft:visual/sky_color': '#78a7ff'},
+            'has_precipitation': True, 'temperature': 0.8, 'downfall': 0.4,
+            'effects': {'water_color': 4159204}, 'carvers': [], 'features': [],
+            'spawners': {}, 'spawn_costs': {},
+        }), encoding='utf-8')
+        (datapack / 'pack.mcmeta').write_text(json.dumps({'pack': {
+            'description': 'Veyra camera cloud-height regression', 'min_format': [94, 1], 'max_format': [94, 1],
+        }}), encoding='utf-8')
+        dimensions['minecraft:overworld'][1]['generator'][1]['settings'][1]['biome'] = (8, 'veyra:cloud_height')
+        data['DataPacks'][1]['Enabled'] = (9, (8, ['vanilla', 'file/veyra-cloud-height']))
     with gzip.open(world / "level.dat", "wb") as output:
         output.write(bytes([10]) + string("") + payload(10, {"Data": (10, data)}))
     pack = root / 'shaderpacks' / fixture
@@ -211,8 +233,8 @@ def main():
             for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
                 normal_png(textures / f'block/{sprite}_n.png')
         extra_options = 'resourcePacks:["vanilla","file/veyra-material-fixture"]\n'
-    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
-    print(f"Prepared original Minecraft 1.21.11 flat world and {fixture} fixture")
+    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nsoundCategory_master:0.0\nsoundCategory_music:0.0\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
+    print(f"Prepared original Minecraft 1.21.11 {'natural' if natural_world else 'flat'} world and {fixture} fixture")
 
 
 if __name__ == "__main__":

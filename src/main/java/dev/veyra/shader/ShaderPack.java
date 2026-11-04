@@ -63,14 +63,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final String DAMAGED_BLOCK_PROGRAM = "gbuffers_damagedblock";
     private static final int MAX_COLOR_TARGET_INDEX = 15;
     private static final Pattern GLSL_COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
+    private static final String COLOR_TARGET_NAME = "(colortex\\d+|" + String.join("|", GeometryColorSamplers.LEGACY) + ")";
     private static final Pattern COLOR_TARGET_CLEAR = Pattern.compile(
-            "(?m)\\bconst\\s+bool\\s+colortex(\\d+)Clear\\s*=\\s*(true|false)\\s*;");
+            "(?m)^[\\t ]*const\\s+bool\\s+" + COLOR_TARGET_NAME + "Clear\\s*=\\s*(true|false)\\s*;");
     private static final Pattern COLOR_TARGET_CLEAR_COLOR = Pattern.compile(
-            "(?is)\\bconst\\s+vec4\\s+colortex(\\d+)ClearColor\\s*=\\s*vec4\\s*\\(([^)]*)\\)\\s*;");
+            "(?ims)^[\\t ]*const\\s+vec4\\s+" + COLOR_TARGET_NAME + "ClearColor\\s*=\\s*vec4\\s*\\(([^)]*)\\)\\s*;");
     private static final Pattern COLOR_TARGET_FORMAT = Pattern.compile(
-            "(?m)\\bconst\\s+int\\s+colortex(\\d+)Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
-    private static final Pattern COLOR_TARGET_FORMAT_BLOCK_COMMENT = Pattern.compile(
-            "(?s)/\\*(.*?)\\*/");
+            "(?m)^[\\t ]*const\\s+int\\s+" + COLOR_TARGET_NAME + "Format\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*;");
     private static final Pattern COLOR_TARGET_SIZE_PROPERTY = Pattern.compile("^size\\.buffer\\.colortex(\\d+)$");
     private static final Pattern READONLY_QUALIFIER = Pattern.compile("\\breadonly\\b");
     private static final Map<String, Integer> COLOR_TARGET_FORMATS = Map.ofEntries(
@@ -78,6 +77,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             Map.entry("RGB8", VK10.VK_FORMAT_R8G8B8_UNORM),
             Map.entry("RGB8_SNORM", VK10.VK_FORMAT_R8G8B8_SNORM),
             Map.entry("RGBA8", VK10.VK_FORMAT_R8G8B8A8_UNORM),
+            Map.entry("RGB10_A2", VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32),
             Map.entry("RGBA8_SNORM", VK10.VK_FORMAT_R8G8B8A8_SNORM),
             Map.entry("RGBA16", VK10.VK_FORMAT_R16G16B16A16_UNORM),
             Map.entry("R16F", VK10.VK_FORMAT_R16_SFLOAT),
@@ -88,7 +88,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final Pattern FLOAT_LITERAL = Pattern.compile(
             "([+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)[fF]?");
     private static final Pattern SHADOW_SETTING = Pattern.compile(
-            "\\bconst\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowNearPlane|shadowFarPlane|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
+            "(?m)^[\\t ]*const\\s+(int|float)\\s+(shadowMapResolution|shadowDistance|shadowNearPlane|shadowFarPlane|shadowIntervalSize|sunPathRotation|shadowDistanceRenderMul|entityShadowDistanceMul)\\s*=\\s*([^;]+);");
     private static final Pattern NOISE_TEXTURE_RESOLUTION = Pattern.compile(
             "\\bconst\\s+int\\s+noiseTextureResolution\\s*=\\s*([+-]?\\d+)\\s*;");
     private static final Pattern EYE_BRIGHTNESS_HALF_LIFE = Pattern.compile(
@@ -340,8 +340,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 continue;
             }
             String expanded = expandIncludes(fileName, source.get());
-            parseColorTargetSettings(GLSL_COMMENTS.matcher(expanded).replaceAll(""), parsed, fileName);
-            parseCommentedColorTargetFormats(expanded, parsed, fileName);
+            parseColorTargetSettings(expanded.replaceAll("(?m)//[^\\r\\n]*", ""), parsed, fileName);
         }
 
         Optional<String> propertiesSource = readShader("shaders.properties");
@@ -398,8 +397,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             if (source.isEmpty()) {
                 continue;
             }
-            String uncommented = GLSL_COMMENTS.matcher(expandIncludes(fileName, source.get())).replaceAll("");
-            Matcher matcher = SHADOW_SETTING.matcher(uncommented);
+            // Iris reads line-start const directives even inside block comments (for example Sildur's sun path).
+            String directives = expandIncludes(fileName, source.get()).replaceAll("(?m)//[^\\r\\n]*", "");
+            Matcher matcher = SHADOW_SETTING.matcher(directives);
             while (matcher.find()) {
                 values.putIfAbsent(matcher.group(2), matcher.group(3).trim());
             }
@@ -483,7 +483,12 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     /** Reads uniform./variable. definitions from the preprocessed shaders.properties. */
     public CustomUniforms readCustomUniforms() throws IOException {
-        return CustomUniforms.parse(readShader("shaders.properties").orElse(""));
+        CustomUniforms uniforms = CustomUniforms.parse(readShader("shaders.properties").orElse(""));
+        if (!uniforms.circularDefinitions().isEmpty()) {
+            throw new IOException("Circular custom uniform dependencies: "
+                    + String.join(", ", uniforms.circularDefinitions()));
+        }
+        return uniforms;
     }
 
     /** Iris defaults noisetex to 256 square pixels and exposes this shader-pack directive. */
@@ -595,7 +600,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                                                  String sourceFile) throws IOException {
         Matcher clearMatcher = COLOR_TARGET_CLEAR.matcher(source);
         while (clearMatcher.find()) {
-            int index = Integer.parseInt(clearMatcher.group(1));
+            int index = colorTargetIndex(clearMatcher.group(1));
             if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
                 continue;
             }
@@ -611,7 +616,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
         Matcher colorMatcher = COLOR_TARGET_CLEAR_COLOR.matcher(source);
         while (colorMatcher.find()) {
-            int index = Integer.parseInt(colorMatcher.group(1));
+            int index = colorTargetIndex(colorMatcher.group(1));
             if (index < 1 || index > MAX_COLOR_TARGET_INDEX) {
                 continue;
             }
@@ -627,21 +632,14 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
         Matcher formatMatcher = COLOR_TARGET_FORMAT.matcher(source);
         while (formatMatcher.find()) {
-            setColorTargetFormat(settings, Integer.parseInt(formatMatcher.group(1)),
+            setColorTargetFormat(settings, colorTargetIndex(formatMatcher.group(1)),
                     formatMatcher.group(2), sourceFile);
         }
     }
 
-    private static void parseCommentedColorTargetFormats(String source,
-                                                        Map<Integer, MutableColorTargetSettings> settings,
-                                                        String sourceFile) throws IOException {
-        Matcher comments = COLOR_TARGET_FORMAT_BLOCK_COMMENT.matcher(source);
-        while (comments.find()) {
-            Matcher formats = COLOR_TARGET_FORMAT.matcher(comments.group(1).replaceAll("(?m)//[^\\r\\n]*", ""));
-            while (formats.find()) {
-                setColorTargetFormat(settings, Integer.parseInt(formats.group(1)), formats.group(2), sourceFile);
-            }
-        }
+    private static int colorTargetIndex(String name) {
+        name = name.toLowerCase(java.util.Locale.ROOT);
+        return name.startsWith("colortex") ? Integer.parseInt(name.substring(8)) : GeometryColorSamplers.LEGACY.indexOf(name);
     }
 
     private static void setColorTargetFormat(Map<Integer, MutableColorTargetSettings> settings,
@@ -1230,11 +1228,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public void validatePipelineCapabilities() throws IOException {
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         readCustomTextureProperties();
+        readCustomUniforms();
         String required = properties.getProperty("iris.features.required", "").strip();
-        Set<String> supportedFeatures = configuration.customImages()
-                ? Set.of("SSBO", "CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of("SSBO");
+        Set<String> supportedFeatures = supportedFeatures();
         List<String> unsupportedFeatures = java.util.Arrays.stream(required.split("\\s+")).filter(name -> !name.isEmpty())
-                .filter(name -> !supportedFeatures.contains(name)).toList();
+                .filter(name -> !supportedFeatures.contains(name.toUpperCase(java.util.Locale.ROOT))).toList();
         if (!unsupportedFeatures.isEmpty()) {
             throw new IOException("This pack requires Iris features not implemented by Veyra: " + String.join(" ", unsupportedFeatures));
         }
@@ -1723,13 +1721,13 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 ShaderPackOptions.apply(source.get(), configuration.options())));
     }
 
-    /** Reads a compute source with option values applied but leaves feature conditionals for its adapter. */
+    /** Reads a compute source with options and negotiated optional-feature macros applied. */
     public Optional<String> readComputeStage(String fileName) throws IOException {
         if (!fileName.matches("[A-Za-z0-9_]+\\.csh")) throw new IOException("Invalid compute stage name: " + fileName);
         return readCustomImageStage(fileName);
     }
 
-    /** Explicit custom-image preprocessing; ordinary reads retain their existing capability environment. */
+    /** Reads an image-capable stage using this configuration's negotiated feature environment. */
     Optional<String> readCustomImageStage(String fileName) throws IOException {
         if (!fileName.matches("[A-Za-z0-9_]+\\.(?:vsh|fsh|csh)")) throw new IOException("Invalid custom-image stage name: " + fileName);
         String actualFile = programPath(fileName);
@@ -1740,7 +1738,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 included -> readRawShader(included).map(text ->
                         ShaderPackOptions.apply(text, configuration.options())));
         String active = GlslPreprocessor.process(actualFile, expanded,
-                Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1", "IRIS_FEATURE_COMPUTE_SHADERS", "1"));
+                shaderFeatureMacros());
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return Optional.of(IrisUnsetUniforms.apply(active, customUniforms));
@@ -1754,15 +1752,34 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public ShaderPack withRuntimeFeatures() throws IOException {
         if (configuration.customImages()) return this;
         ShaderPack candidate = inspect(path, new ShaderPackConfiguration(configuration.options(), configuration.dimension(), true));
-        return candidate.activeComputeStageFiles().isEmpty() ? this : candidate;
+        return candidate.activeComputeStageFiles().isEmpty() && candidate.readImageProperties().images().isEmpty()
+                ? this : candidate;
     }
 
+    private Set<String> supportedFeatures() {
+        return configuration.customImages()
+                ? Set.of("SSBO", "CUSTOM_IMAGES", "COMPUTE_SHADERS") : Set.of("SSBO");
+    }
+
+    /** Iris exposes every usable feature to properties so a pack can select its optional flags. */
     private Map<String, String> featureOptions(Map<String, String> options) {
-        if (!configuration.customImages()) return options;
         Map<String, String> effective = new java.util.LinkedHashMap<>(options);
-        effective.put("IRIS_FEATURE_CUSTOM_IMAGES", "1");
-        effective.put("IRIS_FEATURE_COMPUTE_SHADERS", "1");
+        supportedFeatures().forEach(feature -> effective.put("IRIS_FEATURE_" + feature, "1"));
         return effective;
+    }
+
+    /** GLSL only receives supported optional flags, not every available or required feature. */
+    private Map<String, String> shaderFeatureMacros() throws IOException {
+        if (configuration.shaderFeatureMacros() != null) return configuration.shaderFeatureMacros();
+        Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        Map<String, String> macros = new java.util.LinkedHashMap<>();
+        for (String feature : properties.getProperty("iris.features.optional", "").strip().split("\\s+")) {
+            if (supportedFeatures().contains(feature.toUpperCase(java.util.Locale.ROOT))) {
+                macros.put("IRIS_FEATURE_" + feature, "1");
+            }
+        }
+        configuration.cacheShaderFeatureMacros(macros);
+        return configuration.shaderFeatureMacros();
     }
 
     private String programPath(String fileName) throws IOException {
@@ -1892,7 +1909,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         String cached = configuration.processed(actualFile);
         if (cached != null) return cached;
         String processed = GlslPreprocessor.process(actualFile, ShaderIncludes.expand(actualFile, source,
-                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))), featureOptions(Map.of()));
+                included -> readRawShader(included).map(text -> ShaderPackOptions.apply(text, configuration.options()))), shaderFeatureMacros());
         // Uniforms Iris never sets read their initializer or 0 there; mirror that with constants.
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());

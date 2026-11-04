@@ -96,6 +96,49 @@ class ShaderPackTest {
     }
 
     @Test
+    void readsLegacyColorFormatsAndCommentedClearSettingsLikeCanonicalTargets() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("legacy-formats/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), """
+                #version 120
+                /*
+                const int gaux1Format = R8;
+                const int gaux2Format = RGB10_A2;
+                const int gaux3Format = RGBA16;
+                const int gaux4Format = RGBA16;
+                const bool gaux1Clear = false;
+                const vec4 gaux1ClearColor = vec4(0.25, 0.5, 0.75, 1.0);
+                */
+                #if 0
+                const int gaux2Format = NOT_A_FORMAT;
+                #endif
+                // const int gaux2Format = RGBA8;
+                void main() {}
+                """);
+        var settings = ShaderPack.inspect(shaders.getParent()).readColorTargetSettings(640, 360, 16_384);
+        assertEquals(VK10.VK_FORMAT_R8_UNORM, settings.get(4).format());
+        assertEquals(VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32, settings.get(5).format());
+        assertEquals(VK10.VK_FORMAT_R16G16B16A16_UNORM, settings.get(6).format());
+        assertEquals(settings.get(6).format(), settings.get(7).format());
+        assertFalse(settings.get(4).clearEachFrame());
+        assertEquals(0xff4080bf, settings.get(4).clearColor());
+        assertEquals("RGB10_A2", ColorTargetSettings.formatName(settings.get(5).format()));
+        assertEquals(4, ColorTargetSettings.formatSize(settings.get(5).format()));
+    }
+
+    @Test
+    void rejectsConflictingLegacyAndCanonicalFormatsForTheSameBuffer() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("legacy-conflict/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), """
+                const int colortex5Format = RGBA8;
+                const int gaux2Format = RGB10_A2;
+                void main() {}
+                """);
+        var pack = ShaderPack.inspect(shaders.getParent());
+        assertTrue(assertThrows(IOException.class, () -> pack.readColorTargetSettings(640, 360, 16_384))
+                .getMessage().contains("conflicting colortex5Format"));
+    }
+
+    @Test
     void readsEveryColorTargetFormatFromOneMultilineCommentBlock() throws IOException {
         Path shaders = Files.createDirectories(directory.resolve("formats/shaders"));
         Path lib = Files.createDirectories(shaders.resolve("lib"));

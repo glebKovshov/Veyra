@@ -34,6 +34,20 @@ public final class ShaderPackUniformAdapter {
     private ShaderPackUniformAdapter() {
     }
 
+    static String samplingProjections(String source) {
+        // Vertex output keeps native clip coordinates; image sampling must pair the forward matrix with Iris' inverse.
+        return source.replaceAll("\\bgbufferProjection\\b", "veyraSamplingProjection")
+                .replaceAll("\\bgbufferPreviousProjection\\b", "veyraSamplingPreviousProjection");
+    }
+
+    static AdaptedShader extractForSampling(String source, String programName) throws IOException {
+        return extractForSampling(source, programName, supportsEntityColorProgram(programName));
+    }
+
+    static AdaptedShader extractForSampling(String source, String programName, boolean entityColorAvailable) throws IOException {
+        return extract(samplingProjections(source), programName, entityColorAvailable);
+    }
+
     public static AdaptedShader extract(String source, String programName) throws IOException {
         return extract(source, programName, supportsEntityColorProgram(programName));
     }

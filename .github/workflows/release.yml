@@ -40,6 +40,8 @@ jobs:
             test "$GITHUB_REF_NAME" = "release/$version"
           fi
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
+      - name: Test shutdown audit tooling
+        run: python3 -m unittest discover -s scripts/tests -v
       - name: Build and test
         run: ./gradlew --no-daemon build validateShaders packageExamplePacks
       - name: Verify distributable contents
@@ -74,3 +76,12 @@ jobs:
           gh release create "$RELEASE_TAG" release-assets/* \
             --target "$GITHUB_SHA" --title "Veyra ${RELEASE_TAG#v}" \
             --notes-file RELEASE_NOTES.md "${release_flags[@]}"
+      - name: Verify downloaded release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          gh release download "$RELEASE_TAG" --dir downloaded-release
+          (cd downloaded-release && sha256sum --check SHA256SUMS.txt)
+          python3 scripts/verify_jar.py "downloaded-release/veyra-${RELEASE_TAG#v}.jar"

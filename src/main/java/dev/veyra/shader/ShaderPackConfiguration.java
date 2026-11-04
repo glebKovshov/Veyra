@@ -15,6 +15,7 @@ public final class ShaderPackConfiguration {
     private int processedChars;
     private ShaderPackOptions definitions;
     private ShaderPackCustomTextureProperties customTextureProperties;
+    private Map<String, String> shaderFeatureMacros;
     private Boolean shadowFragment;
     private final Map<String, Boolean> programs = new HashMap<>();
 
@@ -30,6 +31,8 @@ public final class ShaderPackConfiguration {
     public Map<String, String> options() { return options; }
     public int dimension() { return dimension; }
     boolean customImages() { return customImages; }
+    Map<String, String> shaderFeatureMacros() { return shaderFeatureMacros; }
+    void cacheShaderFeatureMacros(Map<String, String> macros) { shaderFeatureMacros = Map.copyOf(macros); }
     Optional<String> source(String name) { return sources.get(name); }
     void cacheSource(String name, Optional<String> source) {
         int chars = source.map(String::length).orElse(0);

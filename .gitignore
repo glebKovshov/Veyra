@@ -10,3 +10,5 @@ __pycache__/
 .vscode/
 hs_err_pid*
 replay_pid*
+validation-output/
+.lwjgl/

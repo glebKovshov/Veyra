@@ -43,9 +43,10 @@ public abstract class GraphicsDescriptorsMixin {
             VulkanImage image = descriptor.getImage();
             String key = pipeline.getLocation() + ":" + descriptor.name;
             if (image != null && veyra$seen.add(key)) LoggerFactory.getLogger("veyra-graphics-smoke").info(
-                    "Descriptor evidence: pipeline={} sampler={} binding={} type={} image={} handle={} layout={}",
+                    "Descriptor evidence: pipeline={} sampler={} binding={} type={} image={} handle={} layout={} view={} sampledView={}",
                     pipeline.getLocation(), descriptor.name, descriptor.getBinding(), descriptor.getType(), image.name,
-                    Long.toHexString(image.getId()), image.getCurrentLayout());
+                    Long.toHexString(image.getId()), image.getCurrentLayout(),
+                    Long.toHexString(image.getImageView()), Long.toHexString(descriptor.getImageView(image)));
         }
         for (var buffer : nativePipeline.getBuffers()) {
             if (!(buffer instanceof VeyraStorageBufferUBO)) continue;
