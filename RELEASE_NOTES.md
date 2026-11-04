@@ -1,25 +1,40 @@
-# Veyra 1.0.0 release preparation
+# Veyra 1.0.0
 
-Unpublished candidate for Minecraft 1.21.11 and VulkanMod 0.6.8. Production metadata remains 0.2.3 until the final stability gates pass.
+First stable release of Veyra for Minecraft 1.21.11 and VulkanMod 0.6.8. It runs a checked subset of Iris shaderpack programs on VulkanMod and rejects unsupported features with a diagnostic, not a partly working pipeline.
 
-## Changes
+## Changes since 0.2.3
 
-- Fix Iris capability negotiation and scalar/vector custom-uniform dependencies, including forward references, cycle rejection and registry restoration when switching packs.
-- Support graphics-only custom images and custom noise textures with explicit ownership and synchronization.
-- Correct reflection sampling projections, horizon coverage, camera cloud height, active block-comment settings and legacy color-target directives.
-- Preserve packed/wide storage, including native `R11F_G11F_B10F` on supported devices, filtered color inputs and RGB alpha semantics in primary/auxiliary targets and mipmapped snapshots.
-- Fix loading-overlay swapchain acquisition, clear/upload/depth/index dependencies, screenshot readback ordering and resource/view cleanup.
-- Reduce repeated GLSL declaration scans and extend GPU regressions for invalid replacement, switching packs and native screenshot equality.
+- Iris compatibility: capability macros and optional-feature negotiation now match Iris. Scalar and float-vector custom uniforms resolve forward references, reject cycles and restore their registrations when you switch packs. Block-comment `const` settings and legacy render-target aliases are read. The cloud height comes from the camera environment.
+- Rendering: current and previous reflection sampling projections are corrected, and the Iris-style horizon is drawn. Graphics-only custom images and custom noise textures are supported.
+- Formats: packed and wide render targets keep their storage, including native `R11F_G11F_B10F` where the device supports it. Auxiliary color inputs use linear filtering. RGB targets keep alpha one through RGBA fallbacks and mipmapped snapshots.
+- Vulkan: fixed clear, upload, depth and index dependencies, swapchain acquisition during loading overlays, screenshot readback ordering, and native resource/view cleanup.
+- Swapchain recovery: the swapchain is rebuilt when a resize or restore reaches VulkanMod while the window surface is still 0x0. Before this fix the game could stay on a 10x10 placeholder until the window was resized again.
+- Performance: shaderpack loading no longer repeats GLSL declaration scans on large uniform-only headers.
 
 ## Installation
 
-Requires Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8, and Java 21 or newer.
+Requires Minecraft 1.21.11, Fabric Loader 0.18.4 or newer, VulkanMod 0.6.8 and Java 21 or newer.
 
-The eventual release will provide the install JAR, a sources JAR, an example-packs ZIP and `SHA256SUMS.txt`. Use the install JAR beside VulkanMod, remove older Veyra JARs, and press F6 to select/configure a shader pack. Shaderpack archives are not redistributed or modified by Veyra.
+Assets: the install JAR `veyra-1.0.0+mc1.21.11.jar`, a sources JAR, an example-packs ZIP and `SHA256SUMS.txt`. Put the install JAR beside VulkanMod and remove older Veyra JARs. Press F6 in game to select and configure a shaderpack. Veyra does not redistribute or modify shaderpack archives.
 
-## Validation and limits
+## Validation
 
-- Current local production-code checks pass 671 JUnit tests, seven Python tests, 105 example sources / 123 Vulkan SPIR-V compilations, packaging and JAR verification. The pinned source audit passes 75 profile/dimension cases, 939 geometry programs and 18 active compute stages. Source acceptance does not establish runtime visuals.
-- All four selected profiles completed RTX 3070 lifecycles with zero Vulkan core/sync/teardown errors on the 0b94709 baseline. The native packed-HDR follow-up passes BSL's full lifecycle and the focused rollback/switch/readback fixture; the remaining three repeats, hosted checks and release-ref checks are pending. See STABILITY_1_0.md and WORK_SUMMARY.md for exact evidence.
-- Publication requires the source audit, Lavapipe graphics matrix, build/tests, shader compilation and distributable verification. The publication workflow also downloads its assets and verifies checksums and JAR contents.
-- Veyra supports a checked subset of Iris programs, with 16 color targets and explicit unsupported-feature diagnostics. World rendering still uses VulkanMod's native primary attachment, so HDR range/quantization across world/post boundaries can differ from Iris. Full visual parity and arbitrary pack/profile/GPU compatibility are not certified. See COMPATIBILITY.md for remaining rendering differences and measured limits.
+- JDK 21 checks: 672 JUnit tests and seven Python tests pass, 105 example sources compile to 123 Vulkan SPIR-V modules, and the packaging/JAR checks pass. The pinned source audit covers 4 packs × 3 dimensions in 75 cases: 939 geometry programs and 18 active compute stages, none rejected.
+- Matched Veyra/Iris 1.10.8 runs (RTX 3070) for each pinned profile. Each pair uses byte-identical shader files, the same resolved options, the same scene and a fixed animation clock. Iris confirmed each profile with zero user changes. Each Veyra run then completes a full lifecycle with zero Khronos core/synchronization errors and a clean teardown audit: forced 0x0 surface recovery, resize, Nether and back, disable/re-enable and resource reload.
+
+  | Pack / profile | Shader files | RGB MAE vs Iris (full / wall / floor, of 255) |
+  | --- | --- | --- |
+  | Complementary Reimagined r5.9.3 HIGH | 426 | 4.08 / 4.18 / 3.08 |
+  | Complementary Unbound r5.9.3 COMPLEMENTARY | 426 | 4.24 / 4.38 / 2.48 |
+  | Sildur's Vibrant v2.02 Extreme, defaults | 137 | 3.13 / 1.15 / 3.36 |
+  | BSL 10.1.8 HIGH, natural ocean scene | 292 | 3.64 / 4.23 / 2.45 |
+
+- Hosted gates: the Lavapipe graphics matrix (54 fixtures with Vulkan validation, rollback, pack switching and readback), the source audit, the build and shader compilation. The publication workflow downloads its own assets and checks them against SHA256SUMS.txt and the JAR metadata.
+
+## Known limits
+
+- Pixel parity with Iris is not certified. The remaining differences come from screen-origin sampling phases, storage precision and VulkanMod's native primary attachment between the world and post phases. Water/reflection and temporal differences are still visible in matched frames.
+- Up to 16 logical color buffers (Iris allows 32) and 8 simultaneous outputs. Geometry/tessellation stages, matrix and integer-vector custom uniforms, and unsupported native inputs are rejected with a diagnostic.
+- Hardware validation covers an RTX 3070 and Lavapipe. Other GPUs, packs and profiles are untested.
+
+See COMPATIBILITY.md for the full contract and STABILITY_1_0.md for the release evidence.

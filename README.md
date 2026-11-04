@@ -2,9 +2,9 @@
 
 Veyra is a client-side shader mod for Minecraft 1.21.11 on Fabric with VulkanMod 0.6.8. It runs a supported subset of Iris shader pack programs on VulkanMod.
 
-Download Veyra 0.2.3 from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). This patch fixes mipmapped post-pass sampler bindings so shader packs can sample colortex snapshots for exposure and reflections. It also keeps inventory items on vanilla pipelines and fixes shader resource initialization crashes. See [CHANGELOG.md](CHANGELOG.md) for the changes and [COMPATIBILITY.md](COMPATIBILITY.md) for measured limits; full Iris visual parity remains unverified.
+Download Veyra 1.0.0, the first stable release, from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). It fixes Iris capability negotiation and custom-uniform dependencies, reflection sampling matrices, the Iris horizon, block-comment settings, render-target formats and RGB sampling, and Vulkan synchronization, swapchain recovery and resource cleanup. See [CHANGELOG.md](CHANGELOG.md) for the changes and [COMPATIBILITY.md](COMPATIBILITY.md) for the supported contract and measured differences from Iris; pixel parity with Iris is not claimed.
 
-The `feature/stable-1.0.0` branch contains the integrated 1.0 candidate: Iris capability and custom-uniform fixes, graphics storage images, custom noise, corrected reflection matrices, horizon rendering, RGB sampling semantics, and Vulkan synchronization/resource cleanup. Its final release checks are still running. See [STABILITY_1_0.md](STABILITY_1_0.md) for readiness and [WORK_SUMMARY.md](WORK_SUMMARY.md) for evidence; the development branch is not a published 1.0.0 release.
+The release was gated on four pinned shaderpack profiles (Complementary Reimagined/Unbound r5.9.3, BSL 10.1.8, Sildur v2.02) compared against Iris 1.10.8 in matched scenes, full GPU lifecycles under Khronos core/synchronization validation, the pinned source audit and the hosted Lavapipe matrix. See [STABILITY_1_0.md](STABILITY_1_0.md) for the release evidence.
 
 Cloud fragments can sample a pre-cloud copy of scene color through `colortex0` and its documented aliases, Veyra's `noisetex`, or the active Minecraft cloud image through `texture`. Supported cloud samplers accept `texture`, `texture2D`, `textureLod`, legacy `texture2DLod`, and `textureSize`; the scene copy requires a transferable Vulkan color image. When a supported `gbuffers_clouds.vsh` requests UVs or normals, Veyra rebuilds the cloud mesh with per-quad texture coordinates and flat face normals; BSL's `sunVec`, `upVec`, and `eastVec` are also bridged. The cloud vertex adapter also prunes unreachable shared helpers and supports active fog fields, legacy model-view matrices, `texcoord`, and `dist` where VulkanMod provides those values. `examples/cloud-colortex0`, `examples/cloud-texture-inputs`, and `examples/cloud-model-view` exercise synthetic inputs on Lavapipe; they do not establish full third-party pack visuals.
 
@@ -19,7 +19,7 @@ Terrain, entity-family and post programs can sample the completed shadow pass co
 ## Install and use
 
 1. Install Fabric Loader 0.18.4 or newer and VulkanMod 0.6.8 for Minecraft 1.21.11. The published VulkanMod JAR includes its required Fabric API modules and Vulkan libraries. Development runs additionally declare those runtime libraries in Gradle because Loom does not expose every nested dependency on the dev classpath.
-2. Install `veyra-0.2.3+mc1.21.11.jar` from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). Put the mod JAR in the instance mods folder and remove older Veyra JARs. The sources JAR is for development.
+2. Install `veyra-1.0.0+mc1.21.11.jar` from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases). Put the mod JAR in the instance mods folder and remove older Veyra JARs. The sources JAR is for development.
 3. Put a shader pack folder or zip in `shaderpacks`.
 4. Press F6 in game and select a pack.
 

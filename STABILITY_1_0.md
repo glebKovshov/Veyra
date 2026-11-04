@@ -1,20 +1,19 @@
 # Veyra 1.0.0 readiness
 
-## Current completion audit
+## Release completion audit
 
-Completed baseline: `0b94709`; the native packed-HDR follow-up is undergoing final repeats. Development metadata is still 0.2.3; no 1.0.0 tag or release has been created.
+Final production candidate: `e804e2d` (production sources unchanged by the 1.0.0 metadata/docs commit). Local raw evidence lives in ignored `validation-output/` and is reproducible with `scripts/run_iris_comparison.py`; the recorded hashes and metrics are in [validation/stable-1.0-candidate.json](validation/stable-1.0-candidate.json). Raw local reports named in older sections below were lost on 2026-11-04 (see WORK_SUMMARY.md); their recorded measurements are retained as history only.
 
-| Requirement | Authoritative evidence | Current state |
+| Requirement | Evidence | State |
 | --- | --- | --- |
-| Unit, tooling, shader and package checks | `build/reports/candidate-0b94709-unit-results/`, `build/renamer-full-gate.log`, explicit `scripts/verify_jar.py` run | 670 JUnit / seven Python tests, 105 sources / 123 SPIR-V, packaging and JAR checks pass. |
-| Pinned source/profile acceptance | `build/reports/stable10-renamer-source-audit/` | 75 cases, 939 geometry programs, 18 active compute stages, no rejected stages. |
-| Reimagined HIGH paired rendering and lifecycle | `stable10-renamer-workingtree-veyra-reimagined-high/` and `stable10-candidate-12f1c56-iris-reimagined-high/` | Production source hashes match; all lifecycle flags and strict zero-error Vulkan/teardown checks pass. Matched Iris comparison is recorded. |
-| Unbound COMPLEMENTARY, Sildur defaults and BSL HIGH natural | `build/candidate-0b94709-remaining.log`, corrected Unbound Iris report, `validation/stable-1.0-candidate.json` | All three baseline lifecycles pass. Matched references require the actual profile/clock/capture; wrong-profile Unbound HIGH is excluded. |
-| Native packed-HDR follow-up | `build/reports/native-r11-unit-results/`, `stable10-native-r11-source-audit/`, `stable10-native-r11-custom-uniforms/`, `build/native-r11-candidate.log` | 671 tests, 75 audit cases and the GPU packed-format/rollback/switch/readback probe pass. BSL full lifecycle is Vulkan/teardown-clean; other profile repeats are running. |
-| Rollback, cross-pack switching and native readback | Current hosted graphics matrix plus local RGB round-trip reports | Local probes pass; hosted candidate results still required. |
-| Full hosted build/source/graphics gates | PR #152 checks on the candidate head | In progress at the latest verified read. Missing or failed jobs cannot be counted as passes. |
-| Explain visual differences and define release scope | Matched captures, `validation/iris-bsl-phase-analysis.json`, COMPATIBILITY.md | Full parity is not certified; the residual BSL composition/reflection gap remains under analysis. |
-| Versioned release and downloaded-asset verification | Release workflow, tag, downloaded checksums and JAR metadata | Not started. Select 1.0.0 metadata only after readiness is established. |
+| Unit, tooling, shader and package checks | `validation-output/final-e804e2d/build-gate-rerun.log` (`--rerun-tasks`, no build cache) | 672 JUnit (0 failures/errors/skips), seven Python tests, 105 sources / 123 SPIR-V, packaging and JAR verification pass. |
+| Pinned source/profile acceptance | `validation-output/final-e804e2d/source-audit/` | 75 cases, 939 geometry programs, 18 active compute stages, zero rejections. |
+| Matched Iris comparison and full lifecycle, four pinned profiles | `validation-output/final-e804e2d-matrix/summary.json`, manifest `finalCandidate` | All four pass: identical shader trees, Iris confirms the profile with +0 user changes, fixed clocks; Veyra completes forced 0x0 surface recovery, resize, Nether/return, disable/re-enable and reload with zero core/sync diagnostics and a clean teardown audit. RGB MAE/255 (full): Reimagined 4.08, Unbound 4.24, Sildur 3.13, BSL natural 3.64. |
+| Surface-loss regression | Compute-setup positive/negative fixtures and all lifecycle cases | No-fix control fails with a 10x10 main pass; fixed runs recover. CI requires `surfaceLossRecovered`. |
+| Rollback, cross-pack switching and native readback | Hosted graphics matrix (custom-uniforms, compute-ssbo-only, graphics-custom-image, water-color-inputs) | Required on the release head. |
+| Full hosted build/source/graphics gates | PR #152 checks and the release workflow | Required on the release head; dependency-resolution failures before Minecraft starts are retried, nothing else is relaxed. |
+| Explain visual differences and define release scope | COMPATIBILITY.md, `validation/iris-bsl-phase-analysis.json` | Remaining differences are attributed to sampling phase, storage precision and VulkanMod's primary attachment; pixel parity is explicitly not claimed. |
+| Versioned release and downloaded-asset verification | Release workflow and a local download check | `1.0.0+mc1.21.11` metadata selected after the gates above passed. |
 
 ## 2026-11-03 loading-cost follow-up
 

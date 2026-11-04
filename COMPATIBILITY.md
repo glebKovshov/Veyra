@@ -1,10 +1,10 @@
 # Shaderpack compatibility
 
-## 1.0 candidate scope
+## 1.0 scope
 
 Veyra translates a checked subset of Iris shaderpack programs to VulkanMod; it does not run Iris itself. The pinned comparison source is Iris Minecraft 1.21.11 commit `0a1fcaae55099356bf53410b4f5302753edb0ffc`, while the capture harness uses Iris 1.10.8 with Sodium 0.8.14. Keep source-contract comparisons separate from those runtime versions.
 
-| Contract | Veyra candidate | Remaining boundary |
+| Contract | Veyra 1.0 | Remaining boundary |
 | --- | --- | --- |
 | Color targets | 16 logical buffers; up to eight simultaneous outputs; legacy aliases, packed/wide storage and RGB alpha semantics | Pinned Iris exposes [32 buffers](https://github.com/IrisShaders/Iris/blob/0a1fcaae55099356bf53410b4f5302753edb0ffc/common/src/main/java/net/irisshaders/iris/gl/IrisLimits.java). More than 16 is unsupported. |
 | Color sampling | Linear/clamp auxiliary color inputs, per-pass mipmaps, snapshots inherit logical RGB channels | Same-image geometry feedback uses a deterministic pass-start snapshot; arbitrary OpenGL feedback behavior is not reproduced. |
@@ -13,7 +13,7 @@ Veyra translates a checked subset of Iris shaderpack programs to VulkanMod; it d
 | Programs/resources | Checked geometry vertex subsets, post/compute families, custom textures/noise, SSBOs and supported graphics images | Geometry/tessellation stages and unsupported native inputs/routes fail with diagnostics. Hardware storage features are checked separately. |
 | Lifecycle | Failed-replacement rollback, pack switching, resize, dimension changes, disable/re-enable and reload have focused GPU fixtures | A passed synthetic fixture does not certify arbitrary pack profiles, worlds or GPUs. |
 
-Final-candidate comparisons target Complementary Reimagined r5.9.3 HIGH, Complementary Unbound r5.9.3 COMPLEMENTARY, BSL 10.1.8 HIGH and Sildur v2.02 Extreme defaults. All four completed Vulkan-clean lifecycles on the `0b94709` baseline; [the matched comparison manifest](validation/stable-1.0-candidate.json) excludes a wrong-profile Iris Unbound HIGH capture. The native packed-HDR follow-up has passed BSL's full lifecycle; the other three repeats and hosted gates are running. Historical results below retain their original scope. [STABILITY_1_0.md](STABILITY_1_0.md) tracks the outstanding release evidence.
+Veyra 1.0.0 was gated on Complementary Reimagined r5.9.3 HIGH, Complementary Unbound r5.9.3 COMPLEMENTARY, BSL 10.1.8 HIGH (natural ocean scene) and Sildur v2.02 Extreme defaults. On the final production commit `e804e2d`, each profile passed a matched Iris 1.10.8 capture (identical shader files and options, fixed clocks) and a full Veyra lifecycle under Khronos core/synchronization validation with a clean teardown audit. RGB MAE against Iris is 4.08, 4.24, 3.64 and 3.13 of 255 respectively; see [the comparison manifest](validation/stable-1.0-candidate.json). Historical results below retain their original scope.
 
 Pixel equality with Iris is not certified. BSL diagnostic controls reproduce cloud color/density after aligning Bayer Y phase, but changing that phase alone does not remove the full-frame composition/reflection difference. Read [the measured controls](validation/iris-bsl-phase-analysis.json) as diagnostics, not stock shaderpack certification. Hardware validation currently covers an RTX 3070 and the hosted Lavapipe matrix; other physical GPUs remain unverified.
 
