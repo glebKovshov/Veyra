@@ -16,6 +16,33 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ShaderAdapterTest {
+    @Test
+    void linksStructVaryingsAfterTheirDefinitionsAndReservesAllLocations() throws Exception {
+        String definition = "struct Fog { vec3 color; mat3 basis; };\n";
+        String source = "#version 130\n" + definition
+                + "out Fog fog;\nout vec4 following;\nvoid main() {}\n";
+        var varyings = TerrainVertexShaderAdapter.validateAndGetVaryings("gbuffers_terrain", source);
+        assertEquals(20, varyings.get("fog").location());
+        assertEquals(24, varyings.get("following").location());
+        String fragment = TerrainShaderAdapter.adaptFragment(definition
+                + "in Fog fog;\nin vec4 following;\nvoid main(){gl_FragColor=vec4(fog.color,1.0)+following;}",
+                false, false, varyings);
+        assertTrue(fragment.indexOf("struct Fog") < fragment.indexOf("in Fog fog;"), fragment);
+        assertTrue(fragment.contains("layout(location = 20) in Fog fog;"), fragment);
+        assertTrue(fragment.contains("layout(location = 24) in vec4 following;"), fragment);
+        assertThrows(IOException.class, () -> TerrainVertexShaderAdapter.validate("gbuffers_terrain",
+                "#version 130\nstruct Flags { int value; };\nout Flags flags;\nvoid main(){}"));
+    }
+
+    @Test
+    void acceptsNarrowTerrainAttributeDeclarations() throws Exception {
+        for (String type : new String[]{"float", "vec2", "vec3", "vec4"}) {
+            TerrainVertexShaderAdapter.validate("gbuffers_terrain", "#version 130\nattribute " + type
+                    + " mc_Entity;\nattribute " + type + " mc_midTexCoord;\n"
+                    + "void main(){ gl_Position=vec4(mc_Entity)+vec4(mc_midTexCoord); }");
+        }
+    }
+
     @TestFactory
     List<DynamicTest> adaptsTerrainAndEntityExamples() throws IOException {
         try (Stream<Path> files = Files.walk(Path.of("examples"))) {

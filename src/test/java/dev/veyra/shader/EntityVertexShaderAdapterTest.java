@@ -12,6 +12,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityVertexShaderAdapterTest {
     @Test
+    void narrowsMcEntityToItsDeclaredFloatType() throws Exception {
+        String[] types = {"float", "vec2", "vec3", "vec4"};
+        String[] suffixes = {".x", ".xy", ".xyz", ""};
+        for (int i = 0; i < types.length; i++) {
+            String pack = "#version 120\nattribute " + types[i] + " mc_Entity;\n"
+                    + "void main(){gl_Position=ftransform()+vec4(mc_Entity);}";
+            String adapted = EntityVertexShaderAdapter.validate("gbuffers_block", pack, false).source();
+            assertFalse(adapted.contains("mc_Entity"), adapted);
+            assertTrue(adapted.contains("vec4(0.0, 0.0, 0.0, 1.0)"), adapted);
+            if (i < 3) assertTrue(adapted.contains(")" + suffixes[i]), adapted);
+        }
+    }
+
+    @Test
     void legacyEntityMatricesMoveViewEffectsWithoutApplyingThemTwice() throws Exception {
         String pack = """
                 #version 120

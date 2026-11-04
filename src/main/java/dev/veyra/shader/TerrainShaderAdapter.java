@@ -482,6 +482,7 @@ public final class TerrainShaderAdapter {
         Map<String, String> computedVaryingExpressions = new java.util.LinkedHashMap<>();
         StringBuilder packVaryingDeclarations = new StringBuilder();
         Set<Integer> requiredTerrainInputLocations = new HashSet<>();
+        GlslStructTypes structs = GlslStructTypes.parse(adapted);
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(2);
             String name = varyingMatcher.group(3);
@@ -495,6 +496,16 @@ public final class TerrainShaderAdapter {
                 if (!packVarying.interpolation().equals(interpolation)) {
                     throw new IOException("gbuffers_terrain input '" + name
                             + "' has an interpolation qualifier that does not match its vertex output.");
+                }
+                if (structs.contains(type)) {
+                    // Struct inputs stay where the pack declared them, after their definition.
+                    varyingMatcher.appendReplacement(withoutVaryings, Matcher.quoteReplacement(
+                            "layout(location = " + packVarying.location() + ") "
+                                    + (interpolation.equals("smooth") ? "" : interpolation + " ")
+                                    + "in " + type + ' ' + name + ";\n"));
+                    linkedPackVaryings.put(name, name);
+                    declaredVaryings.add(name);
+                    continue;
                 }
                 String fragmentVariable = packVarying.fixedBridge()
                         ? fixedFragmentVariable(packVarying.location()) : null;
@@ -569,6 +580,7 @@ public final class TerrainShaderAdapter {
                     && declaredVaryings.contains(name)) {
                 continue;
             }
+            if (ShaderSource.declaresVariable(uncommented, name)) continue;
             throw new IOException("gbuffers_terrain input '" + name + "' is not provided by Veyra's terrain bridge yet.");
         }
         if (UNSUPPORTED_TEXTURE_FUNCTION.matcher(uncommented).find()) {

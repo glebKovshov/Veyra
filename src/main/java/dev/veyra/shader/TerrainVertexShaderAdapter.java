@@ -224,31 +224,47 @@ final class TerrainVertexShaderAdapter {
         Matcher attributes = ATTRIBUTE_DECLARATION.matcher(ShaderSource.maskBlockAndLineComments(source));
         StringBuffer withoutAttributes = new StringBuffer();
         List<String> declaredAttributes = new ArrayList<>();
+        Map<String, String> narrowedAttributes = new java.util.LinkedHashMap<>();
         String midBlockType = null;
         while (attributes.find()) {
             String type = attributes.group(1);
             String name = attributes.group(2);
-            String expected = switch (name) {
-                case "mc_Entity", "mc_midTexCoord", "at_tangent" -> "vec4";
-                case "at_midBlock" -> type.equals("vec4") ? "vec4" : "vec3";
-                default -> null;
+            // A GL attribute declared narrower than the supplied vec4 reads its leading components
+            // (Photon declares vec3 mc_Entity and vec2 mc_midTexCoord).
+            boolean supported = switch (name) {
+                case "mc_Entity", "mc_midTexCoord" -> Set.of("float", "vec2", "vec3", "vec4").contains(type);
+                case "at_tangent" -> type.equals("vec3") || type.equals("vec4");
+                case "at_midBlock" -> type.equals("vec3") || type.equals("vec4");
+                default -> false;
             };
-            if (expected == null) {
+            if (!Set.of("mc_Entity", "mc_midTexCoord", "at_tangent", "at_midBlock").contains(name)) {
                 throw new IOException(programName + ".vsh attribute '" + name
                         + "' is not present in VulkanMod's terrain vertex format yet.");
             }
-            if (!type.equals(expected)) {
-                throw new IOException(programName + ".vsh attribute '" + name + "' must use " + expected + ".");
+            if (!supported) {
+                throw new IOException(programName + ".vsh attribute '" + name + "' must use "
+                        + (name.equals("at_tangent") || name.equals("at_midBlock") ? "vec3 or vec4" : "float or a float vector")
+                        + ".");
             }
             if (declaredAttributes.contains(name)) {
                 throw new IOException(programName + ".vsh declares attribute '" + name + "' more than once.");
             }
             declaredAttributes.add(name);
             if (name.equals("at_midBlock")) midBlockType = type;
+            else if (!type.equals("vec4")) narrowedAttributes.put(name, type);
             attributes.appendReplacement(withoutAttributes, "");
         }
         attributes.appendTail(withoutAttributes);
         source = withoutAttributes.toString();
+        for (Map.Entry<String, String> narrowed : narrowedAttributes.entrySet()) {
+            String swizzle = switch (narrowed.getValue()) {
+                case "float" -> ".x";
+                case "vec2" -> ".xy";
+                default -> ".xyz";
+            };
+            source = source.replaceAll("\\b" + narrowed.getKey() + "\\b",
+                    Matcher.quoteReplacement("(" + narrowed.getKey() + ")" + swizzle));
+        }
         if (midBlockType != null) {
             source = source.replaceAll("\\bat_midBlock\\b",
                     midBlockType.equals("vec4") ? "VeyraTerrainMidBlock" : "VeyraTerrainMidBlock.xyz");
@@ -341,6 +357,7 @@ final class TerrainVertexShaderAdapter {
             FixedOutput fixed = fixedOutput(fixedMatcher.group(5), fixedMatcher.group(4), interpolation);
             if (fixed != null) occupiedLocations.add(fixed.location());
         }
+        GlslStructTypes structs = GlslStructTypes.parse(source);
         while (matcher.find()) {
             String interpolation = mergeInterpolation(matcher.group(2), matcher.group(3),
                     programName, matcher.group(5));
@@ -349,6 +366,30 @@ final class TerrainVertexShaderAdapter {
             if (name.equals("mc_Entity")) {
                 throw new IOException(programName
                         + ".vsh cannot redeclare mc_Entity as an output because it is the terrain material vertex input.");
+            }
+            if (structs.contains(type)) {
+                // The struct is defined inside the pack source, after Veyra's bridge declarations, so keep the
+                // output where the pack declared it and only give it consecutive interface locations.
+                if (varyings.containsKey(name)) {
+                    throw new IOException(programName + ".vsh declares vertex output '" + name + "' more than once.");
+                }
+                if (structs.hasIntegerMembers(type) && !interpolation.equals("flat")) {
+                    throw new IOException(programName + ".vsh struct output '" + name + "' has integer members and must use flat interpolation.");
+                }
+                int span = structs.locationSpan(type);
+                int location = allocateOutputLocation(occupiedLocations, nextLocation, span);
+                if (location < 0) {
+                    throw new IOException(programName + ".vsh has too many vertex outputs for Veyra's terrain interface.");
+                }
+                for (int occupied = location; occupied < location + span; occupied++) occupiedLocations.add(occupied);
+                if (location >= 20) nextLocation = location + span;
+                varyings.put(name, new PackVarying(type, interpolation, location, name, false));
+                outputSource.append(source, copiedThrough, matcher.start())
+                        .append("layout(location = ").append(location).append(") ")
+                        .append(interpolation.equals("smooth") ? "" : interpolation + " ")
+                        .append("out ").append(type).append(' ').append(name).append(';');
+                copiedThrough = matcher.end();
+                continue;
             }
             if (!isSupportedVaryingType(type)) {
                 throw new IOException(programName + ".vsh output '" + name

@@ -1,3 +1,12 @@
+## 2026-11-04: Photon adapter groundwork verified (not full support)
+
+- Continued the interrupted Photon work: terrain interfaces retain struct definitions before their input/output declarations and reserve consecutive locations for nested members, arrays and matrices. Narrow float/vector legacy attributes read the leading components of the supplied vec4; entity mc_Entity supports the same narrowing.
+- Hardened the new struct parser: unknown or partially parsed members, unresolved/multidimensional arrays, zero/oversized counts and integer overflow cannot silently produce an undersized interface allocation. Integer-member structs require flat interpolation. Added parser, terrain-linking, narrowing and local-name-filter regressions.
+- JDK 21: 679 JUnit tests, zero failures/errors/skips; build and graphics harness compilation pass. Seven Python tests pass. Shader gate passes 105 example sources / 123 SPIR-V compilations, example packaging and explicit distributable JAR verification. Logs: build/codex-continuation-{gate,tests}.log and build/codex-shader-gate.log.
+- Pinned audit: all 75 cases, 939 geometry fragments and 18 active compute stages pass with zero errors (build/codex-pinned-audit.log; build/reports/external-shaderpacks/).
+- Photon v1.4 remains unsupported: default Overworld source audit accepts 6 geometry fragments and rejects 8, with one rejected compute stage. Remaining errors include NEW_ENTITY at_tangent, entity struct varying OverworldFogParameters, built-in colorimg4/colortex4 compute access, and two disabled-post preprocessing diagnostics requiring investigation. Report: validation-output/photon/codex-audit.log. Gradle success alone is not pack acceptance.
+- No fresh GPU lifecycle/visual validation, installation, push or release for these changes. Keep the installed dev.14 client intact; the local build output with that version contains this uninstalled follow-up.
+
 ## 2026-11-04: Veyra 1.0.0 published
 
 - PR #152 head `4698621` passed all 58 hosted checks (Build #1100/#1099, source audit #318, Graphics smoke #364 with 54 Lavapipe fixtures) and was merged as `8c23dbf`. `release/1.0.0+mc1.21.11` at that commit ran Release workflow 41825845708: all 57 jobs passed (source audit, Lavapipe baseline plus 54 graphics fixtures, build/tests, publication and in-workflow download verification).

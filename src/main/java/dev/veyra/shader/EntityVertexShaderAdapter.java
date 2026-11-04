@@ -52,7 +52,7 @@ final class EntityVertexShaderAdapter {
     private static final Pattern SHADOW_PROJECTION_DECLARATION = Pattern.compile("\\buniform\\s+mat4\\s+shadowProjection\\s*;");
     private static final Pattern MC_ENTITY_ATTRIBUTE_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
-                    + "(?:attribute|in)\\s+vec4\\s+mc_Entity\\s*;"
+                    + "(?:attribute|in)\\s+(float|vec2|vec3|vec4)\\s+mc_Entity\\s*;"
                     + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern MC_ENTITY_ATTRIBUTE_START = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\([^)]*+\\)\\s*)?"
@@ -344,10 +344,19 @@ final class EntityVertexShaderAdapter {
         Matcher declarations = MC_ENTITY_ATTRIBUTE_DECLARATION.matcher(masked);
         StringBuilder withoutDeclarations = new StringBuilder(source.length());
         int cursor = 0;
+        String declaredType = "vec4";
         while (declarations.find()) {
             withoutDeclarations.append(source, cursor, declarations.start());
             cursor = declarations.end();
+            declaredType = declarations.group(1);
         }
+        // A narrower declaration reads the leading components of the supplied vec4 (Photon uses vec3).
+        value = switch (declaredType) {
+            case "float" -> "(" + value + ").x";
+            case "vec2" -> "(" + value + ").xy";
+            case "vec3" -> "(" + value + ").xyz";
+            default -> value;
+        };
         withoutDeclarations.append(source, cursor, source.length());
         String clean = withoutDeclarations.toString();
         String cleanMasked = ShaderSource.maskBlockAndLineComments(clean);

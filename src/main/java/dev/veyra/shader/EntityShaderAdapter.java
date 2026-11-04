@@ -1048,8 +1048,9 @@ public final class EntityShaderAdapter {
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
         Pattern unsupportedInputs = !textPipeline ? UNSUPPORTED_ENTITY_INPUT
                 : suppliesTextNormal ? UNSUPPORTED_TEXT_INPUT_WITH_NORMAL : UNSUPPORTED_TEXT_INPUT;
-        if (unsupportedInputs.matcher(uncommented).find()) {
-            throw new IOException(programName + " uses inputs that Veyra's "
+        String unsupportedInput = ShaderSource.firstUndeclaredUse(unsupportedInputs, uncommented);
+        if (unsupportedInput != null) {
+            throw new IOException(programName + " uses input '" + unsupportedInput + "' that Veyra's "
                     + (textPipeline ? "sign-text" : "entity") + " bridge does not provide yet.");
         }
         if (!suppliesNormal && !textPipeline && NORMAL_REFERENCE.matcher(uncommented).find()) {

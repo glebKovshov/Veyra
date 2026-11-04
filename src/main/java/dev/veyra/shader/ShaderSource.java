@@ -46,4 +46,28 @@ final class ShaderSource {
         }
         return new String(out);
     }
+
+    private static final String VALUE_TYPE =
+            "(?:float|double|int|uint|bool|[biud]?vec[234]|d?mat[234](?:x[234])?)";
+
+    /**
+     * Whether the (comment-free) source declares this identifier itself, as a local, global or parameter.
+     * Legacy input names such as {@code tangent} are also common local variable names (Photon builds a
+     * tangent frame in a helper); such a declaration is not a use of the stage input.
+     */
+    // shortcut: this is a declaration-name filter, rely on GLSL compilation for scope validation.
+    static boolean declaresVariable(String uncommentedSource, String name) {
+        return java.util.regex.Pattern.compile("\\b" + VALUE_TYPE + "\\s+" + java.util.regex.Pattern.quote(name) + "\\b")
+                .matcher(uncommentedSource).find();
+    }
+
+    /** The first identifier the pattern finds that the source does not declare itself, or null. */
+    static String firstUndeclaredUse(java.util.regex.Pattern identifiers, String uncommentedSource) {
+        java.util.regex.Matcher matcher = identifiers.matcher(uncommentedSource);
+        while (matcher.find()) {
+            String name = matcher.group();
+            if (!declaresVariable(uncommentedSource, name)) return name;
+        }
+        return null;
+    }
 }
