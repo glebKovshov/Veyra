@@ -29,6 +29,9 @@ loom {
             vmArgs "-Dveyra.reference.output=${file(project.findProperty('referenceOutput') ?: 'build/reference').absolutePath}"
             if (project.hasProperty('referenceFixedClock')) vmArgs '-Dveyra.reference.fixedClock=true'
             if (project.hasProperty('referenceNativeDepth')) vmArgs '-Dveyra.reference.nativeDepth=true'
+            if (project.hasProperty('referenceWaterPool')) vmArgs '-Dveyra.reference.waterPool=true'
+            if (project.hasProperty('referencePoolPlants')) vmArgs '-Dveyra.reference.poolPlants=true'
+            if (project.hasProperty('referencePoolSeagrass')) vmArgs '-Dveyra.reference.poolSeagrass=true'
         }
     }
 }

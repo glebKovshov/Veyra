@@ -12,6 +12,7 @@ import net.vulkanmod.vulkan.shader.converter.Token;
 import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,12 +21,41 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 
 @Mixin(value = GLSLParser.class, remap = false)
 public abstract class GLSLParserMixin {
     @Shadow(remap = false) private List<Token> tokens;
     @Shadow(remap = false) private int currentTokenIdx;
+    @Unique private ListIterator<?> veyra$outputCursor;
+    @Unique private LinkedList<?> veyra$outputCursorList;
+    @Unique private int veyra$outputCursorIndex = -1;
+
+    @Inject(method = "getOutput", at = @At("HEAD"), remap = false)
+    private void veyra$resetOutputCursor(CallbackInfoReturnable<String> callback) {
+        veyra$outputCursor = null;
+        veyra$outputCursorList = null;
+        veyra$outputCursorIndex = -1;
+    }
+
+    /**
+     * getOutput assembles the program with {@code for (i = 1; i < size; i++) stream.get(i)} over a LinkedList,
+     * walking the list for every token: quadratic in the token count. Shader packs such as Complementary expand
+     * to hundreds of thousands of tokens per program, so selecting one froze the render thread for minutes.
+     * Serve the same sequential reads from a cursor.
+     */
+    @Redirect(method = "getOutput", at = @At(value = "INVOKE",
+            target = "Ljava/util/LinkedList;get(I)Ljava/lang/Object;"), remap = false)
+    private Object veyra$sequentialOutputNode(LinkedList<?> list, int index) {
+        if (list != veyra$outputCursorList || index != veyra$outputCursorIndex + 1 || veyra$outputCursor == null) {
+            veyra$outputCursor = list.listIterator(index);
+            veyra$outputCursorList = list;
+        }
+        veyra$outputCursorIndex = index;
+        return veyra$outputCursor.next();
+    }
 
     @Redirect(method = "parse", at = @At(value = "INVOKE", target =
             "Lnet/vulkanmod/vulkan/shader/converter/GLSLParser;parseAttribute()V"), remap = false)

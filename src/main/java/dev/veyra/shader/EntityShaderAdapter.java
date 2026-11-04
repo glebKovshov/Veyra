@@ -798,6 +798,27 @@ public final class EntityShaderAdapter {
                 geometryColorInputsAvailable, vertexVaryings, java.util.Set.of());
     }
 
+    private record AdaptedFragmentKey(String source, String programName, boolean textPipeline, boolean handPass,
+                                      boolean shadowSamplerAvailable, int entityId, int blockEntityId,
+                                      int currentRenderedItemId, boolean entityColorAvailable, boolean isMainHand,
+                                      boolean geometryColorInputsAvailable,
+                                      Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                                      java.util.Set<String> customTextureSamplers, CustomUniforms customUniforms) { }
+
+    /**
+     * Entity, block-entity and hand pipelines adapt the same few fragment programs for many render types, and
+     * pack validation adapts them again: a pure function of these arguments and the active custom uniforms.
+     * Serving repeats from a bounded LRU removed most of the render-thread time spent selecting Complementary.
+     */
+    private static final int ADAPTED_FRAGMENT_CACHE_SIZE = 64;
+    private static final Map<AdaptedFragmentKey, String> ADAPTED_FRAGMENTS = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(ADAPTED_FRAGMENT_CACHE_SIZE, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<AdaptedFragmentKey, String> eldest) {
+                    return size() > ADAPTED_FRAGMENT_CACHE_SIZE;
+                }
+            });
+
     private static String adaptFragment(String source, String programName, boolean textPipeline,
                                         boolean handPass, boolean shadowSamplerAvailable,
                                         int entityId, int blockEntityId,
@@ -805,6 +826,27 @@ public final class EntityShaderAdapter {
                                         boolean isMainHand, boolean geometryColorInputsAvailable,
                                         Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
                                         java.util.Set<String> customTextureSamplers)
+            throws IOException {
+        AdaptedFragmentKey key = new AdaptedFragmentKey(source, programName, textPipeline, handPass,
+                shadowSamplerAvailable, entityId, blockEntityId, currentRenderedItemId, entityColorAvailable,
+                isMainHand, geometryColorInputsAvailable, Map.copyOf(vertexVaryings),
+                java.util.Set.copyOf(customTextureSamplers), CustomUniforms.active());
+        String cached = ADAPTED_FRAGMENTS.get(key);
+        if (cached != null) return cached;
+        String adapted = adaptFragmentUncached(source, programName, textPipeline, handPass, shadowSamplerAvailable,
+                entityId, blockEntityId, currentRenderedItemId, entityColorAvailable, isMainHand,
+                geometryColorInputsAvailable, vertexVaryings, customTextureSamplers);
+        ADAPTED_FRAGMENTS.put(key, adapted);
+        return adapted;
+    }
+
+    private static String adaptFragmentUncached(String source, String programName, boolean textPipeline,
+                                                boolean handPass, boolean shadowSamplerAvailable,
+                                                int entityId, int blockEntityId,
+                                                int currentRenderedItemId, boolean entityColorAvailable,
+                                                boolean isMainHand, boolean geometryColorInputsAvailable,
+                                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexVaryings,
+                                                java.util.Set<String> customTextureSamplers)
             throws IOException {
         if (source == null || source.isBlank()) {
             throw new IOException(programName + " fragment shader is empty.");

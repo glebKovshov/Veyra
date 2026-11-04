@@ -262,6 +262,12 @@ loom {
             }
             if (project.hasProperty('graphicsSmokePackSwitch')) vmArgs '-Dveyra.graphicsSmoke.packSwitch=true'
             if (project.hasProperty('graphicsSmokeFreezeClock')) vmArgs "-Dveyra.graphicsSmoke.freezeClock=${project.property('graphicsSmokeFreezeClock')}"
+            if (project.hasProperty('graphicsSmokeWaterPool')) vmArgs '-Dveyra.graphicsSmoke.waterPool=true'
+            if (project.hasProperty('graphicsSmokePoolPlants')) vmArgs '-Dveyra.graphicsSmoke.poolPlants=true'
+            if (project.hasProperty('graphicsSmokePoolSeagrass')) vmArgs '-Dveyra.graphicsSmoke.poolSeagrass=true'
+            if (project.hasProperty('graphicsSmokeAllowOptionOverrides')) vmArgs '-Dveyra.graphicsSmoke.allowOptionOverrides=true'
+            if (project.hasProperty('graphicsSmokePerfProbe')) vmArgs '-Dveyra.graphicsSmoke.perfProbe=true'
+            if (project.hasProperty('graphicsSmokeHoldTicks')) vmArgs "-Dveyra.graphicsSmoke.holdTicks=${project.property('graphicsSmokeHoldTicks')}"
             if (project.hasProperty('graphicsSmokeFrameSequence')) vmArgs "-Dveyra.graphicsSmoke.frameSequence=${project.property('graphicsSmokeFrameSequence')}"
         }
     }

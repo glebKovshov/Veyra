@@ -44,6 +44,9 @@ public final class GraphicsSmoke {
     /** Diagnostic: native screenshots of consecutive ticks of the still third-party scene before its capture. */
     private static final int frameSequence = Integer.getInteger("veyra.graphicsSmoke.frameSequence", 0);
     private static int frameSequenceCaptured;
+    /** Diagnostic: keep the still third-party scene rendering for this many ticks before its capture. */
+    private static final int holdTicks = Integer.getInteger("veyra.graphicsSmoke.holdTicks", 0);
+    private static int heldTicks;
     private static int packSwitchPhase;
     private static ShaderPack packBeforeSwitch;
     private static long storageBytesBeforeSwitch;
@@ -361,6 +364,38 @@ public final class GraphicsSmoke {
                                 : net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState();
                         world.setBlock(new net.minecraft.core.BlockPos(x, 70, z), block, 3);
                     }
+                    if (Boolean.getBoolean("veyra.graphicsSmoke.waterPool")) {
+                        // A pool between the player and the wall: screen-space water reflections must show
+                        // the wall mirrored at its far edge, not the floor around the player.
+                        for (int x = -6; x <= 6; x++) for (int z = 2; z <= 6; z++) {
+                            world.setBlock(new net.minecraft.core.BlockPos(x, 69, z),
+                                    net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 3);
+                            world.setBlock(new net.minecraft.core.BlockPos(x, 70, z),
+                                    net.minecraft.world.level.block.Blocks.WATER.defaultBlockState(), 3);
+                        }
+                        LoggerFactory.getLogger("veyra-graphics-smoke").info("Placed the water pool x=-6..6 z=2..6 y=70");
+                        if (Boolean.getBoolean("veyra.graphicsSmoke.poolSeagrass")) {
+                            // Waterlogged plants: the water surface in these blocks must keep the water material.
+                            for (int x = -3; x <= 3; x++) for (int z = 4; z <= 5; z++)
+                                world.setBlock(new net.minecraft.core.BlockPos(x, 70, z),
+                                        net.minecraft.world.level.block.Blocks.SEAGRASS.defaultBlockState(), 3);
+                            LoggerFactory.getLogger("veyra-graphics-smoke").info("Placed pool seagrass x=-3..3 z=4..5 y=70");
+                        }
+                        if (Boolean.getBoolean("veyra.graphicsSmoke.poolPlants")) {
+                            // Plants on the far shore: their reflections and the blocks beside them must stay intact.
+                            var plants = new net.minecraft.world.level.block.state.BlockState[]{
+                                    net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState(),
+                                    net.minecraft.world.level.block.Blocks.POPPY.defaultBlockState(),
+                                    net.minecraft.world.level.block.Blocks.FERN.defaultBlockState(),
+                                    net.minecraft.world.level.block.Blocks.DANDELION.defaultBlockState()};
+                            for (int x = -6; x <= 6; x++) {
+                                world.setBlock(new net.minecraft.core.BlockPos(x, 70, 7),
+                                        net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                                world.setBlock(new net.minecraft.core.BlockPos(x, 71, 7), plants[Math.floorMod(x, plants.length)], 3);
+                            }
+                            LoggerFactory.getLogger("veyra-graphics-smoke").info("Placed pool plants x=-6..6 z=7 y=71");
+                        }
+                    }
                     var materials = new net.minecraft.world.level.block.state.BlockState[]{
                             net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState(),
                             net.minecraft.world.level.block.Blocks.BRICKS.defaultBlockState(),
@@ -441,6 +476,10 @@ public final class GraphicsSmoke {
                                 + client.player.position() + ", dayTime=" + client.level.getDayTime()
                                 + ", floor=" + fixtureFloorState + ", wall=" + fixtureWallState);
                     }
+                    return;
+                }
+                if (heldTicks < holdTicks) {
+                    heldTicks++;
                     return;
                 }
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(
@@ -1215,7 +1254,8 @@ public final class GraphicsSmoke {
     private static void applyThirdPartyProfile(ShaderPack pack) {
         try {
             if (thirdPartyProfile.equals("__DEFAULT__")) {
-                if (!pack.configuration().options().isEmpty() || !VeyraRenderer.isRenderingEnabled()
+                if (!pack.configuration().options().isEmpty() && !Boolean.getBoolean("veyra.graphicsSmoke.allowOptionOverrides")
+                        || !VeyraRenderer.isRenderingEnabled()
                         || !VeyraRenderer.getLastError().isEmpty()) {
                     throw new IllegalStateException("Default shaderpack smoke requires an active pack without option overrides: "
                             + VeyraRenderer.getLastError());

@@ -99,6 +99,17 @@ final class TerrainVertexShaderAdapter {
     static final String SHADOW_CLIP_REMAP = "    gl_Position.y = -gl_Position.y;\n"
             + "    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;\n";
 
+    /**
+     * Geometry pack stages see the same projections as their fragment stages: Veyra's sampling convention,
+     * whose clip coordinates give screen-texture coordinates and window depth through the usual
+     * {@code clip.xyz / clip.w * 0.5 + 0.5}. Packs hand such values to fragments (Sildur's water reflection
+     * starts its screen-space ray from them), so a native vertex projection put the ray in a different
+     * space from the depth and colour images it samples. The forward conversion is
+     * {@link IrisProjectionMatrices#fromVulkan}; this epilogue undoes it for rasterization.
+     */
+    static final String SAMPLING_CLIP_REMAP = SHADOW_CLIP_REMAP;
+    private static final Pattern CLIP_POSITION_WRITE = Pattern.compile("\\bgl_Position\\b");
+
     static AdaptedStage adaptStage(String vulkanModSource, String shaderPackSource, String programName) throws IOException {
         return adaptStage(vulkanModSource, shaderPackSource, programName, 6);
     }
@@ -125,16 +136,45 @@ final class TerrainVertexShaderAdapter {
         source = source.substring(0, baseMain.start()) + "void veyraShaderPackMain();\n"
                 + source.substring(baseMain.start());
         baseMain = findMain(source, "VulkanMod terrain");
+        boolean shadow = programName.startsWith("shadow");
+        // VulkanMod's own main writes a native position first; only a pack-written position is converted.
+        boolean packWritesPosition = CLIP_POSITION_WRITE.matcher(
+                ShaderSource.maskBlockAndLineComments(pack.source())).find();
         source = source.substring(0, baseMain.closeBrace()) + "\n    veyraShaderPackMain();\n"
-                + (programName.startsWith("shadow") ? SHADOW_CLIP_REMAP : "")
+                + (shadow ? SHADOW_CLIP_REMAP : packWritesPosition ? SAMPLING_CLIP_REMAP : "")
                 + source.substring(baseMain.closeBrace());
         return new AdaptedStage(source + "\n" + pack.uniformMacros() + legacyInputBridge(programName) + pack.outputBridge() + "\n"
                 + pack.source().replaceFirst("(?m)\\bvoid\\s+main\\s*\\(", "void veyraShaderPackMain("),
                 pack.varyings());
     }
 
+    private record PreparedStageKey(String programName, String shaderPackSource, int noiseSamplerBinding,
+                                    Set<Integer> freeOutputLocations, Map<String, String> environment,
+                                    CustomUniforms customUniforms) { }
+
+    /** Validation and compilation prepare the same terrain vertex programs; a pure function of this key. */
+    private static final int PREPARED_STAGE_CACHE_SIZE = 32;
+    private static final Map<PreparedStageKey, PreparedStage> PREPARED_STAGES = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(PREPARED_STAGE_CACHE_SIZE, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<PreparedStageKey, PreparedStage> eldest) {
+                    return size() > PREPARED_STAGE_CACHE_SIZE;
+                }
+            });
+
     private static PreparedStage prepare(String programName, String shaderPackSource, int noiseSamplerBinding,
                                         Set<Integer> freeOutputLocations) throws IOException {
+        PreparedStageKey key = new PreparedStageKey(programName, shaderPackSource, noiseSamplerBinding,
+                Set.copyOf(freeOutputLocations), GlslPreprocessor.environment(), CustomUniforms.active());
+        PreparedStage cached = PREPARED_STAGES.get(key);
+        if (cached != null) return cached;
+        PreparedStage prepared = prepareUncached(programName, shaderPackSource, noiseSamplerBinding, freeOutputLocations);
+        PREPARED_STAGES.put(key, prepared);
+        return prepared;
+    }
+
+    private static PreparedStage prepareUncached(String programName, String shaderPackSource, int noiseSamplerBinding,
+                                                 Set<Integer> freeOutputLocations) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) {
             throw new IOException(programName + ".vsh is empty.");
         }
@@ -174,7 +214,9 @@ final class TerrainVertexShaderAdapter {
         source = UnusedSamplerDeclarations.removeUnused(fog.source());
         SamplerBridge samplers = adaptSamplers(programName, source, noiseSamplerBinding);
         source = samplers.source();
-        ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(source, programName);
+        ShaderPackUniformAdapter.AdaptedShader uniforms = programName.startsWith("shadow")
+                ? ShaderPackUniformAdapter.extract(source, programName)
+                : ShaderPackUniformAdapter.extractForSampling(source, programName);
         source = uniforms.source();
         OutputBridge outputBridge = extractOutputs(programName, source, freeOutputLocations);
         source = outputBridge.source();
@@ -471,7 +513,7 @@ final class TerrainVertexShaderAdapter {
                 """;
         return programName.startsWith("shadow")
                 ? bridge.replace("gbufferProjection", "shadowProjection").replace("gbufferModelView", "shadowModelView")
-                : bridge;
+                : bridge.replace("gbufferProjection", "veyraSamplingProjection");
     }
 
     private static String expandCommaDeclarations(String source) {

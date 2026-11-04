@@ -15,7 +15,9 @@ public abstract class FluidRendererMixin {
     @Inject(method = "renderLiquid", at = @At("HEAD"), remap = false)
     private void veyra$beginFluidMaterial(BlockState state, FluidState fluidState, BlockPos pos,
                                          CallbackInfo ci) {
-        TerrainMaterialContext.setFluid(state);
+        // Iris (MixinChunkMeshBuildTask) maps the fluid's own legacy block, not the containing block: water in a
+        // waterlogged seagrass or kelp block must keep the water material, or packs drop its reflections.
+        TerrainMaterialContext.setFluid(fluidState.createLegacyBlock(), state.getLightEmission());
         TerrainMaterialContext.setOrigin(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
     }
 

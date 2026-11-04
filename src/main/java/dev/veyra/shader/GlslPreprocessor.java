@@ -51,7 +51,30 @@ final class GlslPreprocessor {
         return process(file, source, Map.of());
     }
 
+    private record ProcessKey(String file, String source, Map<String, String> additionalMacros,
+                              Map<String, String> environment) { }
+
+    /** Adapters and validation preprocess the same program sources repeatedly while a pack is selected. */
+    private static final int PROCESS_CACHE_SIZE = 64;
+    private static final Map<ProcessKey, String> PROCESSED = java.util.Collections.synchronizedMap(
+            new LinkedHashMap<>(PROCESS_CACHE_SIZE, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<ProcessKey, String> eldest) {
+                    return size() > PROCESS_CACHE_SIZE;
+                }
+            });
+
     static String process(String file, String source, Map<String, String> additionalMacros) throws IOException {
+        ProcessKey key = new ProcessKey(file, source, Map.copyOf(additionalMacros), environment());
+        String cached = PROCESSED.get(key);
+        if (cached != null) return cached;
+        String processed = processUncached(file, source, additionalMacros);
+        PROCESSED.put(key, processed);
+        return processed;
+    }
+
+    private static String processUncached(String file, String source, Map<String, String> additionalMacros)
+            throws IOException {
         if (source.contains(MARKER)) throw new IOException(file + ": reserved preprocessor marker in source.");
         List<String> directives = new ArrayList<>();
         Matcher matcher = DIRECTIVE.matcher(ShaderSource.maskBlockAndLineComments(source));

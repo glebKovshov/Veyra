@@ -355,9 +355,67 @@ class ShaderAdapterTest {
         assertTrue(adapted.contains("veyraShaderPackMain();"));
         assertTrue(adapted.contains("void veyraShaderPackMain("));
         assertTrue(adapted.contains("#define gl_Vertex vec4(getVertexPosition(), 1.0)"));
-        assertTrue(adapted.contains("#define gl_ModelViewProjectionMatrix (gbufferProjection * gbufferModelView)"));
+        // Geometry stages project with the fragment stages' sampling convention, then convert for rasterization.
+        assertTrue(adapted.contains("#define gl_ModelViewProjectionMatrix (veyraSamplingProjection * gbufferModelView)"));
+        assertTrue(adapted.contains("#define gl_ProjectionMatrix veyraSamplingProjection"));
+        assertTrue(adapted.contains("veyraShaderPackMain();\n" + TerrainVertexShaderAdapter.SAMPLING_CLIP_REMAP));
         assertFalse(adapted.contains("unsupportedInactiveInput"));
         assertTrue(adapted.indexOf("veyraShaderPackMain();") < adapted.lastIndexOf("void veyraShaderPackMain("));
+    }
+
+    @Test
+    void terrainVertexStagesShareTheFragmentSamplingProjection() throws IOException {
+        String vulkanModVertex = TerrainShaderAdapter.adaptVertex("""
+                #version 460
+                layout (location = 0) out vec4 vertexColor;
+                layout (location = 1) out vec2 texCoord0;
+                layout (location = 4) out flat float fadeFactor;
+                layout (location = 2) in uint PackedColor;
+                layout (location = 1) in uvec2 UV0;
+                layout(binding = 1) uniform UBO {
+                    int UseRgss;
+                };
+                const float UV_INV = 1.0 / 32768.0;
+                void main() {
+                    const vec3 pos = getVertexPosition();
+                    gl_Position = MVP * vec4(pos, 1.0);
+                    vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                    texCoord0 = UV0 * UV_INV;
+                }
+                """);
+        // Sildur's water stage: screen position and projection diagonal travel to the fragment's ray march.
+        String water = TerrainVertexShaderAdapter.adapt(vulkanModVertex, """
+                #version 120
+                uniform mat4 gbufferProjection;
+                varying vec3 reflectionStart;
+                varying vec3 projectionDiagonal;
+                void main() {
+                    vec3 viewPos = (gl_ModelViewMatrix * gl_Vertex).xyz;
+                    vec4 clipPos = gl_ProjectionMatrix * vec4(viewPos, 1.0);
+                    reflectionStart = clipPos.xyz / clipPos.w * 0.5 + 0.5;
+                    projectionDiagonal = vec3(gbufferProjection[0].x, gbufferProjection[1].y, gbufferProjection[2].z);
+                    gl_Position = ftransform();
+                }
+                """, "gbuffers_water");
+        assertTrue(water.contains("veyraSamplingProjection[0].x"), water);
+        assertFalse(water.contains("gbufferProjection[0].x"), water);
+        assertTrue(water.contains(TerrainVertexShaderAdapter.SAMPLING_CLIP_REMAP));
+
+        // A stage that never writes gl_Position keeps VulkanMod's native position unconverted.
+        String passive = TerrainVertexShaderAdapter.adapt(vulkanModVertex, """
+                #version 120
+                varying vec2 uv;
+                void main() { uv = gl_MultiTexCoord0.xy; }
+                """, "gbuffers_terrain");
+        assertFalse(passive.contains("veyraShaderPackMain();\n" + TerrainVertexShaderAdapter.SAMPLING_CLIP_REMAP));
+
+        // Shadow stages keep their own OpenGL shadow projection and conversion.
+        String shadow = TerrainVertexShaderAdapter.adapt(vulkanModVertex, """
+                #version 120
+                void main() { gl_Position = ftransform(); }
+                """, "shadow");
+        assertTrue(shadow.contains("#define gl_ProjectionMatrix shadowProjection"));
+        assertTrue(shadow.contains(TerrainVertexShaderAdapter.SHADOW_CLIP_REMAP));
     }
 
     @Test
@@ -883,7 +941,29 @@ class ShaderAdapterTest {
         assertEquals(1.0F, tangent[0], 1.0e-6F);
         assertEquals(0.0F, tangent[1], 1.0e-6F);
         assertEquals(0.0F, tangent[2], 1.0e-6F);
-        assertEquals(1.0F, tangent[3]);
+        // Bitangent +Y against Iris' predicted tangent x normal = +X x +Z = -Y: left-handed.
+        assertEquals(-1.0F, tangent[3]);
+        assertBitangentMatchesPackReconstruction(tangent, 0, 0, 1, 0, 1, 0);
+
+        // VulkanMod's still-water top face (fluid renderer order NW, SW, SE, NE): U along +X, V along +Z.
+        TerrainMidTexCoord.computeTangent(
+                new float[]{0, 0, 1, 1}, new float[]{0.875F, 0.875F, 0.875F, 0.875F}, new float[]{0, 1, 1, 0},
+                new float[]{0, 0, 1, 1}, new float[]{0, 1, 1, 0},
+                new int[]{127 << 8, 127 << 8, 127 << 8, 127 << 8}, tangent);
+        assertEquals(1.0F, tangent[0], 1.0e-6F);
+        assertEquals(1.0F, tangent[3], "Iris gives +1 here; Sildur's water bump then keeps +Z as its V axis");
+        assertBitangentMatchesPackReconstruction(tangent, 0, 1, 0, 0, 0, 1);
+    }
+
+    /** Packs rebuild binormal = cross(at_tangent.xyz, gl_Normal) * at_tangent.w; it must equal the UV bitangent. */
+    private static void assertBitangentMatchesPackReconstruction(float[] tangent, float nx, float ny, float nz,
+                                                                 float bx, float by, float bz) {
+        float rx = (tangent[1] * nz - tangent[2] * ny) * tangent[3];
+        float ry = (tangent[2] * nx - tangent[0] * nz) * tangent[3];
+        float rz = (tangent[0] * ny - tangent[1] * nx) * tangent[3];
+        assertEquals(bx, rx, 1.0e-6F);
+        assertEquals(by, ry, 1.0e-6F);
+        assertEquals(bz, rz, 1.0e-6F);
     }
 
     @Test

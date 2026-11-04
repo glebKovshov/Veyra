@@ -123,9 +123,11 @@ public final class TerrainMidTexCoord {
         tangentY /= tangentLength;
         tangentZ /= tangentLength;
 
-        float crossX = normalY * tangentZ - normalZ * tangentY;
-        float crossY = normalZ * tangentX - normalX * tangentZ;
-        float crossZ = normalX * tangentY - normalY * tangentX;
+        // Iris NormalHelper: the predicted bitangent is tangent x normal, which is what packs rebuild
+        // (binormal = cross(at_tangent.xyz, gl_Normal) * at_tangent.w). normal x tangent inverted every w.
+        float crossX = tangentY * normalZ - tangentZ * normalY;
+        float crossY = tangentZ * normalX - tangentX * normalZ;
+        float crossZ = tangentX * normalY - tangentY * normalX;
         float handedness = crossX * bitangentX + crossY * bitangentY + crossZ * bitangentZ < 0.0F ? -1.0F : 1.0F;
         result[0] = tangentX;
         result[1] = tangentY;

@@ -79,6 +79,28 @@ public final class ReferenceCapture implements ClientModInitializer {
                             : Blocks.GRASS_BLOCK.defaultBlockState();
                     world.setBlock(new BlockPos(x, 70, z), block, 3);
                 }
+                if (Boolean.getBoolean("veyra.reference.waterPool")) {
+                    // A pool between the player and the wall, as GraphicsSmoke's waterPool option builds it.
+                    for (int x = -6; x <= 6; x++) for (int z = 2; z <= 6; z++) {
+                        world.setBlock(new BlockPos(x, 69, z), Blocks.STONE.defaultBlockState(), 3);
+                        world.setBlock(new BlockPos(x, 70, z), Blocks.WATER.defaultBlockState(), 3);
+                    }
+                    System.out.println("REFERENCE_WATER_POOL x=-6..6 z=2..6 y=70");
+                    if (Boolean.getBoolean("veyra.reference.poolSeagrass")) {
+                        for (int x = -3; x <= 3; x++) for (int z = 4; z <= 5; z++)
+                            world.setBlock(new BlockPos(x, 70, z), Blocks.SEAGRASS.defaultBlockState(), 3);
+                        System.out.println("REFERENCE_POOL_SEAGRASS x=-3..3 z=4..5 y=70");
+                    }
+                    if (Boolean.getBoolean("veyra.reference.poolPlants")) {
+                        BlockState[] plants = {Blocks.SHORT_GRASS.defaultBlockState(), Blocks.POPPY.defaultBlockState(),
+                                Blocks.FERN.defaultBlockState(), Blocks.DANDELION.defaultBlockState()};
+                        for (int x = -6; x <= 6; x++) {
+                            world.setBlock(new BlockPos(x, 70, 7), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                            world.setBlock(new BlockPos(x, 71, 7), plants[Math.floorMod(x, plants.length)], 3);
+                        }
+                        System.out.println("REFERENCE_POOL_PLANTS x=-6..6 z=7 y=71");
+                    }
+                }
                 BlockState[] materials = {
                         Blocks.OAK_PLANKS.defaultBlockState(), Blocks.BRICKS.defaultBlockState(),
                         Blocks.MOSS_BLOCK.defaultBlockState(), Blocks.COBBLESTONE.defaultBlockState(),

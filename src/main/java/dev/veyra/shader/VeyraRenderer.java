@@ -2754,6 +2754,35 @@ public final class VeyraRenderer {
     }
 
     public static String select(ShaderPack pack) {
+        long started = System.nanoTime();
+        String result = selectTimed(pack);
+        long millis = (System.nanoTime() - started) / 1_000_000L;
+        // Pack preparation blocks the render thread; report it so slow loads are visible in user logs.
+        VeyraClient.LOGGER.info("Prepared shader pack '{}' in {} ms [{}] (SPIR-V: {}){}.", pack.name(), millis,
+                VEYRA$PHASES, dev.veyra.vulkan.VeyraSpirvCache.takeStatistics(),
+                result != null && result.startsWith("Enabled ") ? "" : " (not enabled: " + result + ")");
+        return result;
+    }
+
+
+    private static long veyra$phaseMark;
+    private static final StringBuilder VEYRA$PHASES = new StringBuilder();
+
+    private static void veyra$phaseStart() {
+        VEYRA$PHASES.setLength(0);
+        veyra$phaseMark = System.nanoTime();
+    }
+
+    /** Records the render-thread time since the previous mark for the pack preparation log line. */
+    private static void veyra$phase(String name) {
+        long now = System.nanoTime();
+        if (!VEYRA$PHASES.isEmpty()) VEYRA$PHASES.append(", ");
+        VEYRA$PHASES.append(name).append(' ').append((now - veyra$phaseMark) / 1_000_000L);
+        veyra$phaseMark = now;
+    }
+
+    private static String selectTimed(ShaderPack pack) {
+        veyra$phaseStart();
         ShaderPack previousPack = selectedPack().orElse(null);
         PipelineSet prepared = null;
         TerrainPipelineSet preparedTerrain = null;
@@ -2785,6 +2814,7 @@ public final class VeyraRenderer {
             // first would incorrectly reject valid custom uniforms on a later re-enable.
             CustomUniforms.activate(pack.readCustomUniforms());
             pack.validatePipelineCapabilities();
+            veyra$phase("validate");
             VeyraShaderPackTextures.prepare(pack);
             VeyraShadowRenderer.prepareFallbackTexture();
             // Adapters size uniform blocks from the active definitions, so install them before compiling.
@@ -2801,55 +2831,72 @@ public final class VeyraRenderer {
             VeyraStorageBufferResources.activate(preparedStorageBuffers);
             if (pack.hasTerrainFragment() || pack.hasShadowFragment() || pack.hasComputeStageFiles()) {
                 preparedTerrain = compileTerrainPipelines(pack);
+                veyra$phase("terrain");
             }
             VeyraComputePipelineSet preparedCustomImages = preparedTerrain == null ? null : preparedTerrain.compute();
             prepared = compilePipelines(pack, mainTarget.width, mainTarget.height, preparedCustomImages);
+            veyra$phase("post");
             if (pack.hasEntityFragment()) {
                 preparedEntities = compileEntityPipelines(pack, false, preparedCustomImages);
+                veyra$phase("entities");
             }
             if (pack.supportsBlockEntityPipeline()) {
                 preparedBlockEntities = compileBlockEntityPipelines(pack, preparedCustomImages);
+                veyra$phase("blockEntities");
             }
             if (pack.supportsHandPipeline()) {
                 preparedHand = compileEntityPipelines(pack, true, preparedCustomImages);
+                veyra$phase("hand");
             }
             if (pack.hasParticleFragment()) {
                 preparedParticles = compileParticlePipelines(pack, preparedCustomImages);
+                veyra$phase("particles");
             }
             if (pack.hasWeatherFragment()) {
                 preparedWeather = compileWeatherPipelines(pack, preparedCustomImages);
+                veyra$phase("weather");
             }
             if (pack.hasLightningFragment()) {
                 preparedLightning = compileLightningPipelines(pack);
+                veyra$phase("lightning");
             }
             if (pack.hasBasicFragment()) {
                 preparedBasic = compileBasicPipelines(pack,
                         preparedTerrain == null ? null : preparedTerrain.compute());
+                        veyra$phase("basic");
             }
             if (pack.hasLineFragment() || pack.hasBasicFragment()) {
                 preparedLines = compileLinePipelines(pack,
                         preparedTerrain == null ? null : preparedTerrain.compute());
+                        veyra$phase("lines");
             }
             if (pack.hasGlintFragment() || pack.hasTexturedFragment()) {
                 preparedGlint = compileGlintPipelines(pack, preparedCustomImages);
+                veyra$phase("glint");
             }
             if (pack.hasSkyBasicFragment() || pack.hasBasicFragment()) {
                 preparedSkyBasic = compileSkyBasicPipelines(pack, preparedCustomImages);
+                veyra$phase("skyBasic");
             }
             if (pack.hasSkyTexturedFragment() || pack.hasTexturedFragment()) {
                 preparedSkyTextured = compileSkyTexturedPipelines(pack, preparedCustomImages);
+                veyra$phase("skyTextured");
             }
             if (pack.hasTexturedFragment()) {
                 preparedTextured = compileWorldBorderPipelines(pack, preparedCustomImages);
+                veyra$phase("worldBorder");
             }
             if (pack.hasDamagedBlockPipeline()) {
                 preparedDamagedBlocks = compileDamagedBlockPipelines(pack);
+                veyra$phase("damagedBlocks");
             }
             if (pack.hasBeaconBeamFragment()) {
                 preparedBeaconBeams = compileBeaconBeamPipelines(pack);
+                veyra$phase("beacon");
             }
             if (pack.hasCloudFragment()) {
                 preparedClouds = compileCloudPipeline(pack, preparedTerrain == null ? null : preparedTerrain.compute());
+                veyra$phase("clouds");
             }
             repository.select(pack);
             shaderPackTexturesPreparedFor = pack;

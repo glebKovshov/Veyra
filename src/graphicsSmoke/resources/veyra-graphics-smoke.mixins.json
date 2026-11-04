@@ -17,7 +17,11 @@
     "GraphicsNativePipelineAccessor",
     "GraphicsDescriptorPoolAccessor",
     "GraphicsVariantsAccessor",
-    "GraphicsSwapchainMixin"
+    "GraphicsSwapchainMixin",
+    "GraphicsPerfProbeMixin",
+    "GraphicsPerfSectionsMixin",
+    "GraphicsPerfLevelMixin",
+    "GraphicsPerfShadowMixin"
   ],
   "injectors": {
     "defaultRequire": 1

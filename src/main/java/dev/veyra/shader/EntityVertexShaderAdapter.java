@@ -192,12 +192,64 @@ final class EntityVertexShaderAdapter {
                 customTextureSamplers).varyings();
     }
 
+    /** Everything prepare() derives before entity identifiers are bound; shared by all pipeline variants. */
+    private record PreparedBase(String source, List<String> extensions, OutputBridge outputs, SamplerBridge samplers,
+                                boolean usesMidTexCoord, boolean shadow, String modelView) { }
+
+    private record PreparedBaseKey(String programName, String shaderPackSource, Set<String> customTextureSamplers,
+                                   Map<String, String> environment) { }
+
+    /**
+     * A pack selection prepares each entity vertex program for validation, varying description and every
+     * entity, block-entity and hand variant: Complementary reaches ~46 variants of a few programs. The base
+     * stage (preprocessing and the regex rewrites) is a pure function of its key, so serve repeats from a small
+     * LRU instead of repeating minutes of render-thread work. The preprocessor environment is part of the key.
+     */
+    private static final int PREPARED_BASE_CACHE_SIZE = 32;
+    private static final Map<PreparedBaseKey, PreparedBase> PREPARED_BASES = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(PREPARED_BASE_CACHE_SIZE, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<PreparedBaseKey, PreparedBase> eldest) {
+                    return size() > PREPARED_BASE_CACHE_SIZE;
+                }
+            });
+
     private static PreparedStage prepare(String shaderPackSource, String programName,
                                          int entityId, int blockEntityId,
                                          int currentRenderedItemId,
                                          boolean fogValuesAlreadyDeclared,
                                          Set<String> customTextureSamplers) throws IOException {
         if (shaderPackSource == null || shaderPackSource.isBlank()) throw new IOException(programName + ".vsh is empty.");
+        if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
+        PreparedBaseKey key = new PreparedBaseKey(programName, shaderPackSource, Set.copyOf(customTextureSamplers),
+                GlslPreprocessor.environment());
+        PreparedBase base = PREPARED_BASES.get(key);
+        if (base == null) {
+            base = prepareBase(shaderPackSource, programName, customTextureSamplers);
+            PREPARED_BASES.put(key, base);
+        }
+        String source = EntityShaderAdapter.bindEntityIdentifiers(base.source(), programName,
+                entityId, blockEntityId, currentRenderedItemId);
+        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(
+                source, programName, fogValuesAlreadyDeclared);
+        String uniformSource = fog.source();
+        if (!base.shadow()) uniformSource = "uniform mat4 veyraViewEffects;\nuniform mat4 veyraViewEffectsInverse;\n" + uniformSource;
+        ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(uniformSource, programName);
+        source = uniforms.source();
+        if (UNSUPPORTED_UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
+            throw new IOException(programName + ".vsh declares an unsupported uniform.");
+        }
+        if (NORMAL_MATRIX.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
+            source = NORMAL_MATRIX.matcher(source).replaceAll("transpose(inverse(mat3(" + base.modelView() + ")))");
+        }
+        String uniformBridge = fog.bridge() + uniforms.declarations() + uniforms.macros() + base.samplers().bridge();
+        return new PreparedStage(source, base.extensions(), uniformBridge,
+                base.outputs().declarationsAndMacros(), base.outputs().varyings(),
+                base.samplers().usesNoiseSampler(), base.usesMidTexCoord());
+    }
+
+    private static PreparedBase prepareBase(String shaderPackSource, String programName,
+                                            Set<String> customTextureSamplers) throws IOException {
         if (shaderPackSource.length() > 1024 * 1024) throw new IOException(programName + ".vsh exceeds the 1 MiB size limit.");
         String source = GlslPreprocessor.process(programName + ".vsh", shaderPackSource);
         source = removeDefaultFunctionInputQualifiers(source);
@@ -267,24 +319,8 @@ final class EntityVertexShaderAdapter {
 
         source = UnusedSamplerDeclarations.removeUnused(source);
         SamplerBridge samplers = adaptSamplers(source, programName, customTextureSamplers);
-        source = samplers.source();
-        source = EntityShaderAdapter.bindEntityIdentifiers(source, programName,
-                entityId, blockEntityId, currentRenderedItemId);
-        IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(
-                source, programName, fogValuesAlreadyDeclared);
-        String uniformSource = fog.source();
-        if (!shadow) uniformSource = "uniform mat4 veyraViewEffects;\nuniform mat4 veyraViewEffectsInverse;\n" + uniformSource;
-        ShaderPackUniformAdapter.AdaptedShader uniforms = ShaderPackUniformAdapter.extract(uniformSource, programName);
-        source = uniforms.source();
-        if (UNSUPPORTED_UNIFORM.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
-            throw new IOException(programName + ".vsh declares an unsupported uniform.");
-        }
-        if (NORMAL_MATRIX.matcher(ShaderSource.maskBlockAndLineComments(source)).find()) {
-            source = NORMAL_MATRIX.matcher(source).replaceAll("transpose(inverse(mat3(" + modelView + ")))");
-        }
-        String uniformBridge = fog.bridge() + uniforms.declarations() + uniforms.macros() + samplers.bridge();
-        return new PreparedStage(source, List.copyOf(extensions), uniformBridge,
-                outputs.declarationsAndMacros(), outputs.varyings(), samplers.usesNoiseSampler(), usesMidTexCoord);
+        return new PreparedBase(samplers.source(), List.copyOf(extensions), outputs, samplers,
+                usesMidTexCoord, shadow, modelView);
     }
 
     private static String removeDefaultFunctionInputQualifiers(String source) {

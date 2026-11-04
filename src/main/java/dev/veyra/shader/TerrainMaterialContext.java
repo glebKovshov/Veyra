@@ -15,8 +15,9 @@ public final class TerrainMaterialContext {
         CURRENT.set(new Attributes(BlockIdMap.active().id(state), -1.0F, state.getLightEmission()));
     }
 
-    public static void setFluid(BlockState state) {
-        CURRENT.set(new Attributes(BlockIdMap.active().id(state), 1.0F, state.getLightEmission()));
+    /** Fluid quads take the material of the fluid's legacy block and the light emission of the containing block. */
+    public static void setFluid(BlockState fluidBlock, int lightEmission) {
+        CURRENT.set(new Attributes(BlockIdMap.active().id(fluidBlock), 1.0F, lightEmission));
     }
 
     public static void setOrigin(float x, float y, float z) {
