@@ -560,3 +560,10 @@ The fresh pinned source audit on this runtime code passed: four packs, 12 defaul
 The beta.38 Complementary lifecycle log also identifies concrete unsupported routes: sign text for gbuffers_block requests upVec, and the gbuffers_textured particle fallback requests gaux2. Those shader overrides are skipped with warnings. These gaps remain open even if the generated-scene lifecycle/readback gate passes; source-only acceptance must not be read as complete runtime compatibility.
 
 The versioned beta.38 Complementary Reimagined r5.9.3 COMPLEMENTARY lifecycle run passed on RTX 3070: 326,462 non-black pixels / 55 color buckets, resize, Nether/return, disable/re-enable and resource reload all true, 810,549,248-byte SSBO owner released/recreated, process exit 0. Before allocator destruction, shutdown evidence contains no shader-pack buffers, no active storage owner and zero owner bytes. The captured scene is generated and the sign-text/particle gaps above remain; no whole-pack or natural-world visual certification is claimed.
+
+
+## Local Photon compute color-target follow-up ? 2026-11-04
+
+Compute supports floating-point 2D `colortex1..15` samplers and `colorimg1..15` storage aliases, borrowing the active render target instead of requiring `image.*`. Supported storage qualifiers are restricted to the implemented format table and must match the target. Primary `colortex0` compute access is rejected. `RG16F` color targets and omitted local Y/Z dimensions (default one) are recognized.
+
+The `compute-color-target` GPU fixture passes graphics-to-compute, compute-to-compute and compute-to-graphics visibility, current ping-pong selection, failed replacement rollback and cross-pack restoration on RTX 3070 with clean explicit sync validation and teardown. Photon v1.4's default Overworld compute stage compiles, but its entity tangent and struct interfaces remain unsupported; this does not establish full Photon support or visual parity.

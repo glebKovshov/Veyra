@@ -17,6 +17,16 @@ class ShaderPackTest {
     @TempDir Path directory;
 
     @Test
+    void readsTwoChannelHalfFloatColorTarget() throws IOException {
+        Path shaders = Files.createDirectories(directory.resolve("rg16f/shaders"));
+        Files.writeString(shaders.resolve("final.fsh"), "const int colortex10Format = RG16F;\nvoid main(){}");
+        var settings = ShaderPack.inspect(shaders.getParent()).readColorTargetSettings(640, 360, 16384);
+        assertEquals(VK10.VK_FORMAT_R16G16_SFLOAT, settings.get(10).format());
+        assertEquals("RG16F", ColorTargetSettings.formatName(settings.get(10).format()));
+        assertEquals(4, ColorTargetSettings.formatSize(settings.get(10).format()));
+    }
+
+    @Test
     void acceptsShadowMrtBeforeAllocationEvenWithoutVertexStage() throws IOException {
         Path shaders = Files.createDirectories(directory.resolve("shadow-mrt/shaders"));
         Files.writeString(shaders.resolve("final.fsh"), "void main() { gl_FragColor = vec4(1.0); }\n");

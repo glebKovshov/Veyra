@@ -82,6 +82,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             Map.entry("RGBA16", VK10.VK_FORMAT_R16G16B16A16_UNORM),
             Map.entry("R16F", VK10.VK_FORMAT_R16_SFLOAT),
             Map.entry("RGB16F", VK10.VK_FORMAT_R16G16B16_SFLOAT),
+            Map.entry("RG16F", VK10.VK_FORMAT_R16G16_SFLOAT),
             Map.entry("RGBA16F", VK10.VK_FORMAT_R16G16B16A16_SFLOAT),
             Map.entry("R11F_G11F_B10F", VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32),
             Map.entry("R32F", VK10.VK_FORMAT_R32_SFLOAT));
@@ -1443,7 +1444,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         for (String file : computeFiles) {
             String source = readComputeStage(file).orElseThrow();
             ShaderPackImageBindings.prepare(file, source, properties); // Validate image numeric types too.
-            var shader = ComputeShaderAdapter.adapt(file, source, properties);
+            var shader = ComputeShaderAdapter.adapt(file, source, properties, readColorTargetSettings(1, 1, 16384));
             boolean hasStorageImage = shader.resources().stream()
                     .anyMatch(ComputeShaderAdapter.OpaqueResource::storageImage);
             var storageBuffers = ShaderPackStorageBuffers.validateForVulkanParser(

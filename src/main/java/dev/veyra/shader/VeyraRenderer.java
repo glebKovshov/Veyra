@@ -3336,14 +3336,16 @@ public final class VeyraRenderer {
                     .map(ShaderPass::programName).toList();
             List<ComputeProgramSequence.Event> events = ComputeProgramSequence.interleave(
                     phase, computePrograms, graphicsPrograms);
+            Map<Integer, Identifier> computeTargets = framePlan.initialColorTargets();
             for (ComputeProgramSequence.Event event : events) {
                 if (event.kind() == ComputeProgramSequence.Kind.COMPUTE) {
                     if (compute == null) throw new IllegalStateException("A post-compute pass has no compiled pipeline set.");
                     graphOrder.addComputePass(graph, compute, event.programName(),
-                            mainTarget.width, mainTarget.height);
+                            mainTarget.width, mainTarget.height, computeTargets);
                     continue;
                 }
                 ShaderPass shaderPass = framePlan.shaderPasses().get(event.graphicsIndex());
+                computeTargets = shaderPass.outputColorTargets();
                 updateDynamicUniforms(shaderPass, mainTarget.width, mainTarget.height, frameUniforms);
                 FramePass sampledTransition = prepareSampledTargets(graph, targets,
                         shaderPass.sampledTargets(), shaderPass.mipmapInputs());
@@ -3539,6 +3541,7 @@ public final class VeyraRenderer {
         boolean usesDepth2Sampler = false;
         boolean usesShadowSampler = false;
         Set<Integer> colorTargetIndices = new java.util.TreeSet<>();
+        if (customImageResources != null) colorTargetIndices.addAll(customImageResources.colorTargetIndices());
         for (String name : pack.terrainPrograms()) {
             var fragment = pack.readTerrainFragment(name);
             if (fragment.isPresent()) {
@@ -3817,6 +3820,7 @@ public final class VeyraRenderer {
                 || format == VK10.VK_FORMAT_A2B10G10R10_UNORM_PACK32
                 || format == VK10.VK_FORMAT_R16_SFLOAT
                 || format == VK10.VK_FORMAT_R16G16B16A16_UNORM
+                || format == VK10.VK_FORMAT_R16G16_SFLOAT
                 || format == VK10.VK_FORMAT_R16G16B16A16_SFLOAT
                 || format == VK10.VK_FORMAT_R32_SFLOAT;
     }
@@ -7185,7 +7189,8 @@ public final class VeyraRenderer {
                     PostPass pass = new PostPass(program.pipeline(), outputTargets.get(program.outputTarget()),
                             passUniforms(program, width, height, FrameUniforms.ZERO), inputs);
                     passes.add(new ShaderPass(group.programName(), pass, program,
-                            Set.copyOf(sampledTargets), orderInput, Map.copyOf(mipmapInputs)));
+                            Set.copyOf(sampledTargets), orderInput, Map.copyOf(mipmapInputs),
+                            mergedColorTargets(currentTargets, outputTargets)));
                     if (usesDynamicUniforms(program)) {
                         makeDynamicUniformBuffer(pass, program, width, height);
                     }
@@ -8120,6 +8125,8 @@ public final class VeyraRenderer {
         currentColorTargets.clear();
     }
 
+    private static Map<Integer, Identifier> computeColorTargets;
+
     public static net.vulkanmod.vulkan.texture.VulkanImage geometryColorAttachment(int index) {
         return ((VkGpuTexture) geometryColorTarget(index).getColorTexture()).getVulkanImage();
     }
@@ -8127,7 +8134,7 @@ public final class VeyraRenderer {
     private static RenderTarget geometryColorTarget(int index) {
         ColorTargetPair pair = colorTargets.get(index);
         if (pair == null) throw new IllegalStateException("Geometry colortex" + index + " has not been allocated.");
-        Identifier side = currentColorTargets.get(index);
+        Identifier side = (computeColorTargets == null ? currentColorTargets : computeColorTargets).get(index);
         if (side == null) throw new IllegalStateException("Geometry color buffers have not been initialized for this frame.");
         return colorTargetAId(index).equals(side) ? pair.targetA() : pair.targetB();
     }
@@ -8228,6 +8235,14 @@ public final class VeyraRenderer {
         return changed;
     }
 
+    private static int computeColorUsage(String name) {
+        if (terrainPipelineSet == null || terrainPipelineSet.compute() == null) return 0;
+        for (int index : terrainPipelineSet.compute().storageColorTargetIndices()) {
+            if (name.startsWith("Veyra shader pack colortex" + index + " ")) return VK10.VK_IMAGE_USAGE_STORAGE_BIT;
+        }
+        return 0;
+    }
+
     private static boolean ensureTargetFormat(RenderTarget target, String name, int format, boolean opaqueAlpha) {
         GpuTexture colorTexture = target.getColorTexture();
         if (!(colorTexture instanceof VkGpuTexture vulkanTexture)) {
@@ -8235,6 +8250,7 @@ public final class VeyraRenderer {
         }
         boolean changed = false;
         if (vulkanTexture.getVulkanImage().format != format
+                || (vulkanTexture.getVulkanImage().usage & computeColorUsage(name)) != computeColorUsage(name)
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0
                 || (vulkanTexture.getVulkanImage().usage & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
             replaceColorTargetTexture(target, name, format);
@@ -8268,10 +8284,19 @@ public final class VeyraRenderer {
         GpuTextureView replacementView = null;
         boolean installed = false;
         try {
+            if (computeColorUsage(name) != 0) {
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    VkFormatProperties properties = VkFormatProperties.calloc(stack);
+                    VK10.vkGetPhysicalDeviceFormatProperties(DeviceManager.physicalDevice, format, properties);
+                    if ((properties.optimalTilingFeatures() & VK10.VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) == 0) {
+                        throw new IllegalStateException(name + " format does not support compute storage images.");
+                    }
+                }
+            }
             colorImage = VulkanImage.builder(target.width, target.height)
                     .setName(name)
                     .setFormat(format)
-                    .addUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                    .addUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | computeColorUsage(name))
                     .addUsage(VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
                     .addUsage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                     .createVulkanImage();
@@ -8584,9 +8609,17 @@ public final class VeyraRenderer {
     private record OutputMapping(int fragmentOutputIndex, int targetIndex) {
     }
 
+    private static Map<Integer, Identifier> mergedColorTargets(Map<Integer, Identifier> current,
+                                                               Map<Integer, Identifier> outputs) {
+        Map<Integer, Identifier> merged = new HashMap<>(current);
+        merged.putAll(outputs);
+        return Map.copyOf(merged);
+    }
+
     private record ShaderPass(String programName, PostPass pass, PipelineProgram program,
                               Set<Identifier> sampledTargets,
-                              OrderedPostPassInput orderInput, Map<Integer, Identifier> mipmapInputs) {
+                              OrderedPostPassInput orderInput, Map<Integer, Identifier> mipmapInputs,
+                              Map<Integer, Identifier> outputColorTargets) {
     }
 
     private record FrameUniforms(float frameTimeCounter, float frameTime, int frameCounter,
@@ -8949,7 +8982,7 @@ public final class VeyraRenderer {
         }
 
         private void addComputePass(FrameGraphBuilder graph, VeyraComputePipelineSet compute,
-                                    String programName, int width, int height) {
+                                    String programName, int width, int height, Map<Integer, Identifier> colorTargets) {
             FramePass pass = graph.addPass("veyra:compute-" + programName);
             order(pass);
             pass.disableCulling();
@@ -8958,7 +8991,12 @@ public final class VeyraRenderer {
                     Renderer.getInstance().endRenderPass();
                 }
                 if (storageBufferResources != null) storageBufferResources.barrierAfterShadowPass();
-                compute.dispatchProgram(programName, width, height);
+                computeColorTargets = colorTargets;
+                try {
+                    compute.dispatchProgram(programName, width, height);
+                } finally {
+                    computeColorTargets = null;
+                }
             });
         }
     }

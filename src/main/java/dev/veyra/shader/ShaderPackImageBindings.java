@@ -35,6 +35,8 @@ final class ShaderPackImageBindings {
         while (declarations.find()) {
             String type = declarations.group(3), name = declarations.group(4);
             boolean storage = type.contains("image");
+            if (file.endsWith(".csh") && ComputeShaderAdapter.colorTargetIndex(name) >= 0
+                    && !properties.images().containsKey(name)) continue;
             String imageName = storage ? name : properties.images().values().stream()
                     .filter(image -> image.sampler().equals(name)).map(ShaderPackImageProperties.Image::name)
                     .findFirst().orElse(null);

@@ -58,6 +58,12 @@ public final class VeyraComputeResources implements AutoCloseable {
             for (ComputeShaderAdapter.AdaptedStage shader : shaders) {
                 List<VeyraImageDescriptor> descriptors = new ArrayList<>();
                 for (ComputeShaderAdapter.OpaqueResource resource : shader.resources()) {
+                    int colorTarget = ComputeShaderAdapter.colorTargetIndex(resource.imageName());
+                    if (colorTarget >= 0 && !properties.images().containsKey(resource.imageName())) {
+                        descriptors.add(VeyraImageDescriptor.colorTarget(resource.binding(), resource.glslType(),
+                                resource.name(), colorTarget, resource.storageImage()));
+                        continue;
+                    }
                     ShaderPackImageProperties.Image image = properties.images().get(resource.imageName());
                     if (image == null) {
                         throw new IOException("Compute resource '" + resource.name()

@@ -33,6 +33,7 @@ record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, in
             case VK10.VK_FORMAT_R8G8B8A8_SNORM -> "RGBA8_SNORM";
             case VK10.VK_FORMAT_R16G16B16A16_UNORM -> "RGBA16";
             case VK10.VK_FORMAT_R16_SFLOAT -> "R16F";
+            case VK10.VK_FORMAT_R16G16_SFLOAT -> "RG16F";
             case VK10.VK_FORMAT_R16G16B16_SFLOAT -> "RGB16F";
             case VK10.VK_FORMAT_R16G16B16A16_SFLOAT -> "RGBA16F";
             case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> "R11F_G11F_B10F";
@@ -52,6 +53,7 @@ record ColorTargetSettings(boolean clearEachFrame, int clearColor, int width, in
                     VK10.VK_FORMAT_R32_SFLOAT -> 4;
             case VK10.VK_FORMAT_R16G16B16A16_UNORM -> 8;
             case VK10.VK_FORMAT_R16_SFLOAT -> 2;
+            case VK10.VK_FORMAT_R16G16_SFLOAT -> 4;
             case VK10.VK_FORMAT_R16G16B16_SFLOAT -> 6;
             case VK10.VK_FORMAT_R16G16B16A16_SFLOAT -> 8;
             default -> throw new IllegalArgumentException("Unsupported Vulkan color format " + format + ".");

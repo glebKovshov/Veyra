@@ -197,7 +197,7 @@ public final class GraphicsSmoke {
             basicCustomImageFixture = fixture.equals("basic-custom-image");
             entityCustomImageFixture = fixture.equals("entity-custom-image");
             entityCustomTextureFixture = fixture.equals("entity-custom-texture");
-            compositeCustomImageFixture = fixture.equals("composite-custom-image") || fixture.equals("graphics-custom-image")
+            compositeCustomImageFixture = fixture.equals("compute-color-target") || fixture.equals("composite-custom-image") || fixture.equals("graphics-custom-image")
                     || fixture.equals("compute-ssbo-only") || fixture.equals("compute-begin-stage")
                     || fixture.equals("compute-setup-stage") || fixture.equals("compute-shadow-stage")
                     || fixture.equals("begin-fragment-stage");

@@ -123,7 +123,8 @@ public final class VeyraComputePipeline extends Pipeline {
             // Shader-pack images remain in GENERAL so the same image can be read and written
             // through separate sampled/storage descriptors without VulkanMod applying stale layouts.
             descriptor.isReadOnlyLayout = false;
-            if (descriptor.useSampler) {
+            if (descriptor.useSampler && !(descriptor instanceof dev.veyra.vulkan.VeyraImageDescriptor borrowed
+                    && borrowed.isColorTarget())) {
                 VulkanImage image = descriptor.getImage();
                 if (image == null) throw new IOException("Compute sampler " + descriptor.name + " has no image.");
                 boolean integerSampler = descriptor.qualifier.startsWith("usampler")
@@ -162,6 +163,16 @@ public final class VeyraComputePipeline extends Pipeline {
         vkCmdDispatchIndirect(bindForDispatch(), buffer, Integer.toUnsignedLong(offset));
     }
 
+    void finishColorTargetAccess() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            for (ImageDescriptor descriptor : imageDescriptors) {
+                if (descriptor instanceof dev.veyra.vulkan.VeyraImageDescriptor image && image.isColorTarget()) {
+                    dev.veyra.vulkan.VeyraImage2D.transitionColorImage(image.getImage(), stack, Renderer.getCommandBuffer(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                }
+            }
+        }
+    }
+
     private VkCommandBuffer bindForDispatch() {
         Renderer renderer = Renderer.getInstance();
         if (!Renderer.isRecording() || Renderer.getCommandBuffer() == null) {
@@ -174,6 +185,13 @@ public final class VeyraComputePipeline extends Pipeline {
         int frame = Renderer.getCurrentFrame();
         renderer.addUsedPipeline(this);
         UniformBuffer globalUniformBuffer = Renderer.getDrawer().getUniformBuffer();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            for (ImageDescriptor descriptor : imageDescriptors) {
+                if (descriptor instanceof dev.veyra.vulkan.VeyraImageDescriptor image && image.isColorTarget()) {
+                    dev.veyra.vulkan.VeyraImage2D.transitionColorImage(image.getImage(), stack, commandBuffer, VK_IMAGE_LAYOUT_GENERAL);
+                }
+            }
+        }
         descriptorSets[frame].bindSets(commandBuffer, globalUniformBuffer, VK_PIPELINE_BIND_POINT_COMPUTE);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
         return commandBuffer;

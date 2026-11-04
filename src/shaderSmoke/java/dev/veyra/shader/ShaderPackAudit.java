@@ -81,7 +81,7 @@ public final class ShaderPackAudit {
                         if (file.endsWith(".csh")) {
                             try {
                                 ComputeShaderAdapter.AdaptedStage adapted = ComputeShaderAdapter.adapt(
-                                        file, source, pack.readImageProperties());
+                                        file, source, pack.readImageProperties(), pack.readColorTargetSettings(1, 1, 16384));
                                 ShaderCompileSmoke.compileCompute(adapted.source(),
                                         pack.path().getFileName() + "/" + profile + "/" + file);
                                 computeAccepted++;

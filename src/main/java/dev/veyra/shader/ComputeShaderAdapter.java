@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 /** Builds the Vulkan GLSL interface for a shader-pack compute stage. */
 public final class ComputeShaderAdapter {
     private static final Pattern OPAQUE_UNIFORM = Pattern.compile(
-            "(?m)^[\\t ]*(?:(readonly|writeonly|coherent|volatile|restrict)\\s+)?uniform\\s+"
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(readonly|writeonly|coherent|volatile|restrict)\\s+)?uniform\\s+"
                     + "((?:[iu]?sampler|[iu]?image)[A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;"
                     + "[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
@@ -20,7 +20,7 @@ public final class ComputeShaderAdapter {
     private static final Pattern PRECISION = Pattern.compile(
             "(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)");
     private static final Pattern LOCAL_SIZE = Pattern.compile(
-            "layout\\s*\\(\\s*local_size_x\\s*=\\s*(\\d+)\\s*,\\s*local_size_y\\s*=\\s*(\\d+)\\s*,\\s*local_size_z\\s*=\\s*(\\d+)\\s*\\)\\s*in\\s*;");
+            "layout\\s*\\(\\s*local_size_x\\s*=\\s*(\\d+)(?:\\s*,\\s*local_size_y\\s*=\\s*(\\d+))?(?:\\s*,\\s*local_size_z\\s*=\\s*(\\d+))?\\s*\\)\\s*in\\s*;");
     private static final Pattern WORK_GROUPS_DECLARATION = Pattern.compile(
             "\\bconst\\s+ivec3\\s+workGroups\\s*=\\s*([^;]+);"
     );
@@ -39,6 +39,12 @@ public final class ComputeShaderAdapter {
 
     public static AdaptedStage adapt(String fileName, String source,
                                      ShaderPackImageProperties imageProperties) throws IOException {
+        return adapt(fileName, source, imageProperties, Map.of());
+    }
+
+    public static AdaptedStage adapt(String fileName, String source,
+                                     ShaderPackImageProperties imageProperties,
+                                     Map<Integer, ColorTargetSettings> colorTargets) throws IOException {
         // Iris defines this feature macro when the pack uses image.* resources. Veyra's compute
         // path provides the custom-image interface even though the offline preprocessor has no Iris runtime.
         String active = GlslPreprocessor.process(fileName, source, Map.of("IRIS_FEATURE_CUSTOM_IMAGES", "1"));
@@ -75,6 +81,31 @@ public final class ComputeShaderAdapter {
                 continue;
             }
             boolean storage = declaration.glslType().contains("image");
+            int colorTarget = colorTargetIndex(declaration.name());
+            if (colorTarget >= 0 && !imageProperties.images().containsKey(declaration.name())) {
+                String expected = declaration.name().startsWith("colorimg") ? "image2D" : "sampler2D";
+                if (!declaration.glslType().equals(expected)) {
+                    throw new IOException(fileName + " built-in '" + declaration.name() + "' must use " + expected + ".");
+                }
+                if (colorTarget == 0) throw new IOException(fileName + " compute access to primary colortex0 is not supported yet.");
+                ColorTargetSettings settings = colorTargets.getOrDefault(colorTarget,
+                        ColorTargetSettings.defaults(colorTarget, 1, 1));
+                String format = ColorTargetSettings.formatName(settings.format()).toLowerCase(java.util.Locale.ROOT);
+                if (storage && !java.util.Set.of("rgba8", "rg16f", "rgba16f", "r16f", "r32f", "rgba16", "rgba8_snorm").contains(format)) {
+                    throw new IOException(fileName + " compute storage colortex" + colorTarget + " uses unsupported format " + format + ".");
+                }
+                if (storage) {
+                    Matcher declaredFormat = Pattern.compile("layout\\s*\\(\\s*([a-z][a-z0-9_]*)\\s*\\)")
+                            .matcher(active.substring(declaration.start(), declaration.end()));
+                    if (declaredFormat.find() && !declaredFormat.group(1).equals(format)) {
+                        throw new IOException(fileName + " storage format of '" + declaration.name()
+                                + "' does not match colortex" + colorTarget + " format " + format + ".");
+                    }
+                }
+                resourcesByName.put(declaration.name(), new OpaqueResource(declaration.name(), declaration.glslType(),
+                        declaration.qualifier(), "colortex" + colorTarget, storage, storage ? format : "", -1));
+                continue;
+            }
             String imageName = storage ? declaration.name() : imageProperties.images().values().stream()
                     .filter(image -> image.sampler().equals(declaration.name()))
                     .map(ShaderPackImageProperties.Image::name).findFirst().orElse(null);
@@ -154,8 +185,8 @@ public final class ComputeShaderAdapter {
         }
         int[] localSize = {
                 positiveInt(fileName, "local_size_x", localSizeMatcher.group(1)),
-                positiveInt(fileName, "local_size_y", localSizeMatcher.group(2)),
-                positiveInt(fileName, "local_size_z", localSizeMatcher.group(3))
+                positiveInt(fileName, "local_size_y", localSizeMatcher.group(2) == null ? "1" : localSizeMatcher.group(2)),
+                positiveInt(fileName, "local_size_z", localSizeMatcher.group(3) == null ? "1" : localSizeMatcher.group(3))
         };
         String declarationSource = ShaderSource.maskBlockAndLineComments(uniformStage.source());
         Matcher workGroupsMatcher = WORK_GROUPS_DECLARATION.matcher(declarationSource);
@@ -266,6 +297,11 @@ public final class ComputeShaderAdapter {
             char character = source.charAt(i);
             target.append(character == '\r' || character == '\n' ? character : ' ');
         }
+    }
+
+    public static int colorTargetIndex(String name) {
+        if (!name.matches("(?:colorimg|colortex)(?:[0-9]|1[0-5])")) return -1;
+        return Integer.parseInt(name.substring(8));
     }
 
     private record OpaqueDeclaration(int start, int end, String qualifier, String glslType, String name) { }

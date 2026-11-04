@@ -13,6 +13,39 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ComputeShaderAdapterTest {
     @Test
+    void rejectsInvalidBuiltInImageTypesAndFormats() throws Exception {
+        for (String uniform : new String[]{"uniform image3D colorimg4;", "uniform sampler2D colorimg4;",
+                "layout(rgba16f) uniform image2D colorimg4;"}) {
+            assertThrows(java.io.IOException.class, () -> ComputeShaderAdapter.adapt("deferred.csh",
+                    "layout(local_size_x=1) in;\n" + uniform
+                            + "\nvoid main(){ imageStore(colorimg4,ivec2(0),vec4(1));}",
+                    ShaderPackImageProperties.parse("")));
+        }
+        assertEquals(4, ComputeShaderAdapter.colorTargetIndex("colorimg4"));
+        assertEquals(15, ComputeShaderAdapter.colorTargetIndex("colortex15"));
+        assertEquals(-1, ComputeShaderAdapter.colorTargetIndex("colorimg16"));
+    }
+
+    @Test
+    void bindsBuiltInColorImagesAndDefaultsOmittedLocalDimensions() throws Exception {
+        var stage = ComputeShaderAdapter.adapt("deferred4_a.csh", """
+                layout(local_size_x=256) in;
+                const ivec3 workGroups=ivec3(1,1,1);
+                layout(rgba16f) writeonly uniform image2D colorimg4;
+                uniform sampler2D colortex4;
+                void main(){imageStore(colorimg4,ivec2(0),texelFetch(colortex4,ivec2(1),0));}
+                """, ShaderPackImageProperties.parse(""), java.util.Map.of(4,
+                new ColorTargetSettings(false, 0, 192, 192, org.lwjgl.vulkan.VK10.VK_FORMAT_R16G16B16A16_SFLOAT)));
+        assertEquals(256, stage.localSizeX());
+        assertEquals(1, stage.localSizeY());
+        assertEquals(1, stage.localSizeZ());
+        assertEquals(2, stage.resources().size());
+        assertTrue(stage.resources().stream().allMatch(r -> r.imageName().equals("colortex4")));
+        assertEquals("rgba16f", stage.resources().getFirst().format());
+        assertTrue(stage.source().contains("binding = 0, rgba16f"), stage.source());
+    }
+
+    @Test
     void supportsImageOnlyComputeWithoutAnEmptyUniformBlockOrBindingGap() throws Exception {
         var stage = ComputeShaderAdapter.adapt("shadowcomp.csh", """
                 layout(local_size_x=1,local_size_y=1,local_size_z=1) in;

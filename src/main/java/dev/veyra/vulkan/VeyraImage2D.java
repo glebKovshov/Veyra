@@ -140,7 +140,11 @@ public final class VeyraImage2D extends VulkanImage implements VeyraCustomImage 
 
     @Override
     public void transitionImageLayout(MemoryStack stack, VkCommandBuffer commands, int nextLayout) {
-        int previousLayout = getCurrentLayout();
+        transitionColorImage(this, stack, commands, nextLayout);
+    }
+
+    public static void transitionColorImage(VulkanImage image, MemoryStack stack, VkCommandBuffer commands, int nextLayout) {
+        int previousLayout = image.getCurrentLayout();
         if (previousLayout == nextLayout) return;
         if (commands == null) throw new IllegalStateException("Custom image transitions require a command buffer.");
         LayoutAccess previous = layoutAccess(previousLayout);
@@ -150,16 +154,18 @@ public final class VeyraImage2D extends VulkanImage implements VeyraCustomImage 
                 .oldLayout(previousLayout).newLayout(nextLayout)
                 .srcAccessMask(previous.access()).dstAccessMask(next.access())
                 .srcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED).dstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .image(getId());
+                .image(image.getId());
         barrier.subresourceRange().aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
                 .baseMipLevel(0).levelCount(1).baseArrayLayer(0).layerCount(1);
         vkCmdPipelineBarrier(commands, previous.stages(), next.stages(), 0, null, null, barrier);
-        setCurrentLayout(nextLayout);
+        image.setCurrentLayout(nextLayout);
     }
 
     private static LayoutAccess layoutAccess(int layout) {
         return switch (layout) {
             case VK_IMAGE_LAYOUT_UNDEFINED -> new LayoutAccess(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+            case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> new LayoutAccess(
+                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
             case VK_IMAGE_LAYOUT_GENERAL -> new LayoutAccess(
                     VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                     VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);

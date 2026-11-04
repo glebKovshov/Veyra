@@ -47,7 +47,7 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
         for (String file : files) {
             String source = pack.readComputeStage(file)
                     .orElseThrow(() -> new IOException("The pack no longer contains " + file + "."));
-            adapted.add(ComputeShaderAdapter.adapt(file, source, properties));
+            adapted.add(ComputeShaderAdapter.adapt(file, source, properties, pack.readColorTargetSettings(1, 1, 16384)));
         }
 
         Set<String> graphicsImageNames = new LinkedHashSet<>();
@@ -291,8 +291,9 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                         | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
                         | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
-                VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
-                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
+                VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
         for (int index = 0; index < resolvedStages.size(); index++) {
             ResolvedDispatch dispatch = resolvedStages.get(index);
             if (dispatch.indirectBuffer() == null) {
@@ -300,6 +301,7 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
             } else {
                 dispatch.pipeline().dispatchIndirect(dispatch.indirectBuffer().buffer().getId(), dispatch.indirectOffset());
             }
+            dispatch.pipeline().finishColorTargetAccess();
             if (index + 1 < resolvedStages.size()) {
                 VeyraComputePipeline.memoryBarrier(commandBuffer,
                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -313,7 +315,28 @@ public final class VeyraComputePipelineSet implements AutoCloseable {
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
                         | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
                 VK_ACCESS_SHADER_WRITE_BIT,
-                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    }
+
+    public Set<Integer> colorTargetIndices() {
+        Set<Integer> indices = new LinkedHashSet<>();
+        for (int stage = 0; stage < stages.size(); stage++) {
+            for (var descriptor : resources.descriptors(stage)) {
+                if (descriptor.isColorTarget()) indices.add(descriptor.colorTargetIndex());
+            }
+        }
+        return Set.copyOf(indices);
+    }
+
+    public Set<Integer> storageColorTargetIndices() {
+        Set<Integer> indices = new LinkedHashSet<>();
+        for (int stage = 0; stage < stages.size(); stage++) {
+            for (var descriptor : resources.descriptors(stage)) {
+                if (descriptor.isColorTarget() && descriptor.isStorageImage()) indices.add(descriptor.colorTargetIndex());
+            }
+        }
+        return Set.copyOf(indices);
     }
 
     public int stageCount() {
