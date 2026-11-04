@@ -1,3 +1,9 @@
+## 2026-11-04: Veyra 1.0.0 published
+
+- PR #152 head `4698621` passed all 58 hosted checks (Build #1100/#1099, source audit #318, Graphics smoke #364 with 54 Lavapipe fixtures) and was merged as `8c23dbf`. `release/1.0.0+mc1.21.11` at that commit ran Release workflow 41825845708: all 57 jobs passed (source audit, Lavapipe baseline plus 54 graphics fixtures, build/tests, publication and in-workflow download verification).
+- [v1.0.0+mc1.21.11](https://github.com/glebKovshov/Veyra/releases/tag/v1.0.0%2Bmc1.21.11) is a full release (not prerelease/draft) and the repository's latest release; the tag resolves to `8c23dbf`. Assets: install JAR, sources JAR, example-packs ZIP and SHA256SUMS.txt.
+- Independent local download: all three files match SHA256SUMS.txt; `scripts/verify_jar.py` reports Minecraft 1.21.11, VulkanMod 0.6.8, mod 1.0.0+mc1.21.11, and `fabric.mod.json` carries version 1.0.0+mc1.21.11. Install JAR SHA-256: `7047dd89d5619bb0a34c6847a87caaf7856fff81495139e132604bd248541e6c`.
+
 ## 2026-11-04: 0x0 surface recovery, evidence loss and final candidate
 
 - The Sildur native-HDR repeat failed its resize stage with 46 non-black pixels. Swapchain evidence showed VulkanMod recreating against a 0x0 surface: it destroys the swapchain, keeps a 10x10 placeholder main pass and recreates only on a later window event, which never arrives when Windows delivers the final resize callback early. At shutdown it also destroys the stale views again. Committed as `e804e2d`: Veyra retries recreation from the outer frame while GLFW reports a visible, non-empty framebuffer, forgets already destroyed views at final cleanup and tolerates the released depth attachment.

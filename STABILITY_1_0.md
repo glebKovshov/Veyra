@@ -10,10 +10,10 @@ Final production candidate: `e804e2d` (production sources unchanged by the 1.0.0
 | Pinned source/profile acceptance | `validation-output/final-e804e2d/source-audit/` | 75 cases, 939 geometry programs, 18 active compute stages, zero rejections. |
 | Matched Iris comparison and full lifecycle, four pinned profiles | `validation-output/final-e804e2d-matrix/summary.json`, manifest `finalCandidate` | All four pass: identical shader trees, Iris confirms the profile with +0 user changes, fixed clocks; Veyra completes forced 0x0 surface recovery, resize, Nether/return, disable/re-enable and reload with zero core/sync diagnostics and a clean teardown audit. RGB MAE/255 (full): Reimagined 4.08, Unbound 4.24, Sildur 3.13, BSL natural 3.64. |
 | Surface-loss regression | Compute-setup positive/negative fixtures and all lifecycle cases | No-fix control fails with a 10x10 main pass; fixed runs recover. CI requires `surfaceLossRecovered`. |
-| Rollback, cross-pack switching and native readback | Hosted graphics matrix (custom-uniforms, compute-ssbo-only, graphics-custom-image, water-color-inputs) | Required on the release head. |
-| Full hosted build/source/graphics gates | PR #152 checks and the release workflow | Required on the release head; dependency-resolution failures before Minecraft starts are retried, nothing else is relaxed. |
+| Rollback, cross-pack switching and native readback | Hosted graphics matrix (custom-uniforms, compute-ssbo-only, graphics-custom-image, water-color-inputs) | Passed on PR head `4698621` and in the release run. |
+| Full hosted build/source/graphics gates | PR #152 checks and the release workflow | 58/58 PR checks and 57/57 release jobs passed; only network dependency resolution before Minecraft starts is retried. |
 | Explain visual differences and define release scope | COMPATIBILITY.md, `validation/iris-bsl-phase-analysis.json` | Remaining differences are attributed to sampling phase, storage precision and VulkanMod's primary attachment; pixel parity is explicitly not claimed. |
-| Versioned release and downloaded-asset verification | Release workflow and a local download check | `1.0.0+mc1.21.11` metadata selected after the gates above passed. |
+| Versioned release and downloaded-asset verification | Release workflow 41825845708 and a local download check | Published as v1.0.0+mc1.21.11 at `8c23dbf` (57/57 release jobs). Downloaded checksums and JAR metadata verified. |
 
 ## 2026-11-03 loading-cost follow-up
 
