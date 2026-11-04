@@ -542,6 +542,48 @@ public class ShaderCompileSmoke {
             compile(compiler, options, beaconPackFragment, "beacon-beam-flat-varying-mrt-fragment", true);
             count++;
             compiled += 2;
+            // Photon draws beams with its shared solid program, which the narrow beacon bridge rejects.
+            String beaconSolidPackSource = """
+                    #version 400 compatibility
+                    attribute vec4 at_tangent;
+                    attribute vec3 mc_Entity;
+                    attribute vec2 mc_midTexCoord;
+                    out vec2 uv;
+                    out vec2 light_levels;
+                    out vec4 tint;
+                    flat out uint material_mask;
+                    flat out mat3 tbn;
+                    void main() {
+                        uv = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+                        light_levels = clamp(gl_MultiTexCoord1.xy / 240.0, 0.0, 1.0);
+                        tint = gl_Color;
+                        material_mask = uint(max(mc_Entity.x, 0.0)) + 32u;
+                        tbn[0] = normalize(gl_NormalMatrix * at_tangent.xyz);
+                        tbn[2] = normalize(gl_NormalMatrix * gl_Normal);
+                        tbn[1] = cross(tbn[0], tbn[2]) * sign(at_tangent.w);
+                        bool isTopVertex = uv.y < mc_midTexCoord.y;
+                        gl_Position = ftransform() + vec4(0.0, isTopVertex ? 0.0 : 0.0, 0.0, 0.0);
+                    }
+                    """;
+            BeaconBeamVertexShaderAdapter.AdaptedStage beaconSolidVertex = BeaconBeamVertexShaderAdapter.adaptAnyStage(
+                    nativeBeaconVertex, beaconSolidPackSource, "gbuffers_beaconbeam");
+            compileVertex(compiler, options, beaconSolidVertex.source(), "beacon-beam-block-format-solid-vertex", true);
+            String beaconSolidFragment = TextureColorDistanceShaderAdapter.adaptFragment("""
+                    #version 400 compatibility
+                    uniform sampler2D gtexture;
+                    in vec2 uv;
+                    in vec2 light_levels;
+                    in vec4 tint;
+                    flat in uint material_mask;
+                    flat in mat3 tbn;
+                    void main() {
+                        vec4 albedo = texture2D(gtexture, uv) * tint;
+                        gl_FragData[0] = vec4(albedo.rgb * light_levels.x + tbn[2] * float(material_mask), albedo.a);
+                    }
+                    """, "gbuffers_beaconbeam", beaconSolidVertex.varyings(), false, true);
+            compile(compiler, options, beaconSolidFragment, "beacon-beam-block-format-solid-fragment", true);
+            count++;
+            compiled += 2;
             var basicFallbackLineVertex = BasicVertexShaderAdapter.adaptStage(nativeLineVertex, """
                     #version 130
                     void main() {
@@ -703,6 +745,51 @@ public class ShaderCompileSmoke {
                             }
                             """, "gbuffers_entities", false);
             compileVertex(compiler, options, entityNoiseVertex.source(), "entity-noisetex-vertex", true);
+            EntityVertexShaderAdapter.AdaptedStage entityTangentVertex = EntityVertexShaderAdapter.adaptStage(
+                    entityNativeVertexSource(), """
+                            #version 400 compatibility
+                            attribute vec4 at_tangent;
+                            attribute vec2 mc_midTexCoord;
+                            flat out mat3 tbn;
+                            out vec2 uv_local;
+                            void main() {
+                                vec2 uv = gl_MultiTexCoord0.xy;
+                                uv_local = sign(uv - mc_midTexCoord) * 0.5 + 0.5;
+                                tbn[0] = normalize(gl_NormalMatrix * at_tangent.xyz);
+                                tbn[2] = normalize(gl_NormalMatrix * gl_Normal);
+                                tbn[1] = cross(tbn[0], tbn[2]) * sign(at_tangent.w);
+                                gl_Position = ftransform();
+                            }
+                            """, "gbuffers_entities", false);
+            compileVertex(compiler, options, entityTangentVertex.source(), "entity-tangent-midtexcoord-vertex", true);
+            String fogStruct = """
+                    struct OverworldFogParameters { vec3 rayleigh_density; vec3 mie_density; float mie_coeff; };
+                    """;
+            EntityVertexShaderAdapter.AdaptedStage entityStructVertex = EntityVertexShaderAdapter.adaptStage(
+                    entityNativeVertexSource(), "#version 400 compatibility\n" + fogStruct + """
+                            out OverworldFogParameters fog_params;
+                            flat out mat3 tbn;
+                            void main() {
+                                fog_params.rayleigh_density = vec3(1.0);
+                                fog_params.mie_density = vec3(0.5);
+                                fog_params.mie_coeff = 0.25;
+                                tbn = mat3(1.0);
+                                gl_Position = ftransform();
+                            }
+                            """, "gbuffers_entities_translucent", false);
+            compileVertex(compiler, options, entityStructVertex.source(), "entity-struct-matrix-varyings-vertex", true);
+            String entityStructFragment = EntityShaderAdapter.adaptGeometryFragment(
+                    "#version 400 compatibility\n" + fogStruct + """
+                            in OverworldFogParameters fog_params;
+                            flat in mat3 tbn;
+                            uniform sampler2D depthtex1;
+                            void main() {
+                                float depth1 = texelFetch(depthtex1, ivec2(gl_FragCoord.xy), 0).x;
+                                gl_FragData[0] = vec4(fog_params.mie_density * fog_params.mie_coeff + tbn[0], depth1);
+                            }
+                            """, "gbuffers_entities_translucent", false, false, -1, -1,
+                    ItemIdMap.UNMAPPED, true, false, entityStructVertex.varyings());
+            compile(compiler, options, entityStructFragment, "entity-struct-matrix-varyings-fragment", true);
             String blockLightmapNative = EntityShaderAdapter.adaptBlockVertexFormat(
                     damagedBlockNativeVertexSource(), "gbuffers_damagedblock");
             EntityVertexShaderAdapter.AdaptedStage blockLightmapVertex = EntityVertexShaderAdapter.adaptStage(

@@ -180,11 +180,20 @@ class BasicVertexShaderAdapterTest {
                 NATIVE_LEASH_VERTEX, source, "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH);
         assertFalse(adapted.source().contains("mc_Entity"));
 
-        IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
+        // Iris does not extend the leash format, so an active mc_Entity reads GL's generic default.
+        BasicVertexShaderAdapter.AdaptedStage active = BasicVertexShaderAdapter.adaptStage(
                 NATIVE_LEASH_VERTEX, source.replace("gl_Position = ftransform();",
                         "gl_Position = ftransform() + vec4(mc_Entity.xyz, 0.0);"),
-                "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH));
-        assertTrue(error.getMessage().contains("mc_Entity"));
+                "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH);
+        assertTrue(active.source().contains("#define mc_Entity vec4(0.0, 0.0, 0.0, 1.0)"), active.source());
+
+        IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
+                NATIVE_LEASH_VERTEX, """
+                        #version 130
+                        attribute vec3 at_velocity;
+                        void main() { gl_Position = ftransform() + vec4(at_velocity, 0.0); }
+                        """, "gbuffers_basic", BasicVertexShaderAdapter.Format.LEASH));
+        assertTrue(error.getMessage().contains("at_velocity"));
     }
 
     @Test
@@ -493,14 +502,21 @@ class BasicVertexShaderAdapterTest {
         assertFalse(adapted.source().contains("attribute vec4 mc_midTexCoord"));
         assertTrue(adapted.varyings().containsKey("attributeDefaults"));
 
-        IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
-                NATIVE_TEXTURED_VERTEX, source.replace("attribute vec4 mc_Entity;", "attribute vec3 mc_Entity;"),
-                "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED));
-        assertTrue(error.getMessage().contains("must be declared as vec4"));
+        // Packs may declare these narrower (Photon: vec3 mc_Entity, vec2 mc_midTexCoord).
+        BasicVertexShaderAdapter.AdaptedStage narrow = BasicVertexShaderAdapter.adaptStage(NATIVE_TEXTURED_VERTEX,
+                source.replace("attribute vec4 mc_Entity;", "attribute vec3 mc_Entity;")
+                        .replace("mc_Entity + mc_midTexCoord", "vec4(mc_Entity, 1.0) + mc_midTexCoord"),
+                "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED);
+        assertTrue(narrow.source().contains("#define mc_Entity (vec4(0.0, 0.0, 0.0, 1.0)).xyz"), narrow.source());
 
-        IOException unavailableOnColorFormat = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.validate(
-                "gbuffers_textured", source, BasicVertexShaderAdapter.Format.TEXTURED_COLOR));
-        assertTrue(unavailableOnColorFormat.getMessage().contains("mc_Entity"));
+        IOException error = assertThrows(IOException.class, () -> BasicVertexShaderAdapter.adaptStage(
+                NATIVE_TEXTURED_VERTEX, source.replace("attribute vec4 mc_Entity;", "attribute ivec4 mc_Entity;"),
+                "gbuffers_textured", BasicVertexShaderAdapter.Format.TEXTURED));
+        assertTrue(error.getMessage().contains("float or a float vector"));
+
+        BasicVertexShaderAdapter.AdaptedStage colorFormat = BasicVertexShaderAdapter.validate(
+                "gbuffers_textured", source, BasicVertexShaderAdapter.Format.TEXTURED_COLOR);
+        assertTrue(colorFormat.source().contains("#define mc_Entity vec4(0.0, 0.0, 0.0, 1.0)"));
     }
 
     @Test

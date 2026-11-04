@@ -130,6 +130,53 @@ final class BeaconBeamVertexShaderAdapter {
                         prepared.texCoordInterpolation()), prepared.usesNoiseSampler());
     }
 
+    /**
+     * Adapts a pack beacon program with this narrow position/color/UV0 bridge when it fits, else through the
+     * general adapter over the full BLOCK format the beacon pipelines draw. Packs that reuse their solid
+     * geometry program for beams (Photon's gbuffers_all_solid) need its normals, lightmap and uniforms.
+     */
+    static AdaptedStage adaptAnyStage(String minecraftSource, String shaderPackSource, String programName)
+            throws IOException {
+        try {
+            return adaptStage(minecraftSource, shaderPackSource, programName);
+        } catch (IOException narrow) {
+            try {
+                return general(BasicVertexShaderAdapter.adaptStage(withBlockInputs(minecraftSource, programName),
+                        shaderPackSource, programName, BasicVertexShaderAdapter.Format.BEACON_BEAM));
+            } catch (IOException generalFailure) {
+                generalFailure.addSuppressed(narrow);
+                throw generalFailure;
+            }
+        }
+    }
+
+    /** Validation counterpart of {@link #adaptAnyStage}. */
+    static AdaptedStage validateAny(String programName, String shaderPackSource) throws IOException {
+        try {
+            return validate(programName, shaderPackSource);
+        } catch (IOException narrow) {
+            try {
+                return general(BasicVertexShaderAdapter.validate(programName, shaderPackSource,
+                        BasicVertexShaderAdapter.Format.BEACON_BEAM));
+            } catch (IOException generalFailure) {
+                generalFailure.addSuppressed(narrow);
+                throw generalFailure;
+            }
+        }
+    }
+
+    private static AdaptedStage general(BasicVertexShaderAdapter.AdaptedStage stage) {
+        return new AdaptedStage(stage.source(), stage.varyings(), stage.usesNoiseSampler());
+    }
+
+    /** Declares the BLOCK lightmap and normal the vanilla beacon shader omits; VulkanMod binds inputs by name. */
+    private static String withBlockInputs(String minecraftSource, String programName) throws IOException {
+        Matcher version = VERSION.matcher(minecraftSource);
+        if (!version.find()) throw new IOException("Minecraft's " + programName + " vertex shader has no #version directive.");
+        return minecraftSource.substring(0, version.end()) + "in ivec2 UV2;\nin vec3 Normal;\n"
+                + minecraftSource.substring(version.end());
+    }
+
     static Map<String, TerrainVertexShaderAdapter.PackVarying> nativeVaryings() {
         return effectiveOutputs(Map.of(), "smooth", "smooth");
     }

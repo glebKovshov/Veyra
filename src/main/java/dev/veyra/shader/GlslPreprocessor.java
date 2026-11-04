@@ -51,6 +51,9 @@ final class GlslPreprocessor {
         return process(file, source, Map.of());
     }
 
+    private static final java.util.regex.Pattern GEOMETRY_FRAGMENT =
+            java.util.regex.Pattern.compile("(?:^|/)gbuffers_[A-Za-z0-9_]+\\.fsh$");
+
     private record ProcessKey(String file, String source, Map<String, String> additionalMacros,
                               Map<String, String> environment) { }
 
@@ -69,6 +72,8 @@ final class GlslPreprocessor {
         String cached = PROCESSED.get(key);
         if (cached != null) return cached;
         String processed = processUncached(file, source, additionalMacros);
+        // Geometry fragment adapters route vec4 outputs only; post passes parse their own output types.
+        if (GEOMETRY_FRAGMENT.matcher(file).find()) processed = NarrowFragmentOutputs.widen(processed);
         PROCESSED.put(key, processed);
         return processed;
     }

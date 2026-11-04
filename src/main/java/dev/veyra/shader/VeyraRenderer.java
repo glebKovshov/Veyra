@@ -1490,7 +1490,7 @@ public final class VeyraRenderer {
     }
 
     private static boolean selectedPackUsesDepth1Sampler() {
-        if (terrainUsesOpaqueDepthSampler()) return true;
+        if (terrainUsesOpaqueDepthSampler() || VeyraGeometryTargets.hasOpaqueDepthInputs()) return true;
         if (!pipelinesDirty && pipelineSet != null) {
             return pipelineSet.usesDepth1Sampler();
         }
@@ -4340,6 +4340,22 @@ public final class VeyraRenderer {
                 view.texture().getVulkanImage());
     }
 
+    /**
+     * Translucent entities and hands may draw before this frame's capture, so they read the last snapshot, as
+     * Iris' entities read depthtex1 after its copy. Until the first capture, VulkanMod's white image reads as
+     * far depth (no opaque geometry), matching a freshly cleared snapshot.
+     */
+    public static void bindEntityOpaqueDepth(GraphicsPipeline pipeline) {
+        var descriptor = pipeline.getImageDescriptor(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER);
+        if (descriptor == null) return;
+        if (depthTex1Snapshot.hasSampledView()) {
+            bindTerrainOpaqueDepth(pipeline);
+            return;
+        }
+        net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(descriptor.imageIdx,
+                net.vulkanmod.vulkan.texture.VTextureSelector.getWhiteTexture());
+    }
+
     private static boolean terrainUsesOpaqueDepthSampler() {
         return terrainPipelineSet != null && terrainPipelineSet.pipelines().values().stream()
                 .anyMatch(pipeline -> pipeline.getImageDescriptor("VeyraDepthTex1Sampler") != null);
@@ -4948,7 +4964,7 @@ public final class VeyraRenderer {
         customImageSamplers.addAll(customImageSamplerNames(fragmentImages));
         customImageSamplers.addAll(customTextureSamplers);
         if (usesMidTexCoord && original.getVertexFormatMode() != VertexFormat.Mode.QUADS) {
-            throw new IOException(programName + ".vsh uses mc_midTexCoord, but " + original.getLocation()
+            throw new IOException(programName + ".vsh uses mc_midTexCoord or at_tangent, but " + original.getLocation()
                     + " does not emit QUADS.");
         }
         RenderPipeline shadowPipeline = copyShadowPipelineWithShaders(original, location, vertexShader,
@@ -5434,13 +5450,16 @@ public final class VeyraRenderer {
             throw new IOException(programName + " has custom image samplers but no shared image resource set.");
         }
         if (usesMidTexCoord && original.getVertexFormatMode() != VertexFormat.Mode.QUADS) {
-            throw new IOException(programName + ".vsh uses mc_midTexCoord, but " + original.getLocation()
+            throw new IOException(programName + ".vsh uses mc_midTexCoord or at_tangent, but " + original.getLocation()
                     + " does not emit QUADS.");
         }
         Set<String> extraSamplers = new HashSet<>(customImageStage == null
                 ? Set.of() : customImageSamplerNames(customImageStage));
         extraSamplers.addAll(customTextureSamplers);
         if (usesNormalSampler) extraSamplers.add(VeyraNormalTextures.SAMPLER);
+        boolean usesOpaqueDepthSampler = fragmentSource.contains(
+                "uniform sampler2D " + EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER + ";");
+        if (usesOpaqueDepthSampler) extraSamplers.add(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER);
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 selectedVertexSource == null ? original.getVertexShader() : selectedVertexShader,
                 fragmentShader, usesNoiseSampler, usesShadowSampler, TerrainShaderAdapter.usesSpecularSampler(fragmentSource),
@@ -5489,6 +5508,16 @@ public final class VeyraRenderer {
         }
         if (shadowPass) VeyraGeometryTargets.registerShadow(nativePipeline, outputLayout, blendSettings);
         else VeyraGeometryTargets.register(nativePipeline, outputLayout, blendSettings, false);
+        if (usesOpaqueDepthSampler) {
+            var descriptor = nativePipeline.getImageDescriptor(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER);
+            if (descriptor == null) {
+                throw new IOException("VulkanMod did not expose the depthtex1 descriptor for "
+                        + original.getLocation() + ".");
+            }
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
+            VeyraGeometryTargets.registerOpaqueDepthInput(nativePipeline);
+        }
         return pipeline;
     }
 
@@ -5519,7 +5548,7 @@ public final class VeyraRenderer {
                     BeaconBeamVertexShaderAdapter.nativeVaryings();
             if (packVertexSource.isPresent()) {
                 String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
-                BeaconBeamVertexShaderAdapter.AdaptedStage adaptedVertex = BeaconBeamVertexShaderAdapter.adaptStage(
+                BeaconBeamVertexShaderAdapter.AdaptedStage adaptedVertex = BeaconBeamVertexShaderAdapter.adaptAnyStage(
                         minecraftVertex, packVertexSource.get(), programName);
                 vertexSource = adaptedVertex.source();
                 vertexOutputs = adaptedVertex.varyings();
@@ -5652,7 +5681,7 @@ public final class VeyraRenderer {
                     if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, programName,
                             adaptedVertex.varyings(), pack.hasShadowFragment(),
-                            original.getSamplers().contains("Sampler2"), false);
+                            original.getSamplers().contains("Sampler2"), false, adaptedVertex.renderStage());
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
                 } else {
                     boolean lightmapAvailable = original.getSamplers().contains("Sampler2");
@@ -5837,7 +5866,9 @@ public final class VeyraRenderer {
                     if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(packFragment, fragmentProgram,
                             adaptedVertex.varyings(), pack.hasShadowFragment(),
-                            original.getSamplers().contains("Sampler2"));
+                            original.getSamplers().contains("Sampler2"),
+                            ShaderPackUniformAdapter.supportsEntityColorProgram(fragmentProgram),
+                            adaptedVertex.renderStage());
                     validateColorDistanceSamplerBudget(fragmentProgram, original, usesNoiseSampler, samplerInputs);
                 } else {
                     samplerInputs = samplerInputs.withCustomImageSamplers(customImageSamplerNames(customImageStage));
@@ -5962,7 +5993,9 @@ public final class VeyraRenderer {
                 if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                 fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
                         packFragment, programName, adaptedVertex.varyings(), pack.hasShadowFragment(),
-                        original.getSamplers().contains("Sampler2"));
+                        original.getSamplers().contains("Sampler2"),
+                        ShaderPackUniformAdapter.supportsEntityColorProgram(programName),
+                        adaptedVertex.renderStage());
                 validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
             } else {
                 fragmentSource = ColorDistanceShaderAdapter.adaptFragment(packFragment, programName, false);
@@ -6277,6 +6310,11 @@ public final class VeyraRenderer {
                 "veyra", "shaderpack/color_distance/" + sourceHash);
         Identifier customVertexShader = customVertexSource == null ? null
                 : Identifier.fromNamespaceAndPath("veyra", "shaderpack/color_distance_vertex/" + sourceHash);
+        boolean usesOpaqueDepthSampler = fragmentSource.contains(
+                "uniform sampler2D " + EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER + ";");
+        if (usesOpaqueDepthSampler) {
+            samplerInputs = samplerInputs.withCustomImageSamplers(Set.of(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER));
+        }
         RenderPipeline pipeline = copyPipelineWithShaders(original,
                 customVertexShader == null ? original.getVertexShader() : customVertexShader,
                 fragmentShader, usesNoiseSampler, samplerInputs.usesShadowSampler(),
@@ -6301,8 +6339,19 @@ public final class VeyraRenderer {
                     + " with the selected " + programName + " shader.");
         }
         var nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
-        if (nativePipeline == null && (usesNoiseSampler || samplerInputs.usesSpecularSampler())) {
+        if (nativePipeline == null && (usesNoiseSampler || samplerInputs.usesSpecularSampler()
+                || usesOpaqueDepthSampler)) {
             throw new IOException("VulkanMod did not create a native pipeline for " + original.getLocation() + ".");
+        }
+        if (usesOpaqueDepthSampler) {
+            var descriptor = nativePipeline.getImageDescriptor(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER);
+            if (descriptor == null) {
+                throw new IOException("VulkanMod did not expose the depthtex1 descriptor for "
+                        + original.getLocation() + ".");
+            }
+            descriptor.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
+            VeyraGeometryTargets.registerOpaqueDepthInput(nativePipeline);
         }
         if (hasCustomImageResources) {
             if (nativePipeline == null) {
@@ -6386,21 +6435,24 @@ public final class VeyraRenderer {
             String fragmentSource;
             String adaptedVertexSource = null;
             boolean usesNoiseSampler = false;
+            TextureColorDistanceShaderAdapter.SamplerInputs pipelineSamplers = samplerInputs;
             try {
                 if (packVertexSource.isPresent()) {
                     ShaderManager shaderManager = ((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager();
                     String minecraftVertex = shaderManager.getShader(original.getVertexShader(), ShaderType.VERTEX);
-                    GlintVertexShaderAdapter.AdaptedStage adaptedVertex = GlintVertexShaderAdapter.adaptStage(
-                            minecraftVertex, packVertexSource.get(), "gbuffers_armor_glint");
-                    adaptedVertexSource = adaptedVertex.source();
-                    usesNoiseSampler = adaptedVertex.usesNoiseSampler();
+                    boolean lightmapAvailable = original.getSamplers().contains("Sampler2");
+                    GlintVertexShaderAdapter.LinkedStage linked = GlintVertexShaderAdapter.link(minecraftVertex,
+                            packVertexSource.get(), source, programName, pack.hasShadowFragment(), lightmapAvailable);
+                    adaptedVertexSource = linked.vertexSource();
+                    usesNoiseSampler = linked.usesNoiseSampler();
                     if (usesNoiseSampler) {
                         VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     }
-                    fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(source, programName,
-                            adaptedVertex.outputsColor(), true,
-                            adaptedVertex.colorInterpolation() == null ? "smooth" : adaptedVertex.colorInterpolation(),
-                            adaptedVertex.texCoordInterpolation(), true);
+                    if (linked.samplerInputs().usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
+                    pipelineSamplers = linked.samplerInputs()
+                            .withCustomImageSamplers(samplerInputs.customImageSamplers());
+                    validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, pipelineSamplers);
+                    fragmentSource = linked.fragmentSource();
                 } else {
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(source, programName, false);
                 }
@@ -6418,7 +6470,7 @@ public final class VeyraRenderer {
             if (replacement == null) {
                 replacement = compileColorDistancePipeline(
                         original, programName, fragmentSource, sourceHash, adaptedVertexSource,
-                        usesNoiseSampler, outputLayout, blendSettings, samplerInputs,
+                        usesNoiseSampler, outputLayout, blendSettings, pipelineSamplers,
                         imageResourceIdentity, customImageStage);
                 GLINT_PIPELINE_CACHE.put(cacheKey, replacement);
             }
@@ -6720,7 +6772,8 @@ public final class VeyraRenderer {
                     if (usesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
                     if (samplerInputs.usesSpecularSampler()) VeyraSpecularTextures.prepareTerrain();
                     fragmentSource = TextureColorDistanceShaderAdapter.adaptFragment(
-                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(), true, false);
+                            source, programName, adaptedVertex.varyings(), pack.hasShadowFragment(), true, false,
+                            adaptedVertex.renderStage());
                     outputLayout = FragmentOutputs.parse(GlslPreprocessor.process(programName + ".fsh", source));
                     blendSettings = pack.readGeometryBlendSettings(programName);
                     validateColorDistanceSamplerBudget(programName, original, usesNoiseSampler, samplerInputs);
@@ -8420,7 +8473,8 @@ public final class VeyraRenderer {
             sampledDepthTextureView = null;
             sampledDepthTexture = null;
         }
-        if ((next == null || !next.usesDepth1Sampler()) && !terrainUsesOpaqueDepthSampler()) {
+        if ((next == null || !next.usesDepth1Sampler()) && !terrainUsesOpaqueDepthSampler()
+                && !VeyraGeometryTargets.hasOpaqueDepthInputs()) {
             closeOpaqueDepthSnapshot();
         }
         if (next == null || !next.usesDepth2Sampler()) {

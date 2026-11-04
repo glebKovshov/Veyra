@@ -17,6 +17,8 @@ public final class TextureColorDistanceShaderAdapter {
     private static final Pattern SAMPLER_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?(sampler\\w+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
+    private static final Pattern BEACON_ALPHA_TEST_UNIFORM = Pattern.compile(
+            "(?m)^[\t ]*uniform\s+(?:(?:lowp|mediump|highp)\s+)?float\s+alphaTestRef\s*;[\t ]*(?://[^\r\n]*)?(?:\r?\n|$)");
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?"
                     + "(?:(flat|smooth|noperspective)\\s+)?(?:varying|in)\\s+"
@@ -32,7 +34,7 @@ public final class TextureColorDistanceShaderAdapter {
     private static final Pattern OUTPUT_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?out\\s+vec4\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_OUTPUT_DECLARATION = Pattern.compile(
-            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;?");
+            "(?m)^[\\t ]*(?:layout\\s*\\([^)]*\\)\\s*)?out\\s+(?!vec4\\s+[A-Za-z_][A-Za-z0-9_]*\\s*;)[^\\r\\n]*;");
     private static final Pattern COMMENTS = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\r\\n]*");
     private static final Pattern UNSUPPORTED_TEXTURE_FUNCTION = Pattern.compile(
             "\\btexture(?:(?:2D)?(?:Gather|Offset|Proj)|QueryLod)\\w*\\s*\\(");
@@ -140,6 +142,15 @@ public final class TextureColorDistanceShaderAdapter {
     static String adaptFragment(String source, String programName,
                                 Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
                                 boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
+                                boolean entityColorAvailable, Integer renderStage) throws IOException {
+        return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
+                Map.copyOf(vertexOutputs), true, shadowPassAvailable, lightmapSamplerAvailable, renderStage,
+                entityColorAvailable);
+    }
+
+    static String adaptFragment(String source, String programName,
+                                Map<String, TerrainVertexShaderAdapter.PackVarying> vertexOutputs,
+                                boolean shadowPassAvailable, boolean lightmapSamplerAvailable,
                                 int renderStage) throws IOException {
         return adaptFragment(source, programName, true, true, "smooth", "smooth", true,
                 Map.copyOf(vertexOutputs), true, shadowPassAvailable, lightmapSamplerAvailable, renderStage);
@@ -184,6 +195,17 @@ public final class TextureColorDistanceShaderAdapter {
         adapted = fog.source();
         adapted = UnusedUniformDeclarations.removeUnused(adapted);
         adapted = IrisRenderStages.bindUniform(adapted, renderStage, programName);
+        if (programName.equals("gbuffers_beaconbeam")) {
+            // As in Veyra's shadow beacon pass: beams cut out below 0.1 alpha unless the pack sets ALPHA_CUTOUT.
+            Matcher alphaTest = BEACON_ALPHA_TEST_UNIFORM.matcher(adapted);
+            if (alphaTest.find()) {
+                int declaration = alphaTest.start();
+                String withoutDeclarations = alphaTest.replaceAll("");
+                adapted = withoutDeclarations.substring(0, declaration)
+                        + "#ifndef ALPHA_CUTOUT\n#define ALPHA_CUTOUT 0.1\n#endif\n#define alphaTestRef ALPHA_CUTOUT\n"
+                        + withoutDeclarations.substring(declaration);
+            }
+        }
         adapted = UnusedSamplerDeclarations.removeUnused(adapted);
         SamplerBridge samplers = adaptSamplers(adapted, programName, allowIrisSamplers,
                 shadowPassAvailable, lightmapSamplerAvailable);
@@ -225,6 +247,7 @@ public final class TextureColorDistanceShaderAdapter {
         StringBuffer withoutVaryings = new StringBuffer();
         StringBuilder linkedVertexInputs = new StringBuilder();
         Set<String> linkedInterfaceLocations = new java.util.HashSet<>();
+        GlslStructTypes structs = GlslStructTypes.parse(adapted);
         while (varyingMatcher.find()) {
             String type = varyingMatcher.group(4);
             String name = varyingMatcher.group(5);
@@ -254,6 +277,14 @@ public final class TextureColorDistanceShaderAdapter {
                 if (!linkedInterfaceLocations.add(interfaceKey)) {
                     throw new IOException(programName + " declares more than one fragment input for location "
                             + vertexOutput.location() + ".");
+                }
+                if (structs.contains(type)) {
+                    // Struct inputs stay after their definition in the pack source, at the vertex output's location.
+                    varyingMatcher.appendReplacement(withoutVaryings, Matcher.quoteReplacement(parserSafeLocatedDeclaration(
+                            "VEYRA_BASIC_FRAGMENT_STRUCT_INPUT_" + vertexOutput.location() + "_" + sanitize(name),
+                            "layout(location = " + vertexOutput.location() + ") " + vertexOutput.interpolation()
+                                    + " in " + type + " " + name + ";")));
+                    continue;
                 }
                 linkedVertexInputs.append(parserSafeLocatedDeclaration(
                         "VEYRA_BASIC_FRAGMENT_INPUT_" + vertexOutput.location() + "_" + sanitize(name),
@@ -402,6 +433,7 @@ public final class TextureColorDistanceShaderAdapter {
         int copiedThrough = 0;
         boolean usesLightmap = false;
         boolean usesSampler2DShadow = false;
+        boolean usesOpaqueDepth = false;
         while (matcher.find()) {
             String type = matcher.group(1);
             String name = matcher.group(2);
@@ -409,7 +441,7 @@ public final class TextureColorDistanceShaderAdapter {
                     || name.equals("Sampler0");
             boolean irisSampler = allowIrisSamplers && (name.equals("lightmap") || name.equals("noisetex")
                     || name.equals("specular") || name.equals("shadowtex0") || name.equals("shadowtex1")
-                    || ShadowColorSampler.isSampler(name)
+                    || ShadowColorSampler.isSampler(name) || name.equals("depthtex1")
                     || geometryInputs.containsKey(name));
             if (!recognized && !irisSampler) {
                 throw new IOException(programName + " uses unsupported sampler '" + name + "'.");
@@ -421,6 +453,7 @@ public final class TextureColorDistanceShaderAdapter {
                 throw new IOException(programName + " sampler '" + name + "' must use sampler2D.");
             }
             if (name.equals("lightmap")) usesLightmap = true;
+            if (name.equals("depthtex1")) usesOpaqueDepth = true;
             if (shadowCompare) usesSampler2DShadow = true;
             stripped.append(source, copiedThrough, matcher.start());
             copiedThrough = matcher.end();
@@ -447,6 +480,9 @@ public final class TextureColorDistanceShaderAdapter {
         if (usesOpaqueShadow) bridge.append("uniform sampler2D ").append(ShadowDepthSampler.NAME)
                 .append(";\n#define shadowtex1 ").append(ShadowDepthSampler.NAME).append('\n');
         bridge.append(ShadowColorSampler.bridge(shadowColorInputs));
+        // Iris' pre-translucent depth, from the snapshot Veyra takes before translucent terrain.
+        if (usesOpaqueDepth) bridge.append("uniform sampler2D ").append(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER)
+                .append(";\n#define depthtex1 ").append(EntityShaderAdapter.OPAQUE_DEPTH_SAMPLER).append('\n');
         for (Map.Entry<String, Integer> input : geometryInputs.entrySet()) {
             bridge.append("uniform sampler2D ").append(GeometryColorSamplers.samplerName(input.getValue()))
                     .append(";\n#define ").append(input.getKey()).append(' ')

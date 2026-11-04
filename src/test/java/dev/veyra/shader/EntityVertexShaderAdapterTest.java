@@ -243,6 +243,45 @@ class EntityVertexShaderAdapterTest {
     }
 
     @Test
+    void bridgesIrisTangentAndNarrowMidTexCoordDeclarationsToTheExtendedEntityFormat() throws Exception {
+        // Photon's gbuffers_all_solid.vsh declares these widths for entities, hands and block entities.
+        String pack = """
+                #version 400 compatibility
+                attribute vec4 at_tangent;
+                attribute vec2 mc_midTexCoord;
+                flat out mat3 tbn;
+                out vec2 uvLocal;
+                void main() {
+                    vec2 uv = gl_MultiTexCoord0.xy;
+                    uvLocal = sign(uv - mc_midTexCoord) * 0.5 + 0.5;
+                    tbn[0] = normalize(gl_NormalMatrix * at_tangent.xyz);
+                    tbn[2] = normalize(gl_NormalMatrix * gl_Normal);
+                    tbn[1] = cross(tbn[0], tbn[2]) * sign(at_tangent.w);
+                    gl_Position = ftransform();
+                }
+                """;
+
+        EntityVertexShaderAdapter.AdaptedStage adapted = EntityVertexShaderAdapter.adaptStage(
+                NATIVE, pack, "gbuffers_entities", false);
+
+        assertTrue(adapted.usesMidTexCoord());
+        assertTrue(adapted.source().contains("in float VeyraEntityTangentW;"), adapted.source());
+        assertTrue(adapted.source().contains("#define at_tangent vec4(VeyraEntityTangentX, VeyraEntityTangentY, "
+                + "VeyraEntityTangentZ, VeyraEntityTangentW)"), adapted.source());
+        assertTrue(adapted.source().contains("#define mc_midTexCoord (vec4(MidTexCoord, 0.0, 1.0)).xy"),
+                adapted.source());
+        assertFalse(adapted.source().contains("attribute vec4 at_tangent"), adapted.source());
+
+        String tangentOnly = pack.replace("attribute vec2 mc_midTexCoord;\n", "")
+                .replace("uvLocal = sign(uv - mc_midTexCoord) * 0.5 + 0.5;", "uvLocal = uv;");
+        assertTrue(EntityVertexShaderAdapter.validate("gbuffers_hand", tangentOnly, true).usesMidTexCoord());
+
+        IOException blockFormat = assertThrows(IOException.class,
+                () -> EntityVertexShaderAdapter.validate("gbuffers_damagedblock", tangentOnly, false));
+        assertTrue(blockFormat.getMessage().contains("at_tangent"), blockFormat.getMessage());
+    }
+
+    @Test
     void suppliesEntityShadowFallbacksForBlockOnlyMidBlockAndVertexIdInputs() throws Exception {
         String pack = """
                 #version 120
@@ -629,11 +668,11 @@ class EntityVertexShaderAdapterTest {
 
     @Test
     void rejectsAttributesThatNewEntityDoesNotProvide() {
-        String pack = "#version 120\nattribute vec4 at_tangent;\nvoid main(){gl_Position=ftransform();}\n";
+        String pack = "#version 120\nattribute vec3 at_velocity;\nvoid main(){gl_Position=ftransform();}\n";
 
         IOException error = assertThrows(IOException.class,
                 () -> EntityVertexShaderAdapter.validate("gbuffers_entities", pack, false));
-        assertTrue(error.getMessage().contains("at_tangent"));
+        assertTrue(error.getMessage().contains("at_velocity"));
     }
 
     @Test

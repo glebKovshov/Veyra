@@ -304,6 +304,48 @@ final class GlintVertexShaderAdapter {
         throw new IOException(name + " main() entrypoint has unmatched braces.");
     }
 
+    /** A pack glint vertex stage with its linked fragment and the samplers the fragment needs. */
+    record LinkedStage(String vertexSource, String fragmentSource, boolean usesNoiseSampler,
+                       TextureColorDistanceShaderAdapter.SamplerInputs samplerInputs) { }
+
+    /**
+     * Links a pack glint program through this fixed glint interface when it fits, else through the general
+     * POSITION_TEX adapter, which carries arbitrary varyings and pack uniforms (Photon names its UV 'uv').
+     * A null {@code minecraftSource} validates against a stand-in native shader instead.
+     */
+    static LinkedStage link(String minecraftSource, String shaderPackSource, String fragmentSource,
+                            String fragmentProgram, boolean shadowPassAvailable, boolean lightmapSamplerAvailable)
+            throws IOException {
+        String programName = "gbuffers_armor_glint";
+        try {
+            AdaptedStage narrow = minecraftSource == null ? validate(programName, shaderPackSource)
+                    : adaptStage(minecraftSource, shaderPackSource, programName);
+            return new LinkedStage(narrow.source(), TextureColorDistanceShaderAdapter.adaptFragment(
+                    fragmentSource, fragmentProgram, narrow.outputsColor(), true,
+                    narrow.colorInterpolation() == null ? "smooth" : narrow.colorInterpolation(),
+                    narrow.texCoordInterpolation(), true), narrow.usesNoiseSampler(),
+                    TextureColorDistanceShaderAdapter.SamplerInputs.empty());
+        } catch (IOException narrowFailure) {
+            try {
+                BasicVertexShaderAdapter.AdaptedStage general = minecraftSource == null
+                        ? BasicVertexShaderAdapter.validate(programName, shaderPackSource,
+                                BasicVertexShaderAdapter.Format.GLINT)
+                        : BasicVertexShaderAdapter.adaptStage(minecraftSource, shaderPackSource, programName,
+                                BasicVertexShaderAdapter.Format.GLINT);
+                TextureColorDistanceShaderAdapter.SamplerInputs samplers = TextureColorDistanceShaderAdapter
+                        .inspectSamplers(fragmentSource, fragmentProgram, shadowPassAvailable, lightmapSamplerAvailable);
+                String fragment = TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, fragmentProgram,
+                        general.varyings(), shadowPassAvailable, lightmapSamplerAvailable,
+                        ShaderPackUniformAdapter.supportsEntityColorProgram(fragmentProgram), general.renderStage());
+                return new LinkedStage(general.source(), fragment,
+                        general.usesNoiseSampler() || samplers.usesNoiseSampler(), samplers);
+            } catch (IOException generalFailure) {
+                generalFailure.addSuppressed(narrowFailure);
+                throw generalFailure;
+            }
+        }
+    }
+
     record AdaptedStage(String source, String colorInterpolation, String texCoordInterpolation,
                         boolean usesLegacyColor, boolean usesNoiseSampler) {
         boolean outputsColor() {

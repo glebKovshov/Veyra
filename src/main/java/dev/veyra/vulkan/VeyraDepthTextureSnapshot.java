@@ -90,6 +90,10 @@ public final class VeyraDepthTextureSnapshot implements AutoCloseable {
         return vulkanTexture.getVulkanImage();
     }
 
+    public boolean hasSampledView() {
+        return sampledView != null && !sampledView.isClosed();
+    }
+
     public GpuTextureView sampledView() {
         if (sampledView == null || sampledView.isClosed()) {
             throw new IllegalStateException("The " + name + " snapshot has not been captured yet.");

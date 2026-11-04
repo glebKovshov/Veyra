@@ -16,8 +16,13 @@ class EntityMidTexCoordTest {
                     EntityMidTexCoord.VERTEX_FORMAT.getOffset(element), element.toString());
         }
         assertEquals(DefaultVertexFormat.NEW_ENTITY.getVertexSize(), EntityMidTexCoord.MIDPOINT_OFFSET);
-        assertEquals(DefaultVertexFormat.NEW_ENTITY.getVertexSize() + Float.BYTES * 2,
+        assertEquals(DefaultVertexFormat.NEW_ENTITY.getVertexSize() + Float.BYTES * 2, EntityMidTexCoord.TANGENT_OFFSET);
+        assertEquals(DefaultVertexFormat.NEW_ENTITY.getVertexSize() + Float.BYTES * 6,
                 EntityMidTexCoord.VERTEX_FORMAT.getVertexSize());
+        for (VertexFormatElement tangent : EntityMidTexCoord.TANGENT_ELEMENTS) {
+            assertEquals(VertexFormatElement.Usage.GENERIC, tangent.usage());
+            assertEquals(1, tangent.count());
+        }
     }
 
     @Test

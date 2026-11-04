@@ -17,7 +17,11 @@ final class BasicVertexShaderAdapter {
     enum Format {
         LEASH, LINE, SKY, STARS, SUNRISE_SUNSET,
         LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER,
-        SIGN_TEXT, SIGN_TEXT_FULLBRIGHT
+        SIGN_TEXT, SIGN_TEXT_FULLBRIGHT,
+        /** Minecraft's beacon pipelines draw DefaultVertexFormat.BLOCK; the vanilla shader reads only part of it. */
+        BEACON_BEAM,
+        /** Minecraft's glint pipelines: Position and UV0, with the vanilla shader's fog distances kept. */
+        GLINT
     }
 
     private static final Pattern VERSION = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
@@ -53,6 +57,8 @@ final class BasicVertexShaderAdapter {
             "\\b(vaNormal|Normal|UV2|LineWidth)\\b");
     private static final Pattern UNSUPPORTED_WEATHER_INPUT = Pattern.compile(
             "\\b(vaNormal|Normal|LineWidth)\\b");
+    /** BLOCK elements the vanilla beacon shader leaves undeclared; VulkanMod binds inputs by element name. */
+    static final String BEACON_BLOCK_INPUTS = "layout(location=3) in ivec2 UV2;\nlayout(location=4) in vec3 Normal;\n";
     private static final Pattern CORE_MATRIX_UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+mat4\\s+(?:projectionMatrix|modelViewMatrix)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern UNSUPPORTED_SIGN_TEXT_INPUT =Pattern.compile("\\b(LineWidth)\\b");
@@ -126,7 +132,8 @@ final class BasicVertexShaderAdapter {
         String bridge = nativeInputBridge(format);
         return new AdaptedStage(base + "\n" + pack.outputDeclarations() + bridge + pack.uniformBridge()
                 + renameMain(pack.source(), "veyraShaderPackMain", programName)
-                + "\n" + generatedMain, effectiveOutputs(pack.outputs(), format), pack.usesNoiseSampler());
+                + "\n" + generatedMain, effectiveOutputs(pack.outputs(), format), pack.usesNoiseSampler(),
+                IrisRenderStages.forBasicProgram(programName, format));
     }
 
     static AdaptedStage validate(String programName, String shaderPackSource, Format format) throws IOException {
@@ -150,6 +157,9 @@ final class BasicVertexShaderAdapter {
                     + "layout(location=2) in vec2 UV0;\nlayout(location=3) in ivec2 UV2;\n";
             case SIGN_TEXT_FULLBRIGHT -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
                     + "layout(location=2) in vec2 UV0;\n";
+            case BEACON_BEAM -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec4 Color;\n"
+                    + "layout(location=2) in vec2 UV0;\n" + BEACON_BLOCK_INPUTS;
+            case GLINT -> "layout(location=0) in vec3 Position;\nlayout(location=1) in vec2 UV0;\n";
         };
         String outputs = switch (format) {
             case LEASH, LINE, SUNRISE_SUNSET -> "layout(location=0) out vec4 vertexColor;\n"
@@ -166,14 +176,16 @@ final class BasicVertexShaderAdapter {
                     + "out vec2 texCoord0;\nout vec4 vertexColor;\n";
             case SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\n"
                     + "out vec2 texCoord0;\nout vec4 vertexColor;\n";
+            case BEACON_BEAM -> "out vec4 vertexColor;\nout vec2 texCoord0;\n";
+            case GLINT -> "out float sphericalVertexDistance;\nout float cylindricalVertexDistance;\nout vec2 texCoord0;\n";
         };
         String textureOutput = switch (format) {
             case SKY_TEXTURED, TEXTURED, SKY_TEXTURED_COLOR, TEXTURED_COLOR, WEATHER,
-                    SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> "texCoord0 = UV0;";
+                    SIGN_TEXT, SIGN_TEXT_FULLBRIGHT, BEACON_BEAM, GLINT -> "texCoord0 = UV0;";
             default -> "";
         };
         String colorOutput = switch (format) {
-            case LIGHTNING, SKY_TEXTURED_COLOR, TEXTURED_COLOR -> "vertexColor = Color;";
+            case LIGHTNING, SKY_TEXTURED_COLOR, TEXTURED_COLOR, BEACON_BEAM -> "vertexColor = Color;";
             default -> "";
         };
         String weatherSampler = format == Format.WEATHER ? "uniform sampler2D Sampler2;\n" : "";
@@ -211,7 +223,7 @@ final class BasicVertexShaderAdapter {
         source = UnusedUniformDeclarations.removeUnused(source);
         // Iris replaces the core-profile matrices; the native input bridge maps them to ProjMat and ModelViewMat.
         source = CORE_MATRIX_UNIFORM.matcher(source).replaceAll("");
-        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forSkyFormat(format), programName);
+        source = IrisRenderStages.bindUniform(source, IrisRenderStages.forBasicProgram(programName, format), programName);
         List<String> extensions = new ArrayList<>();
         Matcher extensionMatcher = EXTENSION.matcher(source);
         while (extensionMatcher.find()) extensions.add(extensionMatcher.group().strip());
@@ -311,12 +323,30 @@ final class BasicVertexShaderAdapter {
         Set<String> emittedVariables = new HashSet<>();
         int nextLocation = isTextureFormat(format) ? NATIVE_TEXTURE_COORD_LOCATION + 1 : 6;
         int cursor = 0;
+        GlslStructTypes structs = GlslStructTypes.parse(source);
         while (matcher.find()) {
             String interpolation = mergeInterpolation(matcher.group(2), matcher.group(3), programName, matcher.group(5));
             String type = matcher.group(4), name = matcher.group(5);
             if (name.startsWith("gl_")) throw new IOException(programName + ".vsh cannot redeclare reserved output '" + name + "'.");
-            if (!supportedType(type)) throw new IOException(programName + ".vsh output '" + name + "' uses unsupported type " + type + ".");
             if (varyings.containsKey(name)) throw new IOException(programName + ".vsh declares output '" + name + "' more than once.");
+            if (structs.contains(type) && matcher.group(1) == null) {
+                // The pack defines the struct after Veyra's bridge, so the output keeps its declaration site and
+                // only gains consecutive interface locations (Photon's OverworldFogParameters fog_params).
+                if (structs.hasIntegerMembers(type) && !interpolation.equals("flat")) {
+                    throw new IOException(programName + ".vsh struct output '" + name + "' has integer members and must use flat interpolation.");
+                }
+                int span = structs.locationSpan(type);
+                int location = nextFree(occupied, nextLocation, span);
+                if (location < 0 || location + span > 32) throw new IOException(programName + ".vsh has too many vertex outputs.");
+                for (int i = location; i < location + span; i++) occupied.add(i);
+                nextLocation = Math.max(nextLocation, location + span);
+                varyings.put(name, new TerrainVertexShaderAdapter.PackVarying(type, interpolation, location, name, false));
+                clean.append(source, cursor, matcher.start()).append(parserSafeOutput(
+                        "VEYRA_BASIC_STRUCT_OUTPUT_" + location + "_" + sanitize(name), location, interpolation, type, name));
+                cursor = matcher.end();
+                continue;
+            }
+            if (!supportedType(type)) throw new IOException(programName + ".vsh output '" + name + "' uses unsupported type " + type + ".");
             if (integerType(type) && !interpolation.equals("flat")) {
                 throw new IOException(programName + ".vsh integer output '" + name + "' must use flat interpolation.");
             }
@@ -407,7 +437,7 @@ final class BasicVertexShaderAdapter {
     private static String nativeInputBridge(Format format) {
         String lightmap = switch (format) {
             case LEASH -> "vec4(vec2(UV2), 0.0, 1.0)";
-            case WEATHER, SIGN_TEXT -> "vec4(vec2(UV2), 0.0, 1.0)";
+            case WEATHER, SIGN_TEXT, BEACON_BEAM -> "vec4(vec2(UV2), 0.0, 1.0)";
             case SIGN_TEXT_FULLBRIGHT -> "vec4(240.0, 240.0, 0.0, 1.0)";
             case LINE -> "vec4(240.0, 240.0, 0.0, 1.0)";
             default -> "vec4(0.0, 0.0, 0.0, 1.0)";
@@ -418,14 +448,14 @@ final class BasicVertexShaderAdapter {
             case LEASH, LINE -> "vec4((Color * ColorModulator).rgb, ColorModulator.a)";
             case SKY_TEXTURED -> "vec4(1.0)";
             case SKY_TEXTURED_COLOR -> "Color";
-            case TEXTURED -> "vec4(1.0)";
+            case TEXTURED, GLINT -> "vec4(1.0)";
             case TEXTURED_COLOR -> "Color";
-            case WEATHER, SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> "Color";
+            case WEATHER, SIGN_TEXT, SIGN_TEXT_FULLBRIGHT, BEACON_BEAM -> "Color";
         };
         String vertex = format == Format.TEXTURED
                 ? "vec4(Position + ModelOffset, 1.0)" : "vec4(Position + veyraVertexOffset, 1.0)";
         // Iris' GLYPH serializer computes +Z for each planar text quad; particles use the OpenGL default.
-        String normal = format == Format.LINE ? "Normal" : "vec3(0.0, 0.0, 1.0)";
+        String normal = hasNormalInput(format) ? "Normal" : "vec3(0.0, 0.0, 1.0)";
         String texture0 = hasTextureCoordinate(format)
                 ? "vec4(UV0, 0.0, 1.0)"
                 : format == Format.LIGHTNING ? "vec4(0.0, 0.0, 0.0, 1.0)"
@@ -501,11 +531,12 @@ final class BasicVertexShaderAdapter {
         String initializeColor = switch (format) {
             case SKY, STARS -> "vertexColor = ColorModulator; ";
             case SKY_TEXTURED -> "vertexColor = vec4(1.0); ";
-            case TEXTURED -> "vertexColor = vec4(1.0); ";
+            case TEXTURED, GLINT -> "vertexColor = vec4(1.0); ";
             default -> "";
         };
+        // Weather and glint keep the fog distances their vanilla shaders compute.
         String initializeDistances = format == Format.STARS || format == Format.SUNRISE_SUNSET
-                || isTextureFormat(format) && format != Format.WEATHER
+                || isTextureFormat(format) && format != Format.WEATHER && format != Format.GLINT
                 ? "sphericalVertexDistance = 0.0; cylindricalVertexDistance = 0.0; " : "";
         return "void main() { veyraMinecraftSkyMain(); " + initializeColor + initializeDistances
                 + "veyraFogFragCoord = sphericalVertexDistance; veyraShaderPackMain(); }\n";
@@ -518,28 +549,31 @@ final class BasicVertexShaderAdapter {
     private static boolean isTextureFormat(Format format) {
         return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
                 || format == Format.TEXTURED || format == Format.TEXTURED_COLOR
-                || format == Format.WEATHER || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT;
+                || format == Format.WEATHER || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT
+                || format == Format.BEACON_BEAM || format == Format.GLINT;
     }
 
     private static boolean hasTextureCoordinate(Format format) {
         return format == Format.SKY_TEXTURED || format == Format.SKY_TEXTURED_COLOR
                 || format == Format.TEXTURED || format == Format.TEXTURED_COLOR
-                || format == Format.WEATHER || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT;
+                || format == Format.WEATHER || format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT
+                || format == Format.BEACON_BEAM || format == Format.GLINT;
     }
 
     private static boolean hasNormalInput(Format format) {
-        return format == Format.LINE;
+        return format == Format.LINE || format == Format.BEACON_BEAM;
     }
 
     private static boolean hasColorInput(Format format) {
         return switch (format) {
-            case SKY, STARS, SKY_TEXTURED, TEXTURED -> false;
+            case SKY, STARS, SKY_TEXTURED, TEXTURED, GLINT -> false;
             default -> true;
         };
     }
 
     private static boolean hasLightmapInput(Format format) {
-        return format == Format.LEASH || format == Format.WEATHER || format == Format.SIGN_TEXT;
+        return format == Format.LEASH || format == Format.WEATHER || format == Format.SIGN_TEXT
+                || format == Format.BEACON_BEAM;
     }
 
     /** Iris core-profile attributes the native input bridge supplies for this format, with their declared types. */
@@ -695,9 +729,10 @@ final class BasicVertexShaderAdapter {
 
     private static String nativeDefaultAttribute(Format format, String type, String name, String programName)
             throws IOException {
-        if ((format != Format.TEXTURED && format != Format.WEATHER && format != Format.SIGN_TEXT
-                && format != Format.SIGN_TEXT_FULLBRIGHT)
-                || !(name.equals("mc_Entity") || name.equals("mc_midTexCoord")
+        // Iris extends only the BLOCK, NEW_ENTITY and glyph formats with these elements; every format this adapter
+        // serves otherwise lacks them, so a pack reads OpenGL's generic-attribute default (Photon shares one
+        // all-translucent program across particles, lightning and weather).
+        if (!(name.equals("mc_Entity") || name.equals("mc_midTexCoord") || name.equals("at_tangent")
                 || (format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT)
                 && (name.equals("Normal") || name.equals("vaNormal")))) {
             return null;
@@ -710,13 +745,37 @@ final class BasicVertexShaderAdapter {
             // Iris computes the same +Z normal from each planar glyph quad.
             return "#define " + name + " vec3(0.0, 0.0, 1.0)\n";
         }
-        if (!type.equals("vec4")) {
-            throw new IOException(programName + ".vsh input '" + name + "' must be declared as vec4.");
+        // Iris packs declare these at any width (Photon: vec2 mc_midTexCoord, vec3 mc_Entity).
+        if (!Set.of("float", "vec2", "vec3", "vec4").contains(type)) {
+            throw new IOException(programName + ".vsh input '" + name + "' must be declared as float or a float vector.");
+        }
+        if (name.equals("at_tangent") && format == Format.BEACON_BEAM) {
+            // Iris extends BLOCK to its TERRAIN format and derives the tangent from each quad's UVs on the CPU.
+            // Beam faces are axis-aligned, so build the same kind of unit tangent orthogonal to the face normal
+            // that Iris' NormalHelper falls back to; it only orients normal maps, never the surface normal.
+            return "#define at_tangent " + narrowVec4("vec4(normalize(abs(Normal.y) < 0.9 ? vec3(Normal.z, 0.0, "
+                    + "-Normal.x) : vec3(0.0, -Normal.z, Normal.y)), 1.0)", type) + "\n";
+        }
+        if (name.equals("at_tangent") && (format == Format.SIGN_TEXT || format == Format.SIGN_TEXT_FULLBRIGHT)) {
+            // Iris' GLYPH format derives a tangent per planar glyph quad: u runs along +X and v down +Y with
+            // the +Z normal above, so NormalHelper's handedness test (tangent x normal = -Y) yields -1.
+            return "#define at_tangent " + narrowVec4("vec4(1.0, 0.0, 0.0, -1.0)", type) + "\n";
         }
         // Iris maps WORLD_BORDER to TEXTURED and draws particles with the vanilla PARTICLE format;
         // neither carries these elements.
         // Match OpenGL's generic-attribute default for pack declarations absent from that format.
-        return "#define " + name + " vec4(0.0, 0.0, 0.0, 1.0)\n";
+        // Beacon beams differ: Iris' TERRAIN format fills mc_midTexCoord per quad and Veyra cannot rebuild it in
+        // the shader, so packs that bend beams by mid-texture position (none of the pinned packs) would see 0.
+        return "#define " + name + " " + narrowVec4("vec4(0.0, 0.0, 0.0, 1.0)", type) + "\n";
+    }
+
+    private static String narrowVec4(String value, String type) {
+        return switch (type) {
+            case "float" -> "(" + value + ").x";
+            case "vec2" -> "(" + value + ").xy";
+            case "vec3" -> "(" + value + ").xyz";
+            default -> value;
+        };
     }
 
     private static MainFunction findMain(String source, String owner) throws IOException {
@@ -733,8 +792,9 @@ final class BasicVertexShaderAdapter {
         throw new IOException(owner + " main() has unmatched braces.");
     }
 
+    /** {@code renderStage} is the Iris stage of the drawing pipeline, for the linked fragment's renderStage. */
     record AdaptedStage(String source, Map<String, TerrainVertexShaderAdapter.PackVarying> varyings,
-                        boolean usesNoiseSampler) { }
+                        boolean usesNoiseSampler, Integer renderStage) { }
     private record PreparedStage(String source, List<String> extensions, String uniformBridge,
                                  String outputDeclarations, Map<String, TerrainVertexShaderAdapter.PackVarying> outputs,
                                  boolean usesNoiseSampler, boolean usesFogCoord) { }

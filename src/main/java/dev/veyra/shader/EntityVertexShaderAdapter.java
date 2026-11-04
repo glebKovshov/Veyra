@@ -48,7 +48,14 @@ final class EntityVertexShaderAdapter {
     private static final Pattern LEGACY_BLOCK_OVERLAY_INPUT = Pattern.compile("\\bgl_MultiTexCoord2\\b");
     private static final Pattern LEGACY_INPUT = Pattern.compile(
             "\\b(gl_MultiTexCoord[3-7]|gl_VertexID|gl_InstanceID|gl_ClipVertex|gl_FrontColor|gl_BackColor|"
-                    + "mc_Entity|at_tangent|at_midBlock|mc_midBlock)\\b");
+                    + "mc_Entity|at_midBlock|mc_midBlock)\\b");
+    private static final Pattern TANGENT_REFERENCE = Pattern.compile("\\bat_tangent\\b");
+    private static final Pattern MID_TEX_COORD_REFERENCE = Pattern.compile("\\bmc_midTexCoord\\b");
+    /** Shader inputs for the four scalar tangent elements of Veyra's extended entity format. */
+    static final String[] TANGENT_INPUTS = {
+            "VeyraEntityTangentX", "VeyraEntityTangentY", "VeyraEntityTangentZ", "VeyraEntityTangentW"};
+    private static final String MID_TEX_COORD_VALUE = "vec4(MidTexCoord, 0.0, 1.0)";
+    private static final String TANGENT_VALUE = "vec4(" + String.join(", ", TANGENT_INPUTS) + ")";
     private static final Pattern SHADOW_PROJECTION_DECLARATION = Pattern.compile("\\buniform\\s+mat4\\s+shadowProjection\\s*;");
     private static final Pattern MC_ENTITY_ATTRIBUTE_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:(?:flat|smooth|noperspective|centroid|sample|invariant)\\s+)*"
@@ -86,7 +93,8 @@ final class EntityVertexShaderAdapter {
             "UV1", new NativeAttribute("ivec2", 3),
             "UV2", new NativeAttribute("ivec2", 4),
             "Normal", new NativeAttribute("vec3", 5),
-            "mc_midTexCoord", new NativeAttribute("vec4", 6));
+            "mc_midTexCoord", new NativeAttribute("vec4", 6),
+            "at_tangent", new NativeAttribute("vec4", 7));
     private static final Map<String, NativeAttribute> BLOCK_ATTRIBUTES = Map.of(
             "Position", new NativeAttribute("vec3", 0),
             "Color", new NativeAttribute("vec4", 1),
@@ -139,7 +147,7 @@ final class EntityVertexShaderAdapter {
         if (pack.usesMidTexCoord()) {
             Matcher header = SHADER_HEADER.matcher(nativeSource);
             if (!header.find()) throw new IOException("Minecraft's " + programName + " vertex shader has no #version header.");
-            nativeSource = nativeSource.substring(0, header.end()) + "in vec2 MidTexCoord;\n"
+            nativeSource = nativeSource.substring(0, header.end()) + extendedInputDeclarations()
                     + nativeSource.substring(header.end());
         }
         String bridge = nativeBridge(programName, pack.usesMidTexCoord());
@@ -298,9 +306,15 @@ final class EntityVertexShaderAdapter {
         if (unsupportedInput.find()) throw new IOException(programName + ".vsh uses legacy interface '"
                 + unsupportedInput.group(1) + "', which is not provided by Minecraft's "
                 + vertexFormatName(programName) + " vertex format.");
-        boolean usesMidTexCoord = Pattern.compile("\\bmc_midTexCoord\\b")
-                .matcher(ShaderSource.maskBlockAndLineComments(source)).find();
-        if (usesMidTexCoord && usesBlockFormat(programName)) {
+        String maskedSource = ShaderSource.maskBlockAndLineComments(source);
+        boolean usesTangent = TANGENT_REFERENCE.matcher(maskedSource).find();
+        if (usesTangent && usesBlockFormat(programName)) {
+            throw new IOException(programName + ".vsh uses legacy interface 'at_tangent', which is not provided by Minecraft's BLOCK vertex format.");
+        }
+        boolean readsMidTexCoord = MID_TEX_COORD_REFERENCE.matcher(maskedSource).find();
+        // mc_midTexCoord and at_tangent share Veyra's extended entity format, which carries both.
+        boolean usesMidTexCoord = readsMidTexCoord || usesTangent;
+        if (readsMidTexCoord && usesBlockFormat(programName)) {
             throw new IOException(programName + ".vsh uses legacy interface 'mc_midTexCoord', which is not provided by Minecraft's BLOCK vertex format.");
         }
         if (usesBlockFormat(programName)
@@ -511,16 +525,18 @@ final class EntityVertexShaderAdapter {
         Set<Integer> occupied = new HashSet<>();
         int nextLocation = 16;
         int cursor = 0;
+        GlslStructTypes structs = GlslStructTypes.parse(source);
         while (matcher.find()) {
             String type = matcher.group(4), name = matcher.group(5);
             String interpolation = mergeInterpolation(matcher.group(2), matcher.group(3), programName, name);
             if (name.startsWith("gl_")) throw new IOException(programName + ".vsh cannot redeclare reserved output '" + name + "'.");
-            if (!supportedType(type)) throw new IOException(programName + ".vsh output '" + name + "' uses unsupported type " + type + ".");
+            boolean struct = structs.contains(type);
+            if (!struct && !supportedType(type)) throw new IOException(programName + ".vsh output '" + name + "' uses unsupported type " + type + ".");
             if (varyings.containsKey(name)) throw new IOException(programName + ".vsh declares output '" + name + "' more than once.");
-            if (integerType(type) && !interpolation.equals("flat")) {
+            if ((struct ? structs.hasIntegerMembers(type) : integerType(type)) && !interpolation.equals("flat")) {
                 throw new IOException(programName + ".vsh integer output '" + name + "' must use flat interpolation.");
             }
-            int span = locationSpan(type);
+            int span = struct ? structs.locationSpan(type) : locationSpan(type);
             int requested = matcher.group(1) == null ? -1 : Integer.parseInt(matcher.group(1));
             int location = requested < 0 ? nextFree(occupied, nextLocation, span) : requested;
             if (location < 16 || location + span > 32) {
@@ -530,6 +546,17 @@ final class EntityVertexShaderAdapter {
                 if (!occupied.add(i)) throw new IOException(programName + ".vsh has duplicate output location " + i + ".");
             }
             nextLocation = Math.max(nextLocation, location + span);
+            if (struct) {
+                // The pack defines the struct after Veyra's bridge, so the output keeps its declaration site
+                // and only gains consecutive interface locations (Photon's OverworldFogParameters fog_params).
+                varyings.put(name, new TerrainVertexShaderAdapter.PackVarying(type, interpolation, location, name, false));
+                String macro = "VEYRA_ENTITY_STRUCT_OUTPUT_" + location + "_" + sanitize(name);
+                clean.append(source, cursor, matcher.start()).append("#define ").append(macro)
+                        .append(" layout(location = ").append(location).append(") ").append(interpolation)
+                        .append(" out ").append(type).append(' ').append(name).append(";\n").append(macro).append('\n');
+                cursor = matcher.end();
+                continue;
+            }
             String variable = "veyraEntityVarying_" + name;
             varyings.put(name, new TerrainVertexShaderAdapter.PackVarying(type, interpolation, location, variable, false));
             String macro = "VEYRA_ENTITY_OUTPUT_" + location + "_" + sanitize(name);
@@ -558,6 +585,20 @@ final class EntityVertexShaderAdapter {
             NativeAttribute attribute = nativeAttributes.get(name);
             if (attribute == null) throw new IOException(programName + ".vsh attribute '" + name
                     + "' is not provided by Minecraft's " + vertexFormatName(programName) + " vertex format.");
+            if (name.equals("mc_midTexCoord") || name.equals("at_tangent")) {
+                if (!Set.of("float", "vec2", "vec3", "vec4").contains(type)) {
+                    throw new IOException(programName + ".vsh attribute '" + name + "' must use float or a float vector.");
+                }
+                if (matcher.group(1) != null && Integer.parseInt(matcher.group(1)) != attribute.location()) {
+                    throw new IOException(programName + ".vsh attribute '" + name + "' uses an unsupported location.");
+                }
+                // Iris packs declare these at any width (Photon: vec2 mc_midTexCoord); keep the declared type.
+                String value = name.equals("at_tangent") ? TANGENT_VALUE : MID_TEX_COORD_VALUE;
+                clean.append(source, cursor, matcher.start()).append("#undef ").append(name).append("\n#define ")
+                        .append(name).append(' ').append(narrow(value, type)).append('\n');
+                cursor = matcher.end();
+                continue;
+            }
             boolean legacyFloatUv = !usesBlockFormat(programName)
                     && (name.equals("UV1") || name.equals("UV2")) && type.equals("vec2");
             if (!attribute.type().equals(type) && !legacyFloatUv) {
@@ -571,6 +612,21 @@ final class EntityVertexShaderAdapter {
         }
         clean.append(source, cursor, source.length());
         return clean.toString();
+    }
+
+    private static String narrow(String vec4Value, String type) {
+        return switch (type) {
+            case "float" -> "(" + vec4Value + ").x";
+            case "vec2" -> "(" + vec4Value + ").xy";
+            case "vec3" -> "(" + vec4Value + ").xyz";
+            default -> vec4Value;
+        };
+    }
+
+    private static String extendedInputDeclarations() {
+        StringBuilder declarations = new StringBuilder("in vec2 MidTexCoord;\n");
+        for (String input : TANGENT_INPUTS) declarations.append("in float ").append(input).append(";\n");
+        return declarations.toString();
     }
 
     private static boolean usesBlockFormat(String programName) {
@@ -600,7 +656,8 @@ final class EntityVertexShaderAdapter {
                 #define gl_Normal Normal
                 #define gl_MultiTexCoord0 vec4(UV0, 0.0, 1.0)
                 """ + lightmapAliases + (usesMidTexCoord
-                ? "#define mc_midTexCoord vec4(MidTexCoord, 0.0, 1.0)\n" : "") + """
+                ? "#define mc_midTexCoord " + MID_TEX_COORD_VALUE + "\n#define at_tangent " + TANGENT_VALUE + "\n"
+                : "") + """
                 #define gl_ModelViewMatrix ModelViewMat
                 #define gl_ProjectionMatrix ProjMat
                 #define gl_ModelViewProjectionMatrix (ProjMat * ModelViewMat)
@@ -618,13 +675,14 @@ final class EntityVertexShaderAdapter {
                 #version 460
                 """);
         nativeAttributes(programName).entrySet().stream()
-                .filter(entry -> !usesMidTexCoord || !entry.getKey().equals("mc_midTexCoord"))
+                .filter(entry -> !usesMidTexCoord
+                        || !entry.getKey().equals("mc_midTexCoord") && !entry.getKey().equals("at_tangent"))
                 .sorted(java.util.Comparator.comparingInt(entry -> entry.getValue().location()))
                 .forEach(entry -> source.append("layout(location=").append(entry.getValue().location())
                         .append(") in ").append(entry.getValue().type()).append(' ').append(entry.getKey()).append(';')
                         .append('\n'));
         if (usesMidTexCoord) {
-            source.append("in vec2 MidTexCoord;\n");
+            source.append(extendedInputDeclarations());
         }
         return source.append("""
                 layout(location=0) out vec4 vertexColor;
@@ -684,7 +742,7 @@ final class EntityVertexShaderAdapter {
     }
 
     private static boolean supportedType(String type) {
-        return type.matches("(?:float|int|uint|vec[234]|ivec[234]|uvec[234])");
+        return type.matches("(?:float|int|uint|vec[234]|ivec[234]|uvec[234]|mat[234])");
     }
     private static boolean integerType(String type) {
         return type.equals("int") || type.equals("uint") || type.startsWith("ivec") || type.startsWith("uvec");

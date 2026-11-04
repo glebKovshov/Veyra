@@ -44,7 +44,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     private static final List<String> ENTITY_PROGRAMS = List.of(
             "gbuffers_entities", "gbuffers_entities_translucent", "gbuffers_spidereyes");
     // Iris intentionally ignores this legacy OptiFine program and its stages.
-    private static final Set<String> IGNORED_IRIS_PROGRAMS = Set.of("gbuffers_entities_glowing");
+    // gbuffers_voxels belongs to the Photonics mod, which supplies its /photonics includes and draw route;
+    // without it Iris never loads the program (Photon ships one).
+    private static final Set<String> IGNORED_IRIS_PROGRAMS = Set.of("gbuffers_entities_glowing", "gbuffers_voxels");
     private static final List<String> PARTICLE_PROGRAMS = List.of(
             "gbuffers_particles", "gbuffers_particles_translucent");
     private static final List<String> WEATHER_PROGRAMS = List.of("gbuffers_weather");
@@ -435,13 +437,15 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     public Set<Integer> readShadowColorTargetIndices() throws IOException {
         Set<Integer> indices = new java.util.TreeSet<>();
         for (String file : stageFiles().stream().filter(name -> name.endsWith(".fsh")).sorted().toList()) {
+            String program = file.substring(0, file.length() - 4);
+            // Iris never loads disabled programs; Photon's DoF composite #errors when its option is off.
+            if (!isProgramEnabled(program)) continue;
             Optional<String> source = configuration.customImages() ? readCustomImageStage(file) : readStage(file);
             if (source.isEmpty()) continue;
             String active = UnreachableGlslFunctions.removeUnreachable(
                     GlslPreprocessor.process(file, source.get()), "main");
             indices.addAll(ShadowColorSampler.indices(active));
-            String program = file.substring(0, file.length() - 4);
-            if (SHADOW_PROGRAMS.contains(program) && isProgramEnabled(program)) {
+            if (SHADOW_PROGRAMS.contains(program)) {
                 indices.addAll(FragmentOutputs.parse(active).targets());
             }
         }
@@ -1325,15 +1329,11 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 } else if (program.equals("gbuffers_armor_glint")) {
                     String vertexSource = readStage(file).orElseThrow(
                             () -> new IOException("The pack no longer contains " + file + "."));
-                    GlintVertexShaderAdapter.AdaptedStage adaptedVertex =
-                            GlintVertexShaderAdapter.validate(program, vertexSource);
                     String fragmentProgram = hasGlintFragment() ? program : "gbuffers_textured";
                     String fragmentSource = readGlintFragment().orElseThrow(
                             () -> new IOException("The pack no longer contains an armor-glint fragment shader."));
-                    TextureColorDistanceShaderAdapter.adaptFragment(fragmentSource, fragmentProgram,
-                            adaptedVertex.outputsColor(), true,
-                            adaptedVertex.colorInterpolation() == null ? "smooth" : adaptedVertex.colorInterpolation(),
-                            adaptedVertex.texCoordInterpolation(), true);
+                    GlintVertexShaderAdapter.link(null, vertexSource, fragmentSource, fragmentProgram,
+                            hasShadowFragment(), false);
                 } else if (program.equals(BASIC_PROGRAM) || program.equals(LINE_PROGRAM)) {
                     // The leash/line vertex formats and cross-stage varyings were checked above.
                 } else if (program.equals(SKY_BASIC_PROGRAM)) {
@@ -1534,7 +1534,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
             String vertex, BasicVertexShaderAdapter.Format format, Integer renderStage) throws IOException {
         BasicVertexShaderAdapter.AdaptedStage adapted = BasicVertexShaderAdapter.validate(
                 vertexProgram, vertex, format);
-        validateTextureFragmentLink(fragmentProgram, fragment, adapted.varyings(), renderStage);
+        validateTextureFragmentLink(fragmentProgram, fragment, adapted.varyings(),
+                renderStage == null ? adapted.renderStage() : renderStage);
     }
 
     private void validateTextureFragmentLink(String program, String fragment,
@@ -1631,7 +1632,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         readGeometryBlendSettings(BEACON_BEAM_PROGRAM);
         Optional<String> vertex = readBeaconBeamVertex();
         Map<String, TerrainVertexShaderAdapter.PackVarying> outputs = BeaconBeamVertexShaderAdapter.nativeVaryings();
-        if (vertex.isPresent()) outputs = BeaconBeamVertexShaderAdapter.validate(BEACON_BEAM_PROGRAM, vertex.get()).varyings();
+        if (vertex.isPresent()) outputs = BeaconBeamVertexShaderAdapter.validateAny(BEACON_BEAM_PROGRAM, vertex.get()).varyings();
         TextureColorDistanceShaderAdapter.adaptFragment(fragment, BEACON_BEAM_PROGRAM, outputs,
                 hasShadowFragment(), true);
     }

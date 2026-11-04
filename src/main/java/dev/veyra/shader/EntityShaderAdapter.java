@@ -23,6 +23,8 @@ public final class EntityShaderAdapter {
     private static final Pattern UNSUPPORTED_UNIFORM_DECLARATION = Pattern.compile("(?m)^[\\t ]*uniform\\b");
     private static final Pattern ENTITY_IDENTIFIER_UNIFORM = Pattern.compile(
             "(?m)^[\\t ]*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?int\\s+(entityId|blockEntityId|currentRenderedItemId)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
+    /** The pre-translucent depth snapshot sampler, shared with terrain water and post-processing. */
+    public static final String OPAQUE_DEPTH_SAMPLER = "VeyraDepthTex1Sampler";
     private static final Pattern VARYING_DECLARATION = Pattern.compile(
             "(?m)^[\\t ]*(?:layout\\s*\\(\\s*location\\s*=\\s*(\\d+)\\s*\\)\\s*)?(?:varying|in)\\s+(?:(flat|smooth|noperspective)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;[\\t ]*(?://[^\\r\\n]*)?(?:\\r?\\n|$)");
     private static final Pattern LEADING_VARYING_INTERPOLATION = Pattern.compile(
@@ -886,9 +888,13 @@ public final class EntityShaderAdapter {
         Matcher samplerMatcher = SAMPLER_DECLARATION.matcher(adapted);
         StringBuffer withoutSamplers = new StringBuffer();
         boolean usesLightmapSampler = false;
+        boolean usesOpaqueDepthSampler = false;
         while (samplerMatcher.find()) {
             String sampler = samplerMatcher.group(2);
-            if (!sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
+            // Iris' depthtex1 holds depth before translucents; Veyra snapshots it before translucent terrain.
+            boolean opaqueDepth = sampler.equals("depthtex1") && !programName.startsWith("shadow");
+            usesOpaqueDepthSampler |= opaqueDepth;
+            if (!opaqueDepth && !sampler.equals("texture") && !sampler.equals("tex") && !sampler.equals("gtexture") && !sampler.equals("Sampler0")
                     && !sampler.equals("lightmap") && !sampler.equals("noisetex") && !sampler.equals("specular")
                     && !sampler.equals("normals")
                     && !geometryColorInputs.containsKey(sampler)
@@ -953,6 +959,7 @@ public final class EntityShaderAdapter {
         boolean suppliesNorthVector = false;
         boolean suppliesTextNormal = false;
         Map<String, TerrainVertexShaderAdapter.PackVarying> linkedPackVaryings = new LinkedHashMap<>();
+        GlslStructTypes structs = GlslStructTypes.parse(adapted);
         while (varyingMatcher.find()) {
             String interpolation = varyingMatcher.group(2) == null ? "smooth" : varyingMatcher.group(2);
             String type = varyingMatcher.group(3);
@@ -979,6 +986,13 @@ public final class EntityShaderAdapter {
                 if (!packVarying.interpolation().equals(interpolation)) {
                     throw new IOException(programName + " input '" + name + "' uses " + interpolation
                             + " interpolation, but its vertex output uses " + packVarying.interpolation() + ".");
+                }
+                if (structs.contains(type)) {
+                    // Struct inputs stay after their definition in the pack source, at the vertex output's location.
+                    varyingMatcher.appendReplacement(withoutVaryings, Matcher.quoteReplacement(
+                            "layout(location = " + packVarying.location() + ") " + interpolation
+                                    + " in " + type + ' ' + name + ";\n"));
+                    continue;
                 }
                 if (textPipeline || !packVarying.fixedBridge() || !Set.of("vertexColor", "texCoord0",
                         "sphericalVertexDistance", "cylindricalVertexDistance")
@@ -1053,7 +1067,9 @@ public final class EntityShaderAdapter {
             throw new IOException(programName + " uses input '" + unsupportedInput + "' that Veyra's "
                     + (textPipeline ? "sign-text" : "entity") + " bridge does not provide yet.");
         }
-        if (!suppliesNormal && !textPipeline && NORMAL_REFERENCE.matcher(uncommented).find()) {
+        // Packs may declare their own local 'normal' (Photon: vec3 normal = tbn[2];), which needs no input.
+        if (!suppliesNormal && !textPipeline && NORMAL_REFERENCE.matcher(uncommented).find()
+                && !ShaderSource.declaresVariable(uncommented, "normal")) {
             throw new IOException(programName + " uses 'normal' without declaring it as a fragment input.");
         }
         if (!suppliesViewPosition && VIEW_POSITION_REFERENCE.matcher(uncommented).find()
@@ -1228,6 +1244,10 @@ public final class EntityShaderAdapter {
                             .append(macro).append('\n');
                 });
         bridge = packVaryingBridge + bridge;
+        if (usesOpaqueDepthSampler) {
+            bridge = "uniform sampler2D " + OPAQUE_DEPTH_SAMPLER + ";\n#define depthtex1 " + OPAQUE_DEPTH_SAMPLER + "\n"
+                    + bridge;
+        }
         if (TerrainShaderAdapter.usesSpecularSampler(source)) {
             bridge = "uniform sampler2D VeyraSpecularSampler;\n#define specular VeyraSpecularSampler\n" + bridge;
         }

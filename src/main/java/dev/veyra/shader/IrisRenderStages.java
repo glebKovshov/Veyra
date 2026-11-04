@@ -111,12 +111,26 @@ final class IrisRenderStages {
             case SKY -> Stage.SKY.ordinal();
             case STARS -> Stage.STARS.ordinal();
             case SUNRISE_SUNSET -> Stage.SUNSET.ordinal();
-            case SIGN_TEXT, SIGN_TEXT_FULLBRIGHT -> Stage.BLOCK_ENTITIES.ordinal();
+            case SIGN_TEXT, SIGN_TEXT_FULLBRIGHT, BEACON_BEAM -> Stage.BLOCK_ENTITIES.ordinal();
             // Iris draws leashes inside the entity pass. Veyra replaces the native line pipelines that draw the
             // block outline, so lines take Iris' OUTLINE stage; debug lines sharing them get outline styling.
             case LEASH -> Stage.ENTITIES.ordinal();
             case LINE -> Stage.OUTLINE.ordinal();
-            case LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER -> null;
+            case GLINT, LIGHTNING, SKY_TEXTURED, SKY_TEXTURED_COLOR, TEXTURED, TEXTURED_COLOR, WEATHER -> null;
+        };
+    }
+
+    /**
+     * The stage Iris reports while the native pipeline behind a basic-format program draws. Iris draws
+     * lightning inside the entity pass; the particle format serves both weather and particle programs.
+     */
+    static Integer forBasicProgram(String vertexProgram, BasicVertexShaderAdapter.Format format) {
+        return switch (format) {
+            case TEXTURED -> Stage.WORLD_BORDER.ordinal();
+            case LIGHTNING -> Stage.ENTITIES.ordinal();
+            case WEATHER -> vertexProgram.startsWith("gbuffers_weather")
+                    ? Stage.RAIN_SNOW.ordinal() : Stage.PARTICLES.ordinal();
+            default -> forSkyFormat(format);
         };
     }
 

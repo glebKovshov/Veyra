@@ -30,6 +30,7 @@ public final class VeyraGeometryTargets {
     private static final Map<GraphicsPipeline, GeometryBlendSettings> blends = new IdentityHashMap<>();
     private static final Set<GraphicsPipeline> terrainInputs = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<GraphicsPipeline> specularInputs = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<GraphicsPipeline> opaqueDepthInputs = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<GraphicsPipeline> shadowPipelines = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Map<Key, VeyraMrtFramebuffer> framebuffers = new HashMap<>();
     private static final Map<Framebuffer, RenderPass> resumePasses = new IdentityHashMap<>();
@@ -66,9 +67,12 @@ public final class VeyraGeometryTargets {
     public static boolean isShadowPipeline(GraphicsPipeline pipeline) { return shadowPipelines.contains(pipeline); }
     static boolean shouldBindTerrainShadowSampler(boolean terrain, boolean shadowPass) { return terrain && !shadowPass; }
     public static void registerSpecularInput(GraphicsPipeline pipeline) { specularInputs.add(pipeline); }
+    /** Non-terrain geometry (translucent entities, hands) that samples the depthtex1 snapshot. */
+    public static void registerOpaqueDepthInput(GraphicsPipeline pipeline) { opaqueDepthInputs.add(pipeline); }
+    public static boolean hasOpaqueDepthInputs() { return !opaqueDepthInputs.isEmpty(); }
     public static void unregister(GraphicsPipeline pipeline) {
         layouts.remove(pipeline); blends.remove(pipeline); terrainInputs.remove(pipeline);
-        specularInputs.remove(pipeline); shadowPipelines.remove(pipeline);
+        specularInputs.remove(pipeline); shadowPipelines.remove(pipeline); opaqueDepthInputs.remove(pipeline);
     }
 
     public static void beforeBind(GraphicsPipeline pipeline) {
@@ -81,6 +85,7 @@ public final class VeyraGeometryTargets {
             VeyraSpecularTextures.bindTerrain(pipeline);
         VeyraNormalTextures.bindTerrain(pipeline);
         if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);
+        else if (opaqueDepthInputs.contains(pipeline)) VeyraRenderer.bindEntityOpaqueDepth(pipeline);
         boolean bindTerrainShadowSampler = shouldBindTerrainShadowSampler(terrain, VeyraShadowRenderer.isRendering());
         if (bindTerrainShadowSampler) VeyraShadowRenderer.bindTerrainShadowSampler(pipeline);
         Renderer renderer = Renderer.getInstance();
