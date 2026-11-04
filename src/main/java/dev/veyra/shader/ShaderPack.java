@@ -35,6 +35,8 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                          boolean hasHandFragment, boolean hasHandWaterFragment,
                          boolean hasDamagedBlockFragment, Set<String> blockPrograms, String issue, ShaderPackConfiguration configuration) {
     private static final int MAX_SHADER_BYTES = 1024 * 1024;
+    // Textures are larger than sources (Photon's galaxy.png is 1.9 MB).
+    private static final int MAX_ASSET_BYTES = 64 * 1024 * 1024;
     private static final int MAX_PASS_SUFFIX = 99;
     private static final List<String> MULTI_PASS_PROGRAMS = List.of("begin", "prepare", "deferred", "composite");
     private static final List<String> SHADOW_PROGRAMS = List.of(
@@ -1845,7 +1847,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     }
 
     private Optional<String> readUncachedShader(String fileName) throws IOException {
-        Optional<byte[]> source = readShaderBytes(fileName);
+        Optional<byte[]> source = readShaderBytes(fileName, MAX_SHADER_BYTES);
         if (source.isEmpty()) return Optional.empty();
         String portable = fileName.replace('\\', '/');
         String basename = portable.substring(portable.lastIndexOf('/') + 1);
@@ -1857,10 +1859,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     /** Reads a binary asset inside this pack's shaders directory with the same path checks as shader sources. */
     public Optional<byte[]> readShaderAsset(String fileName) throws IOException {
-        return readShaderBytes(fileName);
+        return readShaderBytes(fileName, MAX_ASSET_BYTES);
     }
 
-    private Optional<byte[]> readShaderBytes(String fileName) throws IOException {
+    private Optional<byte[]> readShaderBytes(String fileName, int limit) throws IOException {
         String portable = fileName.replace('\\', '/');
         if (portable.startsWith("/") || java.util.Arrays.asList(portable.split("/")).contains(".."))
             throw new IOException("Shader source escapes its directory: " + fileName);
@@ -1890,7 +1892,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 return Optional.empty();
             }
             try (InputStream input = Files.newInputStream(realShader)) {
-                bytes = readBounded(input);
+                bytes = readBounded(input, limit);
             }
         } else {
             try (ZipFile zip = new ZipFile(path.toFile())) {
@@ -1899,7 +1901,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                     return Optional.empty();
                 }
                 try (InputStream input = zip.getInputStream(entry)) {
-                    bytes = readBounded(input);
+                    bytes = readBounded(input, limit);
                 }
             }
         }
@@ -2141,10 +2143,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return false;
     }
 
-    private static byte[] readBounded(InputStream input) throws IOException {
-        byte[] bytes = input.readNBytes(MAX_SHADER_BYTES + 1);
-        if (bytes.length > MAX_SHADER_BYTES) {
-            throw new IOException("Shader file exceeds the 1 MiB size limit.");
+    private static byte[] readBounded(InputStream input, int limit) throws IOException {
+        byte[] bytes = input.readNBytes(limit + 1);
+        if (bytes.length > limit) {
+            throw new IOException("Shader-pack file exceeds the " + (limit >> 20) + " MiB size limit.");
         }
         return bytes;
     }

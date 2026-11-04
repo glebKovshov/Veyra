@@ -40,6 +40,7 @@ import dev.veyra.vulkan.VeyraCloudTexture;
 import dev.veyra.vulkan.VeyraNoiseTexture;
 import dev.veyra.vulkan.VeyraSpecularTextures;
 import dev.veyra.vulkan.VeyraNormalTextures;
+import dev.veyra.vulkan.VeyraRawTexture;
 import dev.veyra.vulkan.VeyraShaderPackTextures;
 import net.vulkanmod.Initializer;
 import net.minecraft.client.Minecraft;
@@ -3573,26 +3574,36 @@ public final class VeyraRenderer {
             addGeometryColorTargets("gbuffers_beaconbeam", beaconBeamFragment.get(), width, height,
                     colorTargetSettings, colorTargetIndices);
         }
+        ShaderPackCustomTextureProperties rawTextureProperties = pack.readCustomTextureProperties();
         for (ShaderPack.Program source : sources) {
+            ShaderPackRawTextures.Prepared rawFragment = ShaderPackRawTextures.prepare(
+                    source.name(), source.source(), rawTextureProperties);
+            Optional<String> postVertexSource = source.vertexSource();
+            ShaderPackRawTextures.Prepared rawVertex = postVertexSource.isPresent()
+                    ? ShaderPackRawTextures.prepare(source.name(), postVertexSource.get(), rawTextureProperties)
+                    : ShaderPackRawTextures.Prepared.none("");
+            if (postVertexSource.isPresent()) postVertexSource = Optional.of(rawVertex.source());
+            List<ShaderPackRawTextures.Binding> rawBindings =
+                    ShaderPackRawTextures.merge(rawFragment.bindings(), rawVertex.bindings());
             ShaderPackImageBindings.PreparedStage customImageStage = customImageResources == null
-                    ? new ShaderPackImageBindings.PreparedStage(source.source(), List.of())
-                    : ShaderPackImageBindings.prepare(source.name() + ".fsh", source.source(), customImageProperties);
+                    ? new ShaderPackImageBindings.PreparedStage(rawFragment.source(), List.of())
+                    : ShaderPackImageBindings.prepare(source.name() + ".fsh", rawFragment.source(), customImageProperties);
             if (TerrainShaderAdapter.usesNoiseSampler(customImageStage.source())) {
                 VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
             }
             List<PipelineProgram> outputs = new ArrayList<>();
-            List<String> vertexUniforms = source.vertexSource()
+            List<String> vertexUniforms = postVertexSource
                     .map(shader -> readPostVertexUniforms(shader, source.name()))
                     .orElse(List.of());
-            Set<Integer> vertexColorSamplers = source.vertexSource()
+            Set<Integer> vertexColorSamplers = postVertexSource
                     .map(shader -> PostVertexColorSamplers.read(shader, source.name()))
                     .orElse(Set.of());
-            boolean vertexUsesNoiseSampler = source.vertexSource()
+            boolean vertexUsesNoiseSampler = postVertexSource
                     .map(shader -> PostVertexNoiseSampler.read(shader, source.name()))
                     .orElse(false);
             if (vertexUsesNoiseSampler) VeyraNoiseTexture.ensure(pack.readNoiseTextureResolution());
             PostVertexVaryings.Interface postVaryings = PostVertexVaryings.link(
-                    source.name(), source.vertexSource().orElse(null), source.source());
+                    source.name(), postVertexSource.orElse(null), rawFragment.source());
             for (AdaptedShader fragmentAdapted : adaptShader(
                     source.name(), customImageStage.source(), vertexUniforms, pack.hasShadowFragment(),
                     storageBufferProperties, width, height, postVaryings)) {
@@ -3603,26 +3614,32 @@ public final class VeyraRenderer {
                         fragmentAdapted.usesDepth2Sampler(), fragmentAdapted.usesShadowSampler(),
                         fragmentAdapted.shadowInputs(), Set.copyOf(combinedColorSamplers),
                         fragmentAdapted.outputTarget());
-                String vertexSource = source.vertexSource()
+                String vertexSource = postVertexSource
                         .map(shader -> adaptPostVertexShader(
                                 shader, source.name(), adapted.uniforms(),
                                 adapted.colorSamplers(), vertexUsesNoiseSampler, postVaryings))
                         .orElse(null);
+                if (vertexSource != null) vertexSource = ShaderPackRawTextures.decorate(vertexSource, rawVertex.bindings());
                 String variantName = source.name() + "_colortex" + adapted.outputTarget();
-                AdaptedShader linked = customImageStage.resources().isEmpty() ? adapted
-                        : new AdaptedShader(ShaderPackImageBindings.decorateNativeSamplers(
-                                adapted.source(), customImageStage), adapted.uniforms(),
+                String linkedFragment = ShaderPackRawTextures.decorate(adapted.source(), rawFragment.bindings());
+                if (!customImageStage.resources().isEmpty()) {
+                    linkedFragment = ShaderPackImageBindings.decorateNativeSamplers(linkedFragment, customImageStage);
+                }
+                AdaptedShader linked = linkedFragment.equals(adapted.source()) ? adapted
+                        : new AdaptedShader(linkedFragment, adapted.uniforms(),
                                 adapted.usesDepthSampler(), adapted.usesDepth1Sampler(), adapted.usesDepth2Sampler(),
                                 adapted.usesShadowSampler(), adapted.shadowInputs(), adapted.colorSamplers(),
                                 adapted.outputTarget());
                 dumpShaderSource("post-" + variantName + ".vsh", vertexSource);
                 dumpShaderSource("post-" + variantName + ".fsh", linked.source());
                 dumpShaderSource("post-" + variantName + ".uniforms", String.join("\n", adapted.uniforms()));
-                List<String> customSamplers = customImageStage.resources().stream()
-                        .map(ComputeShaderAdapter.OpaqueResource::name).toList();
+                List<String> customSamplers = new ArrayList<>(customImageStage.resources().stream()
+                        .map(ComputeShaderAdapter.OpaqueResource::name).toList());
+                rawBindings.forEach(binding -> customSamplers.add(binding.uniform()));
                 PipelineProgram program = pipelineProgram(variantName, linked, vertexSource,
-                        customImageResources, customSamplers);
+                        customImageResources, List.copyOf(customSamplers));
                 compilePipeline(program);
+                if (!rawBindings.isEmpty()) bindRawTextures(program, pack, rawBindings, source.name());
                 if (!customImageStage.resources().isEmpty()) {
                     GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(program.pipeline()).getPipeline();
                     if (nativePipeline == null) {
@@ -3749,6 +3766,36 @@ public final class VeyraRenderer {
             }
             return List.copyOf(plans);
         } catch (RuntimeException exception) { plans.forEach(FramePlan::close); throw exception; }
+    }
+
+    /** Points each renamed raw-texture sampler of a compiled post pass at its uploaded image. */
+    private static void bindRawTextures(PipelineProgram program, ShaderPack pack,
+                                        List<ShaderPackRawTextures.Binding> bindings, String programName)
+            throws IOException {
+        GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(program.pipeline()).getPipeline();
+        if (nativePipeline == null) {
+            throw new IOException("VulkanMod did not create a native post pipeline for " + programName + ".");
+        }
+        List<net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor> descriptors = nativePipeline.getImageDescriptors();
+        for (ShaderPackRawTextures.Binding binding : bindings) {
+            var nativeDescriptor = nativePipeline.getImageDescriptor(binding.uniform());
+            int index = nativeDescriptor == null ? -1 : descriptors.indexOf(nativeDescriptor);
+            if (index < 0) {
+                throw new IOException("VulkanMod did not expose raw texture sampler '" + binding.sampler()
+                        + "' for " + programName + ".");
+            }
+            VeyraRawTexture image = VeyraShaderPackTextures.rawTexture(pack, binding.spec());
+            var replacement = new dev.veyra.vulkan.VeyraImageDescriptor(nativeDescriptor.getBinding(),
+                    binding.glslType(), binding.uniform(), image, false);
+            replacement.setLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            image.setSampler(image.ownSampler());
+            try {
+                descriptors.set(index, replacement);
+            } catch (UnsupportedOperationException exception) {
+                throw new IOException("VulkanMod's image descriptor list is immutable; cannot bind raw texture '"
+                        + binding.sampler() + "'.", exception);
+            }
+        }
     }
 
     private static void ensureInitialDepthSnapshots(FramePlan plan, int width, int height) {
@@ -3991,7 +4038,7 @@ public final class VeyraRenderer {
                     + ".vsh uses legacy vertex input '" + unsupportedLegacyInput.group()
                     + "' that Veyra does not provide for post passes.");
         }
-        body = PostVertexVaryings.stripVertexDeclarations(livePostVertexSource);
+        body = PostVertexVaryings.stripVertexDeclarations(livePostVertexSource, postVaryings);
         Matcher mainMatcher = POST_VERTEX_MAIN.matcher(body);
         if (!mainMatcher.find()) {
             throw new IllegalArgumentException(programName + ".vsh must define void main().");
@@ -7427,7 +7474,7 @@ public final class VeyraRenderer {
         body = DRAWBUFFERS_DIRECTIVE.matcher(body).replaceAll("");
         body = COMMENTS.matcher(body).replaceAll("");
         body = PostVertexInterfaceDeclarations.expand(body);
-        body = PostVertexVaryings.stripFragmentDeclarations(body);
+        body = PostVertexVaryings.stripFragmentDeclarations(body, postVaryings);
         IrisFogUniformAdapter.AdaptedShader fog = IrisFogUniformAdapter.extract(body, "post-processing");
         body = UnreachableGlslFunctions.removeUnreachable(fog.source(), "main");
         body = ShaderPackStorageBuffers.removeUnused(body);

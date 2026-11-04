@@ -9,6 +9,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.veyra.VeyraClient;
 import dev.veyra.shader.ShaderPack;
+import dev.veyra.shader.RawTextureSpec;
 import dev.veyra.shader.ShaderPackCustomTextureProperties;
 import net.vulkanmod.render.engine.VkGpuDevice;
 import net.vulkanmod.render.engine.VkGpuTexture;
@@ -28,9 +29,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalDouble;
 
-/** Uploads and binds shader-pack PNG inputs declared through customTexture.* or texture.<stage>.*. */
+/**
+ * Uploads and binds shader-pack PNG inputs declared through customTexture.* or texture.<stage>.*, and uploads
+ * Iris raw (binary) textures, which post passes bind through their own descriptors.
+ */
 public final class VeyraShaderPackTextures {
     private static final Map<Key, UploadedTexture> TEXTURES = new HashMap<>();
+    private static final Map<Key, RawTexture> RAW_TEXTURES = new HashMap<>();
 
     private VeyraShaderPackTextures() {
     }
@@ -58,6 +63,11 @@ public final class VeyraShaderPackTextures {
                     || resourcePath.startsWith("minecraft:")) {
                 continue;
             }
+            RawTextureSpec raw = RawTextureSpec.parse(resourcePath);
+            if (raw != null) {
+                prepareRaw(pack, packPath, raw);
+                continue;
+            }
             String normalizedPath = normalizeResourcePath(resourcePath);
             byte[] bytes = pack.readShaderAsset(normalizedPath).orElseThrow(
                     () -> new IOException("Shader-pack texture '" + normalizedPath + "' was not found."));
@@ -83,6 +93,14 @@ public final class VeyraShaderPackTextures {
                     || resourcePath.startsWith("minecraft:")) {
                 continue;
             }
+            RawTextureSpec raw = RawTextureSpec.parse(resourcePath);
+            if (raw != null) {
+                if (!RAW_TEXTURES.containsKey(rawKey(packPath, raw))) {
+                    prepare(pack);
+                    return;
+                }
+                continue;
+            }
             Key key = new Key(packPath, normalizeResourcePath(resourcePath));
             UploadedTexture current = TEXTURES.get(key);
             if (current == null || current.texture().isClosed() || current.view().isClosed()) {
@@ -106,6 +124,8 @@ public final class VeyraShaderPackTextures {
             }
             if (pipeline.getImageDescriptor(bindingName) == null) continue;
             String resourcePath = mapping.getValue();
+            // Raw textures are bound by their pipelines' own descriptors.
+            if (ShaderPackCustomTextureProperties.isRawTexture(resourcePath)) continue;
             if (ShaderPackCustomTextureProperties.isMinecraftBlockAtlas(resourcePath)) {
                 VeyraBlockAtlasSampler.bind(pass, pipeline, bindingName);
                 continue;
@@ -122,6 +142,38 @@ public final class VeyraShaderPackTextures {
             }
             pass.bindTexture(bindingName, uploaded.view(), uploaded.sampler());
         }
+    }
+
+    /** The uploaded image for a raw texture declaration of the selected pack. */
+    public static synchronized VeyraRawTexture rawTexture(ShaderPack pack, RawTextureSpec spec) throws IOException {
+        RawTexture raw = RAW_TEXTURES.get(rawKey(pack.path().toAbsolutePath().normalize(), spec));
+        if (raw == null) throw new IOException("Raw shader-pack texture '" + spec.path() + "' was not prepared.");
+        return raw.image();
+    }
+
+    private static void prepareRaw(ShaderPack pack, Path packPath, RawTextureSpec spec) throws IOException {
+        String normalizedPath = normalizeResourcePath(spec.path());
+        byte[] bytes = pack.readShaderAsset(normalizedPath).orElseThrow(
+                () -> new IOException("Raw shader-pack texture '" + normalizedPath + "' was not found."));
+        FilterSettings settings = readFilterSettings(pack, normalizedPath);
+        String fingerprint = sha256(bytes) + ":" + settings.blur() + ":" + settings.clamp();
+        Key key = rawKey(packPath, spec);
+        RawTexture current = RAW_TEXTURES.get(key);
+        if (current != null && current.fingerprint().equals(fingerprint)) return;
+        VeyraRawTexture image = VeyraRawTexture.upload("Veyra raw shader-pack texture " + normalizedPath, spec,
+                spec.storedTexels(bytes), settings.blur(), settings.clamp());
+        RAW_TEXTURES.put(key, new RawTexture(fingerprint, image));
+        if (current != null) retireAfterFrame(current);
+    }
+
+    /** One upload per file and declared layout; Photon binds the same noise file to several stages. */
+    private static Key rawKey(Path packPath, RawTextureSpec spec) throws IOException {
+        return new Key(packPath, normalizeResourcePath(spec.path()) + "|" + spec.dimensions() + "|" + spec.width()
+                + "x" + spec.height() + "x" + spec.depth() + "|" + spec.components() + "|" + spec.pixelType());
+    }
+
+    private static void retireAfterFrame(RawTexture texture) {
+        MemoryManager.getInstance().addFrameOp(texture.image()::free);
     }
 
     static String adaptedSamplerName(String programName, String samplerName) {
@@ -153,6 +205,14 @@ public final class VeyraShaderPackTextures {
                 iterator.remove();
             }
         }
+        var rawIterator = RAW_TEXTURES.entrySet().iterator();
+        while (rawIterator.hasNext()) {
+            Map.Entry<Key, RawTexture> entry = rawIterator.next();
+            if (!entry.getKey().packPath().equals(keep)) {
+                retireAfterFrame(entry.getValue());
+                rawIterator.remove();
+            }
+        }
     }
 
     public static synchronized void discard(Path packPath) {
@@ -165,11 +225,21 @@ public final class VeyraShaderPackTextures {
                 iterator.remove();
             }
         }
+        var rawIterator = RAW_TEXTURES.entrySet().iterator();
+        while (rawIterator.hasNext()) {
+            Map.Entry<Key, RawTexture> entry = rawIterator.next();
+            if (entry.getKey().packPath().equals(discard)) {
+                retireAfterFrame(entry.getValue());
+                rawIterator.remove();
+            }
+        }
     }
 
     public static synchronized void closeAll() {
         TEXTURES.values().forEach(VeyraShaderPackTextures::retire);
         TEXTURES.clear();
+        RAW_TEXTURES.values().forEach(raw -> raw.image().free());
+        RAW_TEXTURES.clear();
     }
 
     private static UploadedTexture upload(String resourcePath, String fingerprint, byte[] bytes,
@@ -280,4 +350,6 @@ public final class VeyraShaderPackTextures {
     private record FilterSettings(boolean blur, boolean clamp) { }
 
     record UploadedTexture(String fingerprint, VkGpuTexture texture, VkTextureView view, GpuSampler sampler) { }
+
+    private record RawTexture(String fingerprint, VeyraRawTexture image) { }
 }

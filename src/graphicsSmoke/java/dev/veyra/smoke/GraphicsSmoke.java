@@ -482,6 +482,10 @@ public final class GraphicsSmoke {
                     heldTicks++;
                     return;
                 }
+                if (IconifyProbe.holding()) {
+                    IconifyProbe.tick(client);
+                    return;
+                }
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(
                         "Capture request: tick={} pos=({}, {}, {}) rotation=({}, {}) dayTime={} floor={} wall={}",
                         worldTicks, client.player.getX(), client.player.getY(), client.player.getZ(),

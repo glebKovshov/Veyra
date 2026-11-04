@@ -215,6 +215,18 @@ public final class TerrainShaderAdapter {
             uvec4 veyraSample(usampler3D sourceSampler, vec3 sourceCoord) {
                 return texture(sourceSampler, sourceCoord);
             }
+            vec4 veyraSample(sampler2D sourceSampler, vec2 sourceUv, float bias) {
+                return texture(sourceSampler, sourceUv, bias);
+            }
+            vec4 veyraSample(sampler3D sourceSampler, vec3 sourceCoord, float bias) {
+                return texture(sourceSampler, sourceCoord, bias);
+            }
+            uvec4 veyraSample(usampler2D sourceSampler, vec2 sourceUv, float bias) {
+                return texture(sourceSampler, sourceUv, bias);
+            }
+            uvec4 veyraSample(usampler3D sourceSampler, vec3 sourceCoord, float bias) {
+                return texture(sourceSampler, sourceCoord, bias);
+            }
             vec4 veyraSampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
                 return textureLod(sourceSampler, sourceUv, lod);
             }
@@ -239,9 +251,15 @@ public final class TerrainShaderAdapter {
             uvec4 veyraSampleGrad(usampler3D sourceSampler, vec3 sourceCoord, vec3 dx, vec3 dy) {
                 return textureGrad(sourceSampler, sourceCoord, dx, dy);
             }
-            vec4 veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
-                float visibility = step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r);
-                return vec4(visibility);
+            // texture() on a depth-compare sampler returns float; GLSL 1.20 shadow2D() returns vec4.
+            float veyraSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                return step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r);
+            }
+            float veyraSample(sampler2D sourceSampler, vec3 sourceCoord, float bias) {
+                return step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy, bias).r);
+            }
+            vec4 veyraShadow2D(sampler2D sourceSampler, vec3 sourceCoord) {
+                return vec4(veyraSample(sourceSampler, sourceCoord));
             }
             #define texture Sampler0
             #define tex Sampler0
@@ -249,7 +267,7 @@ public final class TerrainShaderAdapter {
             #define lightmap LightTexture
             #define shadowtex0 VeyraShadowSampler
             #define noisetex VeyraNoiseSampler
-            #define shadow2D(sampler, coord) veyraSample(sampler, coord)
+            #define shadow2D(sampler, coord) veyraShadow2D(sampler, coord)
             #define alphaTestRef AlphaCutout
             #define gl_FragColor veyraFragColor
             """;
@@ -667,7 +685,7 @@ public final class TerrainShaderAdapter {
             bridge = bridge.replaceAll(
                     "(?m)^[\\t ]*layout\\(binding = 5\\) uniform sampler2D VeyraShadowSampler;[\\t ]*\\R", "")
                     .replaceAll("(?m)^[\\t ]*#define shadowtex0 VeyraShadowSampler[\\t ]*\\R", "")
-                    .replaceAll("(?m)^[\\t ]*#define shadow2D\\(sampler, coord\\) veyraSample\\(sampler, coord\\)[\\t ]*\\R", "");
+                    .replaceAll("(?m)^[\\t ]*#define shadow2D\\(sampler, coord\\) veyraShadow2D\\(sampler, coord\\)[\\t ]*\\R", "");
         }
         if (!noiseSamplerAvailable) {
             bridge = bridge.replaceAll(

@@ -989,9 +989,11 @@ public final class EntityShaderAdapter {
                 }
                 if (structs.contains(type)) {
                     // Struct inputs stay after their definition in the pack source, at the vertex output's location.
+                    // VulkanMod's parser reads a bare layout(...) as a uniform block, so declare through a macro.
+                    String macro = "VEYRA_ENTITY_STRUCT_INPUT_" + packVarying.location();
                     varyingMatcher.appendReplacement(withoutVaryings, Matcher.quoteReplacement(
-                            "layout(location = " + packVarying.location() + ") " + interpolation
-                                    + " in " + type + ' ' + name + ";\n"));
+                            "#define " + macro + " layout(location = " + packVarying.location() + ") " + interpolation
+                                    + " in " + type + ' ' + name + ";\n" + macro + "\n"));
                     continue;
                 }
                 if (textPipeline || !packVarying.fixedBridge() || !Set.of("vertexColor", "texCoord0",
@@ -1128,6 +1130,15 @@ public final class EntityShaderAdapter {
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
                 }
+                vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv, float bias) {
+                    return texture(sourceSampler, sourceUv, bias);
+                }
+                vec4 veyraEntitySample(sampler3D sourceSampler, vec3 sourceCoord) {
+                    return texture(sourceSampler, sourceCoord);
+                }
+                vec4 veyraEntitySample(sampler3D sourceSampler, vec3 sourceCoord, float bias) {
+                    return texture(sourceSampler, sourceCoord, bias);
+                }
                 vec4 veyraEntitySampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
                     return textureLod(sourceSampler, sourceUv, lod);
                 }
@@ -1182,6 +1193,15 @@ public final class EntityShaderAdapter {
                 vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
                 }
+                vec4 veyraEntitySample(sampler2D sourceSampler, vec2 sourceUv, float bias) {
+                    return texture(sourceSampler, sourceUv, bias);
+                }
+                vec4 veyraEntitySample(sampler3D sourceSampler, vec3 sourceCoord) {
+                    return texture(sourceSampler, sourceCoord);
+                }
+                vec4 veyraEntitySample(sampler3D sourceSampler, vec3 sourceCoord, float bias) {
+                    return texture(sourceSampler, sourceCoord, bias);
+                }
                 vec4 veyraEntitySampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
                     return textureLod(sourceSampler, sourceUv, lod);
                 }
@@ -1224,6 +1244,13 @@ public final class EntityShaderAdapter {
                         }
                         vec4 veyraEntityShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
                             return vec4(veyraEntityShadowCompare(sourceSampler, sourceCoord));
+                        }
+                        // texture() on a depth-compare sampler returns float.
+                        float veyraEntitySample(sampler2D sourceSampler, vec3 sourceCoord) {
+                            return veyraEntityShadowCompare(sourceSampler, sourceCoord);
+                        }
+                        float veyraEntitySample(sampler2D sourceSampler, vec3 sourceCoord, float bias) {
+                            return step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy, bias).r);
                         }
                         """ : "")
                 .replace("__VEYRA_SPHERICAL_DISTANCE__",

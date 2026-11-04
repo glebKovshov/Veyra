@@ -25,5 +25,6 @@ public abstract class GraphicsPerfProbeMixin {
     @Inject(method = "endFrame", at = @At("HEAD"), remap = false)
     private void veyra$frameBoundary(CallbackInfo callback) {
         PerfProbe.frame();
+        dev.veyra.smoke.IconifyProbe.frame();
     }
 }

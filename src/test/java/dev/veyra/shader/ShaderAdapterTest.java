@@ -1584,7 +1584,7 @@ class ShaderAdapterTest {
                 """);
 
         assertTrue(adapted.contains("float sampleShadow(sampler2D depthSampler, vec3 coordinate)"));
-        assertTrue(adapted.contains("#define shadow2D(sampler, coord) veyraSample(sampler, coord)"));
+        assertTrue(adapted.contains("#define shadow2D(sampler, coord) veyraShadow2D(sampler, coord)"));
         assertTrue(adapted.contains("step(sourceCoord.z, texture(sourceSampler, sourceCoord.xy).r)"));
         assertTrue(adapted.contains("sampleShadow(shadowtex0"));
         assertFalse(adapted.contains("sampler2DShadow"));

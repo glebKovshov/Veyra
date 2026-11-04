@@ -28,7 +28,7 @@ final class PostVertexVaryings {
             "float", "double", "int", "uint", "bool",
             "vec2", "vec3", "vec4", "dvec2", "dvec3", "dvec4",
             "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4",
-            "bvec2", "bvec3", "bvec4");
+            "bvec2", "bvec3", "bvec4", "mat2", "mat3", "mat4");
 
     private PostVertexVaryings() { }
 
@@ -42,10 +42,19 @@ final class PostVertexVaryings {
         }
     }
 
-    record Interface(List<Varying> vertexOutputs, List<Varying> fragmentInputs) {
+    /**
+     * {@code structVaryings} keep their declaration site, after the pack's struct definition (Photon passes
+     * CloudsParameters from prepare.vsh); every other varying is declared by Veyra ahead of the pack source.
+     */
+    record Interface(List<Varying> vertexOutputs, List<Varying> fragmentInputs, Set<String> structVaryings) {
         Interface {
             vertexOutputs = List.copyOf(vertexOutputs);
             fragmentInputs = List.copyOf(fragmentInputs);
+            structVaryings = Set.copyOf(structVaryings);
+        }
+
+        Interface(List<Varying> vertexOutputs, List<Varying> fragmentInputs) {
+            this(vertexOutputs, fragmentInputs, Set.of());
         }
 
         String vertexDeclarations() {
@@ -56,10 +65,19 @@ final class PostVertexVaryings {
             return declarations(fragmentInputs, "in");
         }
 
-        private static String declarations(List<Varying> varyings, String storage) {
+        private String declarations(List<Varying> varyings, String storage) {
             StringBuilder declarations = new StringBuilder();
-            for (Varying varying : varyings) declarations.append(varying.declaration(storage));
+            for (Varying varying : varyings) {
+                if (!structVaryings.contains(varying.name())) declarations.append(varying.declaration(storage));
+            }
             return declarations.toString();
+        }
+
+        Varying varying(String name, boolean vertex) {
+            for (Varying varying : vertex ? vertexOutputs : fragmentInputs) {
+                if (varying.name().equals(name)) return varying;
+            }
+            return null;
         }
     }
 
@@ -93,7 +111,12 @@ final class PostVertexVaryings {
             validateCompatible(programName, output, input);
         }
 
-        Map<String, Integer> locations = assignLocations(programName, outputs, fragmentByName);
+        GlslStructTypes vertexStructs = GlslStructTypes.parse(vertexSource == null ? "" : vertexSource);
+        Map<String, Integer> locations = assignLocations(programName, outputs, fragmentByName, vertexStructs);
+        Set<String> structVaryings = new LinkedHashSet<>();
+        for (Declaration output : outputs.values()) {
+            if (vertexStructs.contains(output.type())) structVaryings.add(output.name());
+        }
         List<Varying> vertexOutputs = new ArrayList<>(outputs.size());
         for (Declaration output : outputs.values()) {
             Declaration input = fragmentByName.get(output.name());
@@ -110,18 +133,27 @@ final class PostVertexVaryings {
             Declaration source = input != null ? input : output;
             fragmentInputs.add(toVarying(source, output, locations.get(name)));
         }
-        return new Interface(vertexOutputs, fragmentInputs);
+        return new Interface(vertexOutputs, fragmentInputs, structVaryings);
     }
 
     static String stripVertexDeclarations(String source) {
-        return stripDeclarations(source, true);
+        return stripDeclarations(source, true, null);
     }
 
     static String stripFragmentDeclarations(String source) {
-        return stripDeclarations(source, false);
+        return stripDeclarations(source, false, null);
     }
 
-    private static String stripDeclarations(String source, boolean vertex) {
+    /** Strips interface declarations, re-declaring struct varyings in place at their linked locations. */
+    static String stripVertexDeclarations(String source, Interface linked) {
+        return stripDeclarations(source, true, linked);
+    }
+
+    static String stripFragmentDeclarations(String source, Interface linked) {
+        return stripDeclarations(source, false, linked);
+    }
+
+    private static String stripDeclarations(String source, boolean vertex, Interface linked) {
         String expanded = PostVertexInterfaceDeclarations.expand(source);
         Matcher matcher = INTERFACE_DECLARATION.matcher(expanded);
         StringBuffer stripped = new StringBuffer();
@@ -130,11 +162,28 @@ final class PostVertexVaryings {
             boolean isVertexOutput = storage.equals("varying") || storage.equals("out");
             boolean isFragmentInput = storage.equals("varying") || storage.equals("in");
             if (vertex ? isVertexOutput : isFragmentInput) {
-                matcher.appendReplacement(stripped, "");
+                String name = normalizeName(matcher.group(5));
+                Varying inPlace = linked != null && linked.structVaryings().contains(name)
+                        ? linked.varying(name, vertex) : null;
+                matcher.appendReplacement(stripped, inPlace == null ? ""
+                        : Matcher.quoteReplacement(inPlaceDeclaration(inPlace, vertex ? "out" : "in")));
             }
         }
         matcher.appendTail(stripped);
         return stripped.toString();
+    }
+
+    /**
+     * Post adapters later strip the pack's {@code layout(location = N)} qualifiers, so the in-place struct
+     * declaration spells its location through a function-like macro those patterns do not match.
+     */
+    private static String inPlaceDeclaration(Varying varying, String storage) {
+        String direction = storage.equals("out") ? "OUT" : "IN";
+        String macro = "VEYRA_INTERNAL_POST_" + direction + "_" + varying.location();
+        String interpolation = varying.qualifiers().equals("smooth ") ? "" : varying.qualifiers().strip() + " ";
+        return "#ifndef VEYRA_INTERNAL_POST_LOCATION\n#define VEYRA_INTERNAL_POST_LOCATION(n) layout(location = n)\n#endif\n"
+                + "#define " + macro + " VEYRA_INTERNAL_POST_LOCATION(" + varying.location() + ") " + interpolation
+                + storage + " " + varying.type() + " " + varying.name() + "\n" + macro + ";\n";
     }
 
     private static List<Declaration> declarations(String programName, String source, boolean vertex)
@@ -151,7 +200,8 @@ final class PostVertexVaryings {
                     : storage.equals("varying") || storage.equals("in");
             if (!matchesStage) continue;
             String type = matcher.group(4);
-            if (!SUPPORTED_TYPES.contains(type)) {
+            if (!SUPPORTED_TYPES.contains(type) && !type.matches("mat[234]x[234]")
+                    && !GlslStructTypes.parse(uncommented).contains(type)) {
                 throw new IOException(programName + (vertex ? ".vsh" : ".fsh")
                         + " uses unsupported varying type '" + type + "'.");
             }
@@ -181,8 +231,15 @@ final class PostVertexVaryings {
         return byName;
     }
 
+    private static int locationSpan(String type, GlslStructTypes structs) {
+        // A matrix takes one location per column: matCxR and matC span C locations.
+        if (type.matches("mat[234](?:x[234])?")) return type.charAt(3) - '0';
+        return structs.contains(type) ? structs.locationSpan(type) : 1;
+    }
+
     private static Map<String, Integer> assignLocations(String programName,
-            LinkedHashMap<String, Declaration> outputs, Map<String, Declaration> fragmentInputs) throws IOException {
+            LinkedHashMap<String, Declaration> outputs, Map<String, Declaration> fragmentInputs,
+            GlslStructTypes structs) throws IOException {
         LinkedHashMap<String, Integer> locations = new LinkedHashMap<>();
         LinkedHashMap<Integer, String> namesByLocation = new LinkedHashMap<>();
         reserveLocation(programName, "texCoord", 0, locations, namesByLocation);
@@ -196,15 +253,32 @@ final class PostVertexVaryings {
                         + "' has different explicit vertex and fragment locations.");
             }
             Integer explicit = outputLocation != null ? outputLocation : inputLocation;
-            if (explicit != null) reserveLocation(programName, output.name(), explicit, locations, namesByLocation);
+            if (explicit != null) {
+                int span = locationSpan(output.type(), structs);
+                for (int slot = explicit; slot < explicit + span; slot++) {
+                    reserveLocation(programName, output.name(), slot, locations, namesByLocation);
+                }
+                locations.put(output.name(), explicit);
+            }
         }
-        int next = 1;
         for (Declaration output : outputs.values()) {
             if (locations.containsKey(output.name())) continue;
-            while (namesByLocation.containsKey(next)) next++;
-            reserveLocation(programName, output.name(), next++, locations, namesByLocation);
+            int span = locationSpan(output.type(), structs);
+            int start = 1;
+            while (!free(namesByLocation, start, span)) start++;
+            for (int slot = start; slot < start + span; slot++) {
+                reserveLocation(programName, output.name(), slot, locations, namesByLocation);
+            }
+            locations.put(output.name(), start);
         }
         return Map.copyOf(locations);
+    }
+
+    private static boolean free(Map<Integer, String> namesByLocation, int start, int span) {
+        for (int slot = start; slot < start + span; slot++) {
+            if (namesByLocation.containsKey(slot)) return false;
+        }
+        return true;
     }
 
     private static void reserveLocation(String programName, String name, int location,

@@ -41,7 +41,8 @@ public record ShaderPackCustomTextureProperties(
                 sampler = key.substring("customTexture.".length());
             } else if (key.startsWith("texture.")) {
                 String[] parts = key.split("\\.", -1);
-                if (parts.length != 3 || !parts[1].matches("[A-Za-z_][A-Za-z0-9_]*")) continue;
+                // Iris keeps only the sampler name before a further dot (Photon: texture.deferred.colortex6.1).
+                if (parts.length < 3 || !parts[1].matches("[A-Za-z_][A-Za-z0-9_]*")) continue;
                 scope = parts[1];
                 sampler = parts[2];
             } else {
@@ -77,6 +78,20 @@ public record ShaderPackCustomTextureProperties(
         result.putAll(scopedTextures.getOrDefault(stage, Map.of()));
         result.putAll(scopedTextures.getOrDefault(programName, Map.of()));
         return Collections.unmodifiableMap(result);
+    }
+
+    /** Raw (binary) textures visible to a program, by sampler name. */
+    public Map<String, RawTextureSpec> rawTexturesForProgram(String programName) throws IOException {
+        Map<String, RawTextureSpec> raw = new LinkedHashMap<>();
+        for (Map.Entry<String, String> texture : texturesForProgram(programName).entrySet()) {
+            RawTextureSpec spec = RawTextureSpec.parse(texture.getValue());
+            if (spec != null) raw.put(texture.getKey(), spec);
+        }
+        return Collections.unmodifiableMap(raw);
+    }
+
+    public static boolean isRawTexture(String value) {
+        return value.strip().split("\\s+").length > 1;
     }
 
     public Set<String> samplersForProgram(String programName) {

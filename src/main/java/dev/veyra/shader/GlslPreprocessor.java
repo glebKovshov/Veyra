@@ -51,8 +51,25 @@ final class GlslPreprocessor {
         return process(file, source, Map.of());
     }
 
-    private static final java.util.regex.Pattern GEOMETRY_FRAGMENT =
-            java.util.regex.Pattern.compile("(?:^|/)gbuffers_[A-Za-z0-9_]+\\.fsh$");
+    private static final java.util.regex.Pattern VULKAN_SAMPLER_KEYWORD =
+            java.util.regex.Pattern.compile("\\bsampler\\b");
+    private static final java.util.regex.Pattern MULTILINE_LAYOUT =
+            java.util.regex.Pattern.compile("\\blayout\\s*\\(([^()]*\\R[^()]*)\\)");
+
+    static String collapseMultilineLayouts(String source) {
+        java.util.regex.Matcher layout = MULTILINE_LAYOUT.matcher(source);
+        if (!layout.find()) return source;
+        StringBuilder collapsed = new StringBuilder(source.length());
+        int cursor = 0;
+        do {
+            collapsed.append(source, cursor, layout.start()).append("layout(")
+                    .append(layout.group(1).strip().replaceAll("\\s+", " ")).append(')');
+            cursor = layout.end();
+        } while (layout.find());
+        return collapsed.append(source, cursor, source.length()).toString();
+    }
+
+    private static final java.util.regex.Pattern FRAGMENT_STAGE = java.util.regex.Pattern.compile("\\.fsh$");
 
     private record ProcessKey(String file, String source, Map<String, String> additionalMacros,
                               Map<String, String> environment) { }
@@ -72,8 +89,13 @@ final class GlslPreprocessor {
         String cached = PROCESSED.get(key);
         if (cached != null) return cached;
         String processed = processUncached(file, source, additionalMacros);
-        // Geometry fragment adapters route vec4 outputs only; post passes parse their own output types.
-        if (GEOMETRY_FRAGMENT.matcher(file).find()) processed = NarrowFragmentOutputs.widen(processed);
+        // 'sampler' is an ordinary identifier in OpenGL GLSL (Photon names parameters so) but a type keyword in
+        // Vulkan GLSL; desktop GLSL has no 'sampler' type, so renaming every such token keeps the pack's meaning.
+        processed = VULKAN_SAMPLER_KEYWORD.matcher(processed).replaceAll("veyra_sampler");
+        // Adapters parse one-line declarations; Photon spreads layout(location = N) over three lines.
+        processed = collapseMultilineLayouts(processed);
+        // Geometry and post-pass adapters route vec4 fragment outputs only.
+        if (FRAGMENT_STAGE.matcher(file).find()) processed = NarrowFragmentOutputs.widen(processed);
         PROCESSED.put(key, processed);
         return processed;
     }

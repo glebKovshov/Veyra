@@ -91,9 +91,9 @@ final class GlslStructTypes {
         return switch (type) {
             case "float", "vec2", "vec3", "vec4", "int", "ivec2", "ivec3", "ivec4",
                     "uint", "uvec2", "uvec3", "uvec4", "bool", "bvec2", "bvec3", "bvec4" -> 1;
-            case "mat2" -> 2;
-            case "mat3" -> 3;
-            case "mat4" -> 4;
+            case "mat2", "mat2x2", "mat2x3", "mat2x4" -> 2;
+            case "mat3", "mat3x2", "mat3x3", "mat3x4" -> 3;
+            case "mat4", "mat4x2", "mat4x3", "mat4x4" -> 4;
             default -> structs.getOrDefault(type, 0);
         };
     }
