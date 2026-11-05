@@ -25,7 +25,42 @@ final class ShaderPackImageBindings {
                 && ("shadow_entities".equals(programName) || "shadow_block".equals(programName));
     }
 
+    private record PrepareKey(String file, String source, ShaderPackImageProperties properties) { }
+
+    /** Validation and each pipeline family prepare the same stages; large packs repeat this dozens of times. */
+    private static final int PREPARE_CACHE_SIZE = 512;
+    private static final long PREPARE_CACHE_CHARS = 48L * 1024 * 1024;
+    private static long preparedChars;
+    private static final Map<PrepareKey, PreparedStage> PREPARED = Collections.synchronizedMap(
+            new LinkedHashMap<>(PREPARE_CACHE_SIZE, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<PrepareKey, PreparedStage> eldest) {
+                    if (size() > PREPARE_CACHE_SIZE || preparedChars > PREPARE_CACHE_CHARS) {
+                        preparedChars -= chars(eldest.getKey(), eldest.getValue());
+                        return true;
+                    }
+                    return false;
+                }
+            });
+
+    private static long chars(PrepareKey key, PreparedStage stage) {
+        return (long) key.source().length() + stage.source().length();
+    }
+
     static PreparedStage prepare(String file, String source, ShaderPackImageProperties properties) throws IOException {
+        PrepareKey key = new PrepareKey(file, source, properties);
+        PreparedStage cached = PREPARED.get(key);
+        if (cached != null) return cached;
+        PreparedStage prepared = prepareUncached(file, source, properties);
+        synchronized (PREPARED) {
+            PreparedStage previous = PREPARED.put(key, prepared);
+            preparedChars += chars(key, prepared) - (previous == null ? 0 : chars(key, previous));
+        }
+        return prepared;
+    }
+
+    private static PreparedStage prepareUncached(String file, String source, ShaderPackImageProperties properties)
+            throws IOException {
         String directivesSelected = RenderTargetDirectives.keepActiveComments(file, source);
         String active = GlslPreprocessor.process(file, directivesSelected, Map.of(
                 "IRIS_FEATURE_CUSTOM_IMAGES", "1", "IRIS_FEATURE_COMPUTE_SHADERS", "1"));

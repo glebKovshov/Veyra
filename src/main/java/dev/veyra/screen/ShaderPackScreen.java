@@ -13,6 +13,7 @@ import java.util.List;
 public final class ShaderPackScreen extends Screen {
     private String status = "Select a supported shader pack. Refresh reloads the active pack from disk.";
     private int firstVisiblePack;
+    private final DeferredShaderWork loading = new DeferredShaderWork();
 
     public ShaderPackScreen() {
         super(Component.literal("Veyra Shader Packs"));
@@ -51,8 +52,12 @@ public final class ShaderPackScreen extends Screen {
                     status = pack.issue();
                     return;
                 }
-                status = VeyraRenderer.selectWithSavedOptions(pack);
-                rebuildWidgets();
+                if (loading.pending()) return;
+                status = "Loading " + pack.name() + "... Compiling shaders can take several seconds.";
+                loading.schedule(() -> VeyraRenderer.selectWithSavedOptions(pack), result -> {
+                    status = result;
+                    rebuildWidgets();
+                });
             }).bounds(center - panelWidth / 2, top + 28 + i * 26, panelWidth, 22).build();
             // Unsupported entries remain clickable so their diagnostic can be read.
             button.active = true;
@@ -66,8 +71,12 @@ public final class ShaderPackScreen extends Screen {
             rebuildWidgets();
         }).bounds(navigationLeft, height - 38, navigationWidth, 20).build()).active = firstVisiblePack > 0;
         addRenderableWidget(Button.builder(Component.literal("Refresh list"), button -> {
-            status = VeyraRenderer.refreshPacks();
-            rebuildWidgets();
+            if (loading.pending()) return;
+            status = "Refreshing shader packs...";
+            loading.schedule(VeyraRenderer::refreshPacks, result -> {
+                status = result;
+                rebuildWidgets();
+            });
         }).bounds(navigationLeft + navigationWidth + 5, height - 38, navigationWidth, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Done"), button -> onClose())
                 .bounds(navigationLeft + (navigationWidth + 5) * 2, height - 38, navigationWidth, 20).build());
@@ -90,6 +99,13 @@ public final class ShaderPackScreen extends Screen {
                 : "Packs: " + VeyraClient.shaderPacks.getPacks().size();
         graphics.drawCenteredString(font, listStatus, width / 2, height - 54, 0xFFCCCCCC);
         super.render(graphics, mouseX, mouseY, partialTick);
+        loading.frameRendered();
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        loading.tick();
     }
 
     @Override

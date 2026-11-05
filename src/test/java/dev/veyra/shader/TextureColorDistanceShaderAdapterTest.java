@@ -354,6 +354,25 @@ class TextureColorDistanceShaderAdapterTest {
     }
 
     @Test
+    void depthCompareLookupsYieldFloatsAndBiasedLookupsResolve() throws IOException {
+        // Photon's particles accumulate texture(shadowtex1, vec3) into a float and sample gtexture with a bias.
+        String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
+                uniform sampler2D gtexture;
+                uniform sampler2DShadow shadowtex1;
+                in vec2 texCoord0;
+                void main() {
+                    float shadow = 0.0;
+                    shadow += texture(shadowtex1, vec3(0.5));
+                    gl_FragColor = texture(gtexture, texCoord0, -1.0) * shadow;
+                }
+                """, "gbuffers_textured", true, true, true, true, true);
+
+        assertTrue(adapted.contains("float veyraTextureSample(sampler2D sourceSampler, vec3 sourceCoord)"), adapted);
+        assertTrue(adapted.contains("vec4 veyraTextureSample(sampler2D sourceSampler, vec2 sourceUv, float bias)"), adapted);
+        assertTrue(adapted.contains("shadow += veyraTextureSample(shadowtex1, vec3(0.5));"), adapted);
+    }
+
+    @Test
     void renamesPackShadowComparisonHelpersBeforeAddingItsVulkanBridge() throws IOException {
         String adapted = TextureColorDistanceShaderAdapter.adaptFragment("""
                 uniform sampler2DShadow shadowtex0;

@@ -4497,6 +4497,13 @@ public final class VeyraRenderer {
      * VulkanMod's parser creates its fields without resolving suppliers, so they would upload zeros.
      */
     private static CompiledRenderPipeline precompileGeometryPipeline(RenderPipeline pipeline, ShaderSource source) {
+        if (Boolean.getBoolean("veyra.debug.dumpShaderSources")) {
+            String name = "geometry-" + pipeline.getLocation().getPath().replace('/', '_');
+            dumpShaderSource(name + ".vsh", source.get(pipeline.getVertexShader(),
+                    com.mojang.blaze3d.shaders.ShaderType.VERTEX));
+            dumpShaderSource(name + ".fsh", source.get(pipeline.getFragmentShader(),
+                    com.mojang.blaze3d.shaders.ShaderType.FRAGMENT));
+        }
         CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(pipeline, source);
         if (compiled.isValid()) {
             GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();

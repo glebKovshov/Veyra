@@ -24,6 +24,7 @@ public final class ShaderOptionsScreen extends Screen {
     private final Map<String, String> changed;
     private final String section;
     private String status = "Changes take effect when you press Apply.";
+    private final DeferredShaderWork loading = new DeferredShaderWork();
     private int page;
 
     public ShaderOptionsScreen(Screen parent, ShaderPack pack, ShaderPackOptions options) {
@@ -114,7 +115,12 @@ public final class ShaderOptionsScreen extends Screen {
                 .bounds(left + (small + 6) * 2, height - 65, small, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Next"), button -> { page++; rebuildWidgets(); })
                 .bounds(left + (small + 6) * 3, height - 65, small, 20).build()).active = page < lastPage;
-        addRenderableWidget(Button.builder(Component.literal("Apply"), button -> status = VeyraRenderer.applyOptions(pack, changed))
+        addRenderableWidget(Button.builder(Component.literal("Apply"), button -> {
+            if (loading.pending()) return;
+            status = "Compiling shaders with the new options... This can take several seconds.";
+            var staged = java.util.Map.copyOf(changed);
+            loading.schedule(() -> VeyraRenderer.applyOptions(pack, staged), result -> status = result);
+        })
                 .bounds(left, height - 40, totalWidth, 20).build());
     }
 
@@ -145,6 +151,8 @@ public final class ShaderOptionsScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         var lines = font.split(Component.literal(status), Math.max(1, width - 16));
         for (int i = 0; i < Math.min(2, lines.size()); i++) graphics.drawCenteredString(font, lines.get(i), width / 2, height - 88 + i * 9, 0xFFCCCCCC);
+        loading.frameRendered();
     }
+    @Override public void tick() { super.tick(); loading.tick(); }
     @Override public void onClose() { minecraft.setScreen(parent); }
 }

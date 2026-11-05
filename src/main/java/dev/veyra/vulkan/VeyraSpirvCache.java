@@ -11,7 +11,7 @@ import java.util.Map;
  * the source, the stage and VulkanMod's fixed compiler options, so repeats reuse the first compilation.
  */
 public final class VeyraSpirvCache {
-    private static final int MAX_ENTRIES = 96;
+    private static final int MAX_ENTRIES = 512;
     private static final long MAX_BYTES = 64L * 1024 * 1024;
 
     private record Key(String source, int kind) { }

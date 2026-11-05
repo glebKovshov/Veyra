@@ -335,6 +335,17 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     public Map<Integer, ColorTargetSettings> readColorTargetSettings(
             int viewportWidth, int viewportHeight, int maxTextureSize) throws IOException {
+        // Every compute stage and pipeline family asks for these; each read scans all pack sources.
+        List<Integer> key = List.of(viewportWidth, viewportHeight, maxTextureSize);
+        Map<Integer, ColorTargetSettings> cached = configuration.colorTargetSettings(key);
+        if (cached != null) return cached;
+        Map<Integer, ColorTargetSettings> settings = parseColorTargetSettings(viewportWidth, viewportHeight, maxTextureSize);
+        configuration.cacheColorTargetSettings(key, settings);
+        return settings;
+    }
+
+    private Map<Integer, ColorTargetSettings> parseColorTargetSettings(
+            int viewportWidth, int viewportHeight, int maxTextureSize) throws IOException {
         Map<Integer, MutableColorTargetSettings> parsed = new HashMap<>();
         for (String fileName : listShaderFiles().stream().sorted().toList()) {
             if (!isGlslSource(fileName)) {
@@ -1233,6 +1244,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
 
     /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
     public void validatePipelineCapabilities() throws IOException {
+        // A configuration is an immutable source snapshot, so one successful pass covers every later
+        // pipeline rebuild of it (Photon's full validation takes seconds on the render thread).
+        if (configuration.capabilitiesValidated()) return;
         Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
         readCustomTextureProperties();
         readCustomUniforms();
@@ -1372,6 +1386,7 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 throw new IOException("Cannot execute " + file + ": " + extension + " shader stages are not implemented by Veyra's Vulkan backend.");
             }
         }
+        configuration.markCapabilitiesValidated();
     }
 
     private void validateVertexStorageBufferCapabilities() throws IOException {
@@ -1736,6 +1751,10 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
     Optional<String> readCustomImageStage(String fileName) throws IOException {
         if (!fileName.matches("[A-Za-z0-9_]+\\.(?:vsh|fsh|csh)")) throw new IOException("Invalid custom-image stage name: " + fileName);
         String actualFile = programPath(fileName);
+        // Validation and every pipeline family re-read the same stages; the result depends only on this snapshot.
+        String cacheKey = "custom-image:" + actualFile;
+        String cached = configuration.processed(cacheKey);
+        if (cached != null) return Optional.of(cached);
         Optional<String> source = readRawShader(actualFile);
         if (source.isEmpty()) return Optional.empty();
         String expanded = ShaderIncludes.expand(actualFile,
@@ -1746,7 +1765,9 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
                 shaderFeatureMacros());
         Set<String> customUniforms = readCustomUniforms().uniforms().stream()
                 .map(CustomUniforms.Uniform::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
-        return Optional.of(IrisUnsetUniforms.apply(active, customUniforms));
+        String result = IrisUnsetUniforms.apply(active, customUniforms);
+        configuration.cacheProcessed(cacheKey, result);
+        return Optional.of(result);
     }
 
     public ShaderPack configured(Map<String, String> options, int dimension) {

@@ -394,6 +394,9 @@ public final class TextureColorDistanceShaderAdapter {
                 vec4 veyraTextureSample(sampler2D sourceSampler, vec2 sourceUv) {
                     return texture(sourceSampler, sourceUv);
                 }
+                vec4 veyraTextureSample(sampler2D sourceSampler, vec2 sourceUv, float bias) {
+                    return texture(sourceSampler, sourceUv, bias);
+                }
                 vec4 veyraTextureSampleLod(sampler2D sourceSampler, vec2 sourceUv, float lod) {
                     return textureLod(sourceSampler, sourceUv, lod);
                 }
@@ -496,8 +499,12 @@ public final class TextureColorDistanceShaderAdapter {
                     vec4 veyraTextureShadowSample(sampler2D sourceSampler, vec3 sourceCoord) {
                         return vec4(veyraTextureShadowCompare(sourceSampler, sourceCoord));
                     }
-                    vec4 veyraTextureSample(sampler2D sourceSampler, vec3 sourceCoord) {
-                        return veyraTextureShadowSample(sourceSampler, sourceCoord);
+                    // A depth-compare texture() lookup yields a float (Photon: shadow += texture(...)).
+                    float veyraTextureSample(sampler2D sourceSampler, vec3 sourceCoord) {
+                        return veyraTextureShadowCompare(sourceSampler, sourceCoord);
+                    }
+                    float veyraTextureSample(sampler2D sourceSampler, vec3 sourceCoord, float bias) {
+                        return veyraTextureShadowCompare(sourceSampler, sourceCoord);
                     }
                     """);
         }

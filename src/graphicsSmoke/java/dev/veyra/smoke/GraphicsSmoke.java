@@ -51,6 +51,7 @@ public final class GraphicsSmoke {
     private static ShaderPack packBeforeSwitch;
     private static long storageBytesBeforeSwitch;
     private static boolean packSwitchPassed;
+    private static boolean reselectProbed;
     private static String expectedReplacementError = "";
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
@@ -484,6 +485,16 @@ public final class GraphicsSmoke {
                 }
                 if (IconifyProbe.holding()) {
                     IconifyProbe.tick(client);
+                    return;
+                }
+                if (Boolean.getBoolean("veyra.graphicsSmoke.reselectProbe") && !reselectProbed) {
+                    // Times the shader-screen path: a fresh configuration snapshot selected on the render thread.
+                    reselectProbed = true;
+                    var pack = VeyraRenderer.selectedPack().orElseThrow();
+                    long started = System.nanoTime();
+                    String result = VeyraRenderer.selectWithSavedOptions(pack);
+                    LoggerFactory.getLogger("veyra-graphics-smoke").info("RESELECT {} ms: {}",
+                            (System.nanoTime() - started) / 1_000_000L, result);
                     return;
                 }
                 LoggerFactory.getLogger("veyra-graphics-smoke").info(

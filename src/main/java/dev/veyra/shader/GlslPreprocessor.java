@@ -74,13 +74,23 @@ final class GlslPreprocessor {
     private record ProcessKey(String file, String source, Map<String, String> additionalMacros,
                               Map<String, String> environment) { }
 
-    /** Adapters and validation preprocess the same program sources repeatedly while a pack is selected. */
-    private static final int PROCESS_CACHE_SIZE = 64;
+    /**
+     * Adapters and validation preprocess the same program sources repeatedly while a pack is selected.
+     * Photon alone has well over a hundred stages, each preprocessed under several macro sets, so the cache is
+     * bounded by output size rather than a small entry count that a large pack would cycle through.
+     */
+    private static final int PROCESS_CACHE_SIZE = 1024;
+    private static final long PROCESS_CACHE_CHARS = 48L * 1024 * 1024;
+    private static long processedChars;
     private static final Map<ProcessKey, String> PROCESSED = java.util.Collections.synchronizedMap(
             new LinkedHashMap<>(PROCESS_CACHE_SIZE, 0.75F, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<ProcessKey, String> eldest) {
-                    return size() > PROCESS_CACHE_SIZE;
+                    if (size() > PROCESS_CACHE_SIZE || processedChars > PROCESS_CACHE_CHARS) {
+                        processedChars -= eldest.getValue().length();
+                        return true;
+                    }
+                    return false;
                 }
             });
 
@@ -88,7 +98,9 @@ final class GlslPreprocessor {
         ProcessKey key = new ProcessKey(file, source, Map.copyOf(additionalMacros), environment());
         String cached = PROCESSED.get(key);
         if (cached != null) return cached;
-        String processed = processUncached(file, source, additionalMacros);
+        // The preprocessor keeps one empty line per skipped conditional line: 84% of a Photon particle stage is
+        // whitespace (39k lines, 2k of code), and every adapter regex would otherwise rescan it.
+        String processed = dropBlankLines(processUncached(file, source, additionalMacros));
         // 'sampler' is an ordinary identifier in OpenGL GLSL (Photon names parameters so) but a type keyword in
         // Vulkan GLSL; desktop GLSL has no 'sampler' type, so renaming every such token keeps the pack's meaning.
         processed = VULKAN_SAMPLER_KEYWORD.matcher(processed).replaceAll("veyra_sampler");
@@ -96,8 +108,27 @@ final class GlslPreprocessor {
         processed = collapseMultilineLayouts(processed);
         // Geometry and post-pass adapters route vec4 fragment outputs only.
         if (FRAGMENT_STAGE.matcher(file).find()) processed = NarrowFragmentOutputs.widen(processed);
-        PROCESSED.put(key, processed);
+        synchronized (PROCESSED) {
+            String previous = PROCESSED.put(key, processed);
+            processedChars += processed.length() - (previous == null ? 0 : previous.length());
+        }
         return processed;
+    }
+
+    /** Removes whitespace-only lines and trailing whitespace; preprocessed GLSL has no line continuations. */
+    static String dropBlankLines(String source) {
+        StringBuilder compact = new StringBuilder(source.length() / 2);
+        int length = source.length();
+        int lineStart = 0;
+        while (lineStart < length) {
+            int newline = source.indexOf('\n', lineStart);
+            int lineEnd = newline < 0 ? length : newline;
+            int contentEnd = lineEnd;
+            while (contentEnd > lineStart && Character.isWhitespace(source.charAt(contentEnd - 1))) contentEnd--;
+            if (contentEnd > lineStart) compact.append(source, lineStart, contentEnd).append('\n');
+            lineStart = lineEnd + 1;
+        }
+        return compact.toString();
     }
 
     private static String processUncached(String file, String source, Map<String, String> additionalMacros)

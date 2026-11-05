@@ -17,6 +17,8 @@ public final class ShaderPackConfiguration {
     private ShaderPackCustomTextureProperties customTextureProperties;
     private Map<String, String> shaderFeatureMacros;
     private Boolean shadowFragment;
+    private boolean capabilitiesValidated;
+    private final Map<java.util.List<Integer>, Map<Integer, ColorTargetSettings>> colorTargetSettings = new HashMap<>();
     private final Map<String, Boolean> programs = new HashMap<>();
 
     public ShaderPackConfiguration(Map<String, String> options, int dimension) {
@@ -52,6 +54,12 @@ public final class ShaderPackConfiguration {
     void cacheDefinitions(ShaderPackOptions options) { definitions = options; }
     ShaderPackCustomTextureProperties customTextureProperties() { return customTextureProperties; }
     void cacheCustomTextureProperties(ShaderPackCustomTextureProperties properties) { customTextureProperties = properties; }
+    Map<Integer, ColorTargetSettings> colorTargetSettings(java.util.List<Integer> key) { return colorTargetSettings.get(key); }
+    void cacheColorTargetSettings(java.util.List<Integer> key, Map<Integer, ColorTargetSettings> settings) {
+        if (colorTargetSettings.size() < 16) colorTargetSettings.put(key, settings);
+    }
+    boolean capabilitiesValidated() { return capabilitiesValidated; }
+    void markCapabilitiesValidated() { capabilitiesValidated = true; }
     Boolean shadowFragment() { return shadowFragment; }
     void cacheShadowFragment(boolean present) { shadowFragment = present; }
 }
