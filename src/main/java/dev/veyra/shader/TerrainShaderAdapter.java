@@ -711,7 +711,7 @@ public final class TerrainShaderAdapter {
                 .append(type).append(' ').append(name).append(";\n"));
         bridge += packVaryingDeclarations.toString() + computedVaryingDeclarations;
         boolean initializePackVaryings = !computedVaryingExpressions.isEmpty();
-        boolean alphaTest = fragmentOutputs.variables().containsKey(0);
+        boolean alphaTest = fragmentOutputs.variables().containsKey(0) && fragmentOutputs.legacyAlphaOutput();
         if (hasTangentSpaceInputs || initializePackVaryings || alphaTest) {
             adapted = renameMainForTerrainInitialization(adapted);
         }

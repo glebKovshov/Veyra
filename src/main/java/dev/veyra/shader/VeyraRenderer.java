@@ -4044,12 +4044,12 @@ public final class VeyraRenderer {
             throw new IllegalArgumentException(programName + ".vsh must define void main().");
         }
         mainMatcher.reset();
-        body = mainMatcher.replaceFirst("void main() {\n    texCoord = veyraFullscreenUv();");
+        body = mainMatcher.replaceFirst("void veyraPackPostVertexMain() {");
         body = body.replaceAll("\\bgl_VertexID\\b", "gl_VertexIndex")
                 .replaceAll("\\bgl_TexCoord\\s*\\[\\s*0\\s*\\]", "texCoord")
                 .replaceAll("\\bgl_MultiTexCoord0\\b", "vec4(veyraFullscreenUv(), 0.0, 1.0)")
                 .replaceAll("\\bgl_TextureMatrix\\s*\\[\\s*0\\s*\\]", "mat4(1.0)")
-                .replaceAll("\\bgl_Vertex\\b", "veyraFullscreenPosition()")
+                .replaceAll("\\bgl_Vertex\\b", "vec4(veyraFullscreenUv(), 0.0, 1.0)")
                 .replaceAll("\\bftransform\\s*\\(\\s*\\)", "veyraFullscreenPosition()")
                 .replaceAll("\\btexcoord\\b", "texCoord")
                 .replaceAll("\\btexture2DLod\\s*\\(", "textureLod(")
@@ -4060,15 +4060,24 @@ public final class VeyraRenderer {
         adapted.append(PostVertexColorSamplers.declarations(colorSamplers))
                 .append(PostVertexNoiseSampler.declaration(usesNoiseSampler));
         adapted.append(postVaryings.vertexDeclarations());
+        // Iris draws post passes as a [0,1] quad whose gl_Vertex equals gl_MultiTexCoord0, in OpenGL's y-up clip
+        // space. Packs build gl_Position from it (Photon scales it into bloom tiles: an NDC gl_Vertex smeared
+        // each tile across the frame), so expose that space and flip y once for Vulkan after the pack's main.
         return adapted.append("""
                 vec2 veyraFullscreenUv() {
                     return vec2((gl_VertexIndex << 1) & 2, 1.0 - (gl_VertexIndex & 2));
                 }
                 vec4 veyraFullscreenPosition() {
-                    vec2 uv = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
-                    return vec4(uv * 2.0 - 1.0, 0.0, 1.0);
+                    return vec4(veyraFullscreenUv() * 2.0 - 1.0, 0.0, 1.0);
                 }
-                """).append(body).toString();
+                """).append(body).append("""
+
+                void main() {
+                    texCoord = veyraFullscreenUv();
+                    veyraPackPostVertexMain();
+                    gl_Position.y = -gl_Position.y;
+                }
+                """).toString();
     }
 
     private static TerrainPipelineSet compileTerrainPipelines(ShaderPack pack) throws IOException {

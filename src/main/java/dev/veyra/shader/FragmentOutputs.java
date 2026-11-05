@@ -54,6 +54,16 @@ public record FragmentOutputs(List<Integer> targets, Map<Integer, String> variab
         return new FragmentOutputs(targets, variables);
     }
 
+    /**
+     * Whether location 0 is written through gl_FragColor or gl_FragData[0]. Iris only appends its fixed-function
+     * alpha test to those legacy outputs; packs with their own {@code out} variables test {@code alphaTestRef}
+     * themselves, and may store packed data in alpha (Photon packs light levels there).
+     */
+    public boolean legacyAlphaOutput() {
+        String name = variables.get(0);
+        return "veyraFragColor".equals(name) || "veyraFragData0".equals(name);
+    }
+
     private static int number(String value, String kind) throws IOException {
         try { return Integer.parseInt(value); }
         catch (NumberFormatException exception) { throw new IOException("Invalid " + kind + ": " + value, exception); }

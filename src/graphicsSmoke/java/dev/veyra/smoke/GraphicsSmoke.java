@@ -936,7 +936,8 @@ public final class GraphicsSmoke {
                             || !VeyraRenderer.getLastError().isEmpty()
                             ? new IllegalStateException("The real shaderpack/profile was no longer active: "
                                     + VeyraRenderer.getLastError())
-                            : nonBlackPixelCount < 10000 || colorBucketCount < 24
+                            : (nonBlackPixelCount < 10000 || colorBucketCount < 24)
+                                    && !Boolean.getBoolean("veyra.graphicsSmoke.allowUniformFrame") // debug views of single buffers
                             ? new IllegalStateException("The real shaderpack frame was empty or nearly uniform: nonBlack="
                                     + nonBlackPixelCount + ", colorBuckets=" + colorBucketCount)
                             : null;

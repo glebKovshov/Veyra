@@ -1318,7 +1318,7 @@ public final class EntityShaderAdapter {
                     + "\n    normal = faceforward(normal, viewPos, normal);"
                     + adapted.substring(fragmentMain.end());
         }
-        if (textPipeline || outputLayout.variables().containsKey(0)) {
+        if ((textPipeline || outputLayout.variables().containsKey(0)) && outputLayout.legacyAlphaOutput()) {
             String firstOutput = outputLayout.variables().entrySet().stream()
                     .min(Map.Entry.comparingByKey()).orElseThrow().getValue();
             adapted = wrapAlphaTest(adapted, firstOutput, programName);
