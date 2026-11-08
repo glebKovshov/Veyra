@@ -1,6 +1,6 @@
 <div align="center">
 
-# Veyra
+<img src="docs/assets/veyra-banner.png" alt="Veyra — Minecraft shader loader" width="100%">
 
 **Shader packs, powered by VulkanMod.**
 
@@ -105,3 +105,8 @@ On Windows, use `.\gradlew.bat build validateShaders`. Built JARs are written to
 Built on [VulkanMod](https://github.com/xCollateral/VulkanMod) and [Fabric](https://fabricmc.net/), with shader pack compatibility informed by [Iris](https://github.com/IrisShaders/Iris). Thanks to their contributors and to shader pack authors for their work.
 
 Veyra is licensed under the [MIT License](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) for dependency licenses and attribution.
+
+<div align="center">
+  <br>
+  <img src="docs/assets/veyra-logo.png" alt="Veyra logo" width="72">
+</div>
