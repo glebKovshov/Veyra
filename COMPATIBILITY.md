@@ -1,5 +1,18 @@
 # Shaderpack compatibility
 
+## 1.1.0 additions - 2026-11-08
+
+1.1.0 keeps the 1.0 contract below and widens it as follows.
+
+| Area | 1.1.0 behavior | Evidence and boundary |
+| --- | --- | --- |
+| Photon v1.4 | Runs end to end. Raw `TEXTURE_2D`/`TEXTURE_3D` `.dat` textures (RED/RG/RGB/RGBA, UNSIGNED_BYTE/HALF_FLOAT/FLOAT) are supported in post passes, as are entity tangents, struct and matrix varyings, and `RG16F` targets. | On RTX 3070 with a fixed clock, the foliage scene differs from Iris 1.10.8 by about 6/255 RGB MAE. Magma emission is dimmer than in Iris. LPV/colored lights and 1D/RECTANGLE raw textures are not supported. |
+| Post vertex inputs | `gl_Vertex` is Iris' [0,1] quad (equal to `gl_MultiTexCoord0`) in OpenGL clip space, and Veyra flips Y once after the pack's `main`. | Photon's tiled bloom passes depend on this. Complementary, BSL and Sildur frames are unchanged. |
+| Buffer flips | `flip.<program>.<buffer> = true` swaps an unwritten buffer after that program; `false` keeps a written buffer's read side. | Photon flips `colortex6` after `composite1` to keep its ambient-occlusion history. |
+| Custom expressions | Expressions can read matrix elements `matrix.column.row` (GLSL `m[column][row]`) of the gbuffer and shadow matrices. | Matrix-typed and integer-vector uniform results are still rejected. |
+| Alpha test | Only `gl_FragColor`/`gl_FragData[0]` outputs get the fixed-function alpha test, as in Iris. | Packs with their own `out` variables test `alphaTestRef` themselves. |
+| VulkanMod GLSL parser | `out` function parameters become `inout`, and `in` parameter qualifiers are dropped. VulkanMod 0.6.8 treats every `in`/`out` token as a stage interface. | Without this, Photon's GTAO bent normal came back as zero and its ambient occlusion flickered. |
+
 ## 1.0 scope
 
 Veyra translates a checked subset of Iris shaderpack programs to VulkanMod; it does not run Iris itself. The pinned comparison source is Iris Minecraft 1.21.11 commit `0a1fcaae55099356bf53410b4f5302753edb0ffc`, while the capture harness uses Iris 1.10.8 with Sodium 0.8.14. Keep source-contract comparisons separate from those runtime versions.

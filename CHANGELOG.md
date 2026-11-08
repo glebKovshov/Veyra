@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 - 2026-11-08
+
+- Photon v1.4 runs end to end: raw 3D textures from `.dat` files, Iris core-profile inputs in leash and line programs, entity tangents and struct varyings, Vulkan GLSL portability (the `sampler` identifier, multi-line layouts, narrow fragment outputs, float depth-compare results), and the `RG16F` color format. A matched foliage scene against Iris 1.10.8 differs by about 6/255 RGB MAE.
+- Post vertex stages see `gl_Vertex` as Iris' [0,1] quad with OpenGL clip space; Photon's bloom tiles no longer smear across the frame.
+- Iris compatibility: honor `flip.<program>.<buffer>`; read matrix elements (`matrix.column.row`) in custom-uniform expressions; only add the fixed-function alpha test to `gl_FragColor`/`gl_FragData[0]` outputs.
+- Work around VulkanMod's GLSL parser, which treats `in`/`out` function parameters as stage interfaces: out-parameters returned nothing (Photon's ambient occlusion flickered on foliage).
+- Shadows: depth for deferred programs is copied before translucents, shadow culling covers the drawn depth range and does not use camera occlusion, and post programs read the current frame's shadow matrices.
+- Water: vertex stages see the sampling projection, tangent handedness matches Iris, and waterlogged plants keep the water material.
+- Loading: a pack loads about twice as fast (Photon from the menu ~21 s to ~12 s on RTX 3070). The shader screens show a loading status instead of freezing on the click.
+- GUI: **Shader Settings** in VulkanMod's video settings opens a full-screen Iris-style pack list with a shaders toggle, Apply/Cancel/Done, folder and refresh buttons; option screens use the full window. English and Russian translations.
+- Validation: 693 JUnit tests, 173 shader compilation checks, the 75-case pinned source audit, and 55 of 56 graphics fixtures on RTX 3070 (`shadow-color-entity` also fails there with 1.0.0; the hosted Lavapipe gate runs all 56). Complementary, BSL and Sildur render unchanged.
+
 ## 1.0.0 - 2026-11-04
 
 - Match supported Iris capability macros and optional-feature negotiation; resolve forward scalar/vector uniform dependencies, reject cycles, bound expressions and restore uniform registrations when packs change.
