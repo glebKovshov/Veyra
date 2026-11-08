@@ -78,7 +78,8 @@
     "accessor.TextureAtlasSpriteAccessor",
     "accessor.SpriteAnimationStateAccessor",
     "accessor.TextureManagerAccessor",
-    "accessor.LexerAccessor"
+    "accessor.LexerAccessor",
+    "VulkanModOptionScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

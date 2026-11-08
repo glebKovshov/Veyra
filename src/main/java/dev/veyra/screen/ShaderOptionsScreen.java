@@ -26,6 +26,7 @@ public final class ShaderOptionsScreen extends Screen {
     private String status = "Changes take effect when you press Apply.";
     private final DeferredShaderWork loading = new DeferredShaderWork();
     private int page;
+    private int pageCount = 1;
 
     public ShaderOptionsScreen(Screen parent, ShaderPack pack, ShaderPackOptions options) {
         this(parent, pack, options, new LinkedHashMap<>(pack.configuration().options()), "");
@@ -48,11 +49,12 @@ public final class ShaderOptionsScreen extends Screen {
     }
 
     @Override protected void init() {
-        int totalWidth = Math.max(1, Math.min(400, width - 24));
-        int left = (width - totalWidth) / 2;
-        int columns = options.columns(section);
+        // Use the whole screen: full-width columns and as many rows as fit between the header and footer.
+        int totalWidth = Math.max(1, width - 32);
+        int left = 16;
+        int columns = Math.max(options.columns(section), totalWidth >= 900 ? 3 : totalWidth >= 560 ? 2 : 1);
         int columnWidth = Math.max(1, (totalWidth - 6 * (columns - 1)) / columns);
-        int rows = Math.max(1, (height - 162) / 24);
+        int rows = Math.max(1, (height - 56 - 84) / 24);
         int count = rows * columns;
         List<String> entries = entries();
         int lastPage = Math.max(0, (entries.size() - 1) / count);
@@ -66,16 +68,16 @@ public final class ShaderOptionsScreen extends Screen {
         }
         final int currentProfileIndex = profileIndex;
         String profile = profileIndex >= 0 && profileIndex < profiles.size() ? profiles.get(profileIndex) : "Custom";
-        addRenderableWidget(Button.builder(Component.literal("Profile: " + options.label("profile." + profile, profile)), button -> {
+        addRenderableWidget(Button.builder(Component.translatable("veyra.shaders.options.profile", options.label("profile." + profile, profile)), button -> {
             if (profiles.isEmpty()) return;
             int next = (currentProfileIndex + 1) % profiles.size();
             changed.putAll(options.profiles().get(profiles.get(next)));
             status = "Profile staged. Press Apply to compile.";
             rebuildWidgets();
-        }).bounds(left, 48, totalWidth, 20).build()).active = !profiles.isEmpty();
+        }).bounds(left, 30, totalWidth, 20).build()).active = !profiles.isEmpty();
         for (int i = 0; i < count && page * count + i < entries.size(); i++) {
             String name = entries.get(page * count + i);
-            int x = left + (i % columns) * (columnWidth + 6), y = 78 + (i / columns) * 24;
+            int x = left + (i % columns) * (columnWidth + 6), y = 56 + (i / columns) * 24;
             if (name.equals("<empty>") || name.equals("<profile>")) continue;
             if (name.startsWith("[") && name.endsWith("]")) {
                 String target = name.substring(1, name.length() - 1);
@@ -105,23 +107,24 @@ public final class ShaderOptionsScreen extends Screen {
                 addRenderableWidget(button);
             }
         }
+        pageCount = lastPage + 1;
         int small = Math.max(1, (totalWidth - 18) / 4);
-        addRenderableWidget(Button.builder(Component.literal("Previous"), button -> { page--; rebuildWidgets(); })
-                .bounds(left, height - 65, small, 20).build()).active = page > 0;
-        addRenderableWidget(Button.builder(Component.literal("Reset"), button -> {
+        addRenderableWidget(Button.builder(Component.translatable("veyra.shaders.options.previous"), button -> { page--; rebuildWidgets(); })
+                .bounds(left, height - 52, small, 20).build()).active = page > 0;
+        addRenderableWidget(Button.builder(Component.translatable("veyra.shaders.options.reset"), button -> {
             changed.clear(); status = "Defaults staged. Press Apply to save."; rebuildWidgets();
-        }).bounds(left + small + 6, height - 65, small, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Back"), button -> onClose())
-                .bounds(left + (small + 6) * 2, height - 65, small, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Next"), button -> { page++; rebuildWidgets(); })
-                .bounds(left + (small + 6) * 3, height - 65, small, 20).build()).active = page < lastPage;
-        addRenderableWidget(Button.builder(Component.literal("Apply"), button -> {
+        }).bounds(left + small + 6, height - 52, small, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("veyra.shaders.options.back"), button -> onClose())
+                .bounds(left + (small + 6) * 2, height - 52, small, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("veyra.shaders.options.next"), button -> { page++; rebuildWidgets(); })
+                .bounds(left + (small + 6) * 3, height - 52, totalWidth - (small + 6) * 3, 20).build()).active = page < lastPage;
+        addRenderableWidget(Button.builder(Component.translatable("veyra.shaders.options.apply"), button -> {
             if (loading.pending()) return;
             status = "Compiling shaders with the new options... This can take several seconds.";
             var staged = java.util.Map.copyOf(changed);
             loading.schedule(() -> VeyraRenderer.applyOptions(pack, staged), result -> status = result);
         })
-                .bounds(left, height - 40, totalWidth, 20).build());
+                .bounds(left, height - 28, totalWidth, 20).build());
     }
 
     private Component optionMessage(ShaderPackOptions.Option option) {
@@ -146,11 +149,14 @@ public final class ShaderOptionsScreen extends Screen {
     }
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, width, height, 0xEE101010);
-        graphics.drawCenteredString(font, title, width / 2, 18, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
-        var lines = font.split(Component.literal(status), Math.max(1, width - 16));
-        for (int i = 0; i < Math.min(2, lines.size()); i++) graphics.drawCenteredString(font, lines.get(i), width / 2, height - 88 + i * 9, 0xFFCCCCCC);
+        graphics.drawCenteredString(font, title, width / 2, 12, 0xFFFFFFFF);
+        if (pageCount > 1) {
+            Component pageLabel = Component.translatable("veyra.shaders.options.page", page + 1, pageCount);
+            graphics.drawString(font, pageLabel, width - 16 - font.width(pageLabel), 12, 0xFFAAAAAA);
+        }
+        var lines = font.split(Component.literal(status), Math.max(1, width - 32));
+        for (int i = 0; i < Math.min(2, lines.size()); i++) graphics.drawCenteredString(font, lines.get(i), width / 2, height - 76 + i * 10, 0xFFCCCCCC);
         loading.frameRendered();
     }
     @Override public void tick() { super.tick(); loading.tick(); }

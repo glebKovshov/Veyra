@@ -52,6 +52,16 @@ public final class GraphicsSmoke {
     private static long storageBytesBeforeSwitch;
     private static boolean packSwitchPassed;
     private static boolean reselectProbed;
+    private static boolean guiProbeStarted;
+    private static volatile String guiCaptureName;
+    private static volatile Runnable guiCaptureDone;
+
+    /** Reads back the next presented frame, GUI included, into {@code name}. */
+    static void requestGuiCapture(String name, Runnable done) {
+        guiCaptureName = name;
+        guiCaptureDone = done;
+        requested = true;
+    }
     private static String expectedReplacementError = "";
     private static Runnable completion;
     private static final Path output = Path.of(System.getProperty("veyra.graphicsSmoke.output", "graphics-smoke-output"));
@@ -137,6 +147,10 @@ public final class GraphicsSmoke {
             if (completion != null) {
                 Runnable ready = completion; completion = null; ready.run();
                 if (finished) return;
+            }
+            if (guiProbeStarted && GuiProbe.holding()) {
+                GuiProbe.tick(client, output);
+                return;
             }
             if (client.level != null && client.screen instanceof net.minecraft.client.gui.screens.PauseScreen) {
                 LoggerFactory.getLogger("veyra-graphics-smoke").info("Resuming the unattended validation world from PauseScreen");
@@ -502,6 +516,11 @@ public final class GraphicsSmoke {
                     IconifyProbe.tick(client);
                     return;
                 }
+                if (GuiProbe.holding() && !guiProbeStarted) {
+                    guiProbeStarted = true;
+                    GuiProbe.tick(client, output);
+                    return;
+                }
                 if (Boolean.getBoolean("veyra.graphicsSmoke.reselectProbe") && !reselectProbed) {
                     // Times the shader-screen path: a fresh configuration snapshot selected on the render thread.
                     reselectProbed = true;
@@ -766,6 +785,19 @@ public final class GraphicsSmoke {
                         int third = bytes.get(offset + 2) & 255, alpha = bytes.get(offset + 3) & 255;
                         image.setPixel(x, y, (alpha << 24) | ((bgra ? third : first) << 16)
                                 | (green << 8) | (bgra ? first : third));
+                    }
+                    String guiName = guiCaptureName;
+                    if (guiName != null) {
+                        // GuiProbe frames: write the swapchain image with its GUI and skip the scene checks.
+                        guiCaptureName = null;
+                        try (image) {
+                            Files.createDirectories(output);
+                            image.writeToFile(output.resolve(guiName));
+                        }
+                        Runnable done = guiCaptureDone;
+                        guiCaptureDone = null;
+                        if (done != null) client.execute(done);
+                        return;
                     }
                     NativeImage mrtImage = null;
                     if (completedGlintMrt != null) {
