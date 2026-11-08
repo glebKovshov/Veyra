@@ -12,3 +12,7 @@ hs_err_pid*
 replay_pid*
 validation-output/
 .lwjgl/
+
+# Local game sessions and logs
+/logs/
+/run-photon-*/
