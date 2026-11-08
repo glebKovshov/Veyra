@@ -88,6 +88,16 @@ public final class CustomUniforms {
         double component(int index) { return vector == null ? scalar : vector[index]; }
     }
 
+    private static final Pattern MATRIX_ELEMENT_INPUT = Pattern.compile(
+            "(?:gbufferModelView|gbufferModelViewInverse|gbufferProjection|gbufferProjectionInverse|"
+                    + "gbufferPreviousModelView|gbufferPreviousProjection|shadowModelView|shadowModelViewInverse|"
+                    + "shadowProjection|shadowProjectionInverse)\\.[0-3]\\.[0-3]");
+
+    /** Iris exposes matrix elements to expressions as {@code matrix.column.row}. */
+    static boolean isMatrixElementInput(String name) {
+        return MATRIX_ELEMENT_INPUT.matcher(name).matches();
+    }
+
     private static Map<String, Integer> inputWidths() {
         Map<String, Integer> widths = new HashMap<>();
         for (String name : BUILT_IN_INPUTS) {
@@ -206,7 +216,8 @@ public final class CustomUniforms {
             Definition definition = parsed.get(name);
             String missing = inputs.get(name).stream().filter(input ->
                     irisUnresolved.containsKey(input)
-                            || !BUILT_IN_WIDTHS.containsKey(input) && BiomeIds.constant(input) == null
+                            || !BUILT_IN_WIDTHS.containsKey(input) && !isMatrixElementInput(input)
+                            && BiomeIds.constant(input) == null
                             && (!parsed.containsKey(input) || unavailable.containsKey(input)))
                     .findFirst().orElse(null);
             if (missing == null) {

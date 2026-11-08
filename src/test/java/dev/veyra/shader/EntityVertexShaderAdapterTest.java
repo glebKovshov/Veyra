@@ -320,7 +320,7 @@ class EntityVertexShaderAdapterTest {
 
         String adapted = EntityVertexShaderAdapter.adaptStage(NATIVE, pack, "shadow_entities", false).source();
 
-        assertTrue(adapted.contains("GetRawWave( vec3 pos, float wind)"), adapted);
+        assertTrue(adapted.contains("GetRawWave(vec3 pos, float wind)"), adapted);
         assertTrue(adapted.contains("in vec3 Position;"), adapted);
     }
 

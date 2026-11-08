@@ -643,8 +643,35 @@ public final class VeyraRenderer {
             case "eyeBrightness.y" -> (double) camera.eyeBrightness().y;
             case "eyeBrightnessSmooth.x" -> (double) camera.eyeBrightnessSmooth().x;
             case "eyeBrightnessSmooth.y" -> (double) camera.eyeBrightnessSmooth().y;
-            default -> IrisExtraUniforms.expressionInput(name);
+            default -> {
+                Double element = matrixElementInput(name);
+                yield element != null ? element : IrisExtraUniforms.expressionInput(name);
+            }
         };
+    }
+
+    private static final Pattern MATRIX_ELEMENT_INPUT = Pattern.compile("([A-Za-z]+)\\.([0-3])\\.([0-3])");
+
+    /**
+     * Iris custom-uniform expressions read matrix elements as {@code matrix.column.row}, like GLSL
+     * {@code m[column][row]}. Photon derives sun_dir and light_dir from gbufferModelViewInverse this way;
+     * without these inputs they were zero vectors, which darkened its lighting and discolored the sky.
+     */
+    static Double matrixElementInput(String name) {
+        Matcher element = MATRIX_ELEMENT_INPUT.matcher(name);
+        if (!element.matches()) return null;
+        FrameMatrices matrices = frameMatrices;
+        Matrix4f matrix = switch (element.group(1)) {
+            case "gbufferModelView", "gbufferModelViewInverse", "gbufferProjection", "gbufferProjectionInverse",
+                 "gbufferPreviousModelView", "gbufferPreviousProjection" -> shaderPackMatrix(element.group(1), matrices);
+            case "shadowModelView" -> matrices.shadowModelView();
+            case "shadowModelViewInverse" -> matrices.shadowModelViewInverse();
+            case "shadowProjection" -> matrices.shadowProjection();
+            case "shadowProjectionInverse" -> matrices.shadowProjectionInverse();
+            default -> null;
+        };
+        if (matrix == null) return null;
+        return (double) matrix.get(Integer.parseInt(element.group(2)), Integer.parseInt(element.group(3)));
     }
 
     private static final Map<String, MappedBuffer> SHADER_PACK_VECTOR4_BUFFERS = new HashMap<>();
@@ -3531,6 +3558,7 @@ public final class VeyraRenderer {
                                                 VeyraComputePipelineSet customImageResources) throws IOException {
         pack.validatePipelineCapabilities();
         List<ShaderPack.Program> sources = pack.readPrograms();
+        Map<String, Map<Integer, Boolean>> explicitFlips = pack.readExplicitFlips();
         ShaderPackImageProperties customImageProperties = customImageResources == null
                 ? null : pack.readImageProperties();
         ShaderPackStorageBufferProperties storageBufferProperties = pack.readStorageBufferProperties();
@@ -3658,7 +3686,8 @@ public final class VeyraRenderer {
                 }
             }
             programs.add(new ProgramGroup(source.name(), ShaderPassPhase.forProgram(source.name()),
-                    List.copyOf(outputs), PostMipmapSamplers.read(source.source())));
+                    List.copyOf(outputs), PostMipmapSamplers.read(source.source()),
+                    explicitFlips.getOrDefault(source.name(), Map.of())));
         }
 
         for (int index : colorTargetIndices) {
@@ -7311,7 +7340,16 @@ public final class VeyraRenderer {
                         makeDynamicUniformBuffer(pass, program, width, height);
                     }
                 }
+                Map<Integer, Identifier> beforeGroup = Map.copyOf(currentTargets);
                 currentTargets.putAll(outputTargets);
+                // Iris flip.<program>.<buffer>: swap an unwritten buffer's sides, or keep a written one's.
+                group.explicitFlips().forEach((index, flip) -> {
+                    Identifier current = currentTargets.get(index);
+                    if (current == null) return;
+                    boolean written = outputTargets.containsKey(index);
+                    if (flip && !written) currentTargets.put(index, nextColorTarget(index, current));
+                    else if (!flip && written) currentTargets.put(index, beforeGroup.get(index));
+                });
             }
 
             Identifier finalColortex0 = currentTargets.get(0);
@@ -8713,7 +8751,7 @@ public final class VeyraRenderer {
     }
 
     private record ProgramGroup(String programName, ShaderPassPhase phase, List<PipelineProgram> outputs,
-                                Set<Integer> mipmapSamplers) {
+                                Set<Integer> mipmapSamplers, Map<Integer, Boolean> explicitFlips) {
     }
 
     private record ColorTargetPair(RenderTarget targetA, RenderTarget targetB) {

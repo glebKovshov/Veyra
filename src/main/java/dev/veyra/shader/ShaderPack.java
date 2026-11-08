@@ -1242,6 +1242,30 @@ public record ShaderPack(Path path, String name, String shaderDirectory,
         return parsed;
     }
 
+    private static final Pattern EXPLICIT_FLIP = Pattern.compile("flip\\.([A-Za-z0-9_]+)\\." + COLOR_TARGET_NAME);
+
+    /**
+     * Iris {@code flip.<program>.<buffer> = true|false}: after that program, swap the buffer's read and write
+     * sides even if the program did not draw to it, or keep them when it did. Photon flips colortex6 after
+     * composite1 so the next frame's ambient-occlusion pass reads its own history, not the fog it shares with.
+     */
+    public Map<String, Map<Integer, Boolean>> readExplicitFlips() throws IOException {
+        Properties properties = ShaderPackOptions.loadProperties(readShader("shaders.properties").orElse(""));
+        Map<String, Map<Integer, Boolean>> flips = new HashMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            Matcher flip = EXPLICIT_FLIP.matcher(key.strip());
+            if (!flip.matches()) continue;
+            int index = colorTargetIndex(flip.group(2));
+            if (index < 0 || index > MAX_COLOR_TARGET_INDEX) continue;
+            String value = properties.getProperty(key).strip();
+            if (!value.equals("true") && !value.equals("false")) continue;
+            flips.computeIfAbsent(flip.group(1), ignored -> new HashMap<>()).put(index, Boolean.parseBoolean(value));
+        }
+        Map<String, Map<Integer, Boolean>> result = new HashMap<>();
+        flips.forEach((program, buffers) -> result.put(program, Map.copyOf(buffers)));
+        return Map.copyOf(result);
+    }
+
     /** Reject requirements that this backend cannot execute, before allocating GPU resources. */
     public void validatePipelineCapabilities() throws IOException {
         // A configuration is an immutable source snapshot, so one successful pass covers every later

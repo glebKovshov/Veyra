@@ -32,6 +32,9 @@ loom {
             if (project.hasProperty('referenceWaterPool')) vmArgs '-Dveyra.reference.waterPool=true'
             if (project.hasProperty('referencePoolPlants')) vmArgs '-Dveyra.reference.poolPlants=true'
             if (project.hasProperty('referencePoolSeagrass')) vmArgs '-Dveyra.reference.poolSeagrass=true'
+            if (project.hasProperty('referenceFoliage')) vmArgs '-Dveyra.reference.foliage=true'
+            if (project.hasProperty('referenceHoldTicks')) vmArgs "-Dveyra.reference.holdTicks=${project.property('referenceHoldTicks')}"
+            if (project.hasProperty('referenceSequence')) vmArgs "-Dveyra.reference.sequence=${project.property('referenceSequence')}"
         }
     }
 }

@@ -104,6 +104,8 @@ final class GlslPreprocessor {
         // 'sampler' is an ordinary identifier in OpenGL GLSL (Photon names parameters so) but a type keyword in
         // Vulkan GLSL; desktop GLSL has no 'sampler' type, so renaming every such token keeps the pack's meaning.
         processed = VULKAN_SAMPLER_KEYWORD.matcher(processed).replaceAll("veyra_sampler");
+        // VulkanMod's parser turns every in/out token into a stage interface, including function parameters.
+        processed = FunctionParameterQualifiers.normalize(processed);
         // Adapters parse one-line declarations; Photon spreads layout(location = N) over three lines.
         processed = collapseMultilineLayouts(processed);
         // Geometry and post-pass adapters route vec4 fragment outputs only.

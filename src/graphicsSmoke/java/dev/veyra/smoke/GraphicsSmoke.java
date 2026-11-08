@@ -419,6 +419,21 @@ public final class GraphicsSmoke {
                         world.setBlock(new net.minecraft.core.BlockPos(-8 + column, 71 + row, 8),
                                 materials[(row + column) % materials.length], 3);
                     }
+                    if (Boolean.getBoolean("veyra.graphicsSmoke.foliage")) {
+                        // Cutout foliage in front of the wall: leaves of several species and a row of grass.
+                        var foliage = new net.minecraft.world.level.block.state.BlockState[]{
+                                net.minecraft.world.level.block.Blocks.OAK_LEAVES.defaultBlockState()
+                                        .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true),
+                                net.minecraft.world.level.block.Blocks.BIRCH_LEAVES.defaultBlockState()
+                                        .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true),
+                                net.minecraft.world.level.block.Blocks.SPRUCE_LEAVES.defaultBlockState()
+                                        .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true)};
+                        for (int x = -5; x <= 5; x++) for (int y = 71; y <= 73; y++)
+                            world.setBlock(new net.minecraft.core.BlockPos(x, y, 5), foliage[Math.floorMod(x, 3)], 3);
+                        for (int x = -8; x <= 8; x++)
+                            world.setBlock(new net.minecraft.core.BlockPos(x, 71, 3),
+                                    net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                    }
                     world.setBlock(new net.minecraft.core.BlockPos(-9, 71, 8),
                             net.minecraft.world.level.block.Blocks.GLOWSTONE.defaultBlockState(), 3);
                     world.setBlock(new net.minecraft.core.BlockPos(9, 71, 8),

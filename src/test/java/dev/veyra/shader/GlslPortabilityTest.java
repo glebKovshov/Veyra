@@ -25,6 +25,37 @@ class GlslPortabilityTest {
     }
 
     @Test
+    void hidesFunctionParameterQualifiersFromVulkanModsInterfaceParser() throws IOException {
+        // Photon's compute_gtao returns its bent normal through a multi-line out parameter.
+        String processed = GlslPreprocessor.process("composite.fsh", """
+                #version 400
+                in vec2 uv;
+                layout(location = 0) out vec4 color;
+                vec2 compute_gtao(
+                    vec3 view_pos,
+                    in float dither,
+                    out vec3 bent_normal
+                ) {
+                    bent_normal = vec3(dither);
+                    return vec2(1.0);
+                }
+                void blend(inout vec3 a, const in vec3 b) { a += b; }
+                void main() {
+                    vec3 bent_normal;
+                    vec2 ao = compute_gtao(vec3(uv, 1.0), 0.5, bent_normal);
+                    color = vec4(ao, bent_normal.xy);
+                }
+                """);
+
+        assertTrue(processed.contains("inout vec3 bent_normal"), processed);
+        assertTrue(processed.contains("    float dither,"), processed);
+        assertTrue(processed.contains("void blend(inout vec3 a, const vec3 b)"), processed);
+        assertTrue(processed.contains("in vec2 uv;"), processed);
+        assertTrue(processed.contains("layout(location = 0) out vec4 color;"), processed);
+        assertEquals(processed, FunctionParameterQualifiers.normalize(processed), "normalizing is idempotent");
+    }
+
+    @Test
     void widensNarrowFragmentOutputsAfterThePackMain() throws IOException {
         String processed = GlslPreprocessor.process("composite5.fsh", """
                 #version 400

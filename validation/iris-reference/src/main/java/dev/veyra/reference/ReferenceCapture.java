@@ -16,6 +16,8 @@ public final class ReferenceCapture implements ClientModInitializer {
     private int worldTicks;
     private boolean prepared;
     private boolean captured;
+    private boolean sequenceBusy;
+    private int sequenceCaptured;
     private boolean naturalScene;
     private boolean sceneRead;
     private volatile int surfaceHeight = Integer.MIN_VALUE;
@@ -26,7 +28,26 @@ public final class ReferenceCapture implements ClientModInitializer {
     }
 
     private void tick(Minecraft client) {
-        if (captured) return;
+        if (captured) {
+            // Optional diagnostic sequence: one screenshot per client tick of the still scene, then stop.
+            int sequence = Integer.getInteger("veyra.reference.sequence", 0);
+            if (sequence > 0 && !sequenceBusy) {
+                if (sequenceCaptured >= sequence) { client.execute(client::stop); sequenceCaptured = Integer.MIN_VALUE; return; }
+                if (sequenceCaptured < 0) return;
+                sequenceBusy = true;
+                int index = sequenceCaptured++;
+                File output = new File(System.getProperty("veyra.reference.output", "reference"));
+                Screenshot.takeScreenshot(client.getMainRenderTarget(), image -> {
+                    try (image) {
+                        image.writeToFile(new File(output, String.format("sequence-%02d.png", index)));
+                    } catch (Exception exception) {
+                        throw new IllegalStateException("Could not write the Iris sequence capture", exception);
+                    }
+                    sequenceBusy = false;
+                });
+            }
+            return;
+        }
         if (!sceneRead) {
             sceneRead = true;
             var marker = client.gameDirectory.toPath().resolve("veyra/graphics-fixture.txt");
@@ -114,6 +135,16 @@ public final class ReferenceCapture implements ClientModInitializer {
                 for (int row = 0; row < 7; row++) for (int column = 0; column < 17; column++) {
                     world.setBlock(new BlockPos(-8 + column, 71 + row, 8), materials[(row + column) % materials.length], 3);
                 }
+                if (Boolean.getBoolean("veyra.reference.foliage")) {
+                    // Same cutout foliage as GraphicsSmoke's foliage option.
+                    BlockState[] foliage = {
+                            Blocks.OAK_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true),
+                            Blocks.BIRCH_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true),
+                            Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true)};
+                    for (int x = -5; x <= 5; x++) for (int y = 71; y <= 73; y++)
+                        world.setBlock(new BlockPos(x, y, 5), foliage[Math.floorMod(x, 3)], 3);
+                    for (int x = -8; x <= 8; x++) world.setBlock(new BlockPos(x, 71, 3), Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                }
                 world.setBlock(new BlockPos(-9, 71, 8), Blocks.GLOWSTONE.defaultBlockState(), 3);
                 world.setBlock(new BlockPos(9, 71, 8), Blocks.GLOWSTONE.defaultBlockState(), 3);
                 BlockPos signPos = new BlockPos(0, 71, 8);
@@ -135,7 +166,7 @@ public final class ReferenceCapture implements ClientModInitializer {
         client.options.hideGui = true;
         client.player.setXRot(naturalScene ? 15.0F : -2.0F);
         client.player.setYRot(naturalScene ? 135.0F : 0.0F);
-        if (worldTicks >= 160) {
+        if (worldTicks >= 160 + Integer.getInteger("veyra.reference.holdTicks", 0)) {
             if (naturalScene && surfaceHeight == Integer.MIN_VALUE) return;
             var fixtureFloor = new BlockPos(0, naturalScene ? surfaceHeight - 1 : 70, 0);
             var fixtureFloorState = client.level.getBlockState(fixtureFloor);
@@ -167,7 +198,7 @@ public final class ReferenceCapture implements ClientModInitializer {
                 } catch (Exception exception) {
                     throw new IllegalStateException("Could not write the Iris reference capture", exception);
                 }
-                client.execute(client::stop);
+                if (Integer.getInteger("veyra.reference.sequence", 0) == 0) client.execute(client::stop);
             });
         }
     }

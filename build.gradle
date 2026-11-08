@@ -268,6 +268,7 @@ loom {
             if (project.hasProperty('graphicsSmokeAllowOptionOverrides')) vmArgs '-Dveyra.graphicsSmoke.allowOptionOverrides=true'
             if (project.hasProperty('graphicsSmokePerfProbe')) vmArgs '-Dveyra.graphicsSmoke.perfProbe=true'
             if (project.hasProperty('graphicsSmokeAllowUniformFrame')) vmArgs '-Dveyra.graphicsSmoke.allowUniformFrame=true'
+            if (project.hasProperty('graphicsSmokeFoliage')) vmArgs '-Dveyra.graphicsSmoke.foliage=true'
             if (project.hasProperty('graphicsSmokeReselectProbe')) vmArgs '-Dveyra.graphicsSmoke.reselectProbe=true'
             if (project.hasProperty('graphicsSmokeIconifyProbe')) vmArgs "-Dveyra.graphicsSmoke.iconifyProbe=${project.property('graphicsSmokeIconifyProbe')}"
             if (project.hasProperty('graphicsSmokeHoldTicks')) vmArgs "-Dveyra.graphicsSmoke.holdTicks=${project.property('graphicsSmokeHoldTicks')}"

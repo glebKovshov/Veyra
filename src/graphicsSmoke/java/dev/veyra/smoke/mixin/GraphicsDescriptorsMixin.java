@@ -48,6 +48,16 @@ public abstract class GraphicsDescriptorsMixin {
                     Long.toHexString(image.getId()), image.getCurrentLayout(),
                     Long.toHexString(image.getImageView()), Long.toHexString(descriptor.getImageView(image)));
         }
+        // A pass that samples the image it is drawing into reads undefined data (Vulkan feedback loop).
+        VulkanImage target = boundRenderPass == null || boundRenderPass.getFramebuffer() == null
+                ? null : boundRenderPass.getFramebuffer().getColorAttachment();
+        if (target != null) for (var descriptor : nativePipeline.getImageDescriptors()) {
+            VulkanImage image = descriptor.getImage();
+            if (image != null && image.getId() == target.getId()
+                    && veyra$seen.add("feedback:" + pipeline.getLocation() + ":" + descriptor.name + ":" + target.getId()))
+                LoggerFactory.getLogger("veyra-graphics-smoke").warn("FEEDBACK pipeline={} sampler={} image={}",
+                        pipeline.getLocation(), descriptor.name, veyra$image(image));
+        }
         for (var buffer : nativePipeline.getBuffers()) {
             if (!(buffer instanceof VeyraStorageBufferUBO)) continue;
             String key = pipeline.getLocation() + ":storage:" + buffer.name;

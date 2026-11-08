@@ -34,6 +34,25 @@ class CustomUniformVectorsTest {
     }
 
     @Test
+    void readsMatrixElementsLikePhotonsSunDirection() {
+        // Photon: sun_dir = gbufferModelViewInverse * view_sun_dir, written element by element (column.row).
+        CustomUniforms uniforms = CustomUniforms.parse("""
+                variable.float.vx = 0.0
+                variable.float.vy = 1.0
+                variable.float.vz = 0.0
+                uniform.vec3.sun_dir = vec3(gbufferModelViewInverse.0.0 * vx + gbufferModelViewInverse.1.0 * vy + gbufferModelViewInverse.2.0 * vz, \\
+                    gbufferModelViewInverse.0.1 * vx + gbufferModelViewInverse.1.1 * vy + gbufferModelViewInverse.2.1 * vz, \\
+                    gbufferModelViewInverse.0.2 * vx + gbufferModelViewInverse.1.2 * vy + gbufferModelViewInverse.2.2 * vz)
+                """);
+        Map<String, Double> matrix = Map.of("gbufferModelViewInverse.1.0", 0.25,
+                "gbufferModelViewInverse.1.1", 0.5, "gbufferModelViewInverse.1.2", -0.75);
+        uniforms.evaluate(name -> matrix.getOrDefault(name, name.startsWith("gbufferModelViewInverse.") ? 0.0 : null), .05);
+        vector(uniforms, "sun_dir", 0.25F, 0.5F, -0.75F);
+        assertTrue(CustomUniforms.isMatrixElementInput("shadowProjection.3.2"));
+        assertFalse(CustomUniforms.isMatrixElementInput("gbufferModelViewInverse.4.0"));
+    }
+
+    @Test
     void evaluatesIrisVectorArithmeticAndFunctions() {
         CustomUniforms uniforms = CustomUniforms.parse("""
                 variable.vec3.a=vec3(-1.2, 2.3, 3.4)
