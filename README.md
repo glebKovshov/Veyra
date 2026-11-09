@@ -7,8 +7,8 @@
 A client-side shader loader for Minecraft that brings a supported subset of Iris-style shader packs to Vulkan.
 
 [![Build](https://github.com/glebKovshov/Veyra/actions/workflows/build.yml/badge.svg)](https://github.com/glebKovshov/Veyra/actions/workflows/build.yml)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-62B47A)](#requirements)
-[![VulkanMod](https://img.shields.io/badge/VulkanMod-0.6.8-A66CFF)](#requirements)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.5%20%7C%201.21.9%E2%80%931.21.11-62B47A)](#requirements)
+[![VulkanMod](https://img.shields.io/badge/VulkanMod-0.5.6%20%7C%200.6.6%20%7C%200.6.8-A66CFF)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [**Download**](https://github.com/glebKovshov/Veyra/releases) / [Release notes](RELEASE_NOTES.md) / [Report an issue](https://github.com/glebKovshov/Veyra/issues) / [Contribute](CONTRIBUTING.md)
@@ -30,20 +30,23 @@ Veyra is an independent project. It requires VulkanMod; it does not use Iris as 
 
 ## Requirements
 
-| Component | Required version |
-| --- | --- |
-| Minecraft: Java Edition | **1.21.11** |
-| Fabric Loader | **0.18.4 or newer** |
-| VulkanMod | **0.6.8** |
-| Java | **21 or newer** |
-| Graphics | A GPU and driver supported by VulkanMod |
+Each Minecraft version has its own Veyra JAR, built against one exact VulkanMod release:
 
-VulkanMod's exact version matters: Veyra integrates with its internal rendering classes. Other versions require compatibility testing.
+| Minecraft | VulkanMod | Veyra JAR |
+| --- | --- | --- |
+| **1.21.11** | **0.6.8** | `veyra-<version>+mc1.21.11.jar` |
+| **1.21.10** | **0.6.6** | `veyra-<version>+mc1.21.10.jar` |
+| **1.21.9** | **0.6.6** | `veyra-<version>+mc1.21.9.jar` |
+| **1.21.5** | **0.5.6** | `veyra-<version>+mc1.21.5.jar` |
+
+You also need Fabric Loader **0.18.4 or newer**, Java **21 or newer**, and a GPU and driver supported by VulkanMod.
+
+VulkanMod's exact version matters: Veyra integrates with its internal rendering classes. Other VulkanMod versions require compatibility testing. VulkanMod has no release for Minecraft 1.21.6–1.21.8, so Veyra cannot support them. Minecraft 1.21–1.21.4 predate the rendering API Veyra is built on and are not supported; see [multi-version notes](docs/MULTIVERSION.md).
 
 ## Installation
 
-1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for Minecraft **1.21.11** and [VulkanMod 0.6.8](https://github.com/xCollateral/VulkanMod/releases).
-2. Download the Veyra mod JAR from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases) and put it in your instance's `mods/` folder alongside VulkanMod. Remove older Veyra JARs; the `-sources.jar` is for development.
+1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for your Minecraft version and the matching [VulkanMod](https://modrinth.com/mod/vulkanmod/versions) release from the table above.
+2. Download the Veyra JAR whose `+mc` suffix matches your Minecraft version from [GitHub Releases](https://github.com/glebKovshov/Veyra/releases) and put it in your instance's `mods/` folder alongside VulkanMod. Remove older Veyra JARs; the `-sources.jar` is for development.
 3. Put a shader pack ZIP or folder in the instance's `shaderpacks/` directory.
 4. Launch the game and open **Options / Video Settings / Shader Settings**, or press **F6**.
 5. Select a pack and press **Apply** or **Done**. Use **Shader Pack Settings** to change its options and profile.

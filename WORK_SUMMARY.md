@@ -2485,3 +2485,11 @@ An initial compute regression called Pipeline.bindDescriptorSets with a compute 
 The extraction passes default 1.21.11 backend/shadow-layer tests and 1.21.9 tests with isolated project history. Fresh synchronized GPU `water-shadow-depth-entity` fixtures pass on 1.21.10 (14123 active marker pixels) and 1.21.11 (14032), zero disabled pixels and zero full-process validation diagnostics. Reports: `build/targets/1.21.10/reports/shadow-entities-port` and `build/reports/shadow-entities-port`; logs: `build/shadow-entities-port-graphics.log` and `build/default-shadow-entities-port-graphics.log`. Old 1.21.5 shadow behavior remains unverified in a client.
 
 The first concurrent default/1.21.9 regression exposed shared Gradle project-history cleanup deleting another target's class output. A 1.21.9 rerun with `--project-cache-dir .gradle/targets/1.21.9` passes. Subsequent isolated 1.21.5/10/11 runs retain all three modern class output directories. CI and the commands at the start of this document now select per-version project caches; the failed initial test run is retained in `build/legacy-shadow-entities-regression.log` rather than counted as passing evidence.
+
+## 2026-11-09 handoff (Claude, after the Codex session hit its usage limit)
+
+The Codex session stopped mid-1.21.4 probe. Fresh `build validateShaders` passes for 1.21.11, 1.21.10, 1.21.9 and 1.21.5 (logs `build/claude-verify-<target>.log`), and all four JARs pass `verify_jar.py`. The work was committed as a checkpoint on `feat/minecraft-1.21-multiversion`.
+
+A full 1.21.4 `compileJava` with `-Xmaxerrs 100000` (`build/claude-1.21.4-full.log`) reports 432 symbol-resolution errors: `com.mojang.blaze3d.textures`, `RenderPipeline` and VulkanMod's `net.vulkanmod.render.engine` are absent. The 0.6.7+1.21.1 VulkanMod JAR has no `render/engine` package either. Pre-1.21.5 versions need a separate render-integration backend; they are documented as unsupported pending an owner decision. VulkanMod has no 1.21.6–1.21.8 release (Modrinth API, 2026-11-09).
+
+The release workflow now builds, verifies and attaches the 1.21.10, 1.21.9 and 1.21.5 JARs alongside 1.21.11. README lists the per-version requirements.

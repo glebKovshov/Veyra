@@ -10,6 +10,8 @@ if (project.hasProperty('targetMinecraft')) {
     def target = new Properties()
     targetFile.withInputStream { target.load(it) }
     target.each { key, value -> project.ext.set(key.toString(), value.toString()) }
+    // One release version for every target; only the +mc suffix differs.
+    project.ext.set('mod_version', project.mod_version.replaceFirst(/\+mc.*$/, '') + "+mc${project.minecraft_version}")
     layout.buildDirectory = file("build/targets/${project.property('targetMinecraft')}")
 }
 

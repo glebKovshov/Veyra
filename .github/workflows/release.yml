@@ -46,11 +46,22 @@ jobs:
         run: ./gradlew --no-daemon build validateShaders packageExamplePacks
       - name: Verify distributable contents
         run: python3 scripts/verify_jar.py
+      # Each older Minecraft version gets its own JAR with exact dependency pins.
+      - name: Build and verify older Minecraft targets
+        shell: bash
+        run: |
+          for target in 1.21.10 1.21.9 1.21.5; do
+            ./gradlew --no-daemon --project-cache-dir ".gradle/targets/$target" build validateShaders "-PtargetMinecraft=$target"
+            python3 scripts/verify_jar.py --target "$target"
+          done
       - name: Prepare release assets
         shell: bash
         run: |
           mkdir release-assets
           cp build/libs/veyra-*.jar release-assets/
+          for target in 1.21.10 1.21.9 1.21.5; do
+            find "build/targets/$target/libs" -name "veyra-*+mc$target.jar" -exec cp {} release-assets/ \;
+          done
           cp build/distributions/veyra-example-packs-*.zip release-assets/
           cd release-assets
           sha256sum ./* > SHA256SUMS.txt
@@ -85,3 +96,7 @@ jobs:
           gh release download "$RELEASE_TAG" --dir downloaded-release
           (cd downloaded-release && sha256sum --check SHA256SUMS.txt)
           python3 scripts/verify_jar.py "downloaded-release/veyra-${RELEASE_TAG#v}.jar"
+          base="${RELEASE_TAG#v}"
+          for target in 1.21.10 1.21.9 1.21.5; do
+            python3 scripts/verify_jar.py --target "$target" "downloaded-release/veyra-${base%%+mc*}+mc$target.jar"
+          done

@@ -1,18 +1,24 @@
 # Minecraft 1.21.x compatibility
 
-Veyra is being ported to every stable 1.21.x version, with a separate JAR for each exact Minecraft version. The published build currently targets **1.21.11**. The table below tracks local port candidates; it does not announce published releases.
+Veyra builds a separate JAR for each exact Minecraft version. The table below records every stable 1.21.x release and why it is or is not a target.
 
 | Minecraft | Pinned VulkanMod | Status |
 | --- | --- | --- |
-| 1.21 / 1.21.1 | 0.6.7+1.21.1 (`2eqroDKD`) | Port required |
-| 1.21.2 / 1.21.3 | 0.5.3 (`mr9uxFGT`) | Port required |
-| 1.21.4 | 0.5.6 (`RAtVo03C`) | Port required |
+| 1.21 / 1.21.1 | 0.6.7+1.21.1 (`2eqroDKD`) | Not supported: pre-1.21.5 renderer (see below) |
+| 1.21.2 / 1.21.3 | 0.5.3 (`mr9uxFGT`) | Not supported: pre-1.21.5 renderer (see below) |
+| 1.21.4 | 0.5.6 (`RAtVo03C`) | Not supported: pre-1.21.5 renderer; pipeline/shader adapter probe only |
 | 1.21.5 | 0.5.6 (`7pYvUnJk`) | Full build, 707 tests, shader compilation and seven representative GPU fixtures pass |
-| 1.21.6 / 1.21.7 / 1.21.8 | Dependency port required | No compatible release advertised in the dependency inventory |
+| 1.21.6 / 1.21.7 / 1.21.8 | None released | Not supported: VulkanMod has no release for these versions |
 | 1.21.9 / 1.21.10 | 0.6.6 (`jkDMvvWU`) | Separate JARs build and verify; seven representative GPU fixtures pass |
 | 1.21.11 | 0.6.8+1.21.11 (`hWKRTXbQ`) | Existing supported target |
 
-Dependency version IDs are pinned from the [VulkanMod version API](https://api.modrinth.com/v2/project/JYQhtZtO/version). An absent advertised release does not establish that a renderer source port is impossible. Full 1.21.x coverage includes resolving that dependency for 1.21.6?1.21.8.
+Dependency version IDs are pinned from the [VulkanMod version API](https://api.modrinth.com/v2/project/JYQhtZtO/version). As of 2026-11-09 VulkanMod has no release for 1.21.6–1.21.8. Supporting them would first require porting VulkanMod itself.
+
+### Why 1.21–1.21.4 are not targets
+
+Veyra hooks Minecraft's GPU abstraction (`com.mojang.blaze3d.textures`, `RenderPipeline`, `GpuDevice`, `CommandEncoder`), introduced in 1.21.5, and VulkanMod's implementation of it in `net.vulkanmod.render.engine` (`VkGpuDevice`, `VkCommandEncoder`, `VkRenderPass`). Neither exists before 1.21.5: those versions render through `RenderSystem`/shader programs, and VulkanMod 0.5.x/0.6.7+1.21.1 intercepts that path instead. A symbol-resolution compile of the shared sources against 1.21.4 reports 432 errors (408 in `VeyraRenderer`) before method bodies are checked.
+
+Supporting these versions therefore needs a second render-integration backend, not source rewrites, and 1.21.1, 1.21.2/1.21.3 and 1.21.4 each pin a different VulkanMod generation. The 1.21.4 profile in `gradle/targets/` is kept only for the passing native pipeline/UBO/shader adapter probe (`checkLegacy4PipelineAdapters`); it does not produce a mod.
 
 ## Build an exact-version package
 
