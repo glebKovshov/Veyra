@@ -32,8 +32,8 @@ public abstract class SkyRendererMixin {
                 try (var stack = org.lwjgl.system.MemoryStack.stackPush()) {
                     var bytes = stack.malloc(vertices.length * Float.BYTES);
                     bytes.asFloatBuffer().put(vertices);
-                    veyra$horizon = RenderSystem.getDevice().createBuffer(() -> "Veyra sky horizon",
-                            GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, bytes);
+                    veyra$horizon = dev.veyra.vulkan.VeyraVertexBuffers.create(
+                            RenderSystem.getDevice(), () -> "Veyra sky horizon", bytes);
                 }
                 veyra$horizonDistance = distance;
             }

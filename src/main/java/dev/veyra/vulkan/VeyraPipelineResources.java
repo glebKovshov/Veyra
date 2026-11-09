@@ -15,6 +15,9 @@ public final class VeyraPipelineResources {
     private static final Set<RenderPipeline> owned = Collections.newSetFromMap(new IdentityHashMap<>());
     private VeyraPipelineResources() { }
     public static void track(RenderPipeline pipeline) { owned.add(pipeline); }
+    public static GraphicsPipeline nativePipeline(RenderPipeline pipeline) {
+        return (GraphicsPipeline) ExtendedRenderPipeline.of(pipeline).getPipeline();
+    }
 
     public static void retain(Set<RenderPipeline> live) {
         Set<GraphicsPipeline> liveNative = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -22,13 +25,13 @@ public final class VeyraPipelineResources {
         Set<Identifier> shaders = new HashSet<>();
         for (RenderPipeline pipeline : live) {
             shaders.add(pipeline.getVertexShader()); shaders.add(pipeline.getFragmentShader());
-            GraphicsPipeline nativePipeline = ExtendedRenderPipeline.of(pipeline).getPipeline();
+            GraphicsPipeline nativePipeline = nativePipeline(pipeline);
             if (nativePipeline != null) liveNative.add(nativePipeline);
         }
         owned.removeIf(pipeline -> {
             if (live.contains(pipeline)) return false;
             ExtendedRenderPipeline extended = ExtendedRenderPipeline.of(pipeline);
-            GraphicsPipeline nativePipeline = extended.getPipeline();
+            GraphicsPipeline nativePipeline = nativePipeline(pipeline);
             if (nativePipeline != null && !liveNative.contains(nativePipeline)) retired.add(nativePipeline);
             extended.setPipeline(null);
             extended.setProgram(null);

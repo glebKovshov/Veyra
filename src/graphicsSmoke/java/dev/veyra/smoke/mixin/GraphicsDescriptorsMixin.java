@@ -59,14 +59,12 @@ public abstract class GraphicsDescriptorsMixin {
                         pipeline.getLocation(), descriptor.name, veyra$image(image));
         }
         for (var buffer : nativePipeline.getBuffers()) {
-            if (!(buffer instanceof VeyraStorageBufferUBO)) continue;
-            String key = pipeline.getLocation() + ":storage:" + buffer.name;
+            if (!(buffer instanceof VeyraStorageBufferUBO storage)) continue;
+            String key = pipeline.getLocation() + ":storage:" + dev.veyra.vulkan.VeyraUniformBlocks.description(buffer);
             if (veyra$seen.add(key)) LoggerFactory.getLogger("veyra-graphics-smoke").info(
                     "Storage buffer evidence: pipeline={} buffer={} binding={} type={} stages={} global={} handle={} offset={} range={}",
-                    pipeline.getLocation(), buffer.name, buffer.getBinding(), buffer.getType(), buffer.getStages(),
-                    buffer.useGlobalBuffer(),
-                    Long.toHexString(buffer.getBufferSlice().getBuffer().getId()),
-                    buffer.getBufferSlice().getOffset(), buffer.getBufferSlice().getSize());
+                    pipeline.getLocation(), dev.veyra.vulkan.VeyraUniformBlocks.description(buffer), buffer.getBinding(), buffer.getType(), buffer.getStages(),
+                    false, Long.toHexString(storage.bufferId()), 0, storage.getSize());
         }
     }
 

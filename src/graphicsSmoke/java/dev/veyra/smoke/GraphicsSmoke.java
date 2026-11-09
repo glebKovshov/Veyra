@@ -359,7 +359,7 @@ public final class GraphicsSmoke {
                 server.execute(() -> {
                     var world = server.overworld();
                     world.setDayTime(1000L);
-                    world.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.ADVANCE_TIME, false, server);
+                    SmokeEnvironment.freezeTime(world, server);
                     if (thirdPartyNaturalScene) {
                         thirdPartySurfaceHeight = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, 0, 0);
                         client.execute(() -> {
@@ -692,7 +692,7 @@ public final class GraphicsSmoke {
             var surface = renderer.getSwapChain();
             LoggerFactory.getLogger("veyra-graphics-smoke").info(
                     "Capture surface: stage={} extent={}x{} hasImages={} acquired={} iconified={} source={}x{} format={}",
-                    stage, surface.getWidth(), surface.getHeight(), surface.hasImages(), surface.isAcquired(),
+                    stage, surface.getWidth(), surface.getHeight(), surface.hasImages(), SmokeEnvironment.isAcquired(surface),
                     org.lwjgl.glfw.GLFW.glfwGetWindowAttrib(client.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_ICONIFIED),
                     source.width, source.height, source.format);
             int width = source.width, height = source.height, format = source.format;
@@ -1622,8 +1622,7 @@ public final class GraphicsSmoke {
         Files.writeString(output.resolve("frame-matrices.json"), new com.google.gson.Gson().toJson(matrices));
         var client = Minecraft.getInstance();
         float partialTick = client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
-        float cameraHeight = client.gameRenderer.getMainCamera().attributeProbe().getValue(
-                net.minecraft.world.attribute.EnvironmentAttributes.CLOUD_HEIGHT, partialTick);
+        float cameraHeight = SmokeEnvironment.cloudHeight(client, partialTick);
         var uniformsField = VeyraRenderer.class.getDeclaredField("shaderPackFrameUniforms");
         uniformsField.setAccessible(true);
         var uniforms = uniformsField.get(null);
@@ -1632,8 +1631,7 @@ public final class GraphicsSmoke {
         float shaderHeight = (float) cloudHeightAccessor.invoke(uniforms);
         if (shaderHeight != cameraHeight) throw new IllegalStateException("Cloud height differs from camera environment");
         Files.writeString(output.resolve("frame-environment.json"), new com.google.gson.Gson().toJson(Map.of(
-                "cloudHeight", shaderHeight, "dimensionCloudHeight", client.level.environmentAttributes()
-                        .getDimensionValue(net.minecraft.world.attribute.EnvironmentAttributes.CLOUD_HEIGHT))));
+                "cloudHeight", shaderHeight, "dimensionCloudHeight", SmokeEnvironment.dimensionCloudHeight(client))));
     }
 
     private static boolean advancePackSwitch(Minecraft client, int magenta, int green) {
@@ -1705,7 +1703,7 @@ public final class GraphicsSmoke {
         finished = true;
         try {
             Files.createDirectories(output);
-            String error = failure == null ? "" : failure.toString().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+            String error = new com.google.gson.Gson().toJson(failure == null ? "" : failure.toString());
             String renderer = physicalDeviceName().replace("\\", "\\\\").replace("\"", "\\\"");
             String profile = thirdPartyProfile.replace("\\", "\\\\").replace("\"", "\\\"");
             String escapedSkipReason = skipReason.replace("\\", "\\\\").replace("\"", "\\\"");
@@ -1784,7 +1782,7 @@ public final class GraphicsSmoke {
                     + ",\"thirdPartyStorageBufferOwnerReleased\":" + thirdPartyStorageBufferOwnerReleased
                     + ",\"thirdPartyStorageBufferOwnerRecreated\":" + thirdPartyStorageBufferOwnerRecreated
                     + ",\"thirdPartyStorageBufferManagerRecreated\":" + thirdPartyStorageBufferManagerRecreated
-                    + ",\"error\":\"" + error + "\"}\n");
+                    + ",\"error\":" + error + "}\n");
         } catch (Exception writeFailure) { LoggerFactory.getLogger("veyra-graphics-smoke").error("Could not save graphics result", writeFailure); }
         if (failure != null) LoggerFactory.getLogger("veyra-graphics-smoke").error("Graphics integration check failed", failure);
         client.stop();

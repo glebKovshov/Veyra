@@ -94,9 +94,9 @@ class NormalPixelsTest {
 
     @Test void entityNormalDescriptorUsesFreeVulkanTextureSlot() {
         int samplerType = org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        var albedo = new ImageDescriptor(0, "sampler2D", "Sampler0", 0, samplerType);
-        var normal = new ImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER, 2, samplerType);
-        var lightmap = new ImageDescriptor(7, "sampler2D", "Sampler2", 3, samplerType);
+        var albedo = new TestImageDescriptor(0, "sampler2D", "Sampler0", 0, samplerType);
+        var normal = new TestImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER, 2, samplerType);
+        var lightmap = new TestImageDescriptor(7, "sampler2D", "Sampler2", 3, samplerType);
 
         var descriptors = EntitySamplerBindings.reserveNormalSamplerSlot(java.util.List.of(albedo, normal, lightmap));
 
@@ -110,9 +110,9 @@ class NormalPixelsTest {
 
     @Test void entityNormalDescriptorAvoidsOccupiedReservedSlot() {
         int samplerType = org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        var albedo = new ImageDescriptor(0, "sampler2D", "Sampler0", 0, samplerType);
-        var normal = new ImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER, 2, samplerType);
-        var reserved = new ImageDescriptor(8, "sampler2D", "Sampler6", VeyraNormalTextures.IMAGE_SLOT, samplerType);
+        var albedo = new TestImageDescriptor(0, "sampler2D", "Sampler0", 0, samplerType);
+        var normal = new TestImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER, 2, samplerType);
+        var reserved = new TestImageDescriptor(8, "sampler2D", "Sampler6", VeyraNormalTextures.IMAGE_SLOT, samplerType);
 
         var descriptors = EntitySamplerBindings.reserveNormalSamplerSlot(java.util.List.of(albedo, normal, reserved));
 
@@ -122,13 +122,19 @@ class NormalPixelsTest {
 
     @Test void entityNormalDescriptorUsesDirectImageEvenAtReservedSlot() {
         int samplerType = org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        var normal = new ImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER,
+        var normal = new TestImageDescriptor(6, "sampler2D", VeyraNormalTextures.SAMPLER,
                 VeyraNormalTextures.IMAGE_SLOT, samplerType);
 
         var descriptors = EntitySamplerBindings.reserveNormalSamplerSlot(java.util.List.of(normal));
 
         assertInstanceOf(VeyraEntityNormalDescriptor.class, descriptors.get(0));
         assertEquals(VeyraNormalTextures.IMAGE_SLOT, descriptors.get(0).imageIdx);
+    }
+
+    private static final class TestImageDescriptor extends dev.veyra.vulkan.VeyraImageDescriptorBase {
+        private TestImageDescriptor(int binding, String qualifier, String name, int slot, int type) {
+            super(binding, qualifier, name, slot, type);
+        }
     }
 
     private static void assertUnit(int argb) {

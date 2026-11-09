@@ -53,7 +53,7 @@ public final class VeyraMrtFramebuffer extends Framebuffer implements AutoClosea
     public List<VulkanImage> colors() { return colors; }
     @Override public VulkanImage getColorAttachment() { return colors.getFirst(); }
     @Override public VulkanImage getDepthAttachment() { return depth; }
-    @Override public long getColorAttachmentView() { return colors.getFirst().getImageView(); }
+    public long getColorAttachmentView() { return colors.getFirst().getImageView(); }
     @Override public long getDepthImageView() { return depth.getImageView(); }
 
     @Override public void beginRenderPass(VkCommandBuffer commands, RenderPass ignored, MemoryStack stack) {

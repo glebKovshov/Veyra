@@ -1,8 +1,5 @@
 package dev.veyra.shader;
 
-import dev.veyra.vulkan.VeyraNoiseTexture;
-import dev.veyra.vulkan.VeyraCloudTexture;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -14,6 +11,8 @@ import java.util.regex.Pattern;
 
 /** Adapts the supported scene, noise, cloud-texture, and varying inputs for Iris cloud programs. */
 public final class CloudShaderAdapter {
+    public static final String CLOUD_TEXTURE_SAMPLER_NAME = "VeyraCloudTextureSampler";
+    public static final String NOISE_TEXTURE_SAMPLER_NAME = "VeyraNoiseSampler";
     private static final Pattern VERSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#version[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern EXTENSION_DIRECTIVE = Pattern.compile("(?m)^[\\t ]*#extension[^\\r\\n]*(?:\\r?\\n|$)");
     private static final Pattern PRECISION_DECLARATION = Pattern.compile("(?m)^[\\t ]*precision\\s+(?:lowp|mediump|highp)\\s+\\w+\\s*;[\\t ]*(?:\\r?\\n|$)");
@@ -380,10 +379,10 @@ public final class CloudShaderAdapter {
             samplerBindings.put(CLOUD_SCENE_SAMPLER_NAME, nextImageBinding++);
         }
         if (sceneColorInput.usesNoiseSampler()) {
-            samplerBindings.put(VeyraNoiseTexture.SAMPLER_NAME, nextImageBinding++);
+            samplerBindings.put(NOISE_TEXTURE_SAMPLER_NAME, nextImageBinding++);
         }
         if (sceneColorInput.usesCloudTexture()) {
-            samplerBindings.put(VeyraCloudTexture.SAMPLER_NAME, nextImageBinding);
+            samplerBindings.put(CLOUD_TEXTURE_SAMPLER_NAME, nextImageBinding);
         }
 
         String uncommented = COMMENTS.matcher(adapted).replaceAll("");
@@ -485,14 +484,14 @@ public final class CloudShaderAdapter {
             }
         }
         if (sceneColorInput.usesNoiseSampler()) {
-            result.append("layout(binding = ").append(samplerBindings.get(VeyraNoiseTexture.SAMPLER_NAME))
-                    .append(") uniform sampler2D ").append(VeyraNoiseTexture.SAMPLER_NAME).append(";\n")
-                    .append("#define ").append(NOISE_SAMPLER).append(' ').append(VeyraNoiseTexture.SAMPLER_NAME).append('\n');
+            result.append("layout(binding = ").append(samplerBindings.get(NOISE_TEXTURE_SAMPLER_NAME))
+                    .append(") uniform sampler2D ").append(NOISE_TEXTURE_SAMPLER_NAME).append(";\n")
+                    .append("#define ").append(NOISE_SAMPLER).append(' ').append(NOISE_TEXTURE_SAMPLER_NAME).append('\n');
         }
         if (sceneColorInput.usesCloudTexture()) {
-            result.append("layout(binding = ").append(samplerBindings.get(VeyraCloudTexture.SAMPLER_NAME))
-                    .append(") uniform sampler2D ").append(VeyraCloudTexture.SAMPLER_NAME).append(";\n");
-            adapted = replaceSamplerArgument(adapted, "texture", VeyraCloudTexture.SAMPLER_NAME);
+            result.append("layout(binding = ").append(samplerBindings.get(CLOUD_TEXTURE_SAMPLER_NAME))
+                    .append(") uniform sampler2D ").append(CLOUD_TEXTURE_SAMPLER_NAME).append(";\n");
+            adapted = replaceSamplerArgument(adapted, "texture", CLOUD_TEXTURE_SAMPLER_NAME);
         }
         adapted = adapted.replaceAll("\\btexture2DLod\\b", "textureLod");
         adapted = LEGACY_TEXTURE_2D.matcher(adapted).replaceAll("texture");

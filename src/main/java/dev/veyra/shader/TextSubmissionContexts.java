@@ -1,25 +1,25 @@
 package dev.veyra.shader;
 
-import net.minecraft.client.renderer.SubmitNodeStorage;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
+/** Submission keys are opaque identities; this tracker never reads version-specific node data. */
 final class TextSubmissionContexts {
     private static final Context NONE = new Context(false, BlockIdMap.UNMAPPED);
 
-    private final Map<SubmitNodeStorage.TextSubmit, Context> pending = new IdentityHashMap<>();
+    private final Map<Object, Context> pending = new IdentityHashMap<>();
     private final ThreadLocal<Deque<Context>> rendering = ThreadLocal.withInitial(ArrayDeque::new);
 
-    void capture(SubmitNodeStorage.TextSubmit textSubmit, int blockEntityId) {
+    void capture(Object textSubmit, int blockEntityId) {
         synchronized (pending) {
             pending.put(textSubmit, new Context(true, blockEntityId));
         }
     }
 
-    void begin(SubmitNodeStorage.TextSubmit textSubmit) {
+    void begin(Object textSubmit) {
         Context context;
         synchronized (pending) {
             context = pending.remove(textSubmit);
@@ -33,7 +33,7 @@ final class TextSubmissionContexts {
         if (contexts.isEmpty()) rendering.remove();
     }
 
-    void clear(List<SubmitNodeStorage.TextSubmit> textSubmits) {
+    void clear(List<?> textSubmits) {
         synchronized (pending) {
             textSubmits.forEach(pending::remove);
         }

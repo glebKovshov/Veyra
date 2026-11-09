@@ -11,6 +11,26 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - minecraft: '1.21.11'
+            gradle_args: ''
+            verify_args: ''
+            build_dir: build
+          - minecraft: '1.21.10'
+            gradle_args: '-PtargetMinecraft=1.21.10'
+            verify_args: '--target 1.21.10'
+            build_dir: build/targets/1.21.10
+          - minecraft: '1.21.9'
+            gradle_args: '-PtargetMinecraft=1.21.9'
+            verify_args: '--target 1.21.9'
+            build_dir: build/targets/1.21.9
+          - minecraft: '1.21.5'
+            gradle_args: '-PtargetMinecraft=1.21.5'
+            verify_args: '--target 1.21.5'
+            build_dir: build/targets/1.21.5
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -30,26 +50,26 @@ jobs:
         run: python3 -m unittest discover -s scripts/tests -v
 
       - name: Build mod
-        run: ./gradlew --no-daemon build validateShaders
+        run: ./gradlew --no-daemon --project-cache-dir .gradle/targets/${{ matrix.minecraft }} build validateShaders ${{ matrix.gradle_args }}
 
       - name: Verify distributable contents
-        run: python3 scripts/verify_jar.py
+        run: python3 scripts/verify_jar.py ${{ matrix.verify_args }}
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports
+          name: test-reports-${{ matrix.minecraft }}
           path: |
-            build/reports/tests/
-            build/test-results/
+            ${{ matrix.build_dir }}/reports/tests/
+            ${{ matrix.build_dir }}/test-results/
           if-no-files-found: ignore
           retention-days: 14
 
       - name: Upload mod jar
         uses: actions/upload-artifact@v7
         with:
-          name: veyra-minecraft-1.21.11
-          path: build/libs/veyra-*+mc1.21.11.jar
+          name: veyra-minecraft-${{ matrix.minecraft }}
+          path: ${{ matrix.build_dir }}/libs/veyra-*+mc${{ matrix.minecraft }}.jar
           if-no-files-found: error
           retention-days: 14

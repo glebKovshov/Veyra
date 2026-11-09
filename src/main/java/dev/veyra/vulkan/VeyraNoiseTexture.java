@@ -22,7 +22,7 @@ import java.util.Random;
 
 /** Iris-compatible deterministic noise texture, uploaded and sampled through VulkanMod. */
 public final class VeyraNoiseTexture {
-    public static final String SAMPLER_NAME = "VeyraNoiseSampler";
+    public static final String SAMPLER_NAME = dev.veyra.shader.CloudShaderAdapter.NOISE_TEXTURE_SAMPLER_NAME;
     private static VkGpuTexture texture;
     private static VkTextureView view;
     private static GpuSampler sampler;

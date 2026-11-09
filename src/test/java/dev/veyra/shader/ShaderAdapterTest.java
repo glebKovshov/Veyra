@@ -16,6 +16,55 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ShaderAdapterTest {
+    @Test void adaptsLegacyHomogeneousTerrainPositions() throws IOException {
+        String source = """
+                layout (location = 2) out float vertexDistance;
+                layout (binding = 3) uniform sampler2D Sampler2;
+                layout (location = 2) in uint PackedColor;
+                vec4 getVertexPosition() {
+                    return vec4(fma(Position.xyz, POSITION_INV, ModelOffset + baseOffset), 1.0);
+                    return vec4(Position.xyz + baseOffset, 1.0);
+                }
+                void main() {
+                    const vec4 pos = getVertexPosition();
+                    gl_Position = MVP * pos;
+                    vertexDistance = fog_distance(pos.xyz, 0);
+                    vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                    texCoord0 = UV0 * UV_INV;
+                }
+                """;
+        String adapted = TerrainShaderAdapter.adaptVertex(source);
+        assertTrue(adapted.contains("vec3 getVertexPosition()"));
+        assertTrue(adapted.contains("return fma(Position.xyz, POSITION_INV, ModelOffset + baseOffset);"));
+        assertTrue(adapted.contains("gl_Position = MVP * vec4(pos, 1.0);"));
+        assertTrue(adapted.contains("veyraShadowPos = shadowProjection * shadowModelView * vec4(pos, 1.0);"));
+        assertTrue(adapted.contains("cylindricalVertexDistance = max(length(pos.xz), abs(pos.y));"));
+        assertTrue(adapted.contains("layout (binding = 4) uniform sampler2D Sampler2;"));
+        assertTrue(adapted.contains("float AlphaCutout;"));
+        assertFalse(adapted.contains("fog_distance(pos.xyz, 0)"));
+        assertThrows(IOException.class, () -> TerrainShaderAdapter.adaptVertex(
+                source.replace("gl_Position = MVP * pos;", "gl_Position = changedPosition();")));
+    }
+
+    @Test void adaptsPinnedNativeTerrainVertexSource() throws IOException {
+        String source;
+        try (var input = getClass().getClassLoader().getResourceAsStream(
+                "assets/vulkanmod/shaders/basic/terrain/terrain.vsh")) {
+            assertNotNull(input);
+            source = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        String adapted = TerrainShaderAdapter.adaptVertex(source);
+        assertTrue(adapted.contains("mat4 shadowProjection;"));
+        assertTrue(adapted.contains("out vec2 veyraLightmapCoord;"));
+        assertTrue(adapted.contains("const vec3 pos = getVertexPosition();"));
+        assertTrue(adapted.contains("layout (binding = 4) uniform sampler2D Sampler2;"));
+        if (!source.contains("SectionOffsets[")) {
+            assertFalse(adapted.contains("int UseRgss;"));
+            assertFalse(adapted.contains("vec2 TexelSize;"));
+            assertTrue(adapted.contains("float AlphaCutout;"));
+        }
+    }
+
     @Test
     void linksStructVaryingsAfterTheirDefinitionsAndReservesAllLocations() throws Exception {
         String definition = "struct Fog { vec3 color; mat3 basis; };\n";

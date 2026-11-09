@@ -7,6 +7,31 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 class RendererSubmissionTest {
+    @Test void resizeSubmissionAddsAcquisitionWhenTheBackendOmitsIt() throws Exception {
+        var method = RendererSubmissionMixin.class.getDeclaredMethod("withAcquireWaitStages", VkSubmitInfo.class,
+                long.class, MemoryStack.class);
+        method.setAccessible(true);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            for (int count = 0; count <= 1; count++) {
+                VkSubmitInfo original = VkSubmitInfo.calloc(stack).sType$Default().pNext(123)
+                        .pCommandBuffers(stack.pointers(44)).pSignalSemaphores(stack.longs(33));
+                if (count == 1) original.pWaitSemaphores(stack.longs(11)).waitSemaphoreCount(1)
+                        .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_TRANSFER_BIT));
+                VkSubmitInfo submitted = (VkSubmitInfo) method.invoke(null, original, 22L, stack);
+                assertEquals(count + 1, submitted.waitSemaphoreCount());
+                assertEquals(22, submitted.pWaitSemaphores().get(count));
+                assertEquals(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, submitted.pWaitDstStageMask().get(count));
+                if (count == 1) {
+                    assertEquals(11, submitted.pWaitSemaphores().get(0));
+                    assertEquals(VK_PIPELINE_STAGE_TRANSFER_BIT, submitted.pWaitDstStageMask().get(0));
+                }
+                assertEquals(count, original.waitSemaphoreCount());
+                assertEquals(44, submitted.pCommandBuffers().get(0));
+                assertEquals(33, submitted.pSignalSemaphores().get(0));
+                assertEquals(123, submitted.pNext());
+            }
+        }
+    }
     @Test
     void finalSubmitWaitsBeforeAllSwapchainAccessesButPreservesOtherDependencies() throws Exception {
         var method = RendererSubmissionMixin.class.getDeclaredMethod("withAcquireWaitStages", VkSubmitInfo.class,

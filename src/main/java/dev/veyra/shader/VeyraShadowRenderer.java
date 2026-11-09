@@ -7,7 +7,6 @@ import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vertex.PoseStack;
 import dev.veyra.VeyraClient;
 import dev.veyra.mixin.accessor.CameraAccessor;
 import dev.veyra.mixin.accessor.VulkanWorldRendererAccessor;
@@ -15,12 +14,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.client.renderer.RenderBuffers;
-import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.entity.state.EntityRenderState;
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import net.minecraft.client.renderer.state.LevelRenderState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanmod.render.chunk.WorldRenderer;
@@ -42,7 +36,6 @@ import org.joml.Matrix4fStack;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.Set;
@@ -55,6 +48,10 @@ import static org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 /** Renders VulkanMod terrain, entity, and block entity geometry into an Iris-compatible shadow map. */
 public final class VeyraShadowRenderer {
+    static final java.util.List<net.vulkanmod.render.vertex.TerrainRenderType> OPAQUE_TERRAIN_LAYERS =
+            java.util.Arrays.stream(net.vulkanmod.render.vertex.TerrainRenderType.values())
+                    .filter(layer -> layer != net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT).toList();
+
     private static final MappedBuffer SHADOW_MODEL_VIEW_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final MappedBuffer SHADOW_MODEL_VIEW_INVERSE_BUFFER = new MappedBuffer(16 * Float.BYTES);
     private static final MappedBuffer SHADOW_PROJECTION_BUFFER = new MappedBuffer(16 * Float.BYTES);
@@ -80,9 +77,6 @@ public final class VeyraShadowRenderer {
     private static VkTextureView fallbackTextureView;
     private static GpuSampler fallbackSampler;
     private static int opaqueBindingSlot = -1;
-    private static RenderBuffers shadowRenderBuffers;
-    private static SubmitNodeStorage shadowSubmitNodeStorage;
-    private static FeatureRenderDispatcher shadowFeatureRenderDispatcher;
     private static boolean rendering;
     private static boolean renderingFeatures;
     private static boolean preserveIndirectCommands;
@@ -416,7 +410,7 @@ public final class VeyraShadowRenderer {
     }
 
     public static void render(Camera camera, Matrix4f mainModelView, Matrix4f mainProjection,
-                              Matrix4f mainCullProjection, DeltaTracker deltaTracker, LevelRenderState levelRenderState) {
+                              Matrix4f mainCullProjection, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null || !VeyraRenderer.isRenderingEnabled() || !VeyraRenderer.hasShadowPass()) {
             shadowModelView.identity();
@@ -454,10 +448,8 @@ public final class VeyraShadowRenderer {
         try {
             ensureResources();
             float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
-            float sunAttribute = camera.attributeProbe()
-                    .getValue(net.minecraft.world.attribute.EnvironmentAttributes.SUN_ANGLE, partialTick);
-            float moonAttribute = camera.attributeProbe()
-                    .getValue(net.minecraft.world.attribute.EnvironmentAttributes.MOON_ANGLE, partialTick);
+            float sunAttribute = VeyraEnvironment.sunAngle(minecraft, partialTick);
+            float moonAttribute = VeyraEnvironment.moonAngle(minecraft, partialTick);
             float shadowAngle = VeyraRenderer.irisShadowAngle(sunAttribute, moonAttribute);
             IrisShadowMatrices.View shadowView = IrisShadowMatrices.createView(shadowAngle,
                     shadowSettings.intervalSize(), shadowSettings.sunPathRotation(), cameraPosition);
@@ -499,15 +491,14 @@ public final class VeyraShadowRenderer {
             VTextureSelector.bindTexture(3, VTextureSelector.getWhiteTexture());
             VRenderSystem.applyMVP(shadowModelView, shadowProjection);
             rendering = true;
-            worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.SOLID,
-                    cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
-            worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.CUTOUT,
-                    cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
-            worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRIPWIRE,
-                    cameraPosition.x, cameraPosition.y, cameraPosition.z, shadowModelView, shadowProjection);
+            // Older VulkanMod also stores opaque geometry in CUTOUT_MIPPED.
+            for (var layer : OPAQUE_TERRAIN_LAYERS) {
+                worldRenderer.renderSectionLayer(layer, cameraPosition.x, cameraPosition.y, cameraPosition.z,
+                        shadowModelView, shadowProjection);
+            }
             renderer.endRenderPass();
             shadowRenderPassStarted = false;
-            renderEntityAndBlockEntityGeometry(camera, deltaTracker, levelRenderState,
+            renderEntityAndBlockEntityGeometry(camera, deltaTracker,
                     entityShadowFrustum, cameraPosition, shadowModelView, shadowProjection,
                     mainModelView, mainProjection, worldRenderer);
             renderer.endRenderPass();
@@ -622,7 +613,7 @@ public final class VeyraShadowRenderer {
         }
         additionalColorTargets.values().forEach(TextureTarget::destroyBuffers);
         additionalColorTargets.clear();
-        releaseFeatureDispatcher();
+        VeyraShadowEntities.close();
         shadowModelView.identity();
         shadowProjection.identity();
         updateShadowMatrixUniformBuffers();
@@ -712,86 +703,22 @@ public final class VeyraShadowRenderer {
     }
 
     private static void renderEntityAndBlockEntityGeometry(
-            Camera camera, DeltaTracker deltaTracker, LevelRenderState levelRenderState,
+            Camera camera, DeltaTracker deltaTracker,
             Frustum entityShadowFrustum, Vec3 cameraPosition, Matrix4f modelView, Matrix4f projection,
             Matrix4f mainModelView, Matrix4f mainProjection, WorldRenderer worldRenderer) {
-        Minecraft minecraft = Minecraft.getInstance();
-        RenderBuffers buffers = minecraft.renderBuffers();
-        ensureFeatureDispatcher(minecraft, buffers);
-
         Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
         Matrix4f savedModelView = new Matrix4f(modelViewStack);
-        PoseStack poseStack = new PoseStack();
-        SubmitNodeStorage submits = shadowSubmitNodeStorage;
-        Set<Object> submittedEntities = new HashSet<>();
         try {
             modelViewStack.identity().mul(modelView);
             VRenderSystem.applyMVP(modelView, projection);
             renderingFeatures = true;
-
-            float tickDelta = deltaTracker.getGameTimeDeltaPartialTick(false);
-            var entityDispatcher = minecraft.getEntityRenderDispatcher();
-            entityDispatcher.prepare(camera, minecraft.crosshairPickEntity);
-            for (var entity : shadowSettings.shadowEntities()
-                    ? minecraft.level.entitiesForRendering() : java.util.List.<net.minecraft.world.entity.Entity>of()) {
-                if (!entityDispatcher.shouldRender(entity, entityShadowFrustum,
-                        cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
-                    continue;
-                }
-                EntityRenderState state = entityDispatcher.extractEntity(entity, tickDelta);
-                entityDispatcher.submit(state, levelRenderState.cameraRenderState,
-                        state.x - cameraPosition.x, state.y - cameraPosition.y, state.z - cameraPosition.z,
-                        poseStack, submits);
-                submittedEntities.add(entity);
-            }
-
-            var player = minecraft.player;
-            if (shadowSettings.shadowEntities() && player != null && submittedEntities.add(player)
-                    && entityDispatcher.shouldRender(player, entityShadowFrustum,
-                    cameraPosition.x, cameraPosition.y, cameraPosition.z)) {
-                EntityRenderState state = entityDispatcher.extractEntity(player, tickDelta);
-                entityDispatcher.submit(state, levelRenderState.cameraRenderState,
-                        state.x - cameraPosition.x, state.y - cameraPosition.y, state.z - cameraPosition.z,
-                        poseStack, submits);
-            }
-
-            if (shadowSettings.shadowBlockEntities()) {
-                worldRenderer.renderBlockEntities(poseStack, levelRenderState, submits,
-                        new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>());
-            }
-            shadowFeatureRenderDispatcher.renderAllFeatures();
-            buffers.bufferSource().endBatch();
-            shadowFeatureRenderDispatcher.endFrame();
+            VeyraShadowEntities.render(camera, deltaTracker, entityShadowFrustum, cameraPosition, worldRenderer,
+                    shadowSettings.shadowEntities(), shadowSettings.shadowBlockEntities());
         } finally {
-            submits.clear();
             renderingFeatures = false;
             modelViewStack.set(savedModelView);
             VRenderSystem.applyMVP(mainModelView, mainProjection);
         }
-    }
-
-    private static void ensureFeatureDispatcher(Minecraft minecraft, RenderBuffers buffers) {
-        if (shadowFeatureRenderDispatcher != null && shadowRenderBuffers == buffers) {
-            return;
-        }
-        releaseFeatureDispatcher();
-        shadowRenderBuffers = buffers;
-        shadowSubmitNodeStorage = new SubmitNodeStorage();
-        shadowFeatureRenderDispatcher = new FeatureRenderDispatcher(shadowSubmitNodeStorage,
-                minecraft.getBlockRenderer(), buffers.bufferSource(), minecraft.getAtlasManager(),
-                buffers.outlineBufferSource(), buffers.crumblingBufferSource(), minecraft.font);
-    }
-
-    private static void releaseFeatureDispatcher() {
-        if (shadowFeatureRenderDispatcher != null) {
-            shadowFeatureRenderDispatcher.close();
-            shadowFeatureRenderDispatcher = null;
-        }
-        if (shadowSubmitNodeStorage != null) {
-            shadowSubmitNodeStorage.clear();
-            shadowSubmitNodeStorage = null;
-        }
-        shadowRenderBuffers = null;
     }
 
     private static boolean isWithinShadowRenderDistance(double x, double y, double z) {

@@ -71,7 +71,11 @@ class GlslPreprocessorTest {
         assertFalse(result.contains("screen=LOW"));
     }
     @Test void evaluatesVersionAndMinecraftMacros() throws IOException {
-        String result = GlslPreprocessor.process("test", "#version 130\n#if MC_VERSION == 12111 && __VERSION__ == 130\nfloat supported;\n#else\n#error wrong version\n#endif\n");
+        String[] parts = System.getProperty("veyra.test.minecraft", "1.21.11").split("\\.");
+        int version = Integer.parseInt(parts[0]) * 10000 + Integer.parseInt(parts[1]) * 100
+                + (parts.length > 2 ? Integer.parseInt(parts[2]) : 0);
+        assertEquals(Integer.toString(version), GlslPreprocessor.environment().get("MC_VERSION"));
+        String result = GlslPreprocessor.process("test", "#version 130\n#if MC_VERSION == " + version + " && __VERSION__ == 130\nfloat supported;\n#else\n#error wrong version\n#endif\n");
         assertTrue(result.contains("float supported"));
     }
     @Test void enablesIrisShaderPackCompatibilityBranches() throws IOException {

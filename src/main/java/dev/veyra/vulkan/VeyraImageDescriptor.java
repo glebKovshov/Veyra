@@ -1,10 +1,9 @@
 package dev.veyra.vulkan;
 
-import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 
 /** Image descriptor whose resource is owned by Veyra instead of a VulkanMod texture slot. */
-public final class VeyraImageDescriptor extends ImageDescriptor {
+public final class VeyraImageDescriptor extends VeyraImageDescriptorBase {
     private final VulkanImage image;
     private int colorTargetIndex = -1;
 

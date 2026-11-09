@@ -23,9 +23,7 @@ public abstract class VulkanCloudRendererMixin {
     @Unique private boolean veyra$usesExtendedCloudFormat;
 
     @Inject(method = "renderClouds", at = @At("HEAD"), remap = false)
-    private void veyra$captureAndPrepareCloudMesh(float tickDelta, int renderDistance,
-                                                   double cameraX, double cameraY, double cameraZ,
-                                                   long ticks, float partialTick, CallbackInfo ci) {
+    private void veyra$captureAndPrepareCloudMesh(CallbackInfo ci) {
         VeyraRenderer.captureCloudSceneColor();
         if (VeyraRenderer.hasCapturedCloudSceneColor()) {
             Renderer.getInstance().getMainPass().rebindMainTarget();

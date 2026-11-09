@@ -191,7 +191,6 @@ public final class VeyraRawTexture extends VulkanImage {
         return ownView;
     }
 
-    @Override
     public long getImageView(int ignoredFormat) {
         return ownView;
     }

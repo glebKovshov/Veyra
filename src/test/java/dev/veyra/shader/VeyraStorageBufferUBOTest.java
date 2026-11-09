@@ -18,6 +18,7 @@ class VeyraStorageBufferUBOTest {
     void exposesThePackBufferAsADynamicStorageDescriptor() {
         UBO parsedBlock = new UBO("VeyraStorageBuffer_0_fixture", 0, VK_SHADER_STAGE_VERTEX_BIT, 16, List.of());
         Buffer buffer = new Buffer("fixture", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, null);
+        buffer.setBufferSize(256);
         var allocation = new VeyraStorageBufferResources.StorageBuffer(0, buffer, 256, 256);
 
         VeyraStorageBufferUBO descriptor = new VeyraStorageBufferUBO(parsedBlock, allocation);

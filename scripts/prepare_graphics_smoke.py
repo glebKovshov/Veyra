@@ -71,6 +71,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--minecraft", choices=["1.21.5", "1.21.9", "1.21.10", "1.21.11"], default="1.21.11")
     parser.add_argument('--fixture', choices=['compute-color-target', 'geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'graphics-custom-image', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'compute-ssbo-only', 'compute-begin-stage', 'compute-setup-stage', 'compute-shadow-stage', 'begin-fragment-stage', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-atlas-animated', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-sunward-caster', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'third-party-natural-world', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
@@ -78,6 +79,8 @@ def main():
     parser.add_argument('--profile', default='',
                         help='Declared profile name, or __DEFAULT__ for unmodified pack defaults')
     arguments = parser.parse_args()
+    data_version = {"1.21.5": 4325, "1.21.9": 4554, "1.21.10": 4556, "1.21.11": 4671}[arguments.minecraft]
+    resource_format = [55, 0] if arguments.minecraft == "1.21.5" else ([75, 0] if arguments.minecraft == "1.21.11" else [69, 0])
     fixture = arguments.fixture
     natural_world = fixture == 'third-party-natural-world'
     third_party = fixture in {'third-party-shaderpack', 'third-party-natural-world'}
@@ -120,8 +123,8 @@ def main():
             "biome_source": (10, {"type": (8, "minecraft:multi_noise"), "preset": (8, "minecraft:overworld")}),
         })
     data = {
-        "DataVersion": (3, 4671),
-        "Version": (10, {"Name": (8, "1.21.11"), "Id": (3, 4671), "Series": (8, "main"), "Snapshot": (1, 0)}),
+        "DataVersion": (3, data_version),
+        "Version": (10, {"Name": (8, arguments.minecraft), "Id": (3, data_version), "Series": (8, "main"), "Snapshot": (1, 0)}),
         "version": (3, 19133), "LevelName": (8, "VeyraValidation"),
         "GameType": (3, 1), "allowCommands": (1, 1), "hardcore": (1, 0), "initialized": (1, 1),
         "SpawnX": (3, 0), "SpawnY": (3, spawn_y), "SpawnZ": (3, 0), "SpawnAngle": (5, 0),
@@ -195,8 +198,11 @@ def main():
     if fixture.startswith(('specular-', 'normal-')):
         resource_pack = root / 'resourcepacks/veyra-material-fixture'
         resource_pack.mkdir(parents=True, exist_ok=True)
-        (resource_pack / 'pack.mcmeta').write_text(json.dumps({'pack': {
-            'description': 'Original Veyra material data fixture', 'min_format': [75, 0], 'max_format': [75, 0]}}), encoding='utf-8')
+        pack_metadata = {'description': 'Original Veyra material data fixture',
+                         'min_format': resource_format, 'max_format': resource_format}
+        if arguments.minecraft == '1.21.5':
+            pack_metadata['pack_format'] = 55
+        (resource_pack / 'pack.mcmeta').write_text(json.dumps({'pack': pack_metadata}), encoding='utf-8')
         textures = resource_pack / 'assets/minecraft/textures'
         if fixture.startswith('specular-'):
             for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
@@ -233,8 +239,10 @@ def main():
             for sprite in ['grass_block_top', 'grass_block_side', 'dirt', 'stone', 'bedrock']:
                 normal_png(textures / f'block/{sprite}_n.png')
         extra_options = 'resourcePacks:["vanilla","file/veyra-material-fixture"]\n'
-    (root / "options.txt").write_text("renderDistance:3\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nsoundCategory_master:0.0\nsoundCategory_music:0.0\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
-    print(f"Prepared original Minecraft 1.21.11 {'natural' if natural_world else 'flat'} world and {fixture} fixture")
+    # Older clients disable clouds below four chunks; six also keeps the cloud layer inside the far plane.
+    render_distance = 6 if fixture.startswith('cloud-') else 3
+    (root / "options.txt").write_text(f"renderDistance:{render_distance}\nsimulationDistance:5\ncloudStatus:2\nmaxFps:30\nenableVsync:false\npauseOnLostFocus:false\nsoundCategory_master:0.0\nsoundCategory_music:0.0\nentityDistanceScaling:0.5\nshowAutosaveIndicator:false\n" + extra_options, encoding="utf-8")
+    print(f"Prepared original Minecraft {arguments.minecraft} {'natural' if natural_world else 'flat'} world and {fixture} fixture")
 
 
 if __name__ == "__main__":

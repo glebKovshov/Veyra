@@ -1,37 +1,19 @@
 package dev.veyra.shader;
 
-import net.vulkanmod.vulkan.memory.buffer.Buffer;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
-
-import java.util.List;
-
-import static org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+import dev.veyra.vulkan.VeyraStorageDescriptor;
+import dev.veyra.vulkan.VeyraUniformBlocks;
 
 /** Adapts VulkanMod's dynamic buffer descriptor update path to an Iris shader-storage buffer. */
-public final class VeyraStorageBufferUBO extends UBO {
-    private final int rangeBytes;
-
+public final class VeyraStorageBufferUBO extends VeyraStorageDescriptor {
     public VeyraStorageBufferUBO(UBO parsedBlock, VeyraStorageBufferResources.StorageBuffer storageBuffer) {
-        super(parsedBlock.name, ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE + storageBuffer.binding(),
-                parsedBlock.getStages(), 16, List.of());
-        Buffer buffer = storageBuffer.buffer();
-        this.rangeBytes = storageBuffer.rangeBytes();
-        getBufferSlice().set(buffer, 0, rangeBytes);
+        super(VeyraUniformBlocks.description(parsedBlock),
+                ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE + storageBuffer.binding(),
+                parsedBlock.getStages(), storageBuffer.buffer(), storageBuffer.rangeBytes());
     }
-
-    @Override
-    public int getType() {
-        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-    }
-
-    @Override
-    public int getSize() {
-        return rangeBytes;
-    }
-
-    /** Storage descriptors must keep their owned slice instead of VulkanMod's global UBO buffer. */
-    @Override
-    public void setUseGlobalBuffer(boolean useGlobalBuffer) {
-        super.setUseGlobalBuffer(false);
+    public VeyraStorageBufferUBO(int stages, VeyraStorageBufferResources.StorageBuffer storageBuffer) {
+        super("VeyraDirectStorageBuffer_" + storageBuffer.binding(),
+                ShaderPackStorageBuffers.VULKAN_DESCRIPTOR_BINDING_BASE + storageBuffer.binding(),
+                stages, storageBuffer.buffer(), storageBuffer.rangeBytes());
     }
 }

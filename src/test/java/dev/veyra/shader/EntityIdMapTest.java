@@ -44,7 +44,7 @@ class EntityIdMapTest {
                 #endif
                 """);
         Files.writeString(shaders.resolve("block.properties"), """
-                #if MC_VERSION >= 12111
+                #if MC_VERSION >= 12100
                 block.9 = oak_stairs:half=bottom
                 #endif
                 """);

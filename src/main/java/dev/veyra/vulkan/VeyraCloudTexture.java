@@ -23,7 +23,7 @@ import java.util.OptionalDouble;
 
 /** Vulkan upload of the same resource image VulkanMod uses to construct its cloud grid. */
 public final class VeyraCloudTexture {
-    public static final String SAMPLER_NAME = "VeyraCloudTextureSampler";
+    public static final String SAMPLER_NAME = dev.veyra.shader.CloudShaderAdapter.CLOUD_TEXTURE_SAMPLER_NAME;
     private static final Identifier CLOUD_TEXTURE = Identifier.withDefaultNamespace("textures/environment/clouds.png");
     private static final int MAX_TEXTURE_SIZE = 4096;
 

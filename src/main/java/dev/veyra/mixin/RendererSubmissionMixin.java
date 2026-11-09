@@ -73,11 +73,15 @@ public abstract class RendererSubmissionMixin {
 
     @Unique
     private static VkSubmitInfo withAcquireWaitStages(VkSubmitInfo original, long semaphore, MemoryStack stack) {
+        boolean present = false;
         var stages = stack.mallocInt(original.waitSemaphoreCount());
         for (int i = 0; i < original.waitSemaphoreCount(); i++) {
+            present |= original.pWaitSemaphores().get(i) == semaphore;
             stages.put(i, original.pWaitSemaphores().get(i) == semaphore
                     ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT : original.pWaitDstStageMask().get(i));
         }
+        // The resize/discard branch submits commands but omits the acquired-image wait.
+        if (!present) return withAcquireDependency(original, semaphore, stack);
         return VkSubmitInfo.malloc(stack).set(original).pWaitDstStageMask(stages);
     }
 

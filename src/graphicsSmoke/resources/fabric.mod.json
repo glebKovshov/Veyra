@@ -6,5 +6,5 @@
   "license": "MIT",
   "environment": "client",
   "mixins": ["veyra-graphics-smoke.mixins.json"],
-  "depends": {"fabricloader": ">=0.18.4", "minecraft": "1.21.11", "veyra": "*", "vulkanmod": "0.6.8"}
+  "depends": {"fabricloader": ">=0.18.4", "minecraft": "${minecraft_version}", "veyra": "*", "vulkanmod": "${vulkanmod_version}"}
 }

@@ -1,0 +1,151 @@
+package dev.veyra.mixin;
+
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import dev.veyra.vulkan.LegacySampler;
+import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.systems.RenderSystem;
+import dev.veyra.shader.VeyraShadowRenderer;
+import dev.veyra.shader.VeyraRenderer;
+import dev.veyra.vulkan.VeyraNoiseTexture;
+import dev.veyra.vulkan.VeyraGeometryTargets;
+import dev.veyra.vulkan.VeyraNormalTextures;
+import dev.veyra.vulkan.VeyraSpecularTextures;
+import net.minecraft.client.Minecraft;
+import net.vulkanmod.interfaces.shader.ExtendedRenderPipeline;
+import net.vulkanmod.render.engine.VkRenderPass;
+import net.vulkanmod.render.engine.VkTextureView;
+import net.vulkanmod.vulkan.texture.VTextureSelector;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(value = VkRenderPass.class, remap = false)
+public abstract class VkRenderPassMixin {
+    @Inject(method = "bindSampler", at = @At("HEAD"), cancellable = true, remap = false)
+    private void veyra$allowPostMipmapSampling(String name, GpuTextureView view, CallbackInfo ci) {
+        if (!VeyraRenderer.isPostMipmapView(view)) return;
+        LegacySampler.getSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                FilterMode.LINEAR, FilterMode.LINEAR, true).apply(view.texture());
+    }
+
+    @Inject(method = "setPipeline", at = @At("RETURN"), remap = false)
+    private void veyra$bindNoiseSampler(RenderPipeline ignored, CallbackInfo ci) {
+        VkRenderPass pass = (VkRenderPass) (Object) this;
+        RenderPipeline active = pass.getPipeline();
+        if (active == null) return;
+        var pipeline = ExtendedRenderPipeline.of(active).getPipeline();
+        if (pipeline != null) VeyraGeometryTargets.beforeBind(pipeline);
+        if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")
+                && active.getSamplers().contains("Sampler2")) {
+            GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
+            var descriptor = pipeline.getImageDescriptor("Sampler2");
+            if (descriptor != null && lightmap instanceof VkTextureView vulkanView) {
+                var texture = vulkanView.texture();
+                if (!texture.isClosed() && texture.getVulkanImage() != null) {
+                    descriptor.setLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    descriptor.isReadOnlyLayout = false;
+                    VTextureSelector.bindTexture(descriptor.imageIdx, texture.getVulkanImage());
+                }
+            }
+        }
+        if (pipeline != null) VeyraRenderer.bindCloudSceneColor(pass, pipeline);
+        if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra"))
+            { VeyraShadowRenderer.bindEntityShadowColor(pass, pipeline); VeyraShadowRenderer.bindEntityOpaqueDepth(pass, pipeline); }
+        if (pipeline != null && pipeline.getImageDescriptor(VeyraNoiseTexture.SAMPLER_NAME) != null) {
+            VeyraNoiseTexture.bind(pass);
+        }
+        if (pipeline != null && active.getFragmentShader().getNamespace().equals("veyra")
+                && active.getSamplers().contains("Sampler3")) {
+            VeyraShadowRenderer.bindEntityShadowSampler(pass, pipeline);
+        }
+    }
+
+    @Inject(method = "bindSampler", at = @At("HEAD"), cancellable = true, remap = false)
+    private void veyra$forceNoiseRepeatSampler(
+            String name, GpuTextureView view, CallbackInfo ci) {
+        if (view == null || !name.equals(VeyraNoiseTexture.SAMPLER_NAME) || !VeyraNoiseTexture.hasTexture()) return;
+        VeyraNoiseTexture.sampler().apply(view.texture());
+    }
+
+    @Inject(method = "bindSampler", at = @At("RETURN"), remap = false)
+    private void veyra$bindSpecular(String name, GpuTextureView view, CallbackInfo ci) {
+        VkRenderPass pass = (VkRenderPass) (Object) this;
+        if (view != null && name.equals("Sampler0") && pass.getPipeline() != null
+                && pass.getPipeline().getFragmentShader().getNamespace().equals("veyra")) {
+            VeyraSpecularTextures.bindEntity(pass, view);
+            VeyraNormalTextures.bindEntity(pass, view, LegacySampler.from(view.texture()));
+        }
+    }
+
+    @Inject(method = "bindSampler", at = @At("RETURN"), remap = false)
+    private void veyra$bindDepthSnapshots(String name, GpuTextureView view, CallbackInfo ci) {
+        if (!name.equals("Sampler1Sampler") && !name.equals("VeyraDepthTex1Sampler") && !name.equals("VeyraDepthTex2Sampler")) {
+            return;
+        }
+        VkRenderPass pass = (VkRenderPass) (Object) this;
+        if (pass.getPipeline() == null || !pass.getPipeline().getFragmentShader().getNamespace().equals("veyra")
+                || !(view instanceof VkTextureView vulkanView)) {
+            return;
+        }
+        var pipeline = ExtendedRenderPipeline.of(pass.getPipeline()).getPipeline();
+        var descriptor = pipeline.getImageDescriptor(name);
+        var texture = vulkanView.texture();
+        if (descriptor != null && !texture.isClosed() && texture.getVulkanImage() != null) {
+            descriptor.setLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            descriptor.isReadOnlyLayout = false;
+            // External snapshots must populate VulkanMod's indexed image table for this descriptor.
+            VTextureSelector.bindTexture(descriptor.imageIdx, texture.getVulkanImage());
+        }
+    }
+
+    @ModifyVariable(method = "setPipeline", at = @At("HEAD"), argsOnly = true, remap = false)
+    private RenderPipeline veyra$routeEntityPipeline(RenderPipeline original) {
+        if (VeyraRenderer.isGuiRendering()) return original;
+        if (!VeyraRenderer.shaderPackTexturesReady()) return original;
+        RenderPipeline replacement = VeyraRenderer.getHandPipeline(original);
+        if (replacement == null) {
+            replacement = VeyraRenderer.getSignTextPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getEntityPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getBeaconBeamPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getParticlePipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getWeatherPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getLightningPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getBasicPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getLinePipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getGlintPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getSkyBasicPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getSkyTexturedPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getWorldBorderPipeline(original);
+        }
+        if (replacement == null) {
+            replacement = VeyraRenderer.getDamagedBlockPipeline(original);
+        }
+        return replacement == null ? original : replacement;
+    }
+}

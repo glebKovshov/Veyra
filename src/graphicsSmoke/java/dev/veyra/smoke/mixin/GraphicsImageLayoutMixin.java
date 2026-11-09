@@ -28,10 +28,10 @@ public abstract class GraphicsImageLayoutMixin {
             var renderer = net.vulkanmod.vulkan.Renderer.getInstance();
             var swap = renderer == null ? null : renderer.getSwapChain();
             if (swap != null && swap.hasImages() && swap.getImages().contains(image)
-                    && (!swap.isAcquired() || image != swap.getColorAttachment())) {
+                    && (!dev.veyra.smoke.SmokeEnvironment.isAcquired(swap) || image != swap.getColorAttachment())) {
                 throw new IllegalStateException("Swapchain transition requires the current acquired image: image="
                         + Long.toHexString(image.getId()) + ", current=" + Long.toHexString(swap.getColorAttachment().getId())
-                        + ", acquired=" + swap.isAcquired());
+                        + ", acquired=" + dev.veyra.smoke.SmokeEnvironment.isAcquired(swap));
             }
         }
         if (!Boolean.getBoolean("veyra.graphicsSmoke") || veyra$loggedTransitions >= 40

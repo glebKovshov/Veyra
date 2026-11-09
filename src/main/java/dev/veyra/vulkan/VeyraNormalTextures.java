@@ -111,8 +111,7 @@ public final class VeyraNormalTextures {
     /** Bind the static _n.png paired with the entity's live albedo texture. */
     public static void bindEntity(VkRenderPass pass, GpuTextureView albedo, GpuSampler sampler) {
         if (albedo == null || pass.getPipeline() == null) return;
-        GraphicsPipeline pipeline = net.vulkanmod.interfaces.shader.ExtendedRenderPipeline
-                .of(pass.getPipeline()).getPipeline();
+        GraphicsPipeline pipeline = VeyraPipelineResources.nativePipeline(pass.getPipeline());
         var descriptor = pipeline == null ? null : pipeline.getImageDescriptor(SAMPLER);
         if (descriptor == null) return;
         Material material = null;

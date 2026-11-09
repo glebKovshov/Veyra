@@ -186,7 +186,6 @@ public final class VeyraImage2D extends VulkanImage implements VeyraCustomImage 
         return imageView;
     }
 
-    @Override
     public long getImageView(int ignoredFormat) {
         return imageView;
     }

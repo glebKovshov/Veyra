@@ -971,6 +971,43 @@ public class ShaderCompileSmoke {
                     }
                     """);
             compileVertex(compiler, options, terrainVertex, "terrain-view-position-vertex-adapter", true);
+            String oldTerrainVertex = TerrainShaderAdapter.adaptVertex("""
+                    #version 460
+                    layout(binding = 0) uniform UBO0 { mat4 MVP; };
+                    layout(push_constant) uniform Offsets { vec3 ModelOffset; };
+                    layout (binding = 3) uniform sampler2D Sampler2;
+                    layout(location = 0) in ivec4 Position;
+                    layout(location = 1) in uvec2 UV0;
+                    layout (location = 2) in uint PackedColor;
+                    layout(location = 0) out vec4 vertexColor;
+                    layout(location = 1) out vec2 texCoord0;
+                    layout (location = 2) out float vertexDistance;
+                    const float UV_INV = 1.0 / 32768.0;
+                    const vec3 POSITION_INV = vec3(1.0 / 2048.0);
+                    vec4 getVertexPosition() {
+                        const vec3 baseOffset = bitfieldExtract(ivec3(gl_InstanceIndex) >> ivec3(0, 16, 8), 0, 8);
+                        #ifdef COMPRESSED_VERTEX
+                            return vec4(fma(Position.xyz, POSITION_INV, ModelOffset + baseOffset), 1.0);
+                        #else
+                            return vec4(Position.xyz + baseOffset, 1.0);
+                        #endif
+                    }
+                    vec4 sample_lightmap2(sampler2D sourceSampler, int coordinates) {
+                        return texture(sourceSampler, vec2(float(coordinates)));
+                    }
+                    void main() {
+                        const vec4 pos = getVertexPosition();
+                        gl_Position = MVP * pos;
+                        vertexDistance = fog_distance(pos.xyz, 0);
+                        const vec4 Color = unpackUnorm4x8(PackedColor);
+                        vertexColor = Color * sample_lightmap2(Sampler2, Position.a);
+                        texCoord0 = UV0 * UV_INV;
+                    }
+                    """);
+            compileVertex(compiler, options, oldTerrainVertex.replace("#version 460", "#version 460\n#define COMPRESSED_VERTEX"),
+                    "legacy-terrain-homogeneous-compressed", true);
+            compileVertex(compiler, options, oldTerrainVertex,
+                    "legacy-terrain-homogeneous-uncompressed", true);
             String terrainCustomVertex = TerrainVertexShaderAdapter.adapt(terrainVertex, """
                     #version 120
                     attribute vec4 mc_Entity;

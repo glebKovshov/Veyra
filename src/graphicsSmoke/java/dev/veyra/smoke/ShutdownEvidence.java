@@ -27,9 +27,9 @@ public final class ShutdownEvidence {
             GraphicsMemoryAccessor.buffers().long2ReferenceEntrySet().forEach(e->{
                 var b=e.getValue();
                 Object entry=Map.of("handle",hex(e.getLongKey()),"currentHandle",hex(b.getId()),
-                        "name",String.valueOf(b.name),"bytes",b.getBufferSize(),"allocation",hex(b.getAllocation()));
+                        "name",String.valueOf(dev.veyra.vulkan.VeyraStorageDescriptor.bufferName(b)),"bytes",b.getBufferSize(),"allocation",hex(b.getAllocation()));
                 buffers.add(entry);
-                if (String.valueOf(b.name).startsWith("Veyra bufferObject.")) shaderPackBuffers.add(entry);
+                if (String.valueOf(dev.veyra.vulkan.VeyraStorageDescriptor.bufferName(b)).startsWith("Veyra bufferObject.")) shaderPackBuffers.add(entry);
             });
             GraphicsMemoryAccessor.images().long2ReferenceEntrySet().forEach(e->{
                 var i=e.getValue(); images.add(Map.of("handle",hex(e.getLongKey()),"name",String.valueOf(i.name),
@@ -38,7 +38,8 @@ public final class ShutdownEvidence {
             for(var p:List.copyOf(NativePipelineRegistryAccessor.veyra$getPipelines())) {
                 var access=(GraphicsNativePipelineAccessor)p;
                 List<Object> pools=new ArrayList<>();
-                if(access.descriptorSets()!=null) for(var d:access.descriptorSets()) {
+                var descriptorSets=net.vulkanmod.vulkan.shader.GraphicsDescriptorEvidence.descriptorSets(p);
+                if(descriptorSets!=null) for(var d:descriptorSets) {
                     var pool=(GraphicsDescriptorPoolAccessor)d;
                     long[] sets=pool.sets();
                     pools.add(Map.of("pool",hex(pool.descriptorPool()),"sets",sets==null?List.of():Arrays.stream(sets).filter(v->v!=0).mapToObj(ShutdownEvidence::hex).toList()));

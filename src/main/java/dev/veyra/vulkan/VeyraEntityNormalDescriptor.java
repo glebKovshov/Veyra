@@ -1,10 +1,9 @@
 package dev.veyra.vulkan;
 
-import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.texture.VulkanImage;
 
 /** Entity sampler descriptor that tracks the current material image without a global texture slot lookup. */
-public final class VeyraEntityNormalDescriptor extends ImageDescriptor {
+public final class VeyraEntityNormalDescriptor extends VeyraImageDescriptorBase {
     private volatile VulkanImage image;
 
     public VeyraEntityNormalDescriptor(int binding, String qualifier, String name, int imageIdx, int descriptorType) {

@@ -1,6 +1,5 @@
 package dev.veyra.mixin;
 
-import dev.veyra.shader.VeyraStorageBufferUBO;
 import net.vulkanmod.vulkan.Vulkan;
 import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
@@ -24,7 +23,7 @@ import java.util.TreeMap;
 import static org.lwjgl.vulkan.VK10.VK_SUCCESS;
 import static org.lwjgl.vulkan.VK10.vkCreateDescriptorSetLayout;
 
-/** Builds a sparse Vulkan descriptor layout for Veyra's reserved shader-pack SSBO bindings. */
+/** Builds descriptor layouts by binding number, including gaps in legacy terrain and shader-pack SSBOs. */
 @Mixin(value = Pipeline.class, remap = false)
 public abstract class PipelineDescriptorLayoutMixin {
     @Shadow protected List<UBO> buffers;
@@ -33,14 +32,13 @@ public abstract class PipelineDescriptorLayoutMixin {
 
     @Inject(method = "createDescriptorSetLayout", at = @At("HEAD"), cancellable = true, remap = false)
     private void veyra$createSparseStorageBufferLayout(CallbackInfo callback) {
-        if (buffers.stream().noneMatch(VeyraStorageBufferUBO.class::isInstance)) return;
-
         // VulkanMod emits dynamic offsets in buffer-list order. Keep that order equal to binding order.
         buffers = new ArrayList<>(buffers);
         buffers.sort(Comparator.comparingInt(UBO::getBinding));
         Map<Integer, DescriptorBinding> bindings = new TreeMap<>();
         for (UBO buffer : buffers) {
-            addBinding(bindings, buffer.getBinding(), buffer.getType(), buffer.getStages(), buffer.name);
+            addBinding(bindings, buffer.getBinding(), buffer.getType(), buffer.getStages(),
+                    dev.veyra.vulkan.VeyraUniformBlocks.description(buffer));
         }
         for (ImageDescriptor image : imageDescriptors) {
             addBinding(bindings, image.getBinding(), image.getType(), image.getStages(), image.name);
@@ -65,7 +63,7 @@ public abstract class PipelineDescriptorLayoutMixin {
             LongBuffer layout = stack.mallocLong(1);
             int result = vkCreateDescriptorSetLayout(Vulkan.getVkDevice(), layoutInfo, null, layout);
             if (result != VK_SUCCESS) {
-                throw new IllegalStateException("Could not create VulkanMod descriptor layout for shader-pack storage buffers: "
+                throw new IllegalStateException("Could not create VulkanMod descriptor layout: "
                         + result);
             }
             descriptorSetLayout = layout.get(0);

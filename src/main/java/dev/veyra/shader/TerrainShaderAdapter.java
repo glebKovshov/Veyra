@@ -927,6 +927,44 @@ public final class TerrainShaderAdapter {
 
     public static String adaptVertex(String source) throws IOException {
         String outputMarker = "layout (location = 4) out flat float fadeFactor;";
+        String legacyOutput = "layout (location = 3) out float cylindricalVertexDistance;";
+        String legacySampler = "layout (binding = 3) uniform sampler2D Sampler2;";
+        String oldDistanceOutput = "layout (location = 2) out float vertexDistance;";
+        if (source.contains(oldDistanceOutput) && source.contains("vec4 getVertexPosition()")
+                && source.contains(legacySampler)) {
+            // 0.5.6 returns a homogeneous position; the shared bridge operates on world-space vec3s.
+            String[] oldMarkers = {"return vec4(fma(Position.xyz, POSITION_INV, ModelOffset + baseOffset), 1.0);",
+                    "return vec4(Position.xyz + baseOffset, 1.0);", "    const vec4 pos = getVertexPosition();",
+                    "gl_Position = MVP * pos;", "vertexDistance = fog_distance(pos.xyz, 0);"};
+            String[] replacements = {"return fma(Position.xyz, POSITION_INV, ModelOffset + baseOffset);",
+                    "return Position.xyz + baseOffset;", "    const vec3 pos = getVertexPosition();",
+                    "gl_Position = MVP * vec4(pos, 1.0);",
+                    "sphericalVertexDistance = length(pos);\n    cylindricalVertexDistance = max(length(pos.xz), abs(pos.y));"};
+            for (int index = 0; index < oldMarkers.length; index++) {
+                if (!source.contains(oldMarkers[index]))
+                    throw new IOException("VulkanMod's legacy terrain position/distance encoding changed.");
+                source = source.replace(oldMarkers[index], replacements[index]);
+            }
+            source = source.replace("vec4 getVertexPosition()", "vec3 getVertexPosition()")
+                    .replace(oldDistanceOutput, "layout (location = 2) out float sphericalVertexDistance;\n" + legacyOutput);
+        }
+        if (!source.contains(outputMarker) && source.contains(legacyOutput) && source.contains(legacySampler)) {
+            // VulkanMod 0.6.6 has no section fade or vertex fog block; match its terrain UBO layout.
+            source = source.replace(legacySampler, """
+                    layout (binding = 1) uniform UBO {
+                        vec4 FogColor;
+                        float FogEnvironmentalStart;
+                        float FogEnvironmentalEnd;
+                        float FogRenderDistanceStart;
+                        float FogRenderDistanceEnd;
+                        float FogSkyEnd;
+                        float FogCloudsEnd;
+                        float AlphaCutout;
+                    };
+                    layout (binding = 4) uniform sampler2D Sampler2;
+                    """);
+            outputMarker = legacyOutput;
+        }
         if (!source.contains(outputMarker)) {
             throw new IOException("VulkanMod's built-in terrain vertex shader changed; Veyra cannot bridge gbuffers_terrain inputs.");
         }
@@ -977,7 +1015,8 @@ public final class TerrainShaderAdapter {
                     bitfieldExtract(uint(Position.a), 12, 4));
                 veyraLightmapCoord = (vec2(lightCoord) + vec2(0.5)) / 16.0;
                 """);
-        String uniformMarker = "    int UseRgss;";
+        String uniformMarker = source.contains("    int UseRgss;")
+                ? "    int UseRgss;" : "    float AlphaCutout;";
         if (!adapted.contains(uniformMarker)) {
             throw new IOException("VulkanMod's terrain uniform buffer changed; Veyra cannot provide shadow matrices.");
         }

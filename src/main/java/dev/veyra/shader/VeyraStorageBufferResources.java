@@ -120,7 +120,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
                 .anyMatch(dispatch -> dispatch.bufferBinding() == binding)) {
             usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
         }
-        Buffer buffer = new Buffer("Veyra bufferObject." + binding, usage, MemoryTypes.GPU_MEM);
+        Buffer buffer = dev.veyra.vulkan.VeyraStorageDescriptor.createBuffer("Veyra bufferObject." + binding, usage, MemoryTypes.GPU_MEM);
         try {
             buffer.createBuffer(allocationBytes);
         } catch (RuntimeException exception) {
@@ -144,9 +144,7 @@ public final class VeyraStorageBufferResources implements AutoCloseable {
         List<UBO> descriptors = new java.util.ArrayList<>(descriptorStages.size());
         for (var entry : descriptorStages.entrySet()) {
             StorageBuffer storageBuffer = storageBuffer(entry.getKey());
-            UBO logicalBlock = new UBO("VeyraDirectStorageBuffer_" + entry.getKey(), entry.getKey(),
-                    entry.getValue(), 16, List.of());
-            descriptors.add(new VeyraStorageBufferUBO(logicalBlock, storageBuffer));
+            descriptors.add(new VeyraStorageBufferUBO(entry.getValue(), storageBuffer));
         }
         return new DirectCompilation(preparedVertex, preparedFragment, preparedCompute, List.copyOf(descriptors));
     }

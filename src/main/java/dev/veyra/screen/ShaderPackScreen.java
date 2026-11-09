@@ -8,7 +8,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
@@ -236,7 +235,7 @@ public final class ShaderPackScreen extends Screen {
         }
     }
 
-    private final class PackEntry extends ObjectSelectionList.Entry<PackEntry> {
+    private final class PackEntry extends ShaderPackListEntry<PackEntry> {
         private final ShaderPack pack;
 
         PackEntry(ShaderPack pack) {
@@ -249,27 +248,28 @@ public final class ShaderPackScreen extends Screen {
         }
 
         @Override
-        public void renderContent(GuiGraphics graphics, int mouseX, int mouseY, boolean hovered, float partialTick) {
+        protected void renderPack(GuiGraphics graphics, int x, int y, int width, int height,
+                                  int mouseX, int mouseY, boolean hovered, float partialTick) {
             boolean supported = pack.supportsShaderPrograms();
             boolean active = isActive(pack);
             Component tag = !supported ? Component.translatable("veyra.shaders.unsupported")
                     : active ? Component.translatable("veyra.shaders.active") : null;
             int tagWidth = tag == null ? 0 : font.width(tag) + 12;
-            int textY = getContentY() + (getContentHeight() - font.lineHeight) / 2 + 1;
-            String name = font.plainSubstrByWidth(pack.name(), Math.max(1, getContentWidth() - tagWidth - 16));
+            int textY = y + (height - font.lineHeight) / 2 + 1;
+            String name = font.plainSubstrByWidth(pack.name(), Math.max(1, width - tagWidth - 16));
             int color = !supported ? 0xFF8A8A8A : active ? 0xFFFFE070 : 0xFFFFFFFF;
-            graphics.drawString(font, name, getContentX() + 8, textY, color);
+            graphics.drawString(font, name, x + 8, textY, color);
             if (tag != null) {
-                graphics.drawString(font, tag, getContentRight() - font.width(tag) - 8, textY,
+                graphics.drawString(font, tag, x + width - font.width(tag) - 8, textY,
                         supported ? 0xFF70E070 : 0xFFE07070);
             }
             if (hovered && !supported && pack.issue() != null) {
-                graphics.setTooltipForNextFrame(font.split(Component.literal(pack.issue()), 280), mouseX, mouseY);
+                renderIssue(graphics, font, Component.literal(pack.issue()), mouseX, mouseY);
             }
         }
 
         @Override
-        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        protected boolean selectPack(boolean doubleClick) {
             list.setSelected(this);
             staged = pack;
             stagedEnabled = true;

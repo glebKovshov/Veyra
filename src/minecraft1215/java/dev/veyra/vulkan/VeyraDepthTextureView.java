@@ -1,0 +1,96 @@
+package dev.veyra.vulkan;
+
+import net.vulkanmod.gl.VkGlTexture;
+import net.vulkanmod.render.engine.VkGpuTexture;
+import net.vulkanmod.vulkan.Vulkan;
+import net.vulkanmod.vulkan.memory.MemoryManager;
+import net.vulkanmod.vulkan.texture.VulkanImage;
+import org.lwjgl.vulkan.VK10;
+
+/** A sampled view of the depth aspect of VulkanMod's depth-stencil image. */
+public final class VeyraDepthTextureView extends LegacyVkTextureView {
+    private final VkGpuTexture texture;
+    private final Runnable release;
+    private boolean released;
+
+    public VeyraDepthTextureView(VkGpuTexture source) {
+        this(new DepthSampleTexture(source));
+    }
+
+    private VeyraDepthTextureView(DepthSampleTexture texture) {
+        this(texture, () -> {
+            texture.closeDepthImageView();
+            texture.close();
+        });
+    }
+
+    VeyraDepthTextureView(VkGpuTexture texture, Runnable release) {
+        super(texture, 0, texture.getMipLevels());
+        this.texture = texture;
+        this.release = java.util.Objects.requireNonNull(release, "release");
+    }
+
+    public VulkanImage sampledImage() {
+        return texture.getVulkanImage();
+    }
+
+    @Override
+    public void close() {
+        if (released) {
+            return;
+        }
+        released = true;
+        super.close();
+        release.run();
+    }
+
+    private static final class DepthSampleTexture extends VkGpuTexture {
+        private final VulkanImage depthSampleImage;
+        private final long depthImageView;
+        private final int textureId;
+
+        private DepthSampleTexture(VkGpuTexture source) {
+            this(source, createDepthImage(source));
+        }
+
+        private DepthSampleTexture(VkGpuTexture source, SampledDepth sampledDepth) {
+            super(source.getLabel(), source.getFormat(), source.getWidth(0),
+                    source.getHeight(0), source.getMipLevels(), sampledDepth.textureId(),
+                    VkGlTexture.getTexture(sampledDepth.textureId()));
+            textureId = sampledDepth.textureId();
+            depthImageView = sampledDepth.imageView();
+            depthSampleImage = sampledDepth.image();
+        }
+
+        private static SampledDepth createDepthImage(VkGpuTexture source) {
+            VulkanImage sourceImage = source.getVulkanImage();
+            long imageId = sourceImage.getId();
+            long depthImageView = VulkanImage.createImageView(imageId, sourceImage.format,
+                    VK10.VK_IMAGE_ASPECT_DEPTH_BIT, sourceImage.mipLevels);
+            VulkanImage depthSampleImage = new VulkanImage(sourceImage.name, imageId, sourceImage.format, sourceImage.mipLevels,
+                    sourceImage.width, sourceImage.height, sourceImage.formatSize, sourceImage.usage, depthImageView);
+            int textureId = VkGlTexture.genTextureId();
+            VkGlTexture.setVulkanImage(textureId, depthSampleImage);
+            return new SampledDepth(textureId, depthImageView, depthSampleImage);
+        }
+
+        @Override
+        public VulkanImage getVulkanImage() {
+            return depthSampleImage;
+        }
+
+        private void closeDepthImageView() {
+            if (depthImageView != 0L) {
+                // Submitted descriptors can still reference this borrowed depth view after a
+                // pack switch/resize. Retire it at VulkanMod's frame fence, like native images.
+                var device = Vulkan.getVkDevice();
+                MemoryManager.getInstance().addFrameOp(() -> VK10.vkDestroyImageView(device, depthImageView, null));
+            }
+            VkGlTexture.setVulkanImage(textureId, null);
+            VkGlTexture.glDeleteTextures(textureId);
+        }
+    }
+
+    private record SampledDepth(int textureId, long imageView, VulkanImage image) {
+    }
+}

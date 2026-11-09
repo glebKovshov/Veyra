@@ -2,13 +2,11 @@ package dev.veyra.mixin;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
-import dev.veyra.mixin.accessor.LevelRendererAccessor;
 import dev.veyra.shader.VeyraRenderer;
 import dev.veyra.shader.VeyraShadowRenderer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.state.LevelRenderState;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
@@ -38,8 +36,7 @@ public abstract class LevelRendererMixin {
                                         Matrix4f projection, Matrix4f projectionMatrix,
                                         GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky,
                                         CallbackInfo ci) {
-        LevelRenderState state = ((LevelRendererAccessor) (Object) this).veyra$getLevelRenderState();
-        VeyraShadowRenderer.render(camera, modelView, projection, projectionMatrix, deltaTracker, state);
+        VeyraShadowRenderer.render(camera, modelView, projection, projectionMatrix, deltaTracker);
         VeyraRenderer.renderPrepare(net.minecraft.client.Minecraft.getInstance());
     }
 }

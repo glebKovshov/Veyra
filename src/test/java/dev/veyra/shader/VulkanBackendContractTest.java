@@ -9,6 +9,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Verify required injection contracts against the pinned backend bytecode without loading a GPU. */
 class VulkanBackendContractTest {
+    @Test void computeDescriptorsUseTheirOwnBindPoint() throws IOException {
+        requiresCall("dev/veyra/shader/VeyraComputePipeline", "bindForDispatch",
+                "dev/veyra/mixin/accessor/NativeDescriptorSetsAccessor", "veyra$bindSets",
+                "(Lorg/lwjgl/vulkan/VkCommandBuffer;Lnet/vulkanmod/vulkan/memory/buffer/UniformBuffer;I)V");
+        var method = read("dev/veyra/shader/VeyraComputePipeline").methods.stream()
+                .filter(value -> value.name.equals("bindForDispatch")).findFirst().orElseThrow();
+        for (var instruction : method.instructions) if (instruction instanceof MethodInsnNode call) {
+            assertNotEquals("bindDescriptorSets", call.name, "Pipeline overload hardcodes the graphics bind point");
+            if (call.name.equals("veyra$bindSets")) assertEquals(org.objectweb.asm.Opcodes.ICONST_1,
+                    call.getPrevious().getOpcode(), "Descriptor binding must use VK_PIPELINE_BIND_POINT_COMPUTE");
+        }
+    }
     @Test void geometryTargetsAreInitializedBeforeWaitingForShadows() throws IOException {
         var phase = read("dev/veyra/shader/VeyraRenderer").methods.stream()
                 .filter(method -> method.name.equals("renderPhase")).findFirst().orElseThrow();
@@ -52,6 +64,14 @@ class VulkanBackendContractTest {
     @Test void terrainAtlasSamplerHookMatchesPinnedBackend() throws IOException {
         requiresCall("net/vulkanmod/render/chunk/WorldRenderer", "renderSectionLayer",
                 "net/vulkanmod/vulkan/texture/VulkanImage", "setSampler", "(J)V");
+    }
+
+    @Test void cloudPreparationDoesNotDependOnRenderEntryPointArguments() throws IOException {
+        var handler = read("dev/veyra/mixin/VulkanCloudRendererMixin").methods.stream()
+                .filter(method -> method.name.equals("veyra$captureAndPrepareCloudMesh")).findFirst().orElseThrow();
+        assertEquals("(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V", handler.desc);
+        assertEquals(1, read("net/vulkanmod/render/sky/CloudRenderer").methods.stream()
+                .filter(method -> method.name.equals("renderClouds")).count());
     }
 
     private static ClassNode read(String name) throws IOException {

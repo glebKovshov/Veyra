@@ -9,7 +9,6 @@ import net.vulkanmod.vulkan.shader.Pipeline;
 import net.vulkanmod.vulkan.shader.SPIRVUtils;
 import net.vulkanmod.vulkan.shader.descriptor.ImageDescriptor;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
-import net.vulkanmod.vulkan.shader.layout.AlignedStruct;
 import net.vulkanmod.vulkan.shader.layout.Uniform;
 import net.vulkanmod.vulkan.texture.SamplerManager;
 import net.vulkanmod.vulkan.texture.VulkanImage;
@@ -59,16 +58,16 @@ public final class VeyraComputePipeline extends Pipeline {
         this.localSizeY = shader.localSizeY();
         this.localSizeZ = shader.localSizeZ();
 
-        AlignedStruct.Builder uniformBuilder = AlignedStruct.builder();
+        List<Uniform.Info> uniformFields = new ArrayList<>();
         for (ShaderPackUniformAdapter.UniformField field : shader.uniforms()) {
-            Uniform.Info info = Uniform.createUniformInfo(field.type(), field.name());
+            Uniform.Info info = dev.veyra.vulkan.VeyraUniformBlocks.field(field.type(), field.name());
             info.setupSupplier();
-            uniformBuilder.addUniform(info);
+            uniformFields.add(info);
         }
         List<UBO> pipelineBuffers = new ArrayList<>();
         if (!shader.uniforms().isEmpty()) {
-            UBO uniforms = uniformBuilder.buildUBO("VeyraComputeUniforms", 0, VK_SHADER_STAGE_COMPUTE_BIT);
-            uniforms.setUseGlobalBuffer(true);
+            UBO uniforms = dev.veyra.vulkan.VeyraUniformBlocks.create(
+                    "VeyraComputeUniforms", 0, VK_SHADER_STAGE_COMPUTE_BIT, uniformFields);
             pipelineBuffers.add(uniforms);
         }
         pipelineBuffers.addAll(storageBufferDescriptors);
@@ -82,7 +81,7 @@ public final class VeyraComputePipeline extends Pipeline {
             createDescriptorSets(Renderer.getFramesNum());
             try (SPIRVUtils.SPIRV spirv = SPIRVUtils.compileShader(
                     name, shaderSource, SPIRVUtils.ShaderKind.COMPUTE_SHADER)) {
-                long module = createShaderModule(spirv.bytecode());
+                long module = dev.veyra.mixin.accessor.NativePipelineAccessor.veyra$createShaderModule(spirv.bytecode());
                 try (MemoryStack stack = MemoryStack.stackPush()) {
                     VkPipelineShaderStageCreateInfo stage = VkPipelineShaderStageCreateInfo.calloc(stack)
                             .sType$Default()
@@ -182,7 +181,6 @@ public final class VeyraComputePipeline extends Pipeline {
             throw new IllegalStateException("Compute program " + name + " cannot dispatch inside a render pass.");
         }
         VkCommandBuffer commandBuffer = Renderer.getCommandBuffer();
-        int frame = Renderer.getCurrentFrame();
         renderer.addUsedPipeline(this);
         UniformBuffer globalUniformBuffer = Renderer.getDrawer().getUniformBuffer();
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -192,7 +190,8 @@ public final class VeyraComputePipeline extends Pipeline {
                 }
             }
         }
-        descriptorSets[frame].bindSets(commandBuffer, globalUniformBuffer, VK_PIPELINE_BIND_POINT_COMPUTE);
+        ((dev.veyra.mixin.accessor.NativeDescriptorSetsAccessor) (Object) descriptorSets[Renderer.getCurrentFrame()])
+                .veyra$bindSets(commandBuffer, globalUniformBuffer, VK_PIPELINE_BIND_POINT_COMPUTE);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
         return commandBuffer;
     }
@@ -226,7 +225,7 @@ public final class VeyraComputePipeline extends Pipeline {
             computePipeline = VK_NULL_HANDLE;
         }
         if (descriptorSets != null) {
-            destroyDescriptorSets();
+            ((dev.veyra.mixin.accessor.NativePipelineAccessor) (Object) this).veyra$destroyDescriptorSets();
             descriptorSets = null;
         }
         if (pipelineLayout != VK_NULL_HANDLE) {
