@@ -81,7 +81,7 @@ public final class VeyraGeometryTargets {
         VeyraShadowRenderer.bindTerrainShadowColor(pipeline);
         VeyraShadowRenderer.bindTerrainOpaqueDepth(pipeline);
         VeyraNoiseTexture.bind(pipeline);
-        if (terrain || specularInputs.contains(pipeline) || pipeline.name.startsWith("veyra_shadow_"))
+        if (terrain || specularInputs.contains(pipeline) || (pipeline.name != null && pipeline.name.startsWith("veyra_shadow_")))
             VeyraSpecularTextures.bindTerrain(pipeline);
         VeyraNormalTextures.bindTerrain(pipeline);
         if (terrain) VeyraRenderer.bindTerrainOpaqueDepth(pipeline);

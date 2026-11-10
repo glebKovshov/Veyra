@@ -2493,3 +2493,20 @@ The Codex session stopped mid-1.21.4 probe. Fresh `build validateShaders` passes
 A full 1.21.4 `compileJava` with `-Xmaxerrs 100000` (`build/claude-1.21.4-full.log`) reports 432 symbol-resolution errors: `com.mojang.blaze3d.textures`, `RenderPipeline` and VulkanMod's `net.vulkanmod.render.engine` are absent. The 0.6.7+1.21.1 VulkanMod JAR has no `render/engine` package either. Pre-1.21.5 versions need a separate render-integration backend; they are documented as unsupported pending an owner decision. VulkanMod has no 1.21.6–1.21.8 release (Modrinth API, 2026-11-09).
 
 The release workflow now builds, verifies and attaches the 1.21.10, 1.21.9 and 1.21.5 JARs alongside 1.21.11. README lists the per-version requirements.
+
+## 2026-11-10: Minecraft 1.21.4 target
+
+1.21.4 is now a supported target (VulkanMod 0.5.6, `RAtVo03C`). `src/minecraft1214/java` provides `dev.veyra.compat`, a stand-in for the 1.21.5 GPU abstraction on top of the 1.21.4 render-type/program path; `build.gradle` (`veyraLegacy4Line`) rewrites the shared sources to it. See `docs/MULTIVERSION.md` for the design.
+
+Runtime faults found and fixed during GPU bring-up, all invisible to compilation:
+- VulkanMod 1.21.4 numbers sampler slots by declaration order and remaps them in `CompiledShaderProgram.apply()`; Veyra programs get the 1.21.5 slot layout (`Legacy4UniformParserMixin`) and declare no samplers to the program.
+- Vanilla pipelines have no name in this VulkanMod; `VeyraGeometryTargets` now tolerates that (shared fix).
+- 1.21.4 program configs already define `ALPHA_CUTOUT`; pipeline defines are keyed by name.
+- 1.21.5 merged per-render-type shaders (`core/entity`, `core/glint`, ...); classification compares through `VanillaPipelines.shaderIs`.
+- The world pass's clear ran with no render pass bound and was dropped, so stale depth rejected every draw (entities, sky, GUI) with no validation error. Clears with nothing bound now target the main target, as OpenGL's default framebuffer.
+- VulkanMod reads blend/depth/write state globally on this version; post passes apply their pipeline's state and restore defaults.
+- Render-target creation/resize and attachment replacement left GL-emulation render passes open across copies and barriers; bindings are saved and restored. Barriers during input binding suspend the pass. Depth-stencil images get depth-only sampled views (destroyed with the image and at shutdown).
+
+Evidence (RTX 3070, Vulkan core + synchronization validation, whole-process logs including shutdown): vanilla-baseline, entity-mrt, begin-fragment-stage, compute-color-target, compute-ssbo-only, cloud-model-view, normal-atlas-animated and water-shadow-depth-terrain all pass with zero diagnostics. Logs `build/final-1.21.4-<fixture>.log`, reports `build/targets/1.21.4/reports/final-<fixture>/result.json`. `build validateShaders -PtargetMinecraft=1.21.4` passes 706 tests and `checkLegacy4PipelineAdapters` (`build/claude-build-1.21.4.log`); `verify_jar.py --target 1.21.4` passes. Regression builds for 1.21.11/10/9/5 pass (`build/claude-regress-<target>.log`). CI and the release workflow build, verify and attach the 1.21.4 JAR.
+
+Still not targets: 1.21–1.21.3 (separate VulkanMod generations; 1.21.4's backend is the starting point) and 1.21.6–1.21.8 (no VulkanMod release).

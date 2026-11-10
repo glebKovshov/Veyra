@@ -1,0 +1,12 @@
+# Sources from the shared and 1.21.5 layers that hook classes absent before Minecraft 1.21.5.
+# dev.veyra.compat calls the same Veyra entry points directly instead.
+dev/veyra/mixin/VkCommandEncoderMixin.java
+dev/veyra/mixin/VkRenderPassMixin.java
+dev/veyra/mixin/VkGpuDeviceMixin.java
+dev/veyra/mixin/VkGpuBufferMixin.java
+dev/veyra/mixin/LegacyPipelineBindingsMixin.java
+dev/veyra/mixin/LegacyTextureFormatMixin.java
+dev/veyra/mixin/accessor/ShaderCompilationKeyAccessor.java
+dev/veyra/mixin/accessor/LegacyGpuTextureSamplerAccessor.java
+dev/veyra/vulkan/LegacyUniformMetadata.java
+dev/veyra/vulkan/LegacyTextureSlotCache.java
