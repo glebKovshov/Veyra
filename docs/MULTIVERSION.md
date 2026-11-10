@@ -82,17 +82,17 @@ On Linux/macOS use `./gradlew` in place of `.\gradlew.bat`.
 
 | Minecraft | Distributable |
 | --- | --- |
-| 1.21.2 | `build/targets/1.21.2/libs/veyra-1.1.0+mc1.21.2.jar` |
-| 1.21.1 | `build/targets/1.21.1/libs/veyra-1.1.0+mc1.21.1.jar` |
-| 1.21 | `build/targets/1.21/libs/veyra-1.1.0+mc1.21.jar` |
-| 1.21.3 | `build/targets/1.21.3/libs/veyra-1.1.0+mc1.21.3.jar` |
-| 1.21.4 | `build/targets/1.21.4/libs/veyra-1.1.0+mc1.21.4.jar` |
-| 1.21.5 | `build/targets/1.21.5/libs/veyra-1.1.0+mc1.21.5.jar` |
-| 1.21.9 | `build/targets/1.21.9/libs/veyra-1.1.0+mc1.21.9.jar` |
-| 1.21.10 | `build/targets/1.21.10/libs/veyra-1.1.0+mc1.21.10.jar` |
-| 1.21.11 | `build/libs/veyra-1.1.0+mc1.21.11.jar` |
+| 1.21 | `build/targets/1.21/libs/veyra-1.2.0+mc1.21.jar` |
+| 1.21.1 | `build/targets/1.21.1/libs/veyra-1.2.0+mc1.21.1.jar` |
+| 1.21.2 | `build/targets/1.21.2/libs/veyra-1.2.0+mc1.21.2.jar` |
+| 1.21.3 | `build/targets/1.21.3/libs/veyra-1.2.0+mc1.21.3.jar` |
+| 1.21.4 | `build/targets/1.21.4/libs/veyra-1.2.0+mc1.21.4.jar` |
+| 1.21.5 | `build/targets/1.21.5/libs/veyra-1.2.0+mc1.21.5.jar` |
+| 1.21.9 | `build/targets/1.21.9/libs/veyra-1.2.0+mc1.21.9.jar` |
+| 1.21.10 | `build/targets/1.21.10/libs/veyra-1.2.0+mc1.21.10.jar` |
+| 1.21.11 | `build/libs/veyra-1.2.0+mc1.21.11.jar` |
 
-Use a distinct project cache for each target when switching versions. Shared Gradle task history can delete another target's outputs as stale. CI builds and verifies all seven targets separately.
+Use a distinct project cache for each target when switching versions. Shared Gradle task history can delete another target's outputs as stale. CI builds and verifies all nine targets separately.
 
 Each JAR declares its exact Minecraft and VulkanMod dependency versions. The verifier checks metadata, entrypoints and the absence of graphics-test classes. Upload only the matching release JAR to Modrinth; source JARs and test harnesses are not installable releases.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 - 2026-11-10
+
+- Separate JARs for Minecraft 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.9, 1.21.10 and 1.21.11, each pinned to its VulkanMod release (0.6.7+1.21.1, 0.5.3, 0.5.6, 0.6.6, 0.6.8). 1.21.6-1.21.8 have no VulkanMod release.
+- 1.21.4 and older: a compatibility backend provides Minecraft's later GPU device API, render pipelines and command encoder; vanilla render types and program binds are described as the later pipelines so routing is shared. 1.21.3 and older also cover VulkanMod 0.5.3's names and terrain layout and program-drawn sky stages. 1.21.1 and 1.21 read core shaders directly, compile with VulkanMod 0.6.7's GLSL parser (keeping multiple fragment outputs) and emulate the frame graph and post passes.
+- OpenGL-emulation fixes on older VulkanMod: clears with nothing bound reach the main target, post passes apply their pipeline state, render-target creation/resize restore the previous pass, sampled depth-stencil images use depth-only views.
+- CI and releases build, verify and attach every target.
+- Validation: 706-707 JUnit tests, shader compilation and JAR verification on every target; eight graphics fixtures with zero Vulkan core/sync diagnostics on 1.21-1.21.5 (RTX 3070); seven shader fixtures on 1.21.9/1.21.10. Shader-pack sky stages are not applied before 1.21.6.
+
 ## 1.1.0 - 2026-11-08
 
 - Photon v1.4 runs end to end: raw 3D textures from `.dat` files, Iris core-profile inputs in leash and line programs, entity tangents and struct varyings, Vulkan GLSL portability (the `sampler` identifier, multi-line layouts, narrow fragment outputs, float depth-compare results), and the `RG16F` color format. A matched foliage scene against Iris 1.10.8 differs by about 6/255 RGB MAE.
