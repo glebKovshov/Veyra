@@ -7,8 +7,8 @@
 A client-side shader loader for Minecraft that brings a supported subset of Iris-style shader packs to Vulkan.
 
 [![Build](https://github.com/glebKovshov/Veyra/actions/workflows/build.yml/badge.svg)](https://github.com/glebKovshov/Veyra/actions/workflows/build.yml)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.4%E2%80%931.21.5%20%7C%201.21.9%E2%80%931.21.11-62B47A)](#requirements)
-[![VulkanMod](https://img.shields.io/badge/VulkanMod-0.5.6%20%7C%200.6.6%20%7C%200.6.8-A66CFF)](#requirements)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.2%E2%80%931.21.5%20%7C%201.21.9%E2%80%931.21.11-62B47A)](#requirements)
+[![VulkanMod](https://img.shields.io/badge/VulkanMod-0.5.3%20%7C%200.5.6%20%7C%200.6.6%20%7C%200.6.8-A66CFF)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [**Download**](https://github.com/glebKovshov/Veyra/releases) / [Release notes](RELEASE_NOTES.md) / [Report an issue](https://github.com/glebKovshov/Veyra/issues) / [Contribute](CONTRIBUTING.md)
@@ -39,10 +39,12 @@ Each Minecraft version has its own Veyra JAR, built against one exact VulkanMod 
 | **1.21.9** | **0.6.6** | `veyra-<version>+mc1.21.9.jar` |
 | **1.21.5** | **0.5.6** | `veyra-<version>+mc1.21.5.jar` |
 | **1.21.4** | **0.5.6** | `veyra-<version>+mc1.21.4.jar` |
+| **1.21.3** | **0.5.3** | `veyra-<version>+mc1.21.3.jar` |
+| **1.21.2** | **0.5.3** | `veyra-<version>+mc1.21.2.jar` |
 
 You also need Fabric Loader **0.18.4 or newer**, Java **21 or newer**, and a GPU and driver supported by VulkanMod.
 
-VulkanMod's exact version matters: Veyra integrates with its internal rendering classes. Other VulkanMod versions require compatibility testing. VulkanMod has no release for Minecraft 1.21.6–1.21.8, so Veyra cannot support them. Minecraft 1.21–1.21.3 are not supported yet; see [multi-version notes](docs/MULTIVERSION.md).
+VulkanMod's exact version matters: Veyra integrates with its internal rendering classes. Other VulkanMod versions require compatibility testing. VulkanMod has no release for Minecraft 1.21.6–1.21.8, so Veyra cannot support them. Minecraft 1.21 and 1.21.1 are not supported yet, and versions before 1.21.6 do not apply shader-pack sky stages; see [multi-version notes](docs/MULTIVERSION.md).
 
 ## Installation
 

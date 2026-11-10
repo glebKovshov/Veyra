@@ -8,4 +8,5 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(value = Renderer.class, remap = false)
 public interface RendererFramebufferAccessor {
     @Accessor("boundFramebuffer") void veyra$setBoundFramebuffer(Framebuffer framebuffer);
+    @Accessor("boundFramebuffer") Framebuffer veyra$getBoundFramebuffer();
 }

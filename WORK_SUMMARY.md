@@ -2510,3 +2510,16 @@ Runtime faults found and fixed during GPU bring-up, all invisible to compilation
 Evidence (RTX 3070, Vulkan core + synchronization validation, whole-process logs including shutdown): vanilla-baseline, entity-mrt, begin-fragment-stage, compute-color-target, compute-ssbo-only, cloud-model-view, normal-atlas-animated and water-shadow-depth-terrain all pass with zero diagnostics. Logs `build/final-1.21.4-<fixture>.log`, reports `build/targets/1.21.4/reports/final-<fixture>/result.json`. `build validateShaders -PtargetMinecraft=1.21.4` passes 706 tests and `checkLegacy4PipelineAdapters` (`build/claude-build-1.21.4.log`); `verify_jar.py --target 1.21.4` passes. Regression builds for 1.21.11/10/9/5 pass (`build/claude-regress-<target>.log`). CI and the release workflow build, verify and attach the 1.21.4 JAR.
 
 Still not targets: 1.21–1.21.3 (separate VulkanMod generations; 1.21.4's backend is the starting point) and 1.21.6–1.21.8 (no VulkanMod release).
+
+## 2026-11-10: Minecraft 1.21.2 and 1.21.3 targets
+
+Both pin VulkanMod 0.5.3 (`mr9uxFGT`, one JAR for both versions) and build on the 1.21.4 backend. `src/minecraft1213` and `veyraLegacy3Line` cover what changed; see `docs/MULTIVERSION.md`.
+
+Faults found during bring-up:
+- 0.5.3's compressed terrain vertex stores color before UV0 (as a normalized `vec4`). Veyra's extended format initially followed 0.5.6's order. That produced 12 `VUID-VkGraphicsPipelineCreateInfo-Input-08733` vertex-input mismatches in vanilla mode; the format and adapter markers now follow 0.5.3.
+- 1.21.3 has no `VertexBuffer.drawWithRenderType`, so that 1.21.4 hook is excluded. The generated mixin list honours exclusions; an excluded-but-listed mixin crashed startup once.
+- Animation metadata is read through `forEachFrame` rather than an accessor, so it also works in plain unit tests.
+
+Evidence (RTX 3070, core + synchronization validation, whole-process logs): vanilla-baseline plus the seven release fixtures pass with zero diagnostics on 1.21.3 and on 1.21.2 (logs `build/final-1.21.{2,3}-<fixture>.log`). 706 tests, `checkLegacy4PipelineAdapters` and `validateShaders` pass on both; `verify_jar.py` passes for both JARs. Static mixin checks find no target differences between 1.21.2 and 1.21.3.
+
+The sky-stage fixtures (`skybasic-vertex-execution`, `skytextured-stage-variants`) fail on 1.21.3, 1.21.4 and the released 1.21.5 alike: the shared renderer recognises the sky only by the 1.21.6+ `core/sky` shaders. This is documented as a limitation before 1.21.6. 1.21/1.21.1 (VulkanMod 0.6.7+1.21.1) remain unported.

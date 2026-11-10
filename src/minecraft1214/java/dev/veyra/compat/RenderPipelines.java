@@ -3,7 +3,6 @@ package dev.veyra.compat;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import java.util.List;
-import net.minecraft.client.renderer.RenderType;
 
 /** Stand-in for the 1.21.5 pipeline registry, backed by the vanilla render types. */
 public final class RenderPipelines {
@@ -19,5 +18,5 @@ public final class RenderPipelines {
     public static List<RenderPipeline> getStaticPipelines() { return VanillaPipelines.all(); }
 
     /** The sky disc pipeline; resolved on use because program configs change with resource reloads. */
-    public static RenderPipeline sky() { return VanillaPipelines.of(RenderType.sky()); }
+    public static RenderPipeline sky() { return VanillaRenderTypes.sky(); }
 }

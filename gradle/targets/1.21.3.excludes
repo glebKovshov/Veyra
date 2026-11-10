@@ -1,0 +1,5 @@
+# Item render states and the model resolver arrived in Minecraft 1.21.4; LegacyItemRendererMixin hooks ItemRenderer instead.
+dev/veyra/mixin/ItemModelResolverMixin.java
+dev/veyra/mixin/ItemStackRenderStateMixin.java
+dev/veyra/accessor/ItemStackRenderStateAccess.java
+dev/veyra/mixin/LegacyVertexBufferDrawMixin.java

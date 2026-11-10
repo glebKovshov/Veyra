@@ -35,6 +35,14 @@ jobs:
             gradle_args: '-PtargetMinecraft=1.21.4'
             verify_args: '--target 1.21.4'
             build_dir: build/targets/1.21.4
+          - minecraft: '1.21.3'
+            gradle_args: '-PtargetMinecraft=1.21.3'
+            verify_args: '--target 1.21.3'
+            build_dir: build/targets/1.21.3
+          - minecraft: '1.21.2'
+            gradle_args: '-PtargetMinecraft=1.21.2'
+            verify_args: '--target 1.21.2'
+            build_dir: build/targets/1.21.2
     steps:
       - name: Check out source
         uses: actions/checkout@v7

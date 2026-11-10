@@ -36,7 +36,8 @@ public final class VanillaPipelines {
     /** Every pipeline for the render types vanilla creates, like the later static pipeline list. */
     public static synchronized List<RenderPipeline> all() {
         dropStaleDescriptions();
-        for (RenderType type : vanillaTypes()) of(type);
+        for (RenderType type : VanillaRenderTypes.types()) of(type);
+        VanillaRenderTypes.programPipelines();
         return new ArrayList<>(BY_KEY.values());
     }
 
@@ -117,6 +118,40 @@ public final class VanillaPipelines {
         return pipeline;
     }
 
+    /**
+     * Describes a draw that binds a shader program without a render type. The state fields only
+     * classify the pipeline; the draw keeps the render state its caller set.
+     */
+    public static synchronized RenderPipeline ofProgram(String location, ShaderProgram program,
+            com.mojang.blaze3d.vertex.VertexFormat.Mode mode, boolean blend) {
+        dropStaleDescriptions();
+        String key = location + '|' + program.configId() + '|' + mode;
+        RenderPipeline existing = BY_KEY.get(key);
+        if (existing != null) return existing;
+        ShaderProgramConfig config = ShaderSources.program(program.configId());
+        if (config == null) return null;
+        String modern = modernShader(location);
+        if (modern != null) {
+            MODERN_SHADERS.put(config.vertex(), modern);
+            MODERN_SHADERS.put(config.fragment(), modern);
+        }
+        RenderPipeline.Builder builder = RenderPipeline.builder()
+                .withLocation(ResourceLocation.withDefaultNamespace("pipeline/" + location))
+                .withVertexShader(config.vertex())
+                .withFragmentShader(config.fragment())
+                .withVertexFormat(program.vertexFormat(), mode)
+                .withDepthWrite(false);
+        if (blend) builder.withBlend(BlendFunction.TRANSLUCENT);
+        var defines = config.defines().withOverrides(program.defines());
+        defines.values().forEach((define, value) -> builder.withShaderDefine(define, value));
+        defines.flags().forEach(builder::withShaderDefine);
+        config.samplers().forEach(sampler -> builder.withSampler(sampler.name()));
+        for (ShaderProgramConfig.Uniform uniform : config.uniforms()) builder.withUniform(uniform.name(), uniformType(uniform));
+        RenderPipeline pipeline = builder.build();
+        BY_KEY.put(key, pipeline);
+        return pipeline;
+    }
+
     /** The 1.21.5 pipeline name of a 1.21.4 render type; most are unchanged. */
     private static String location(String name, boolean blend, boolean writeDepth) {
         return switch (name) {
@@ -187,28 +222,4 @@ public final class VanillaPipelines {
         };
     }
 
-    private static List<RenderType> vanillaTypes() {
-        return List.of(
-                RenderType.armorCutoutNoCull(TEXTURE), RenderType.createArmorDecalCutoutNoCull(TEXTURE),
-                RenderType.armorTranslucent(TEXTURE), RenderType.entitySolid(TEXTURE),
-                RenderType.entitySolidZOffsetForward(TEXTURE), RenderType.entityCutout(TEXTURE),
-                RenderType.entityCutoutNoCull(TEXTURE), RenderType.entityCutoutNoCullZOffset(TEXTURE),
-                RenderType.itemEntityTranslucentCull(TEXTURE), RenderType.entityTranslucent(TEXTURE),
-                RenderType.entityTranslucentEmissive(TEXTURE), RenderType.entitySmoothCutout(TEXTURE),
-                RenderType.beaconBeam(TEXTURE, false), RenderType.beaconBeam(TEXTURE, true),
-                RenderType.entityDecal(TEXTURE), RenderType.entityNoOutline(TEXTURE), RenderType.entityShadow(TEXTURE),
-                RenderType.dragonExplosionAlpha(TEXTURE), RenderType.eyes(TEXTURE), RenderType.leash(),
-                RenderType.armorEntityGlint(), RenderType.glintTranslucent(), RenderType.glint(), RenderType.entityGlint(),
-                RenderType.crumbling(TEXTURE), RenderType.text(TEXTURE), RenderType.textBackground(),
-                RenderType.textIntensity(TEXTURE), RenderType.textPolygonOffset(TEXTURE),
-                RenderType.textIntensityPolygonOffset(TEXTURE), RenderType.textSeeThrough(TEXTURE),
-                RenderType.textBackgroundSeeThrough(), RenderType.textIntensitySeeThrough(TEXTURE),
-                RenderType.lightning(), RenderType.dragonRays(), RenderType.dragonRaysDepth(),
-                RenderType.lines(), RenderType.secondaryBlockOutline(), RenderType.lineStrip(),
-                RenderType.worldBorder(false), RenderType.worldBorder(true),
-                RenderType.opaqueParticle(TEXTURE), RenderType.translucentParticle(TEXTURE),
-                RenderType.weather(TEXTURE, false), RenderType.weather(TEXTURE, true),
-                RenderType.sky(), RenderType.endSky(), RenderType.sunriseSunset(), RenderType.stars(),
-                RenderType.celestial(TEXTURE));
-    }
 }

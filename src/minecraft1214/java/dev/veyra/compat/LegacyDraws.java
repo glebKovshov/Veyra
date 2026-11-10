@@ -150,6 +150,13 @@ public final class LegacyDraws {
         }
     }
 
+    /** Routes a draw that binds a vanilla shader program without a render type. */
+    public static void beginProgramDraw(RenderPipeline original) {
+        if (original == null || !VeyraRenderer.isRenderingEnabled()) return;
+        RenderPipeline active = route(original);
+        if (active != null && active.getProgram() != null) RenderSystem.setShader(active.getProgram().program());
+    }
+
     // The order matches the pipeline routing of the later render pass hook.
     private static RenderPipeline route(RenderPipeline original) {
         if (VeyraRenderer.isGuiRendering() || !VeyraRenderer.shaderPackTexturesReady()) return null;
