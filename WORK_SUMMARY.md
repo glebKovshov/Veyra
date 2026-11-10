@@ -2176,6 +2176,22 @@ This is an implementation tracker, not a list of supported releases. The publish
 
 ## Dependency inventory
 
+## 2026-11-10: Minecraft 1.21 and 1.21.1 targets
+
+Both pin VulkanMod 0.6.7+1.21.1 (`2eqroDKD`), which declares both versions. They build on the 1.21.3 port with `src/minecraft1211` and `veyraLegacy1Line`. The 1.21 profile builds the same port against the 1.21 game (`minecraft_release=1.21`). See `docs/MULTIVERSION.md`.
+
+VulkanMod 0.6.7 has 0.6.x internals: the shared hooks for the parser, uniform blocks, framebuffer mips, terrain builder and swapchain apply instead of the 0.5.x overrides. Its terrain renderer mixes both generations, so 1.21.1 has its own `WorldRendererMixin`. The shared 0.5.x-only rewrites and test fixtures were narrowed: `veyraVulkan05Line` for 1.21.2–1.21.5, `veyraVulkan053Line` for 1.21.2/1.21.3, and the 0.5.3 terrain/buffer fixture rewrites. A filter that had been applied twice to 1.21.2/1.21.3 test sources was removed.
+
+Faults found during bring-up:
+- 0.6.7's GLSL parser reads every `layout(...)` as a uniform block and accepts a single fragment output. Interface locations are stripped; fragment outputs are hidden from the parser and declared again with their locations.
+- Shared shaders use the 1.21.6+ fog-range names; 1.21.1 supplies only `FogStart`/`FogEnd`, so the later names are registered as aliases.
+- The cloud shader has the older fragment-only fog block (the 0.5.x layout); `VeyraCloudConfigs` adapts it.
+- Post-effect stages live in `shaders/program` before 1.21.2.
+
+Evidence (RTX 3070, core + synchronization validation, whole-process logs): vanilla-baseline plus the seven release fixtures pass with zero diagnostics on 1.21.1 and on 1.21 (logs `build/final-1.21{,.1}-<fixture>.log`). On each, `build validateShaders` passes 706 tests (2 skipped: 0.5.x presentation-hook contracts that do not apply to 0.6.7), and `verify_jar.py` passes. Static mixin checks against the 1.21 and 1.21.1 named jars find no missing targets. Regression builds for 1.21.2–1.21.5 and 1.21.9–1.21.11 pass (`build/claude-regress-<target>.log`).
+
+1.21.6–1.21.8 remain impossible without a VulkanMod release.
+
 VulkanMod releases advertised by the [Modrinth version API](https://api.modrinth.com/v2/project/JYQhtZtO/version), checked 2026-11-08:
 
 | Minecraft | VulkanMod candidate | Modrinth version ID | Veyra status |
@@ -2522,4 +2538,4 @@ Faults found during bring-up:
 
 Evidence (RTX 3070, core + synchronization validation, whole-process logs): vanilla-baseline plus the seven release fixtures pass with zero diagnostics on 1.21.3 and on 1.21.2 (logs `build/final-1.21.{2,3}-<fixture>.log`). 706 tests, `checkLegacy4PipelineAdapters` and `validateShaders` pass on both; `verify_jar.py` passes for both JARs. Static mixin checks find no target differences between 1.21.2 and 1.21.3.
 
-The sky-stage fixtures (`skybasic-vertex-execution`, `skytextured-stage-variants`) fail on 1.21.3, 1.21.4 and the released 1.21.5 alike: the shared renderer recognises the sky only by the 1.21.6+ `core/sky` shaders. This is documented as a limitation before 1.21.6. 1.21/1.21.1 (VulkanMod 0.6.7+1.21.1) remain unported.
+The sky-stage fixtures (`skybasic-vertex-execution`, `skytextured-stage-variants`) fail on 1.21.3, 1.21.4 and the released 1.21.5 alike: the shared renderer recognises the sky only by the 1.21.6+ `core/sky` shaders. This is documented as a limitation before 1.21.6.

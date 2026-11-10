@@ -4,7 +4,7 @@ Veyra builds a separate JAR for each exact Minecraft version. The table below re
 
 | Minecraft | Pinned VulkanMod | Status |
 | --- | --- | --- |
-| 1.21 / 1.21.1 | 0.6.7+1.21.1 (`2eqroDKD`) | Not supported yet (see below) |
+| 1.21 / 1.21.1 | 0.6.7+1.21.1 (`2eqroDKD`) | Separate JARs; full build, 706 tests, shader compilation and the same seven GPU fixtures pass on each |
 | 1.21.2 / 1.21.3 | 0.5.3 (`mr9uxFGT`) | Separate JARs; full build, 706 tests, shader compilation and the same seven GPU fixtures pass on each |
 | 1.21.4 | 0.5.6 (`RAtVo03C`) | Full build, 706 tests, shader compilation and the same seven GPU fixtures as 1.21.5 pass |
 | 1.21.5 | 0.5.6 (`7pYvUnJk`) | Full build, 707 tests, shader compilation and seven representative GPU fixtures pass |
@@ -48,11 +48,19 @@ These versions build on the 1.21.4 backend. `src/minecraft1213/java` covers what
 
 ### Known limitation before 1.21.6
 
-The shared renderer recognises the vanilla sky by the `core/sky` and `core/stars` shaders introduced in 1.21.6. On 1.21.2–1.21.5 the sky uses `core/position`, so the `gbuffers_skybasic` and `gbuffers_skytextured` stages are not applied. Vanilla sky rendering is unaffected. The `skybasic-vertex-execution` and `skytextured-stage-variants` fixtures fail identically on 1.21.3, 1.21.4 and 1.21.5. Weather and particle stages were not validated on these versions.
+The shared renderer recognises the vanilla sky by the `core/sky` and `core/stars` shaders introduced in 1.21.6. On 1.21–1.21.5 the sky uses `core/position`, so the `gbuffers_skybasic` and `gbuffers_skytextured` stages are not applied. Vanilla sky rendering is unaffected. The `skybasic-vertex-execution` and `skytextured-stage-variants` fixtures fail identically on 1.21.3, 1.21.4 and 1.21.5. Weather and particle stages were not validated on these versions.
 
-### Why 1.21 and 1.21.1 are not targets yet
+### How 1.21 and 1.21.1 are supported
 
-They pin VulkanMod 0.6.7+1.21.1, which predates the renderer internals shared by 0.5.3–0.5.6. Minecraft 1.21.1 also predates `CompiledShaderProgram`, the shader-program records and the frame-graph post chain. They need their own port and GPU validation.
+These versions build on the 1.21.3 port. `src/minecraft1211/java` covers what Minecraft added in 1.21.2, and `veyraLegacy1Line` in `build.gradle` rewrites the shared sources:
+
+- **Shader instances.** 1.21.1 has no shader manager, program keys, program configs or compiled programs. `ShaderSources` reads core shader configs and sources from the resource manager and resolves `#moj_import` the way the 1.21.1 shader instance does. `ShaderProgram` and `ShaderProgramConfig` stand in for the later records, and `ShaderInstance` takes the place of `CompiledShaderProgram`.
+- **VulkanMod 0.6.7.** Its internals are 0.6.x, so the shared hooks apply rather than the 0.5.x overrides. `VkGpuDevice` compiles Veyra's pipelines with 0.6.7's GLSL parser, as VulkanMod compiles its own. A shader instance holds the uniforms so vanilla draw paths can bind the result. This parser accepts a single fragment output and no `layout` qualifiers on interface variables. Fragment outputs are therefore declared again with their locations after parsing, and uniform blocks are lowered to named uniforms.
+- **Frame graph.** 1.21.1 renders the level inline. `FrameGraphBuilder`, `FramePass` and `PostPass` provide the 1.21.2 post-chain API. The level hooks run Veyra's begin, shadow and prepare passes after the fog color is set and before the main target is cleared.
+- **Sky, entities and fog.** The level renderer draws the sky itself, and entities are drawn without render states. 1.21.1 has a single fog range, so the later fog-range uniform names read it. VulkanMod 0.6.7's cloud shader has the older fog block.
+- **Older Minecraft APIs:** `RenderSystem.clear` and render targets take the macOS flag, `NativeImage` pixels are ABGR, and colors are vectors.
+
+Minecraft 1.21 builds the same port against the 1.21 game (`gradle/targets/1.21.properties` sets `minecraft_release=1.21`). VulkanMod 0.6.7+1.21.1 declares both versions.
 
 ## Build an exact-version package
 
@@ -63,7 +71,7 @@ Use JDK 21. Target properties are in `gradle/targets/`. For example:
 python scripts/verify_jar.py --target 1.21.5
 ```
 
-Replace `1.21.5` with `1.21.2`, `1.21.3`, `1.21.4`, `1.21.9` or `1.21.10` for those packages. Without a target property, the default is 1.21.11:
+Replace `1.21.5` with `1.21`, `1.21.1`, `1.21.2`, `1.21.3`, `1.21.4`, `1.21.9` or `1.21.10` for those packages. Without a target property, the default is 1.21.11:
 
 ```powershell
 .\gradlew.bat --project-cache-dir .gradle/targets/1.21.11 build validateShaders
@@ -75,6 +83,8 @@ On Linux/macOS use `./gradlew` in place of `.\gradlew.bat`.
 | Minecraft | Distributable |
 | --- | --- |
 | 1.21.2 | `build/targets/1.21.2/libs/veyra-1.1.0+mc1.21.2.jar` |
+| 1.21.1 | `build/targets/1.21.1/libs/veyra-1.1.0+mc1.21.1.jar` |
+| 1.21 | `build/targets/1.21/libs/veyra-1.1.0+mc1.21.jar` |
 | 1.21.3 | `build/targets/1.21.3/libs/veyra-1.1.0+mc1.21.3.jar` |
 | 1.21.4 | `build/targets/1.21.4/libs/veyra-1.1.0+mc1.21.4.jar` |
 | 1.21.5 | `build/targets/1.21.5/libs/veyra-1.1.0+mc1.21.5.jar` |
@@ -90,7 +100,7 @@ Each JAR declares its exact Minecraft and VulkanMod dependency versions. The ver
 
 The build runs JUnit, pinned native adapter checks and shader compilation. GPU validation uses isolated test worlds and the Vulkan core and synchronization validation layers. Passing means the fixture's image assertions pass and its entire process log, including shutdown, has no validation errors. A successful Gradle process alone is insufficient.
 
-The representative matrix, run on 1.21.2–1.21.5, covers entity MRT, begin-stage fragments, HDR compute targets, compute SSBOs, cloud model-view inputs, animated normal/specular atlases, and water with separate opaque/translucent shadow depth. These checks do not establish compatibility with every third-party shader pack.
+The representative matrix, run on 1.21–1.21.5, covers entity MRT, begin-stage fragments, HDR compute targets, compute SSBOs, cloud model-view inputs, animated normal/specular atlases, and water with separate opaque/translucent shadow depth. These checks do not establish compatibility with every third-party shader pack.
 
 Legacy backends keep sampler state on textures. Conflicting simultaneous sampler settings for aliases of one texture remain a limitation. On 1.21.5, native bindings currently require full-range texture views; subrange bindings fail explicitly. Independent sampler aliases and texture subranges need further implementation and graphics coverage before full pack parity can be claimed.
 

@@ -1,0 +1,40 @@
+# Minecraft 1.21.1 with VulkanMod 0.6.7+1.21.1.
+# VulkanMod 0.6.7 has the modern 0.6.x internals: the shared hooks apply, not the 0.5.x overrides.
+minecraft1215:dev/veyra/mixin/DrawBuffersMixin.java
+minecraft1215:dev/veyra/mixin/GLSLParserMixin.java
+minecraft1215:dev/veyra/mixin/GraphicsPipelineMixin.java
+minecraft1215:dev/veyra/mixin/ImageUtilReadbackMixin.java
+minecraft1215:dev/veyra/mixin/RendererSubmissionMixin.java
+minecraft1215:dev/veyra/mixin/RendererSurfaceRecoveryMixin.java
+minecraft1215:dev/veyra/mixin/SwapChainMixin.java
+minecraft1215:dev/veyra/mixin/VeyraUniformsMixin.java
+minecraft1215:dev/veyra/mixin/VulkanModOptionScreenMixin.java
+minecraft1215:dev/veyra/mixin/accessor/NativeDescriptorSetsAccessor.java
+minecraft1214:dev/veyra/mixin/GLSLParserMixin.java
+minecraft1213:dev/veyra/mixin/ImageUtilReadbackMixin.java
+# Hooks for VulkanMod 0.5.x classes and members that 0.6.7 does not have.
+dev/veyra/mixin/LegacyDescriptorSetsMixin.java
+dev/veyra/mixin/LegacyUniformParserMixin.java
+dev/veyra/mixin/Legacy4UniformParserMixin.java
+dev/veyra/mixin/LegacyVertexAttributesMixin.java
+dev/veyra/mixin/LegacyTerrainBuilderMixin.java
+dev/veyra/mixin/accessor/LegacyBufferAccessor.java
+dev/veyra/compat/LegacyBuffer.java
+dev/veyra/vulkan/LegacyPipelineBuilder.java
+dev/veyra/vulkan/LegacyPipelineConfig.java
+dev/veyra/vulkan/LegacyPipelineConfigs.java
+dev/veyra/vulkan/LegacyShaderLoadUtil.java
+dev/veyra/vulkan/LegacyNativeSamplers.java
+dev/veyra/vulkan/LegacyDescriptorBuffers.java
+dev/veyra/vulkan/LegacyMainPassAccess.java
+dev/veyra/mixin/accessor/LegacyMainPassAccessor.java
+dev/veyra/mixin/accessor/LegacyVulkanImageSamplerAccessor.java
+# Minecraft 1.21.1 has no shader manager, compiled programs or GPU buffer objects.
+dev/veyra/mixin/accessor/MinecraftAccessor.java
+dev/veyra/mixin/LegacyShaderConfigsMixin.java
+dev/veyra/mixin/accessor/ShaderSourceKeyAccessor.java
+dev/veyra/mixin/accessor/CompiledShaderProgramInvoker.java
+dev/veyra/vulkan/VeyraVertexBuffers.java
+# VulkanMod 0.6.7 has the 0.6.x descriptor and buffer constructors of the shared sources.
+minecraft1215:dev/veyra/vulkan/VeyraStorageDescriptor.java
+minecraft1215:dev/veyra/vulkan/VeyraImageDescriptorBase.java

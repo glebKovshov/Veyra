@@ -10,9 +10,13 @@ if (project.hasProperty('targetMinecraft')) {
     def target = new Properties()
     targetFile.withInputStream { target.load(it) }
     target.each { key, value -> project.ext.set(key.toString(), value.toString()) }
+    // A target may run on a release other than the port line it builds with (1.21 uses the 1.21.1 port).
+    if (!target.containsKey('minecraft_release')) project.ext.set('minecraft_release', project.minecraft_version)
     // One release version for every target; only the +mc suffix differs.
-    project.ext.set('mod_version', project.mod_version.replaceFirst(/\+mc.*$/, '') + "+mc${project.minecraft_version}")
+    project.ext.set('mod_version', project.mod_version.replaceFirst(/\+mc.*$/, '') + "+mc${project.minecraft_release}")
     layout.buildDirectory = file("build/targets/${project.property('targetMinecraft')}")
+} else {
+    project.ext.set('minecraft_release', project.minecraft_version)
 }
 
 version = project.mod_version
@@ -31,7 +35,7 @@ repositories {
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    minecraft "com.mojang:minecraft:${project.minecraft_release}"
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modCompileOnly "maven.modrinth:JYQhtZtO:${project.vulkanmod_id}"
@@ -57,7 +61,7 @@ dependencies {
 
 test {
     useJUnitPlatform()
-    systemProperty 'veyra.test.minecraft', project.minecraft_version
+    systemProperty 'veyra.test.minecraft', project.minecraft_release
 }
 
 loom {
@@ -69,11 +73,11 @@ loom {
 
 processResources {
     inputs.property 'version', project.version
-    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'minecraft_version', project.minecraft_release
     inputs.property 'vulkanmod_version', project.vulkanmod_version
     filesMatching('fabric.mod.json') {
-        expand version: project.version, minecraft_version: project.minecraft_version, vulkanmod_version: project.vulkanmod_version
-        if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5']) filter { line -> line.replace(
+        expand version: project.version, minecraft_version: project.minecraft_release, vulkanmod_version: project.vulkanmod_version
+        if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5']) filter { line -> line.replace(
                 '"client": ["dev.veyra.VeyraClient"]',
                 '"preLaunch": ["dev.veyra.VeyraLegacyBootstrap"],\n    "client": ["dev.veyra.VeyraClient"]') }
     }
@@ -90,8 +94,8 @@ java {
     withSourcesJar()
 }
 
-if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.9', '1.21.10']) {
-    def minecraftParts = project.minecraft_version.tokenize('.').collect { it.toInteger() }
+if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.9', '1.21.10']) {
+    def minecraftParts = (project.minecraft_release.tokenize('.') + ['0']).collect { it.toInteger() }
     def shaderMinecraftVersion = minecraftParts[0] * 10000 + minecraftParts[1] * 100 + minecraftParts[2]
     ext.veyraPortLine = { line -> line.replaceAll('\\bIdentifier\\b', 'ResourceLocation')
                 .replace('macros.put("MC_VERSION", "12111");', "macros.put(\"MC_VERSION\", \"${shaderMinecraftVersion}\");")
@@ -159,6 +163,22 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
     // VulkanMod 0.5.3 (Minecraft 1.21.2/1.21.3) names its OpenGL emulation and buffer classes differently,
     // its images have no name, and Minecraft 1.21.3 predates several texture and color helpers.
     ext.veyraLegacy3Line = { line -> line
+                    .replace('metadata.frames().orElse(List.of())', 'dev.veyra.compat.LegacyAnimation.frames(metadata)')
+                    .replace('metadata.defaultFrameTime()', 'metadata.getDefaultFrameTime()')
+                    .replace('metadata.interpolatedFrames()', 'metadata.isInterpolatedFrames()')
+                    .replace('if (frame.index() < 0 || frame.index() >= frameCount)', 'if (frame.getIndex() < 0 || frame.getIndex() >= frameCount)')
+                    .replace('frame index " + frame.index()', 'frame index " + frame.getIndex()')
+                    .replace('new Frame(frame.index(), duration)', 'new Frame(frame.getIndex(), duration)')
+                    .replace('frame.timeOr(', 'frame.getTime(')
+                    .replace('AnimationMetadataSection.TYPE', 'AnimationMetadataSection.SERIALIZER')
+                    .replace('protected int scrollBarX()', 'protected int getScrollbarPosition()')
+                    // 1.21.3's world render entry point also takes the light texture.
+                    .replace('GameRenderer gameRenderer, Matrix4f modelView,', 'GameRenderer gameRenderer, net.minecraft.client.renderer.LightTexture lightTexture, Matrix4f modelView,')
+                    .replace('simple.resourceId()', '((dev.veyra.mixin.accessor.LegacySimpleTextureAccessor) simple).veyra$getLocation()')
+                    .replaceAll('net\\.minecraft\\.util\\.ARGB\\.(red|green|blue)Float\\((\\w+)\\)', '(net.minecraft.util.ARGB.$1($2) / 255.0F)') }
+    // VulkanMod 0.5.3 (Minecraft 1.21.2/1.21.3): older class names, unnamed images, protected buffer
+    // members, color-before-UV0 terrain vertices and no swapchain resize callback.
+    ext.veyraVulkan053Line = { line -> line
                     .replaceAll('\\bVkGl(Texture|Framebuffer|Renderbuffer|Buffer|Program)\\b', 'Gl$1')
                     .replace('net/vulkanmod/vulkan/memory/buffer/', 'net/vulkanmod/vulkan/memory/')
                     .replace('net.vulkanmod.vulkan.memory.buffer.', 'net.vulkanmod.vulkan.memory.')
@@ -176,38 +196,123 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                     .replace('buffer.setBufferSize(', '((dev.veyra.compat.LegacyBuffer) buffer).assignBufferSize(')
                     .replace('buffer.setId(1234)', '((dev.veyra.compat.LegacyBuffer) buffer).assignId(1234)')
                     .replace('((dev.veyra.mixin.accessor.NativeImagePixelsAccessor) (Object) data).veyra$getPixels()', 'dev.veyra.compat.LegacyImageNames.pixels(data)')
-                    .replace('metadata.frames().orElse(List.of())', 'dev.veyra.compat.LegacyAnimation.frames(metadata)')
-                    .replace('metadata.defaultFrameTime()', 'metadata.getDefaultFrameTime()')
-                    .replace('metadata.interpolatedFrames()', 'metadata.isInterpolatedFrames()')
-                    .replace('if (frame.index() < 0 || frame.index() >= frameCount)', 'if (frame.getIndex() < 0 || frame.getIndex() >= frameCount)')
-                    .replace('frame index " + frame.index()', 'frame index " + frame.getIndex()')
-                    .replace('new Frame(frame.index(), duration)', 'new Frame(frame.getIndex(), duration)')
-                    .replace('frame.timeOr(', 'frame.getTime(')
-                    .replace('AnimationMetadataSection.TYPE', 'AnimationMetadataSection.SERIALIZER')
                     // VulkanMod 0.5.3's compressed terrain vertex stores color before UV0 and reads it as a normalized vec4.
                     .replace('.add("UV0", CustomVertexFormat.ELEMENT_UV0)', '.add(VEYRA_SWAP_COLOR)')
                     .replace('.add("Color", CustomVertexFormat.ELEMENT_COLOR)', '.add("UV0", CustomVertexFormat.ELEMENT_UV0)')
                     .replace('.add(VEYRA_SWAP_COLOR)', '.add("Color", CustomVertexFormat.ELEMENT_COLOR)')
                     .replace('"layout (location = 2) in uint PackedColor;"', '"layout (location = 2) in uvec2 UV0;"')
                     .replace('#define gl_Color unpackUnorm4x8(PackedColor)', '#define gl_Color Color')
-                    .replace('protected int scrollBarX()', 'protected int getScrollbarPosition()')
-                    // 1.21.3's world render entry point also takes the light texture.
-                    .replace('GameRenderer gameRenderer, Matrix4f modelView,', 'GameRenderer gameRenderer, net.minecraft.client.renderer.LightTexture lightTexture, Matrix4f modelView,')
                     // VulkanMod 0.5.3 recreates swapchain textures without a resize callback, and its images take no name.
                     .replace('@Inject(method = {"onResize", "cleanUp"}, at = @At("HEAD"))', '@Inject(method = "cleanUp", at = @At("HEAD"))')
-                    .replace('"Lnet/vulkanmod/vulkan/texture/VulkanImage;<init>(Ljava/lang/String;JIIIIIIJ)V"), index = 7)', '"Lnet/vulkanmod/vulkan/texture/VulkanImage;<init>(JIIIIIIJ)V"), index = 6)')
-                    .replace('simple.resourceId()', '((dev.veyra.mixin.accessor.LegacySimpleTextureAccessor) simple).veyra$getLocation()')
-                    .replaceAll('net\\.minecraft\\.util\\.ARGB\\.(red|green|blue)Float\\((\\w+)\\)', '(net.minecraft.util.ARGB.$1($2) / 255.0F)') }
-    def legacyOverrides = project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5'] ? file('src/minecraft1215/java') : null
+                    .replace('"Lnet/vulkanmod/vulkan/texture/VulkanImage;<init>(Ljava/lang/String;JIIIIIIJ)V"), index = 7)', '"Lnet/vulkanmod/vulkan/texture/VulkanImage;<init>(JIIIIIIJ)V"), index = 6)') }
+    // VulkanMod 0.5.x (Minecraft 1.21.2-1.21.5) predates the 0.6 pipeline, sampler, view and pass APIs.
+    ext.veyraVulkan05Line = { line -> line
+                    .replace('worldRenderer.renderSectionLayer(layer,', 'worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.getRenderType(layer),')
+                    .replace('worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT,', 'worldRenderer.renderSectionLayer(net.minecraft.client.renderer.RenderType.translucent(),')
+                    .replace('net.vulkanmod.vulkan.shader.PipelineConfig', 'dev.veyra.vulkan.LegacyPipelineConfig')
+                    .replaceAll('\\bPipelineConfig\\b', 'LegacyPipelineConfig')
+                    .replace('net.vulkanmod.render.shader.PipelineConfigs', 'dev.veyra.vulkan.LegacyPipelineConfigs')
+                    .replaceAll('\\bPipelineConfigs\\b', 'LegacyPipelineConfigs')
+                    .replace('net.vulkanmod.render.shader.ShaderLoadUtil', 'dev.veyra.vulkan.LegacyShaderLoadUtil')
+                    .replaceAll('\\bShaderLoadUtil\\.', 'LegacyShaderLoadUtil.')
+                    .replace('LegacyPipelineConfig config = LegacyPipelineConfig.fromJson("clouds",', 'LegacyPipelineConfig config = LegacyPipelineConfigs.clouds(')
+                    .replace('LegacyShaderLoadUtil.loadShader(shaderPath, "clouds.vsh")', 'LegacyPipelineConfigs.cloudVertex(LegacyShaderLoadUtil.loadShader(shaderPath, "clouds.vsh"))')
+                    .replace('Pipeline.Builder builder = new Pipeline.Builder(', 'dev.veyra.vulkan.LegacyPipelineBuilder builder = new dev.veyra.vulkan.LegacyPipelineBuilder(')
+                    .replace('bindGraphicsImages(Pipeline.Builder builder,', 'bindGraphicsImages(dev.veyra.vulkan.LegacyPipelineBuilder builder,')
+                    .replace('Pipeline.Builder builder, String vertexSource, String fragmentSource)', 'dev.veyra.vulkan.LegacyPipelineBuilder builder, String vertexSource, String fragmentSource)')
+                    .replaceAll('\\b(\\w+)\\.getImageDescriptor\\(', 'dev.veyra.vulkan.LegacyImageDescriptors.find($1.getImageDescriptors(), ')
+                    .replace('.isStorageImage()', '.isStorageImage')
+                    .replace('net.vulkanmod.render.shader.PipelineManager', 'net.vulkanmod.render.PipelineManager')
+                    .replace('PipelineManager.getTerrainVertexFormat()', 'PipelineManager.terrainVertexFormat')
+                    .replaceAll('(Renderer\\.getInstance\\(\\)|renderer)\\.getMainPass\\(\\)', '((dev.veyra.vulkan.LegacyMainPassAccess) $1.getMainPass())')
+                    .replace('image.uploadSubTextureAsync(level, 0, ', 'image.uploadSubTextureAsync(level, ')
+                    .replace('.viewType(image.viewType)', '.viewType(VK_IMAGE_VIEW_TYPE_2D)')
+                    .replace('.layerCount(image.arrayLayers)', '.layerCount(1)')
+                    .replace('renderer.beginRenderPass(renderPass, framebuffer);', 'renderer.endRenderPass(); renderer.beginRendering(renderPass, framebuffer);')
+                    .replace('renderer.beginRenderPass(translucentRenderPass, framebuffer);', 'renderer.endRenderPass(); renderer.beginRendering(translucentRenderPass, framebuffer);')
+                    .replace('image.setSampler(SamplerManager.getSampler(true, false, mipLevels - 1));', 'texture.flushModeChanges(); image.setSampler(SamplerManager.getSampler(true, false, mipLevels - 1));')
+                    .replace('net.vulkanmod.vulkan.texture.SamplerManager.getSampler(', 'dev.veyra.vulkan.LegacyNativeSamplers.getSampler(')
+                    .replace('SamplerManager.getSampler(', 'dev.veyra.vulkan.LegacyNativeSamplers.getSampler(')
+                    .replace('view.texture().getVulkanImage().setSampler(', 'dev.veyra.vulkan.LegacyNativeSamplers.setSampler(view.texture().getVulkanImage(), ')
+                    .replaceAll('\\b(?!LegacyNativeSamplers\\b)(\\w+)\\.setSampler\\(', 'dev.veyra.vulkan.LegacyNativeSamplers.setSampler($1, ')
+                    .replace('        setSampler(sampler);', '        dev.veyra.vulkan.LegacyNativeSamplers.setSampler(this, sampler);') }
+    // Minecraft 1.21.1 and VulkanMod 0.6.7: shader instances instead of compiled programs.
+    ext.veyraLegacy1Line = { line -> line
+                    // The frame graph and its post passes arrived in 1.21.2; dev.veyra.compat stands in for them.
+                    .replace('com.mojang.blaze3d.framegraph.', 'dev.veyra.compat.')
+                    .replace('com.mojang.blaze3d.resource.', 'dev.veyra.compat.')
+                    .replace('net.minecraft.client.renderer.PostPass', 'dev.veyra.compat.PostPass')
+                    .replace('PostChain.MAIN_TARGET_ID', 'dev.veyra.compat.PostPass.MAIN_TARGET_ID')
+                    // Compiled shader programs were shader instances before 1.21.2.
+                    .replace('net.minecraft.client.renderer.CompiledShaderProgram', 'net.minecraft.client.renderer.ShaderInstance')
+                    .replaceAll('\\bCompiledShaderProgram\\b', 'ShaderInstance')
+                    .replace('net.minecraft.client.renderer.ShaderDefines', 'dev.veyra.compat.ShaderDefines')
+                    .replace('net.minecraft.util.ARGB', 'dev.veyra.compat.ARGB')
+                    .replace('.getDeltaTracker()', '.getTimer()')
+                    // Render targets take the macOS clear flag; images store ABGR.
+                    .replace('new TextureTarget(', 'dev.veyra.compat.LegacyTargets.textureTarget(')
+                    .replaceAll('\\b(\\w+)\\.setPixel\\(', 'dev.veyra.compat.LegacyNativeImages.setPixel($1, ')
+                    .replaceAll('\\b(\\w+)\\.getPixel\\(', 'dev.veyra.compat.LegacyNativeImages.getPixel($1, ')
+                    .replaceAll('\\b(\\w+)\\.getPixels\\(\\)', 'dev.veyra.compat.LegacyNativeImages.getPixels($1)')
+                    // VulkanMod 0.6.7 exposes the descriptor's texture slot through a getter.
+                    .replaceAll('\\.imageIdx\\b(?!\\s*[(=])', '.getImageIdx()')
+                    // VulkanMod 0.6.7 begins passes with beginRenderPass and returns the main depth image itself.
+                    .replace('renderer.beginRendering(', 'renderer.beginRenderPass(')
+                    .replace('import dev.veyra.vulkan.LegacyMainPassAccess;', '')
+                    .replace('((LegacyMainPassAccess) Renderer.getInstance().getMainPass()).getDepthAttachment()', 'dev.veyra.compat.LegacyMainDepth.texture()')
+                    .replaceAll('\\(\\(dev\\.veyra\\.vulkan\\.LegacyMainPassAccess\\) ([^()]+(?:\\(\\))?)\\.getMainPass\\(\\)\\)', '$1.getMainPass()')
+                    // The shader manager, program keys and configs arrived in 1.21.2; dev.veyra.compat reads
+                    // the core shader resources instead, and shader states hold suppliers of shader instances.
+                    .replace('net.minecraft.client.renderer.ShaderManager', 'dev.veyra.compat.ShaderManager')
+                    .replace('net.minecraft.client.renderer.ShaderProgram', 'dev.veyra.compat.ShaderProgram')
+                    .replace('import dev.veyra.mixin.accessor.MinecraftAccessor;', '')
+                    .replace('((MinecraftAccessor) Minecraft.getInstance()).veyra$getShaderManager()', 'dev.veyra.compat.ShaderManager.INSTANCE')
+                    .replace('.veyra$getShader().orElse(null)', '.veyra$getShader().map(ShaderProgram::of).orElse(null)')
+                    .replace('RenderSystem.setShader(active.getProgram().program());', 'RenderSystem.setShader(active.getProgram()::program);')
+                    .replace('net.vulkanmod.interfaces.shader.ShaderMixed', 'net.vulkanmod.interfaces.ShaderMixed')
+                    // VulkanMod 0.6.7 image views take a layer count; samplers come from explicit options.
+                    .replace('VK10.VK_IMAGE_ASPECT_DEPTH_BIT, sourceImage.mipLevels);', 'VK10.VK_IMAGE_ASPECT_DEPTH_BIT, 1, sourceImage.mipLevels);')
+                    .replaceAll('[\\w]+(?:\\.getInstance\\(\\))?\\.getMainPass\\(\\)\\.getDepthAttachment\\(\\)', 'dev.veyra.compat.LegacyMainDepth.texture()')
+                    .replace('int flags = magFilter == FilterMode.LINEAR ? SamplerManager.LINEAR_FILTERING_BIT : 0;', 'boolean mipmapped = useMipmaps && getMipLevels() > 1;')
+                    .replace('if (addressModeU == AddressMode.CLAMP_TO_EDGE) flags |= SamplerManager.CLAMP_BIT;', '')
+                    .replace('if (useMipmaps && getMipLevels() > 1) {', '{')
+                    .replace('flags |= SamplerManager.USE_MIPMAPS_BIT;', '')
+                    .replace('if (minFilter == FilterMode.LINEAR) flags |= SamplerManager.MIPMAP_LINEAR_FILTERING_BIT;', '')
+                    .replace('getVulkanImage().updateTextureSampler(getMipLevels() - 1, (byte) flags);', 'getVulkanImage().setSampler(SamplerManager.getSampler(addressModeU == AddressMode.CLAMP_TO_EDGE, magFilter == FilterMode.LINEAR, mipmapped && minFilter == FilterMode.LINEAR, mipmapped ? getMipLevels() - 1 : 0));')
+                    .replace('.isStorageImage) {', '.isStorageImage()) {')
+                    // Minecraft 1.21.1 API shapes.
+                    .replace('RenderSystem;clear(I)V', 'RenderSystem;clear(IZ)V')
+                    .replace('PipelineConfig config = PipelineConfig.fromJson("clouds",', 'PipelineConfig config = dev.veyra.vulkan.VeyraCloudConfigs.clouds(')
+                    .replace('ShaderLoadUtil.loadShader(shaderPath, "clouds.vsh")', 'dev.veyra.vulkan.VeyraCloudConfigs.cloudVertex(ShaderLoadUtil.loadShader(shaderPath, "clouds.vsh"))')
+                    .replace('Binding(int width, int height, CallbackInfo callback)', 'Binding(int width, int height, boolean macos, CallbackInfo callback)')
+                    .replace('veyra$preserveWorldDepthForHand(int mask)', 'veyra$preserveWorldDepthForHand(int mask, boolean macos)')
+                    .replace('RenderSystem.clear(mask);', 'RenderSystem.clear(mask, macos);')
+                    .replace('return minecraft.level.getSkyColor(minecraft.gameRenderer.getMainCamera().getPosition(), partialTick);', 'return dev.veyra.compat.ARGB.fromRgb(minecraft.level.getSkyColor(minecraft.gameRenderer.getMainCamera().getPosition(), partialTick));')
+                    .replaceAll('\\.getPrecipitationAt\\(([^,()]+), [\\w.]*getSeaLevel\\(\\)\\)', '.getPrecipitationAt($1)')
+                    .replace('stack.get(net.minecraft.core.component.DataComponents.ITEM_MODEL)', '(net.minecraft.resources.ResourceLocation) null')
+                    .replace('minecraft.level.getMinY()', 'minecraft.level.getMinBuildHeight()')
+                    .replace('swapTargetA.resize(width, height);', 'swapTargetA.resize(width, height, Minecraft.ON_OSX);')
+                    .replace('swapTargetB.resize(width, height);', 'swapTargetB.resize(width, height, Minecraft.ON_OSX);')
+                    .replace('target.resize(settings.width(), settings.height());', 'target.resize(settings.width(), settings.height(), Minecraft.ON_OSX);')
+                    .replace('Mth.lerp(partialTick, entity.zOld, entity.getZ()) - camera.z, partialTick,', 'Mth.lerp(partialTick, entity.zOld, entity.getZ()) - camera.z, Mth.lerp(partialTick, entity.yRotO, entity.getYRot()), partialTick,')
+                    .replace('.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.COMMAND)', '.create(server.overworld())') }
+    def legacyOverrides = project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5'] ? file('src/minecraft1215/java') : null
     // 1.21.4 has no GPU abstraction: src/minecraft1214 supplies dev.veyra.compat stand-ins and its own hooks.
-    def legacy4Overrides = project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4'] ? file('src/minecraft1214/java') : null
+    def legacy4Overrides = project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4'] ? file('src/minecraft1214/java') : null
     // 1.21.3 layers src/minecraft1213 over the 1.21.4 backend for the APIs 1.21.4 added.
-    def legacy3Overrides = project.minecraft_version in ['1.21.2', '1.21.3'] ? file('src/minecraft1213/java') : null
-    def legacy4Excludes = (legacy4Overrides == null ? [] : file('gradle/targets/1.21.4.excludes').readLines())
+    def legacy3Overrides = project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3'] ? file('src/minecraft1213/java') : null
+    // 1.21.1 layers src/minecraft1211 over that for what 1.21.2 added: compiled shader programs and the frame graph.
+    def legacy1Overrides = project.minecraft_version == '1.21.1' ? file('src/minecraft1211/java') : null
+    def excludeLines = (legacy4Overrides == null ? [] : file('gradle/targets/1.21.4.excludes').readLines())
             .plus(legacy3Overrides == null ? [] : file('gradle/targets/1.21.3.excludes').readLines())
+            .plus(legacy1Overrides == null ? [] : file('gradle/targets/1.21.1.excludes').readLines())
             .findAll { it && !it.startsWith('#') }
-    def newerLayer = { entry -> (legacy4Overrides != null && new File(legacy4Overrides, entry.path).isFile())
-            || (legacy3Overrides != null && new File(legacy3Overrides, entry.path).isFile()) }
+    // "<layer>:<path>" drops only that layer's copy, so the next lower layer supplies the file.
+    def legacy4Excludes = excludeLines.findAll { !it.contains(':') }
+    def skippedInLayer = { String layer -> excludeLines.findAll { it.startsWith(layer + ':') }.collect { it.substring(layer.length() + 1) } }
+    def layerHas = { File dir, String layer, entry -> dir != null && new File(dir, entry.path).isFile() && !(entry.path in skippedInLayer(layer)) }
+    def newerLayer = { entry -> layerHas(legacy4Overrides, 'minecraft1214', entry)
+            || layerHas(legacy3Overrides, 'minecraft1213', entry) || layerHas(legacy1Overrides, 'minecraft1211', entry) }
     def portSources = layout.buildDirectory.dir('generated/sources/minecraftPort')
     def preparePortSources = tasks.register('preparePortSources', Sync) {
         inputs.file('build.gradle')
@@ -225,49 +330,42 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                 exclude 'dev/veyra/mixin/accessor/LevelRendererAccessor.java'
                 exclude 'dev/veyra/mixin/accessor/VkGpuTextureAccessor.java'
                 exclude 'dev/veyra/mixin/accessor/ShaderManagerAccessor.java'
-                exclude 'dev/veyra/mixin/accessor/LexerAccessor.java'
-                exclude 'dev/veyra/mixin/UniformBlockMixin.java'
+                if (legacy1Overrides == null) exclude 'dev/veyra/mixin/accessor/LexerAccessor.java'
+                if (legacy1Overrides == null) exclude 'dev/veyra/mixin/UniformBlockMixin.java'
                 exclude 'dev/veyra/mixin/accessor/PostPassAccessor.java'
-                exclude 'dev/veyra/mixin/VulkanFramebufferMipMixin.java'
-                exclude 'dev/veyra/mixin/ThreadBuilderPackMixin.java'
+                if (legacy1Overrides == null) exclude 'dev/veyra/mixin/VulkanFramebufferMipMixin.java'
+                if (legacy1Overrides == null) exclude 'dev/veyra/mixin/ThreadBuilderPackMixin.java'
             }
             exclude { entry -> file("src/minecraft12110/java/${entry.path}").isFile()
-                    || (legacyOverrides != null && new File(legacyOverrides, entry.path).isFile())
-                    || newerLayer(entry) }
+                    || layerHas(legacyOverrides, 'minecraft1215', entry) || newerLayer(entry) }
             exclude legacy4Excludes
         }
         from('src/minecraft12110/java') {
-            exclude { entry -> (legacyOverrides != null && new File(legacyOverrides, entry.path).isFile()) || newerLayer(entry) }
+            exclude { entry -> layerHas(legacyOverrides, 'minecraft1215', entry) || newerLayer(entry) }
             exclude legacy4Excludes
         }
         if (legacyOverrides != null) from(legacyOverrides) {
-            exclude { entry -> newerLayer(entry) }
+            exclude { entry -> newerLayer(entry) || entry.path in skippedInLayer('minecraft1215') }
             exclude legacy4Excludes
         }
         if (legacy4Overrides != null) from(legacy4Overrides) {
-            exclude { entry -> legacy3Overrides != null && new File(legacy3Overrides, entry.path).isFile() }
+            exclude { entry -> layerHas(legacy3Overrides, 'minecraft1213', entry) || layerHas(legacy1Overrides, 'minecraft1211', entry)
+                    || entry.path in skippedInLayer('minecraft1214') }
             exclude legacy4Excludes
         }
-        if (legacy3Overrides != null) from(legacy3Overrides)
+        if (legacy3Overrides != null) from(legacy3Overrides) {
+            exclude { entry -> layerHas(legacy1Overrides, 'minecraft1211', entry) || entry.path in skippedInLayer('minecraft1213') }
+            exclude legacy4Excludes
+        }
+        if (legacy1Overrides != null) from(legacy1Overrides)
         into(portSources)
         filteringCharset = 'UTF-8'
         // Mojang renamed these types in 1.21.11; keep one shared implementation.
         filter(veyraPortLine)
         // Match the legacy CPU terrain block; leave modern shader fixtures in test sources intact.
         filter { line -> line.replaceAll('^\\s*(?:ivec2 TextureSize;|vec2 TexelSize;|int UseRgss;)\\s*$', '') }
-        if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5']) {
+        if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5']) {
             filter { line -> line
-                    .replace('net.vulkanmod.vulkan.shader.PipelineConfig', 'dev.veyra.vulkan.LegacyPipelineConfig')
-                    .replaceAll('\\bPipelineConfig\\b', 'LegacyPipelineConfig')
-                    .replace('net.vulkanmod.render.shader.PipelineConfigs', 'dev.veyra.vulkan.LegacyPipelineConfigs')
-                    .replaceAll('\\bPipelineConfigs\\b', 'LegacyPipelineConfigs')
-                    .replace('net.vulkanmod.render.shader.ShaderLoadUtil', 'dev.veyra.vulkan.LegacyShaderLoadUtil')
-                    .replaceAll('\\bShaderLoadUtil\\.', 'LegacyShaderLoadUtil.')
-                    .replace('LegacyPipelineConfig config = LegacyPipelineConfig.fromJson("clouds",', 'LegacyPipelineConfig config = LegacyPipelineConfigs.clouds(')
-                    .replace('LegacyShaderLoadUtil.loadShader(shaderPath, "clouds.vsh")', 'LegacyPipelineConfigs.cloudVertex(LegacyShaderLoadUtil.loadShader(shaderPath, "clouds.vsh"))')
-                    .replace('Pipeline.Builder builder = new Pipeline.Builder(', 'dev.veyra.vulkan.LegacyPipelineBuilder builder = new dev.veyra.vulkan.LegacyPipelineBuilder(')
-                    .replace('bindGraphicsImages(Pipeline.Builder builder,', 'bindGraphicsImages(dev.veyra.vulkan.LegacyPipelineBuilder builder,')
-                    .replace('Pipeline.Builder builder, String vertexSource, String fragmentSource)', 'dev.veyra.vulkan.LegacyPipelineBuilder builder, String vertexSource, String fragmentSource)')
                     .replace('net.minecraft.client.renderer.UniformValue', 'dev.veyra.shader.LegacyUniformValue')
                     .replaceAll('\\bUniformValue\\b', 'LegacyUniformValue')
                     .replace('com.mojang.blaze3d.buffers.Std140Builder', 'dev.veyra.shader.LegacyStd140Builder')
@@ -278,34 +376,16 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                     .replaceAll('\\bRenderTargetAccessor\\b', 'RenderTargetAccess')
                     .replaceAll('\\b(\\w+)\\.getColorTextureView\\(\\)', 'dev.veyra.accessor.RenderTargetAccess.colorView($1)')
                     .replaceAll('\\b(\\w+)\\.getDepthTextureView\\(\\)', 'dev.veyra.accessor.RenderTargetAccess.depthView($1)')
-                    .replaceAll('\\b(\\w+)\\.getImageDescriptor\\(', 'dev.veyra.vulkan.LegacyImageDescriptors.find($1.getImageDescriptors(), ')
-                    .replace('.isStorageImage()', '.isStorageImage')
-                    .replace('net.vulkanmod.render.shader.PipelineManager', 'net.vulkanmod.render.PipelineManager')
-                    .replace('PipelineManager.getTerrainVertexFormat()', 'PipelineManager.terrainVertexFormat')
                     .replace('originalType.pipeline()', 'originalType.getRenderPipeline()')
                     .replace('camera.position()', 'camera.getPosition()')
                     .replace('"core/screenquad"', '"post/screenquad"')
                     .replace('.getWindow().handle()', '.getWindow().getWindow()')
-                    .replaceAll('(Renderer\\.getInstance\\(\\)|renderer)\\.getMainPass\\(\\)', '((dev.veyra.vulkan.LegacyMainPassAccess) $1.getMainPass())')
                     // The old upload API has no array-layer argument; material atlases are 2D.
-                    .replace('image.uploadSubTextureAsync(level, 0, ', 'image.uploadSubTextureAsync(level, ')
                     // RGB views are registered only for 2D color attachments and their snapshots.
-                    .replace('.viewType(image.viewType)', '.viewType(VK_IMAGE_VIEW_TYPE_2D)')
-                    .replace('.layerCount(image.arrayLayers)', '.layerCount(1)')
                     .replaceAll('\\b(player|vehicle)\\.isInShallowWater\\(\\)', '($1.isInWater() && !$1.isUnderWater())')
-                    .replace('worldRenderer.renderSectionLayer(layer,', 'worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.getRenderType(layer),')
-                    .replace('worldRenderer.renderSectionLayer(net.vulkanmod.render.vertex.TerrainRenderType.TRANSLUCENT,', 'worldRenderer.renderSectionLayer(net.minecraft.client.renderer.RenderType.translucent(),')
-                    .replace('renderer.beginRenderPass(renderPass, framebuffer);', 'renderer.endRenderPass(); renderer.beginRendering(renderPass, framebuffer);')
-                    .replace('renderer.beginRenderPass(translucentRenderPass, framebuffer);', 'renderer.endRenderPass(); renderer.beginRendering(translucentRenderPass, framebuffer);')
                     .replace('com.mojang.blaze3d.systems.RenderSystem.setShaderTexture', 'dev.veyra.vulkan.LegacyTextureSlots.setShaderTexture')
                     .replace('com.mojang.blaze3d.systems.RenderSystem.getShaderTexture', 'dev.veyra.vulkan.LegacyTextureSlots.getShaderTexture')
                     // Native wrapping starts with dirty defaults; apply them before the material's explicit sampler.
-                    .replace('image.setSampler(SamplerManager.getSampler(true, false, mipLevels - 1));', 'texture.flushModeChanges(); image.setSampler(SamplerManager.getSampler(true, false, mipLevels - 1));')
-                    .replace('net.vulkanmod.vulkan.texture.SamplerManager.getSampler(', 'dev.veyra.vulkan.LegacyNativeSamplers.getSampler(')
-                    .replace('SamplerManager.getSampler(', 'dev.veyra.vulkan.LegacyNativeSamplers.getSampler(')
-                    .replace('view.texture().getVulkanImage().setSampler(', 'dev.veyra.vulkan.LegacyNativeSamplers.setSampler(view.texture().getVulkanImage(), ')
-                    .replaceAll('\\b(?!LegacyNativeSamplers\\b)(\\w+)\\.setSampler\\(', 'dev.veyra.vulkan.LegacyNativeSamplers.setSampler($1, ')
-                    .replace('        setSampler(sampler);', '        dev.veyra.vulkan.LegacyNativeSamplers.setSampler(this, sampler);')
                     .replace('com.mojang.blaze3d.textures.GpuTextureView', 'dev.veyra.vulkan.LegacyTextureView')
                     .replace('net.vulkanmod.render.engine.VkTextureView', 'dev.veyra.vulkan.LegacyVkTextureView')
                     .replaceAll('\\bGpuTextureView\\b', 'LegacyTextureView')
@@ -313,17 +393,24 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                     .replace('device.createTextureView(', 'dev.veyra.vulkan.LegacyVkTextureView.create(')
                     .replace('pass.bindSampler(name, view);', 'pass.bindSampler(name, view == null ? null : view.textureForBinding());') }
         }
+        if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5']) filter(veyraVulkan05Line)
         if (legacy4Overrides != null) {
             inputs.file('gradle/targets/1.21.4.excludes')
             if (legacy3Overrides != null) inputs.file('gradle/targets/1.21.3.excludes')
+            if (legacy1Overrides != null) inputs.file('gradle/targets/1.21.1.excludes')
             filter(veyraLegacy4Line)
         }
-        if (project.minecraft_version in ['1.21.2', '1.21.3']) filter(veyraLegacy3Line)
+        if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3']) filter(veyraLegacy3Line)
+        if (project.minecraft_version in ['1.21.2', '1.21.3']) filter(veyraVulkan053Line)
+        if (legacy1Overrides != null) filter(veyraLegacy1Line)
     }
     sourceSets.main.java.setSrcDirs([portSources])
     if (legacyOverrides != null) {
         tasks.register('checkPortAdapters') {
-            dependsOn project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4'] ? 'checkLegacy4PipelineAdapters' : 'checkLegacyTextureAdapters'
+            // VulkanMod 0.6.7 (1.21.1) compiles through its own 0.6.x pipeline builder, covered by the shared tests.
+            if (legacy1Overrides == null) {
+                dependsOn project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4'] ? 'checkLegacy4PipelineAdapters' : 'checkLegacyTextureAdapters'
+            }
         }
         tasks.named('check') { dependsOn 'checkPortAdapters' }
     } else {
@@ -360,11 +447,12 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                     .replace('"accessor.LevelRendererAccessor",', '')
                     .replace('"accessor.VkGpuTextureAccessor",', '"LegacyTextureFormatMixin",')
                     .replace('"accessor.ShaderManagerAccessor",', '')
-                    .replace('"accessor.LexerAccessor",', '')
-                    .replace('"UniformBlockMixin",', '')
+                    .replace('"accessor.LexerAccessor",', legacy1Overrides == null ? '' : '"accessor.LexerAccessor",')
+                    .replace('"UniformBlockMixin",', legacy1Overrides == null ? '' : '"UniformBlockMixin",')
                     .replace('"accessor.PostPassAccessor",', '"accessor.LegacyMainPassAccessor",')
-                    .replace('"VulkanFramebufferMipMixin",', '"LegacyVertexAttributesMixin",\n    "LegacyVertexFormatOffsetsMixin",')
-                    .replace('"ThreadBuilderPackMixin",', '"LegacyTerrainBuilderMixin",')
+                    .replace('"VulkanFramebufferMipMixin",', (legacy1Overrides == null ? '' : '"VulkanFramebufferMipMixin",\n    ')
+                            + '"LegacyVertexAttributesMixin",\n    "LegacyVertexFormatOffsetsMixin",')
+                    .replace('"ThreadBuilderPackMixin",', legacy1Overrides == null ? '"LegacyTerrainBuilderMixin",' : '"ThreadBuilderPackMixin",')
                     .replace('"GLSLParserMixin",', '"GLSLParserMixin",\n    "LegacyPipelineBindingsMixin",\n    "LegacyUniformParserMixin",\n    "LegacyDescriptorSetsMixin",') }
             filter { line -> line.replace('"accessor.SpriteAnimationStateAccessor",',
                     '"accessor.SpriteAnimationStateAccessor",\n    "accessor.LegacySpriteTickerAccessor",\n    "accessor.LegacyGpuTextureSamplerAccessor",\n    "accessor.LegacyGlFramebufferAccessor",\n    "LegacyImageUploadMixin",\n    "LegacyRenderPassDependencyMixin",')
@@ -375,10 +463,15 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                 def excludedMixins = legacy4Excludes.findAll { it.startsWith('dev/veyra/mixin/') }
                         .collect { it.substring('dev/veyra/mixin/'.length()).replace('.java', '').replace('/', '.') }
                 filter { line ->
+                    // Earlier rewrites may have expanded one entry into several lines.
+                    if (line.contains('\n') && !line.contains('"client": [')) {
+                        return line.split('\n').findAll { !(it.trim().replaceAll('^"|",?$', '') in excludedMixins) }.join('\n')
+                    }
                     def entry = line.trim().replaceAll('^"|",?$', '')
                     if (entry in excludedMixins) return ''
-                    def added = legacy3Overrides == null ? [] : ['LegacyItemRendererMixin',
-                            'accessor.LegacyBufferAccessor', 'accessor.LegacySimpleTextureAccessor']
+                    def added = (legacy3Overrides == null ? [] : ['LegacyItemRendererMixin',
+                            'accessor.LegacyBufferAccessor', 'accessor.LegacySimpleTextureAccessor']) +
+                            (legacy1Overrides == null ? [] : ['LegacyFogUniformsMixin'])
                     line.replace('"client": [', '"client": [\n' + (added + [
                             'LegacyDefaultFramebufferClearMixin', 'LegacyDepthViewMixin', 'LegacyImageLifecycleMixin', 'LegacyVulkanCleanupMixin', 'Legacy4UniformParserMixin', 'LegacyMainTargetBindMixin', 'LegacyProgramBindMixin', 'LegacyRenderTypeDrawMixin', 'LegacyShaderConfigsMixin',
                             'LegacyVertexBufferDrawMixin', 'accessor.BooleanStateShardAccessor',
@@ -419,6 +512,7 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4']) {
         filteringCharset = 'UTF-8'
         filter { line -> line.replaceAll('^\\s*(?:ivec2 TextureSize;|vec2 TexelSize;|int UseRgss;)\\s*$', '') }
         if (project.minecraft_version in ['1.21.2', '1.21.3']) filter(veyraLegacy3Line)
+        if (project.minecraft_version in ['1.21.2', '1.21.3']) filter(veyraVulkan053Line)
         inputs.file('build.gradle')
     }
     def compileLegacy4PipelineChecks = tasks.register('compileLegacy4PipelineChecks', JavaCompile) {
@@ -642,15 +736,20 @@ loom {
     }
 }
 
-if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.9', '1.21.10']) {
-    def legacyTarget = project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5']
+if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.9', '1.21.10']) {
+    def legacyTarget = project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5']
     ['test', 'graphicsSmoke', 'shaderSmoke'].each { name ->
         def generated = layout.buildDirectory.dir("generated/sources/port${name}")
         def legacyPort = legacyTarget ? file("src/minecraft1215/${name}/java") : null
-        def legacy4Port = project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4'] ? file("src/minecraft1214/${name}/java") : null
-        def legacy3Port = project.minecraft_version in ['1.21.2', '1.21.3'] ? file("src/minecraft1213/${name}/java") : null
+        def legacy4Port = project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3', '1.21.4'] ? file("src/minecraft1214/${name}/java") : null
+        def legacy3Port = project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3'] ? file("src/minecraft1213/${name}/java") : null
+        def legacy1Port = project.minecraft_version == '1.21.1' ? file("src/minecraft1211/${name}/java") : null
         def newerPort = { entry -> (legacy4Port != null && new File(legacy4Port, entry.path).isFile())
-                || (legacy3Port != null && new File(legacy3Port, entry.path).isFile()) }
+                || (legacy3Port != null && new File(legacy3Port, entry.path).isFile())
+                || (legacy1Port != null && new File(legacy1Port, entry.path).isFile()) }
+        // 1.21.5-layer tests of VulkanMod 0.5.x types that VulkanMod 0.6.7 (1.21.1) shares with the newest targets.
+        def legacySkipped = legacy1Port == null ? [] : ['dev/veyra/shader/VeyraStorageBufferUBOTest.java']
+        def legacyPortHas = { entry -> legacyPort != null && new File(legacyPort, entry.path).isFile() && !(entry.path in legacySkipped) }
         def prepare = tasks.register("preparePort${name.capitalize()}Sources", Sync) {
             inputs.file('build.gradle')
             from("src/${name}/java") {
@@ -661,20 +760,24 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                     exclude 'dev/veyra/vulkan/VeyraBlockAtlasSamplerTest.java'
                 }
                 exclude { entry -> file("src/minecraft12110/${name}/java/${entry.path}").isFile()
-                        || (legacyPort != null && new File(legacyPort, entry.path).isFile()) || newerPort(entry) }
+                        || legacyPortHas(entry) || newerPort(entry) }
             }
             from("src/minecraft12110/${name}/java") {
-                exclude { entry -> (legacyPort != null && new File(legacyPort, entry.path).isFile()) || newerPort(entry) }
+                exclude { entry -> legacyPortHas(entry) || newerPort(entry) }
             }
             if (legacyPort != null) from(legacyPort) {
-                exclude { entry -> newerPort(entry) }
+                exclude { entry -> newerPort(entry) || entry.path in legacySkipped }
                 // 1.21.4 reports texture formats through dev.veyra.compat instead of this mixin.
                 if (legacy4Port != null) exclude 'dev/veyra/mixin/LegacyTextureFormatTest.java'
             }
             if (legacy4Port != null) from(legacy4Port) {
-                exclude { entry -> legacy3Port != null && new File(legacy3Port, entry.path).isFile() }
+                exclude { entry -> (legacy3Port != null && new File(legacy3Port, entry.path).isFile())
+                        || (legacy1Port != null && new File(legacy1Port, entry.path).isFile()) }
             }
-            if (legacy3Port != null) from(legacy3Port)
+            if (legacy3Port != null) from(legacy3Port) {
+                exclude { entry -> legacy1Port != null && new File(legacy1Port, entry.path).isFile() }
+            }
+            if (legacy1Port != null) from(legacy1Port)
             into(generated)
             filteringCharset = 'UTF-8'
             filter(veyraPortLine)
@@ -704,7 +807,22 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                         .replace('long[] sets=pool.sets();', 'long[] sets=dev.veyra.smoke.LegacyShutdownDescriptors.copy(pool.sets());') }
             }
             if (legacy4Port != null) filter(veyraLegacy4Line)
-            if (project.minecraft_version in ['1.21.2', '1.21.3']) filter(veyraLegacy3Line)
+            if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3']) filter(veyraLegacy3Line)
+            if (project.minecraft_version in ['1.21.2', '1.21.3']) filter(veyraVulkan053Line)
+            if (project.minecraft_version == '1.21.1') filter(veyraLegacy1Line)
+            if (project.minecraft_version == '1.21.1' && name == 'test') {
+                // VulkanMod 0.6.7 has the shared presentation hooks and compiles with the 0.6.x GLSL parser;
+                // Minecraft 1.21.1 clears with the macOS flag.
+                filter { line -> line
+                        .replace('"com/mojang/blaze3d/systems/RenderSystem", "clear", "(I)V", 2);', '"com/mojang/blaze3d/systems/RenderSystem", "clear", "(IZ)V", 2);')
+                        .replace('"net/vulkanmod/vulkan/shader/converter/GlslConverter", "process", "(Ljava/lang/String;Ljava/lang/String;)V");',
+                                '"net/vulkanmod/vulkan/shader/converter/GLSLParser", "parse", "(Lnet/vulkanmod/vulkan/shader/converter/Lexer;Lnet/vulkanmod/vulkan/shader/converter/GLSLParser$Stage;)V", 2);')
+                        .replace('requiresCall("dev/veyra/compat/VkGpuDevice", "precompilePipeline",', 'requiresCalls("dev/veyra/compat/VkGpuDevice", "precompilePipeline",')
+                        .replace('@Test void acquisitionResetOccursOnlyWhenAnImageIsAcquired()',
+                                '@org.junit.jupiter.api.Disabled("VulkanMod 0.6.7 uses the shared submission hooks") @Test void acquisitionResetOccursOnlyWhenAnImageIsAcquired()')
+                        .replace('@Test void presentationWaitUsesTheAcquiredImageAndExtraHandlesAreReleased()',
+                                '@org.junit.jupiter.api.Disabled("VulkanMod 0.6.7 uses the shared submission hooks") @Test void presentationWaitUsesTheAcquiredImageAndExtraHandlesAreReleased()') }
+            }
             if (project.minecraft_version in ['1.21.2', '1.21.3'] && name in ['test', 'shaderSmoke']) {
                 // Terrain shader fixtures follow VulkanMod 0.5.3's compressed inputs.
                 filter { line -> line
@@ -716,9 +834,13 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
                         .replace('"(Ljava/lang/String;JIIIIIIJ)V");', '"(JIIIIIIJ)V");') }
             }
             if (project.minecraft_version in ['1.21.2', '1.21.3'] && name == 'graphicsSmoke') {
+                // VulkanMod 0.5.3 buffers allocate through Veyra's subclass, and its images take no name.
                 filter { line -> line
                         .replaceAll('\\b(probe\\.readback|readback|glintMrtReadback|basicMrtReadback)\\.createBuffer\\(', '((dev.veyra.compat.LegacyBuffer) $1).allocate(')
-                        .replaceAll('\\b(image|i)\\.name\\b(?!\\s*\\()', 'dev.veyra.compat.LegacyImageNames.of($1)')
+                        .replaceAll('\\b(image|i)\\.name\\b(?!\\s*\\()', 'dev.veyra.compat.LegacyImageNames.of($1)') }
+            }
+            if (project.minecraft_version in ['1.21.1', '1.21.2', '1.21.3'] && name == 'graphicsSmoke') {
+                filter { line -> line
                         .replace('addParticle(net.minecraft.core.particles.ParticleTypes.CLOUD, true, true,', 'addParticle(net.minecraft.core.particles.ParticleTypes.CLOUD, true,') }
             }
             // NBT getters return values directly before 1.21.5.
@@ -732,10 +854,10 @@ if (project.minecraft_version in ['1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.
 }
 
 tasks.named('processGraphicsSmokeResources') {
-    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'minecraft_version', project.minecraft_release
     inputs.property 'vulkanmod_version', project.vulkanmod_version
     filesMatching('fabric.mod.json') {
-        expand minecraft_version: project.minecraft_version, vulkanmod_version: project.vulkanmod_version
+        expand minecraft_version: project.minecraft_release, vulkanmod_version: project.vulkanmod_version
     }
 }
 

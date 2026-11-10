@@ -71,7 +71,7 @@ def payload(kind, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--minecraft", choices=["1.21.2", "1.21.3", "1.21.4", "1.21.5", "1.21.9", "1.21.10", "1.21.11"], default="1.21.11")
+    parser.add_argument("--minecraft", choices=["1.21", "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5", "1.21.9", "1.21.10", "1.21.11"], default="1.21.11")
     parser.add_argument('--fixture', choices=['compute-color-target', 'geometry-mrt', 'entity-mrt', 'entity-colortex-feedback', 'entity-vertex-execution', 'block-vertex-execution', 'damagedblock-vertex-execution', 'hand-vertex-execution', 'geometry-view-space', 'geometry-mid-texcoord', 'terrain-block-id', 'terrain-vertex-execution', 'terrain-vertex-varyings', 'custom-image-compute', 'graphics-custom-image', 'cloud-custom-image', 'basic-custom-image', 'entity-custom-image', 'entity-custom-texture', 'composite-custom-image', 'compute-ssbo-only', 'compute-begin-stage', 'compute-setup-stage', 'compute-shadow-stage', 'begin-fragment-stage', 'storage-buffer-shadow', 'water-block-id', 'water-opaque-depth', 'water-color-inputs', 'normal-atlas', 'normal-atlas-animated', 'normal-entity', 'normal-entity-missing', 'specular-atlas', 'specular-entity', 'shadow-color-terrain', 'shadow-sunward-caster', 'shadow-color-mrt', 'shadow-color-mrt-lifecycle', 'shadow-color-entity', 'water-shadow-depth-terrain', 'water-shadow-depth-entity', 'water-post-shadow-inputs', 'custom-uniforms', 'cloud-colortex0', 'cloud-texture-inputs', 'cloud-model-view', 'current-rendered-item-id', 'glint-vertex-execution', 'glint-mrt-outputs', 'basic-vertex-execution', 'skybasic-vertex-execution', 'skytextured-stage-variants', 'beaconbeam-vertex-execution', 'weather-vertex-execution', 'particles-translucent-vertex-execution', 'textured-default-vertex-attributes', 'third-party-shaderpack', 'third-party-natural-world', 'vanilla-baseline'], default='geometry-mrt')
     parser.add_argument('--root', type=pathlib.Path, default=pathlib.Path('run-graphics-smoke'))
     parser.add_argument('--shaderpack-archive', type=pathlib.Path)
@@ -79,8 +79,8 @@ def main():
     parser.add_argument('--profile', default='',
                         help='Declared profile name, or __DEFAULT__ for unmodified pack defaults')
     arguments = parser.parse_args()
-    data_version = {"1.21.2": 4080, "1.21.3": 4082, "1.21.4": 4189, "1.21.5": 4325, "1.21.9": 4554, "1.21.10": 4556, "1.21.11": 4671}[arguments.minecraft]
-    resource_format = [42, 0] if arguments.minecraft in ("1.21.2", "1.21.3") else [46, 0] if arguments.minecraft == "1.21.4" else [55, 0] if arguments.minecraft == "1.21.5" else ([75, 0] if arguments.minecraft == "1.21.11" else [69, 0])
+    data_version = {"1.21": 3953, "1.21.1": 3955, "1.21.2": 4080, "1.21.3": 4082, "1.21.4": 4189, "1.21.5": 4325, "1.21.9": 4554, "1.21.10": 4556, "1.21.11": 4671}[arguments.minecraft]
+    resource_format = [34, 0] if arguments.minecraft in ("1.21", "1.21.1") else [42, 0] if arguments.minecraft in ("1.21.2", "1.21.3") else [46, 0] if arguments.minecraft == "1.21.4" else [55, 0] if arguments.minecraft == "1.21.5" else ([75, 0] if arguments.minecraft == "1.21.11" else [69, 0])
     fixture = arguments.fixture
     natural_world = fixture == 'third-party-natural-world'
     third_party = fixture in {'third-party-shaderpack', 'third-party-natural-world'}
@@ -200,7 +200,7 @@ def main():
         resource_pack.mkdir(parents=True, exist_ok=True)
         pack_metadata = {'description': 'Original Veyra material data fixture',
                          'min_format': resource_format, 'max_format': resource_format}
-        if arguments.minecraft in ('1.21.2', '1.21.3', '1.21.4', '1.21.5'):
+        if arguments.minecraft in ('1.21', '1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5'):
             pack_metadata['pack_format'] = resource_format[0]
         (resource_pack / 'pack.mcmeta').write_text(json.dumps({'pack': pack_metadata}), encoding='utf-8')
         textures = resource_pack / 'assets/minecraft/textures'

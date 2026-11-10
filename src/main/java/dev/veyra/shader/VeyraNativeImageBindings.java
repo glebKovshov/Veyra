@@ -53,6 +53,17 @@ public final class VeyraNativeImageBindings {
         return ACTIVE.get();
     }
 
+    /** Runs {@code action} with no substitutions installed, for parsing other than the pipeline being compiled. */
+    public static <T> T without(java.util.function.Supplier<T> action) {
+        VeyraNativeImageBindings previous = ACTIVE.get();
+        ACTIVE.remove();
+        try {
+            return action.get();
+        } finally {
+            if (previous != null) ACTIVE.set(previous);
+        }
+    }
+
     /** Converts the parser's sampler placeholders into Veyra-owned storage-image descriptors. */
     public List<ImageDescriptor> replaceSamplerDescriptors(List<ImageDescriptor> parserDescriptors) throws IOException {
         List<ImageDescriptor> replacements = new ArrayList<>(parserDescriptors);

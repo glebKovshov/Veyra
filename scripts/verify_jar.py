@@ -51,7 +51,7 @@ if __name__ == "__main__":
     if args.target:
         profile = dict(line.split("=", 1) for line in pathlib.Path(
             f"gradle/targets/{args.target}.properties").read_text().splitlines() if "=" in line)
-        minecraft, vulkanmod = profile["minecraft_version"], profile["vulkanmod_version"]
+        minecraft, vulkanmod = profile.get("minecraft_release", profile["minecraft_version"]), profile["vulkanmod_version"]
         directory = pathlib.Path("build/targets") / args.target / "libs"
     files = args.files
     if not files:
